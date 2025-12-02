@@ -12,35 +12,26 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-
 <style>
-/* --- CORE STYLES --- */
-body { 
-    font-family: 'Inter', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
-    user-select: none; 
-    overscroll-behavior-y: contain; 
-}
+/* CORE LAYOUT */
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; }
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- UI COMPONENTS --- */
+/* INTERACTION */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width linear; }
 .long-press-btn.pressing::after { width: 100%; }
 
+/* UI COMPONENTS */
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
-
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-
-/* --- SETTINGS CARDS --- */
+.form-input { @apply w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-blue-500 outline-none; }
+.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
 .setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
 .setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
-.form-input { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none; }
-.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -62,15 +53,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">
         Reminder: Don't forget to start your timer when you arrive.
     </div>
-    
     <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 flex-shrink-0">
-        <div class="spinner"></div> 
-        <span>Syncing <span id="queueCount">0</span> offline reports...</span>
+        <div class="spinner"></div> Syncing <span id="queueCount">0</span> offline reports...
     </div>
 
     <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 min-h-0">
         <div id="locationList" class="space-y-2"></div>
-        <button type="button" onclick="openLocModal()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
+        <button onclick="openLocModal()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
     </div>
 
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 flex-shrink-0">
@@ -78,18 +67,18 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <span class="text-gray-400 text-sm uppercase font-bold">Duration</span>
             <span id="durationDisplay" class="font-bold text-blue-400">0 min</span>
         </div>
-        <input id="durationSlider" type="range" min="0" max="14" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb">
+        <input id="durationSlider" type="range" min="0" max="14" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button type="button" onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
+        <button onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
     </div>
     
     <div>
@@ -100,16 +89,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="space-y-4 w-full">
-        <button type="button" id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
-        <button type="button" id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
-        <button type="button" id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+        <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
+        <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
+        <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
     </div>
 </div>
 
 <div id="settingsPage" class="page p-4 bg-gray-800">
     <header class="flex justify-between mb-4 flex-shrink-0 items-center">
         <h1 class="text-2xl font-bold text-white">Settings</h1>
-        <button type="button" id="btnCloseSettings" onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
+        <button id="btnCloseSettings" onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
     </header>
     
     <div class="flex-1 overflow-y-auto pb-4">
@@ -149,13 +138,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <label class="setting-label text-gray-400">System URL</label>
             <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
             <div class="flex gap-2 mt-2">
-                <button type="button" onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
-                <button type="button" onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
+                <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
+                <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
             </div>
         </div>
     </div>
     
-    <button type="button" onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mb-2 flex-shrink-0">Save Settings</button>
+    <button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mb-2 flex-shrink-0">Save Settings</button>
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
@@ -175,10 +164,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
-            <button type="button" id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
+            <button id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
             <div class="flex-1"></div>
-            <button type="button" onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-            <button type="button" onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
+            <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
     </div>
 
@@ -186,35 +175,28 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
          <h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2>
          <input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric">
          <div class="mt-6 flex justify-end space-x-3">
-            <button type="button" id="cancelPinBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-            <button type="button" id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>
+            <button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button>
          </div>
     </div>
 
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
         <div class="text-gray-300 space-y-4 text-sm">
-            <h3 class="font-bold text-white">1. Starting a Visit</h3>
-            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
-            <h3 class="font-bold text-white">2. During the Visit</h3>
-            <p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
-            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
-            <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
-            <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
-            <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
-            <h3 class="font-bold text-white">5. Offline Mode</h3>
-            <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
+            <h3 class="font-bold text-white">1. Starting a Visit</h3><p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
+            <h3 class="font-bold text-white">2. During the Visit</h3><p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
+            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3><p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
+            <h3 class="font-bold text-white">4. Mileage / Travelling</h3><p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
+            <h3 class="font-bold text-white">5. Offline Mode</h3><p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
         </div>
-        <div class="mt-6 flex justify-end">
-            <button type="button" onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button>
-        </div>
+        <div class="mt-6 flex justify-end"><button onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div>
     </div>
 
     <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500">
         <h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2>
         <p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p>
         <div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div>
-        <button type="button" id="checkinOkBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">I am OK</button>
+        <button onclick="confirmCheckin()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">I am OK</button>
     </div>
 
     <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl">
@@ -222,15 +204,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
       <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2">
         </div>
       <div class="flex gap-3 flex-shrink-0">
-        <button type="button" onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
-        <button type="button" id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
+        <button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
+        <button id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
       </div>
     </div>
 
     <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
         <h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2>
         <p id="alertModalMessage" class="text-gray-300 mb-6"></p>
-        <button type="button" onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button>
+        <button onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button>
     </div>
 
 </div>
@@ -266,31 +248,20 @@ let sigPad = null;
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
-    // 1. Load State
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
-    // 2. Enforce Config Updates
     state.settings.googleSheetUrl = CONFIG.url; 
 
-    // 3. Mileage Logic
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
+            state.locations.unshift({ id: 'travel', name: 'Travelling', address: 'Calculates Mileage via GPS', noReport: false, companyName: 'Internal', templateName: 'Travel Report' });
         }
     } else if(state.locations) {
         state.locations = state.locations.filter(l => l.id !== 'travel');
     }
 
-    // 4. UI & Advanced Features
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -299,7 +270,6 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // 5. Routing
     if(!state.settings.pinCode || !state.settings.workerName) {
         nav('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -310,7 +280,6 @@ window.addEventListener('load', () => {
         renderLocations();
     }
     
-    // 6. Background Tasks
     updateArrivedButtonState();
     processUploadQueue();
     document.body.addEventListener('click', initAudio, { once: true });
@@ -346,7 +315,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); // 5 Mins
+    }, 300000);
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -618,13 +587,13 @@ function triggerCheckin() {
             alert('MISSED CHECK-IN ALERT SENT');
         }
     }, 1000);
-    
-    document.getElementById('checkinOkBtn').onclick = () => {
-        clearInterval(checkinIntervalId);
-        closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval * 60000);
-        saveState();
-    };
+}
+
+function confirmCheckin() {
+    clearInterval(checkinIntervalId); 
+    closeModal('checkin'); 
+    state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
+    saveState();
 }
 
 function extendVisit() {
@@ -899,32 +868,41 @@ function sendToGoogleSheet(data) {
     };
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
-        post(payload);
-    }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; post(payload); });
+        processUploadQueue(payload); // Corrected Call
+    }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; processUploadQueue(payload); });
 }
 
-function post(data) {
+function processUploadQueue(newData = null) {
+    if(newData) {
+        state.pendingUploads.push(newData);
+        saveState();
+    }
+
     if(!navigator.onLine) {
-        state.pendingUploads.push(data); saveState();
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
         document.getElementById('uploadBanner').classList.remove('hidden');
         return;
     }
-    const fd = new FormData(); for(let k in data) fd.append(k, data[k]);
-    fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(() => {
-        state.pendingUploads.push(data); saveState();
-    });
-}
 
-function processQueue() {
-    if(navigator.onLine && state.pendingUploads.length > 0) {
+    if(state.pendingUploads.length > 0) {
         document.getElementById('uploadBanner').classList.remove('hidden');
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
-        const item = state.pendingUploads.shift(); saveState();
-        const fd = new FormData(); for(let k in item) fd.append(k, item[k]);
+        
+        // Process one item
+        const item = state.pendingUploads[0];
+        const fd = new FormData();
+        for(let k in item) fd.append(k, item[k]);
+        
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
-            .then(() => processQueue())
-            .catch(() => { state.pendingUploads.push(item); saveState(); });
+            .then(() => {
+                state.pendingUploads.shift(); // Remove on success
+                saveState();
+                processUploadQueue(); // Process next
+            })
+            .catch(() => {
+                // Keep in queue on fail
+                document.getElementById('uploadBanner').classList.remove('hidden');
+            });
     } else {
         document.getElementById('uploadBanner').classList.add('hidden');
     }
@@ -978,16 +956,6 @@ function syncForms() {
     comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); });
 }
 function clearFormsCache() { state.cachedForms = {}; syncForms(); alert("Forms Syncing..."); }
-
-// Listeners
-document.getElementById('saveSettingsBtn').onclick = saveSettings;
-document.getElementById('saveLocationBtn').onclick = saveLocation;
-document.getElementById('deleteLocationBtn').onclick = deleteLocation;
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
-document.getElementById('clearCacheBtn').onclick = clearData;
-document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
