@@ -1,9 +1,9 @@
 // ==========================================
-// OTG APPSUITE - MASTER BACKEND v2.0
+// OTG APPSUITE - MASTER BACKEND v2.1
 // ==========================================
 const CONFIG = {
   SECRET_KEY: "%%SECRET_KEY%%",
-  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", // Optional (Manually set in script if needed later)
+  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", // Optional
   ORS_API_KEY: "%%ORS_API_KEY%%", // Optional
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%" // Optional
 };
@@ -17,44 +17,50 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // 1. SETUP HEADERS AUTOMATICALLY
+    // 1. SETUP HEADERS (Auto-detect)
     if(sheet.getLastColumn() === 0) {
-      const headers = ["Timestamp","Date","Worker Name","Worker Phone Number","Alarm Status","Notes","Location Name","Last Known GPS","Photo 1","Distance (km)"];
+      const headers = ["Timestamp","Date","Worker Name","Worker Phone Number","Emergency Contact Name","Emergency Contact Number","Emergency Contact Email","Escalation Contact Name","Escalation Contact Number","Escalation Contact Email","Alarm Status","Notes","Location Name","Location Address","Last Known GPS","GPS Timestamp","Battery Level","Photo 1","Distance (km)"];
       sheet.appendRow(headers);
       sheet.getRange(1,1,1,headers.length).setFontWeight("bold").setBackground("#e2e8f0");
     }
     
-    // 2. PROCESS PHOTO (If present)
+    // 2. PROCESS PHOTO
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
-      // Logic: If no folder ID configured, we try to create root file or skip
       try {
         const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
         const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
-        // Simple save to root Drive if no folder ID, to avoid breaking simple deployments
         const file = DriveApp.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         photoUrl = file.getUrl();
-      } catch(err) {
-        photoUrl = "Error saving: " + err.toString();
-      }
+      } catch(err) { photoUrl = "Err: "+err; }
     }
 
     // 3. APPEND ROW
-    sheet.appendRow([
+    const row = [
       new Date(),
       Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
       p['Worker Name'],
       p['Worker Phone Number'],
+      p['Emergency Contact Name'] || '',
+      p['Emergency Contact Number'] || '',
+      p['Emergency Contact Email'] || '',
+      p['Escalation Contact Name'] || '',
+      p['Escalation Contact Number'] || '',
+      p['Escalation Contact Email'] || '',
       p['Alarm Status'],
       p['Notes'],
       p['Location Name'] || '',
+      p['Location Address'] || '',
       p['Last Known GPS'],
+      p['Timestamp'] || new Date().toISOString(),
+      p['Battery Level'] || '',
       photoUrl,
       p['Distance'] || ''
-    ]);
+    ];
+    sheet.appendRow(row);
 
-    // 4. SEND ALERTS (Emails)
+    // 4. SEND ALERTS (To contacts + Owner)
     if(p['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) {
        sendAlert(p);
     }
@@ -69,27 +75,41 @@ function doPost(e) {
 }
 
 function sendAlert(data) {
-  const email = Session.getEffectiveUser().getEmail(); // Sends to script owner
-  const subject = "🚨 OTG ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
+  // Logic: Send to Emergency Contact + Script Owner
+  // If Escalation, send to Escalation Contact instead
+  
+  let recipients = [Session.getEffectiveUser().getEmail()]; // Always notify admin
+  
+  if (data['Alarm Status'] === 'ESCALATION_SENT') {
+     if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
+  } else {
+     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
+  }
+  
+  // Remove duplicates and empty strings
+  recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
+  
+  const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
   const body = `
-    <h1>SAFETY ALERT</h1>
+    <h1 style="color:red;font-weight:bold;">${data['Alarm Status']}</h1>
     <p><strong>Worker:</strong> ${data['Worker Name']}</p>
-    <p><strong>Status:</strong> <span style="color:red">${data['Alarm Status']}</span></p>
     <p><strong>Phone:</strong> <a href="tel:${data['Worker Phone Number']}">${data['Worker Phone Number']}</a></p>
-    <p><strong>GPS:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
+    <p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p>
+    <p><strong>Notes:</strong> ${data['Notes']}</p>
+    <p><strong>GPS Map:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
     <hr>
-    <p>Time: ${new Date().toLocaleString()}</p>
+    <p><em>This is an automated safety alert. Please verify worker safety immediately.</em></p>
   `;
-  MailApp.sendEmail({to: email, subject: subject, htmlBody: body});
+  
+  if(recipients.length > 0) {
+    MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
+  }
 }
 
 function doGet(e) {
-  // Connection Test
   if(e.parameter.test && e.parameter.key === CONFIG.SECRET_KEY) {
     return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
   }
-  
-  // JSONP for Monitor App (Monitor App Template reads this)
   if(e.parameter.callback){
     const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
     const data=sh.getDataRange().getValues();
@@ -97,16 +117,5 @@ function doGet(e) {
     const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
-  
-  // Get Forms (Advanced Feature)
-  if(e.parameter.action === 'getForms') {
-     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
-     if(!sh) return ContentService.createTextOutput("[]");
-     // Logic to read headers and return JSON question list (simplified for template)
-     const rows = sh.getDataRange().getValues();
-     // ... (Implementation handled by advanced logic if needed, stub for now)
-     return ContentService.createTextOutput(JSON.stringify([{type:'header',text:'Standard Report'},{type:'checkbox',text:'Safe?'},{type:'textarea',text:'Notes'}])).setMimeType(ContentService.MimeType.JSON);
-  }
-
-  return ContentService.createTextOutput("OTG Backend Online");
+  return ContentService.createTextOutput("OTG Online");
 }
