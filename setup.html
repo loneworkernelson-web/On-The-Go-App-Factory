@@ -69,7 +69,7 @@
               </div>
             </div>
           </div>
-          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet &rarr;</button></div>
+          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
         </div>
 
         <div id="step2" class="step-section space-y-8">
@@ -84,29 +84,32 @@
             
             <div id="boxChecklists" class="highlight-box border-purple-500/50">
               <h3 class="font-bold text-lg mb-2 text-purple-400">3. 'Checklists' Tab</h3>
-              <p class="text-gray-400 text-sm mb-4">Create <strong>Checklists</strong> tab. Paste full setup in A1.</p>
+              <p class="text-gray-400 text-sm mb-4">Create <strong>Checklists</strong> tab. Paste full setup (includes Mileage form) in A1.</p>
               <button onclick="copyChecklistSetup()" class="w-full btn bg-gray-700 hover:bg-gray-600 text-white py-3">Copy Full Setup</button>
             </div>
           </div>
 
           <div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
-            <details>
-              <summary class="font-bold text-gray-400 cursor-pointer hover:text-white flex items-center gap-2">
-                <span>ℹ️ Template Code Legend (For Custom Forms)</span>
-              </summary>
-              <div class="mt-4 grid md:grid-cols-3 gap-4 text-sm text-gray-300">
-                <div class="p-2 bg-gray-800 rounded"><strong>[YESNO]</strong><br>Yes/No radio buttons</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[CHECK]</strong><br>Single Checkbox</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[TEXT]</strong><br>Large text box</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[NUMBER]</strong><br>Numeric input</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[PHOTO]</strong><br>Camera button</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Section Title</div>
-                <div class="p-2 bg-gray-800 rounded"><strong>[GPS]</strong><br>Capture Location</div>
-              </div>
-            </details>
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">ℹ️</span>
+                    <h4 class="font-bold text-gray-200">Template Code Legend</h4>
+                </div>
+                <button onclick="copyLegend()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded shadow">Copy Legend to Clipboard</button>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">Tip: Paste this legend into your spreadsheet (e.g., cell A20) as a permanent reference.</p>
+            <div class="grid md:grid-cols-3 gap-4 text-sm text-gray-300">
+              <div class="p-2 bg-gray-800 rounded"><strong>[YESNO]</strong><br>Yes/No radio buttons</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[CHECK]</strong><br>Single Checkbox</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[TEXT]</strong><br>Large text box</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[NUMBER]</strong><br>Numeric input</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[PHOTO]</strong><br>Camera button</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Section Title</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[GPS]</strong><br>Capture Location</div>
+            </div>
           </div>
 
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend &rarr;</button></div>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
 
         <div id="step3" class="step-section space-y-6">
@@ -127,7 +130,7 @@
           <div id="testResult" class="text-center font-bold text-lg hidden"></div>
           <div class="flex justify-between pt-6">
             <button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button>
-            <button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Build App &rarr;</button>
+            <button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Build App →</button>
           </div>
         </div>
 
@@ -188,9 +191,26 @@
     }
 
     function copyChecklistSetup() {
-      const full = `Company Name\tTemplate Name\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes\nInternal\tVehicle Check\t[HEADING] Tyres & Oil\tTyres OK?\tOil Level OK?\t[HEADING] Damage`;
+      const full = `Company Name\tTemplate Name\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details`;
       navigator.clipboard.writeText(full);
-      alert("Full Setup Copied!\n\nPaste into cell A1 of 'Checklists' tab.");
+      alert("Full Setup Copied!\n(Includes 'Travel Report' for the Mileage feature)\n\nPaste into cell A1 of 'Checklists' tab.");
+    }
+
+    function copyLegend() {
+      const legend = `Template Code Legend:
+[YESNO] - Yes/No Radio Buttons
+[CHECK] - Single Checkbox
+[TEXT] - Large Text Area
+[NUMBER] - Numeric Input
+[PHOTO] - Camera Upload
+[GPS] - Capture GPS Coords
+[HEADING] - Section Header
+[NOTE] - Instructional Text
+$ - (Prefix) Saves as separate numeric column
+# - (Prefix) Same as [HEADING]
+% - (Prefix) Same as [TEXT]`;
+      navigator.clipboard.writeText(legend);
+      alert("Legend copied!\n\nPaste it into your spreadsheet (e.g., cell A20) as a reference.");
     }
 
     async function loadTemplatesAndGenerateScript() {
