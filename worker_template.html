@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="%%LOGO_DATA%%">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -26,9 +27,8 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
-/* v17 FIX: Added duration */
+/* --- UI COMPONENTS --- */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -37,48 +37,17 @@ body {
 .long-press-btn.pressing::after { width: 100%; }
 
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- v15 VISUAL FIXES (Bulletproof Settings) --- */
-.setting-card { 
-    background-color: #1f2937; /* Gray-800 */
-    padding: 1.25rem; 
-    border-radius: 0.75rem; 
-    border: 1px solid #374151; 
-    margin-bottom: 1rem; 
-}
-.setting-label { 
-    display: block;
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.5rem; 
-}
-/* Standard Input for Forms & Settings */
-.form-input { 
-    width: 100%; 
-    background-color: #111827; /* Gray-900 */
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem;
-    outline: none; 
-    margin-bottom: 0.75rem;
-    display: block; 
-}
-.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-
-/* High Contrast Label Colors */
-.lbl-blue { color: #60a5fa; }
-.lbl-green { color: #4ade80; }
-.lbl-purple { color: #c084fc; }
-.lbl-red { color: #f87171; }
-.lbl-gray { color: #9ca3af; }
+/* --- SETTINGS CARDS --- */
+.setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
+.setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
+.form-input { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none; }
+.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -106,9 +75,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <span>Syncing <span id="queueCount">0</span> offline reports...</span>
     </div>
 
-    <div class="flex-1 overflow-y-auto mb-4 rounded-lg min-h-0">
-        <div id="locationList" class="space-y-3"></div>
-        <button onclick="openLocModal()" class="mt-4 w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold">+ Add Location</button>
+    <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 min-h-0">
+        <div id="locationList" class="space-y-2"></div>
+        <button onclick="openLocModal()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
     </div>
 
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 flex-shrink-0">
@@ -120,8 +89,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
@@ -156,27 +125,27 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card">
-            <label class="setting-label lbl-blue">Your Details *</label>
-            <input id="set_name" class="form-input" placeholder="Full Name">
-            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+            <label class="setting-label text-blue-400">Your Details *</label>
+            <input id="set_name" class="form-input-card" placeholder="Full Name">
+            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label lbl-green">Emergency Contact *</label>
-            <input id="set_emg_name" class="form-input" placeholder="Name">
-            <input id="set_emg_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
-            <input id="set_emg_email" type="email" class="form-input" placeholder="Email">
+            <label class="setting-label text-green-400">Emergency Contact *</label>
+            <input id="set_emg_name" class="form-input-card" placeholder="Name">
+            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label lbl-purple">Escalation Contact</label>
-            <input id="set_esc_name" class="form-input" placeholder="Name">
-            <input id="set_esc_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
-            <input id="set_esc_email" type="email" class="form-input" placeholder="Email">
+            <label class="setting-label text-purple-400">Escalation Contact</label>
+            <input id="set_esc_name" class="form-input-card" placeholder="Name">
+            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label lbl-red">Security (4 Digits) *</label>
+            <label class="setting-label text-red-400">Security (4 Digits) *</label>
             <div class="flex gap-2">
                 <input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN">
                 <input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress">
@@ -184,8 +153,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card border-gray-600">
-            <label class="setting-label lbl-gray">System URL</label>
-            <input id="set_url" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
+            <label class="setting-label text-gray-400">System URL</label>
+            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
             <div class="flex gap-2 mt-2">
                 <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
                 <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
@@ -316,7 +285,7 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
 
-    // Mileage Default (v17 Tile Colors)
+    // Mileage Default
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
@@ -388,7 +357,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); 
+    }, 300000); // 5 Mins
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -449,21 +418,12 @@ function renderLocs() {
     
     state.locations.forEach(l => {
         const el = document.createElement('div');
-        // v17 TILE COLOR LOGIC
-        let borderColor = 'border-transparent';
-        let bgColor = 'bg-gray-900';
-        let textColor = 'text-white';
+        el.className = 'p-4 bg-gray-900 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all mb-2';
+        if(state.selectedLocationId === l.id) el.classList.add('border-blue-500', 'bg-gray-800');
         
-        if(state.selectedLocationId === l.id) {
-            borderColor = 'border-blue-500';
-            bgColor = 'bg-gray-800';
-        }
+        let styleClass = l.id === 'travel' ? "text-purple-400" : "text-white";
         
-        if(l.id === 'travel') textColor = 'text-purple-400';
-
-        el.className = `p-4 rounded-lg border-2 ${borderColor} ${bgColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
-        
-        let html = `<div><div class="font-bold text-lg ${textColor}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
+        let html = `<div><div class="font-bold text-lg ${styleClass}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
         html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
         
         el.innerHTML = html;
@@ -531,7 +491,6 @@ function deleteLoc() {
     }
 }
 
-// v16 GPS BUTTON LOGIC
 function getGpsAddress() {
     const btn = document.getElementById('btnGpsAddr');
     if(!navigator.geolocation) return alert("GPS not supported");
@@ -573,8 +532,8 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic
-        if(CONFIG.isAdv && l.id !== 'travel' && !l.noReport) {
+        // Quick Stat Logic (v20 Enabled for Travel)
+        if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
             btnQ.classList.replace('bg-teal-900','bg-teal-600');
@@ -701,13 +660,6 @@ function triggerCheckin() {
             alert('MISSED CHECK-IN ALERT SENT');
         }
     }, 1000);
-    
-    document.getElementById('checkinOkBtn').onclick = () => {
-        clearInterval(checkinIntervalId);
-        closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
-        saveState();
-    };
 }
 
 function confirmCheckin() {
@@ -792,7 +744,11 @@ function quickStat() {
             "Notes": d.notes,
             "Visit Report Data": JSON.stringify(d.jsonPayload)
         };
+        
         if(d.photo1) data["Photo 1"] = d.photo1;
+        // v20 FIX: Explicit Distance Mapping
+        if(d.custom["$Distance (km)"]) data["Distance"] = d.custom["$Distance (km)"];
+        
         sendToGoogleSheet(data);
         state.activeVisit = null; tempPhoto = null; sigPad = null;
         closeModal('report');
@@ -815,8 +771,8 @@ function buildReportForm(templateName, container) {
             else if(f.type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${f.text}" class="w-5 h-5"><span class="text-gray-300">${f.text}</span></label>`;
             else if(f.type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${f.text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${f.text}" value="Yes" data-key="${f.text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${f.text}" value="No" data-key="${f.text}"> No</label></div></div>`;
             else if(f.type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${f.text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this)">`;
-            else if(f.type==='gps') html = `<button type="button" onclick="captureGPS(this, '${f.text}')" class="mt-2 text-xs bg-blue-900 text-blue-200 px-3 py-2 rounded">📍 Capture Location</button><input type="hidden" data-key="${f.text}">`;
-            else if(f.type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${f.text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button type="button" onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
+            else if(f.type==='gps') html = `<button onclick="captureGPS(this, '${f.text}')" class="mt-2 text-xs bg-blue-900 text-blue-200 px-3 py-2 rounded">📍 Capture Location</button><input type="hidden" data-key="${f.text}">`;
+            else if(f.type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${f.text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
             container.innerHTML += html;
         });
     }
@@ -930,7 +886,6 @@ function withPinVerification(isDuressAction, callback) {
         document.getElementById('confirmPinBtn').removeEventListener('click', confirm);
     };
     document.getElementById('confirmPinBtn').addEventListener('click', confirm);
-    document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
 }
 
 function handlePhoto(input) {
@@ -957,15 +912,29 @@ function captureGPS(btn, key) {
 // --- NETWORK ---
 function sendToGoogleSheet(data) {
     if(!state.settings.googleSheetUrl) return;
+    
     const payload = {
         'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
         'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
         'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
         ...data, 'Timestamp': new Date().toISOString()
     };
+    
+    // v21 FIX: ADD BATTERY
+    if(navigator.getBattery) {
+        navigator.getBattery().then(b => {
+            payload['Battery Level'] = Math.round(b.level * 100) + "%";
+            finalizeSend(payload);
+        });
+    } else {
+        finalizeSend(payload);
+    }
+}
+
+function finalizeSend(payload) {
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
-        processUploadQueue(payload);
+        processUploadQueue(payload); // v12 FIX: Renamed Call
     }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; processUploadQueue(payload); });
 }
 
@@ -996,6 +965,7 @@ function processUploadQueue(newData = null) {
                 processUploadQueue(); // Recursive
             })
             .catch(() => {
+                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
