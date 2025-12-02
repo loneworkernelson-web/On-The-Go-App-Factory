@@ -12,26 +12,70 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
 <style>
-/* CORE LAYOUT */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; }
+/* --- CORE STYLES --- */
+body { 
+    font-family: 'Inter', sans-serif; 
+    -webkit-tap-highlight-color: transparent; 
+    user-select: none; 
+    overscroll-behavior-y: contain; 
+    background-color: #111827; /* Hardcoded Dark BG */
+    color: white;
+}
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* INTERACTION */
+/* --- UI COMPONENTS --- */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width linear; }
 .long-press-btn.pressing::after { width: 100%; }
 
-/* UI COMPONENTS */
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-.form-input { @apply w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-blue-500 outline-none; }
-.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
-.setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
-.setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
+
+/* --- BULLETPROOF SETTINGS STYLES (Standard CSS) --- */
+.setting-card { 
+    background-color: #1f2937; /* Gray-800 */
+    padding: 1.25rem; 
+    border-radius: 0.75rem; 
+    border: 1px solid #374151; 
+    margin-bottom: 1.5rem; 
+}
+.setting-label { 
+    display: block;
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-bottom: 0.75rem; 
+}
+.form-input { 
+    width: 100%; 
+    background-color: #111827; /* Gray-900 */
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.85rem; 
+    color: white; 
+    font-size: 1rem;
+    outline: none; 
+    margin-bottom: 0.75rem;
+    display: block;
+}
+.form-input:focus {
+    border-color: #3b82f6; /* Blue-500 */
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+/* Colors for Labels */
+.lbl-blue { color: #60a5fa; }
+.lbl-green { color: #4ade80; }
+.lbl-purple { color: #c084fc; }
+.lbl-red { color: #f87171; }
+.lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -109,27 +153,27 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card">
-            <label class="setting-label text-blue-400">Your Details *</label>
-            <input id="set_name" class="form-input-card" placeholder="Full Name">
-            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <label class="setting-label lbl-blue">Your Details *</label>
+            <input id="set_name" class="form-input" placeholder="Full Name">
+            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label text-green-400">Emergency Contact *</label>
-            <input id="set_emg_name" class="form-input-card" placeholder="Name">
-            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
-            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email">
+            <label class="setting-label lbl-green">Emergency Contact *</label>
+            <input id="set_emg_name" class="form-input" placeholder="Name">
+            <input id="set_emg_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input" placeholder="Email">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label text-purple-400">Escalation Contact</label>
-            <input id="set_esc_name" class="form-input-card" placeholder="Name">
-            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
-            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email">
+            <label class="setting-label lbl-purple">Escalation Contact</label>
+            <input id="set_esc_name" class="form-input" placeholder="Name">
+            <input id="set_esc_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input" placeholder="Email">
         </div>
 
         <div class="setting-card">
-            <label class="setting-label text-red-400">Security (4 Digits) *</label>
+            <label class="setting-label lbl-red">Security (4 Digits) *</label>
             <div class="flex gap-2">
                 <input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN">
                 <input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress">
@@ -137,8 +181,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card border-gray-600">
-            <label class="setting-label text-gray-400">System URL</label>
-            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
+            <label class="setting-label lbl-gray">System URL</label>
+            <input id="set_url" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
             <div class="flex gap-2 mt-2">
                 <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
                 <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
@@ -255,11 +299,14 @@ let sigPad = null;
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
+    // 1. Load State
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
+    // 2. Enforce Config Updates
     state.settings.googleSheetUrl = CONFIG.url; 
 
+    // 3. Mileage Logic
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
@@ -276,6 +323,7 @@ window.addEventListener('load', () => {
         state.locations = state.locations.filter(l => l.id !== 'travel');
     }
 
+    // 4. UI & Advanced Features
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -284,6 +332,7 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
+    // 5. Routing
     if(!state.settings.pinCode || !state.settings.workerName) {
         nav('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -294,6 +343,7 @@ window.addEventListener('load', () => {
         renderLocations();
     }
     
+    // 6. Background Tasks
     updateArrivedButtonState();
     processUploadQueue();
     document.body.addEventListener('click', initAudio, { once: true });
@@ -523,13 +573,13 @@ function startVisit() {
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" }); // FIX: use processUploadQueue
+            sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" });
             saveState();
         }, () => {
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" }); // FIX: use processUploadQueue
+            sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
         }, { timeout: 5000, maximumAge: 60000 });
     } else {
-        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" }); // FIX: use processUploadQueue
+        sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -863,26 +913,23 @@ function sendToGoogleSheet(data) {
 }
 
 function processUploadQueue(newData = null) {
-    // Add new item
     if(newData) {
         state.pendingUploads.push(newData);
         saveState();
     }
 
-    // Check offline
     if(!navigator.onLine) {
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
         document.getElementById('uploadBanner').classList.remove('hidden');
         return;
     }
 
-    // Process
     if(state.pendingUploads.length > 0) {
         document.getElementById('uploadBanner').classList.remove('hidden');
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
         
-        const item = state.pendingUploads[0]; // Peek
-        const fd = new FormData(); 
+        const item = state.pendingUploads[0];
+        const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
@@ -892,7 +939,6 @@ function processUploadQueue(newData = null) {
                 processUploadQueue(); // Recursive
             })
             .catch(() => {
-                // On fail, stop processing but keep in queue
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
