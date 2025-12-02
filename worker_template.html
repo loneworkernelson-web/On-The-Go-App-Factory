@@ -53,8 +53,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">
         Reminder: Don't forget to start your timer when you arrive.
     </div>
+    
     <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 flex-shrink-0">
-        <div class="spinner"></div> Syncing <span id="queueCount">0</span> offline reports...
+        <div class="spinner"></div> 
+        <span>Syncing <span id="queueCount">0</span> offline reports...</span>
     </div>
 
     <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 min-h-0">
@@ -71,8 +73,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
@@ -183,11 +185,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
         <div class="text-gray-300 space-y-4 text-sm">
-            <h3 class="font-bold text-white">1. Starting a Visit</h3><p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
-            <h3 class="font-bold text-white">2. During the Visit</h3><p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
-            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3><p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
-            <h3 class="font-bold text-white">4. Mileage / Travelling</h3><p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
-            <h3 class="font-bold text-white">5. Offline Mode</h3><p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
+            <h3 class="font-bold text-white">1. Starting a Visit</h3>
+            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
+            <h3 class="font-bold text-white">2. During the Visit</h3>
+            <p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
+            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
+            <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
+            <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
+            <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
+            <h3 class="font-bold text-white">5. Offline Mode</h3>
+            <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
         </div>
         <div class="mt-6 flex justify-end"><button onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div>
     </div>
@@ -256,7 +263,14 @@ window.addEventListener('load', () => {
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ id: 'travel', name: 'Travelling', address: 'Calculates Mileage via GPS', noReport: false, companyName: 'Internal', templateName: 'Travel Report' });
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
         }
     } else if(state.locations) {
         state.locations = state.locations.filter(l => l.id !== 'travel');
@@ -315,7 +329,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000);
+    }, 300000); // 5 Mins
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -509,13 +523,13 @@ function startVisit() {
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" });
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" }); // FIX: use processUploadQueue
             saveState();
         }, () => {
-            sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" }); // FIX: use processUploadQueue
         }, { timeout: 5000, maximumAge: 60000 });
     } else {
-        sendToGoogleSheet({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
+        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" }); // FIX: use processUploadQueue
     }
 }
 
@@ -790,30 +804,6 @@ function closeModal(id) {
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
 }
-function openLocModal(id, e) {
-    if(e) e.stopPropagation();
-    showModal('location');
-    if(id) {
-        const l = state.locations.find(x => x.id === id);
-        document.getElementById('locModalTitle').innerText = "Edit Location";
-        document.getElementById('locId').value = id;
-        document.getElementById('locName').value = l.name;
-        document.getElementById('locAddr').value = l.address;
-        document.getElementById('locTemplate').value = l.templateName || "";
-        document.getElementById('locNoRep').checked = l.noReport || false;
-        if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
-        else document.getElementById('btnDelLoc').classList.remove('hidden');
-    } else {
-        document.getElementById('locModalTitle').innerText = "Add Location";
-        document.getElementById('locId').value = "";
-        document.getElementById('locName').value = "";
-        document.getElementById('locAddr').value = "";
-        document.getElementById('locTemplate').value = "";
-        document.getElementById('locNoRep').checked = false;
-        document.getElementById('btnDelLoc').classList.add('hidden');
-    }
-}
-
 function withPinVerification(isDuressAction, callback) {
     showModal('pin');
     const input = document.getElementById('pinInput');
@@ -868,39 +858,41 @@ function sendToGoogleSheet(data) {
     };
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
-        processUploadQueue(payload); // Corrected Call
+        processUploadQueue(payload);
     }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; processUploadQueue(payload); });
 }
 
 function processUploadQueue(newData = null) {
+    // Add new item
     if(newData) {
         state.pendingUploads.push(newData);
         saveState();
     }
 
+    // Check offline
     if(!navigator.onLine) {
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
         document.getElementById('uploadBanner').classList.remove('hidden');
         return;
     }
 
+    // Process
     if(state.pendingUploads.length > 0) {
         document.getElementById('uploadBanner').classList.remove('hidden');
         document.getElementById('queueCount').innerText = state.pendingUploads.length;
         
-        // Process one item
-        const item = state.pendingUploads[0];
-        const fd = new FormData();
+        const item = state.pendingUploads[0]; // Peek
+        const fd = new FormData(); 
         for(let k in item) fd.append(k, item[k]);
         
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
                 state.pendingUploads.shift(); // Remove on success
                 saveState();
-                processUploadQueue(); // Process next
+                processUploadQueue(); // Recursive
             })
             .catch(() => {
-                // Keep in queue on fail
+                // On fail, stop processing but keep in queue
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
