@@ -18,6 +18,9 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
 .long-press-btn.pressing::after{width:100%}
 .spinner{border:3px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;width:20px;height:20px;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Toggle Switch */
+.toggle-checkbox:checked { right: 0; border-color: #68D391; }
+.toggle-checkbox:checked + .toggle-label { background-color: #68D391; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -39,7 +42,7 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
 
     <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700">
       <div id="locationList" class="space-y-2"></div>
-      <button onclick="addLocation()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
+      <button onclick="openLocModal()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
     </div>
 
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700">
@@ -76,29 +79,31 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
   </div>
 
   <div id="page-settings" class="page h-full flex-col p-6 bg-gray-800">
-    <header class="flex justify-between mb-8">
+    <header class="flex justify-between mb-6">
       <h1 class="text-3xl font-bold text-white">Settings</h1>
       <button onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
     </header>
     
     <div class="space-y-6 flex-1 overflow-y-auto">
+      <p class="text-xs text-gray-400 bg-gray-900 p-2 rounded border border-gray-700">Please use international format for all phone numbers (e.g. +64 21...).</p>
+      
       <div>
         <h3 class="text-sm font-bold text-blue-400 mb-2 uppercase">Your Details</h3>
         <input id="set_name" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Full Name">
-        <input id="set_phone" type="tel" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700" placeholder="Phone Number">
+        <input id="set_phone" type="tel" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700" placeholder="Phone (+64...)">
       </div>
 
       <div>
         <h3 class="text-sm font-bold text-green-400 mb-2 uppercase">Emergency Contact</h3>
         <input id="set_emg_name" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Name">
-        <input id="set_emg_phone" type="tel" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Phone">
+        <input id="set_emg_phone" type="tel" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Phone (+64...)">
         <input id="set_emg_email" type="email" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700" placeholder="Email">
       </div>
 
       <div>
         <h3 class="text-sm font-bold text-purple-400 mb-2 uppercase">Escalation Contact</h3>
         <input id="set_esc_name" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Name">
-        <input id="set_esc_phone" type="tel" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Phone">
+        <input id="set_esc_phone" type="tel" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700 mb-2" placeholder="Phone (+64...)">
         <input id="set_esc_email" type="email" class="w-full p-3 bg-gray-900 rounded-lg text-white border border-gray-700" placeholder="Email">
       </div>
 
@@ -116,6 +121,44 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
     </div>
     
     <button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mt-4 mb-6">Save Settings</button>
+  </div>
+
+  <div id="modal-location" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 animate-fade">
+    <div class="bg-gray-800 w-full max-w-sm rounded-xl p-6 shadow-2xl border border-gray-700">
+      <h2 id="locModalTitle" class="text-xl font-bold text-white mb-4">Edit Location</h2>
+      <input type="hidden" id="locId">
+      
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 uppercase font-bold">Name</label>
+          <input id="locName" class="w-full p-3 bg-gray-900 rounded text-white border border-gray-600">
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 uppercase font-bold">Address</label>
+          <input id="locAddr" class="w-full p-3 bg-gray-900 rounded text-white border border-gray-600">
+        </div>
+        
+        <div id="advLocOptions" class="pt-2 border-t border-gray-700">
+           <label class="flex items-center justify-between p-2 bg-gray-900 rounded cursor-pointer mb-2">
+             <span class="text-sm text-gray-300">No Report Required</span>
+             <input type="checkbox" id="locNoRep" class="w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600">
+           </label>
+           
+           <div>
+             <label class="text-xs text-gray-400 uppercase font-bold">Template Name</label>
+             <input id="locTemplate" class="w-full p-2 bg-gray-900 rounded text-white border border-gray-600 text-sm" placeholder="(Standard)">
+             <p class="text-xs text-gray-500">Matches 'Checklists' sheet</p>
+           </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button id="btnDelLoc" onclick="deleteLoc()" class="px-4 py-2 bg-red-900/50 text-red-400 rounded">Delete</button>
+        <div class="flex-1"></div>
+        <button onclick="closeLocModal()" class="px-4 py-2 bg-gray-700 text-white rounded">Cancel</button>
+        <button onclick="saveLoc()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Save</button>
+      </div>
+    </div>
   </div>
 
   <div id="modal-report" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 animate-fade">
@@ -149,11 +192,22 @@ let timerInt, tempPhoto=null;
 
 // --- INITIALIZATION ---
 window.onload = () => {
-  const s = localStorage.getItem('otg_state_v4');
-  if(s) state = { ...state, ...JSON.parse(s) };
+  const s = localStorage.getItem('otg_state_v5');
+  if(s) {
+      try {
+        const parsed = JSON.parse(s);
+        state = { ...state, ...parsed };
+      } catch(e) { console.error("State corrupted", e); }
+  }
+  
+  // FORCE URL UPDATE (Critical Fix)
+  if(CONFIG.url && !CONFIG.url.includes("%%")) {
+      state.settings.googleSheetUrl = CONFIG.url;
+  }
 
-  // Mileage Logic: Ensure "Travelling" tile exists with correct template linkage
+  // Mileage Logic
   if(CONFIG.mileage) {
+    if(!state.locs) state.locs = [];
     if(!state.locs.find(l => l.id === 'travel')) {
       state.locs.unshift({
         id: 'travel', 
@@ -164,12 +218,17 @@ window.onload = () => {
         templateName: 'Travel Report' 
       });
     }
-  } else {
+  } else if (state.locs) {
     state.locs = state.locs.filter(l => l.id !== 'travel');
   }
 
-  // Restore State
-  if(CONFIG.isAdv) document.getElementById('btnQuick').classList.remove('hidden');
+  // UI Setup
+  if(CONFIG.isAdv) {
+      document.getElementById('btnQuick').classList.remove('hidden');
+      document.getElementById('advLocOptions').classList.remove('hidden');
+  } else {
+      document.getElementById('advLocOptions').classList.add('hidden');
+  }
   
   if(!state.settings.pin) nav('settings');
   else if(state.active) startLockScreen();
@@ -182,7 +241,7 @@ window.onload = () => {
 function nav(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  // Pre-fill settings inputs if opening settings
+  // Pre-fill settings
   if(id === 'settings') {
     document.getElementById('set_name').value = state.settings.name || "";
     document.getElementById('set_phone').value = state.settings.phone || "";
@@ -194,42 +253,105 @@ function nav(id) {
     document.getElementById('set_esc_email').value = state.settings.escEmail || "";
     document.getElementById('set_pin').value = state.settings.pin || "";
     document.getElementById('set_duress').value = state.settings.duressPin || "";
+    document.getElementById('set_url').value = state.settings.googleSheetUrl || "Not Set";
   }
 }
 
-// --- LOCATION LOGIC ---
+// --- LOCATION MANAGEMENT ---
 function renderLocs() {
   const list = document.getElementById('locationList');
   list.innerHTML = '';
+  if(!state.locs) state.locs = [];
+  
   state.locs.forEach(l => {
     const el = document.createElement('div');
     el.className = 'p-4 bg-gray-800 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all';
     if(state.sel && state.sel.id === l.id) el.classList.add('border-blue-500', 'bg-gray-700');
     
     let html = '<div><div class="font-bold text-white text-lg">'+l.name+'</div><div class="text-sm text-gray-400">'+l.addr+'</div></div>';
-    if(l.id !== 'travel') html += '<button class="text-gray-600 hover:text-red-400 px-3 py-2 text-xl font-bold" onclick="delLoc(\''+l.id+'\', event)">×</button>';
+    
+    // Add Edit Gear Icon
+    html += '<div class="flex gap-2">';
+    html += '<button class="text-gray-500 hover:text-white p-2" onclick="openLocModal(\''+l.id+'\', event)">⚙️</button>';
+    html += '</div>';
     
     el.innerHTML = html;
     el.onclick = (e) => {
       if(e.target.tagName === 'BUTTON') return;
       state.sel = l;
-      renderLocs(); // Re-render to show selection
+      renderLocs(); 
       updateDur();
     };
     list.appendChild(el);
   });
 }
 
-function addLoc() {
-  const n = prompt('Location Name:'); if(!n) return;
-  const a = prompt('Address:');
-  state.locs.push({id: Date.now().toString(), name: n, addr: a||''});
-  save(); renderLocs();
+function openLocModal(id = null, e = null) {
+    if(e) e.stopPropagation();
+    document.getElementById('modal-location').classList.remove('hidden');
+    
+    if(id) {
+        // Editing existing
+        const l = state.locs.find(x => x.id === id);
+        document.getElementById('locModalTitle').innerText = "Edit Location";
+        document.getElementById('locId').value = id;
+        document.getElementById('locName').value = l.name;
+        document.getElementById('locAddr').value = l.addr;
+        document.getElementById('locTemplate').value = l.templateName || "";
+        document.getElementById('locNoRep').checked = l.noRep || false;
+        
+        // Hide delete for Travelling
+        if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
+        else document.getElementById('btnDelLoc').classList.remove('hidden');
+    } else {
+        // Adding new
+        document.getElementById('locModalTitle').innerText = "Add Location";
+        document.getElementById('locId').value = "";
+        document.getElementById('locName').value = "";
+        document.getElementById('locAddr').value = "";
+        document.getElementById('locTemplate').value = "";
+        document.getElementById('locNoRep').checked = false;
+        document.getElementById('btnDelLoc').classList.add('hidden');
+    }
 }
 
-function delLoc(id, e) {
-  e.stopPropagation();
-  if(confirm('Delete this location?')) { state.locs = state.locs.filter(l => l.id !== id); save(); renderLocs(); }
+function closeLocModal() { document.getElementById('modal-location').classList.add('hidden'); }
+
+function saveLoc() {
+    const id = document.getElementById('locId').value;
+    const name = document.getElementById('locName').value;
+    const addr = document.getElementById('locAddr').value;
+    const tpl = document.getElementById('locTemplate').value;
+    const noRep = document.getElementById('locNoRep').checked;
+    
+    if(!name) return alert("Name required");
+    
+    if(id) {
+        const idx = state.locs.findIndex(l => l.id === id);
+        if(idx > -1) {
+            state.locs[idx] = { ...state.locs[idx], name, addr, templateName: tpl, noRep };
+        }
+    } else {
+        state.locs.push({
+            id: Date.now().toString(),
+            name, addr, templateName: tpl, noRep
+        });
+    }
+    save();
+    renderLocs();
+    closeLocModal();
+}
+
+function deleteLoc() {
+    const id = document.getElementById('locId').value;
+    if(id === 'travel') return alert("Cannot delete Travelling tile.");
+    if(confirm('Delete location?')) {
+        state.locs = state.locs.filter(l => l.id !== id);
+        if(state.sel && state.sel.id === id) state.sel = null;
+        save();
+        renderLocs();
+        closeLocModal();
+    }
 }
 
 // --- VISIT LOGIC ---
@@ -241,10 +363,13 @@ function updateDur() {
   const btnQ = document.getElementById('btnQuick');
   
   if(state.sel) {
-    if(CONFIG.isAdv && state.sel.id !== 'travel') {
+    if(CONFIG.isAdv && state.sel.id !== 'travel' && !state.sel.noRep) {
         btnQ.disabled = false; 
         btnQ.classList.remove('opacity-50', 'bg-teal-900', 'text-teal-500');
         btnQ.classList.add('bg-teal-600', 'text-white', 'hover:bg-teal-500');
+    } else {
+        btnQ.disabled = true;
+        btnQ.classList.add('opacity-50', 'bg-teal-900', 'text-teal-500');
     }
     
     if(min > 0) {
@@ -390,14 +515,20 @@ function preDepart(isSafeFlow) {
     // If not advanced, just end it
     if(!CONFIG.isAdv) { completeDepart({}); return; }
 
+    const l = state.locs.find(x => x.id === state.active.lid);
+    
+    // If Location says "No Report", skip modal
+    if(l && l.noRep) {
+        completeDepart({});
+        return;
+    }
+
     // Setup Report Modal
     const modal = document.getElementById('modal-report');
     const div = document.getElementById('reportFields');
     div.innerHTML = '';
     modal.classList.remove('hidden');
     
-    const l = state.locs.find(x => x.id === state.active.lid);
-
     // A. MILEAGE REPORT
     if(l.id === 'travel' && CONFIG.mileage) {
        div.innerHTML = '<h3 class="font-bold text-blue-400">Mileage Report</h3><p class="text-sm text-gray-400">Confirm distance travelled.</p>';
@@ -533,7 +664,7 @@ function calcDist(p1, p2) {
 
 // --- NETWORK ---
 function send(status, notes, photo) {
-  if(!CONFIG.url) return;
+  if(!state.settings.googleSheetUrl) return;
   
   const payload = {
     'Worker Name': state.settings.name,
@@ -549,9 +680,8 @@ function send(status, notes, photo) {
     'Timestamp': new Date().toISOString()
   };
   
-  if(photo) payload['Photo 1'] = photo; // Base64 string
+  if(photo) payload['Photo 1'] = photo; 
   
-  // Get GPS then Send
   navigator.geolocation.getCurrentPosition(pos => {
     payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
     post(payload);
@@ -562,7 +692,6 @@ function send(status, notes, photo) {
 }
 
 function post(data) {
-  // Offline Queue Logic
   if(!navigator.onLine) {
     state.queue.push(data);
     save();
@@ -572,9 +701,9 @@ function post(data) {
   const fd = new FormData();
   for(let k in data) fd.append(k, data[k]);
   
-  fetch(CONFIG.url, { method: 'POST', mode: 'no-cors', body: fd })
+  fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
     .catch(() => {
-       state.queue.push(data); // Save if fail
+       state.queue.push(data); 
        save();
     });
 }
@@ -588,7 +717,7 @@ function processQueue() {
     const fd = new FormData();
     for(let k in item) fd.append(k, item[k]);
     
-    fetch(CONFIG.url, { method: 'POST', mode: 'no-cors', body: fd })
+    fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
       .then(() => processQueue())
       .catch(() => {
         state.queue.push(item);
@@ -599,7 +728,7 @@ function processQueue() {
   }
 }
 
-function save() { localStorage.setItem('otg_state_v4', JSON.stringify(state)); }
+function save() { localStorage.setItem('otg_state_v5', JSON.stringify(state)); }
 function saveSettings() {
   state.settings = {
     name: document.getElementById('set_name').value,
@@ -611,11 +740,14 @@ function saveSettings() {
     escPhone: document.getElementById('set_esc_phone').value,
     escEmail: document.getElementById('set_esc_email').value,
     pin: document.getElementById('set_pin').value,
-    duressPin: document.getElementById('set_duress').value
+    duressPin: document.getElementById('set_duress').value,
+    googleSheetUrl: document.getElementById('set_url').value
   };
   save(); nav('main');
 }
 function clearData() {
     if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); }
 }
-</script></body></html>
+</script>
+</body>
+</html>
