@@ -9,7 +9,6 @@
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="%%LOGO_DATA%%">
-
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -167,7 +166,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="space-y-4">
             <div><label class="text-xs text-gray-400 uppercase font-bold">Name</label><input type="text" id="locName" class="form-input"></div>
             <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><input type="text" id="locAddr" class="form-input"></div>
-            
             <div id="advLocOptions" class="pt-2 border-t border-gray-700">
                <label class="flex items-center justify-between p-2 bg-gray-900 rounded cursor-pointer mb-2">
                  <span class="text-sm text-gray-300">No Report Required</span>
@@ -179,7 +177,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="mt-6 flex justify-end space-x-3">
             <button type="button" id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
             <div class="flex-1"></div>
-            <button type="button" id="cancelLocationBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button type="button" onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
             <button type="button" onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
     </div>
@@ -198,16 +196,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="text-gray-300 space-y-4 text-sm">
             <h3 class="font-bold text-white">1. Starting a Visit</h3>
             <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
-            
             <h3 class="font-bold text-white">2. During the Visit</h3>
             <p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
-            
             <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
             <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
-            
             <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
             <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
-            
             <h3 class="font-bold text-white">5. Offline Mode</h3>
             <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
         </div>
@@ -228,7 +222,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
       <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2">
         </div>
       <div class="flex gap-3 flex-shrink-0">
-        <button type="button" id="cancelReportBtn" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
+        <button type="button" onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
         <button type="button" id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
       </div>
     </div>
@@ -236,7 +230,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
         <h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2>
         <p id="alertModalMessage" class="text-gray-300 mb-6"></p>
-        <button type="button" id="alertModalOkBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button>
+        <button type="button" onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button>
     </div>
 
 </div>
@@ -286,7 +280,7 @@ window.addEventListener('load', () => {
             state.locations.unshift({ 
                 id: 'travel', 
                 name: 'Travelling', 
-                addr: 'Calculates Mileage via GPS', 
+                address: 'Calculates Mileage via GPS', 
                 noReport: false, 
                 companyName: 'Internal', 
                 templateName: 'Travel Report' 
@@ -735,11 +729,6 @@ function buildReportForm(templateName, container) {
             else if(f.type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${f.text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button type="button" onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
             container.innerHTML += html;
         });
-        
-        // Auto-add notes field if missing
-        if(!tpl.find(f => f.text === 'Notes')) {
-             container.innerHTML += '<label class="block text-sm text-gray-400 mt-4">Additional Notes</label><textarea id="rep_notes_gen" class="form-input h-24"></textarea>';
-        }
     }
     
     const canvas = document.getElementById('sig-canvas');
@@ -767,7 +756,7 @@ function clearSig() { if(sigPad) { const ctx = sigPad.getContext('2d'); ctx.clea
 
 function gatherFormData() {
     const data = { custom: {}, notes: '', sig: null, jsonPayload: {} };
-    const stdNotes = document.getElementById('rep_notes') || document.getElementById('rep_notes_gen');
+    const stdNotes = document.getElementById('rep_notes');
     if(stdNotes) data.notes = stdNotes.value;
 
     document.querySelectorAll('[data-key]').forEach(el => {
@@ -992,7 +981,6 @@ function clearFormsCache() { state.cachedForms = {}; syncForms(); alert("Forms S
 
 // Listeners
 document.getElementById('saveSettingsBtn').onclick = saveSettings;
-document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
 document.getElementById('saveLocationBtn').onclick = saveLocation;
 document.getElementById('deleteLocationBtn').onclick = deleteLocation;
 document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
@@ -1000,7 +988,6 @@ document.getElementById('clearCacheBtn').onclick = clearData;
 document.getElementById('durationSlider').oninput = updateArrivedButtonState;
 document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
 document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
 </script>
 </body>
 </html>
