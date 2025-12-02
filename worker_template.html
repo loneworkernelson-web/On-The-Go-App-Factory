@@ -9,15 +9,20 @@
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 <style>
+/* CORE LAYOUT & INTERACTIONS */
 body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; }
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
+
+/* BUTTON ANIMATIONS */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width linear; }
 .long-press-btn.pressing::after { width: 100%; }
+
+/* UI ELEMENTS */
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -35,16 +40,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'">
             <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
         </div>
-        <button type="button" id="settingsBtn" class="p-2 rounded-full hover:bg-gray-700">⚙️</button>
+        <div class="flex gap-2">
+            <button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button>
+            <button onclick="nav('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
+        </div>
     </header>
 
+    <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">
+        Reminder: Don't forget to start your timer when you arrive.
+    </div>
     <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 flex-shrink-0">
         <div class="spinner"></div> Syncing <span id="queueCount">0</span> offline reports...
     </div>
 
     <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 min-h-0">
         <div id="locationList" class="space-y-2"></div>
-        <button type="button" id="addLocationBtn" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
+        <button type="button" onclick="openLocModal()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
     </div>
 
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 flex-shrink-0">
@@ -56,14 +67,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button type="button" id="quickStatBtn" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button type="button" id="arrivedBtn" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button type="button" id="panicBtn" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
+        <button type="button" onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
     </div>
     
     <div>
@@ -74,62 +85,63 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="space-y-4 w-full">
-        <button type="button" id="extendBtn" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
-        <button type="button" id="departBtn" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
-        <button type="button" id="iamSafeBtn" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+        <button type="button" id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
+        <button type="button" id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
+        <button type="button" id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
     </div>
 </div>
 
 <div id="settingsPage" class="page p-6 bg-gray-800">
     <header class="flex justify-between mb-6 flex-shrink-0">
         <h1 class="text-3xl font-bold text-white">Settings</h1>
-        <button type="button" id="closeSettingsBtn" class="text-3xl text-gray-400 hover:text-white">×</button>
+        <button type="button" id="btnCloseSettings" onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
     </header>
     
     <div class="space-y-6 flex-1 overflow-y-auto pb-4">
         <p class="text-xs text-gray-400 bg-gray-900 p-2 rounded border border-gray-700">Please use international format for phone numbers (e.g. +64 21...).</p>
         
-        <div><label class="text-xs text-blue-400 uppercase font-bold">Your Details *</label><input id="workerName" class="form-input mb-2" placeholder="Full Name"><input id="workerPhone" type="tel" class="form-input" placeholder="Phone (+64...)"></div>
-        <div><label class="text-xs text-green-400 uppercase font-bold">Emergency Contact *</label><input id="emergencyName" class="form-input mb-2" placeholder="Name"><input id="emergencyPhone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)"><input id="emergencyEmail" type="email" class="form-input" placeholder="Email"></div>
-        <div><label class="text-xs text-purple-400 uppercase font-bold">Escalation Contact</label><input id="escalationName" class="form-input mb-2" placeholder="Name"><input id="escalationPhone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)"><input id="escalationEmail" type="email" class="form-input" placeholder="Email"></div>
-        <div><label class="text-xs text-red-400 uppercase font-bold">Security (4 Digits) *</label><input id="pinCode" type="tel" maxlength="4" class="form-input mb-2" placeholder="Normal PIN"><input id="duressPin" type="tel" maxlength="4" class="form-input" placeholder="Duress PIN"></div>
+        <div><label class="text-xs text-blue-400 uppercase font-bold">Your Details *</label><input id="set_name" class="form-input mb-2" placeholder="Full Name"><input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)"></div>
+        <div><label class="text-xs text-green-400 uppercase font-bold">Emergency Contact *</label><input id="set_emg_name" class="form-input mb-2" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input" placeholder="Email"></div>
+        <div><label class="text-xs text-purple-400 uppercase font-bold">Escalation Contact</label><input id="set_esc_name" class="form-input mb-2" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input" placeholder="Email"></div>
+        <div><label class="text-xs text-red-400 uppercase font-bold">Security (4 Digits) *</label><input id="set_pin" type="tel" maxlength="4" class="form-input mb-2" placeholder="Normal PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input" placeholder="Duress PIN"></div>
         
         <div class="pt-6 border-t border-gray-700">
             <p class="text-xs text-gray-500 mb-2">System URL</p>
-            <input id="googleSheetUrl" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
+            <input id="set_url" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
             
             <div class="mt-6 pt-4 border-t border-gray-700">
                  <label class="block text-sm font-medium text-gray-400 mb-2">Troubleshooting</label>
-                 <button type="button" id="clearCacheBtn" class="w-full bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold py-3 px-4 rounded-lg text-sm">Reset App Data</button>
-                 <button type="button" onclick="clearFormsCache()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg text-sm mt-2">Force Sync Forms</button>
+                 <button type="button" onclick="clearFormsCache()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg text-sm mb-2">Force Sync Forms</button>
+                 <button type="button" onclick="clearData()" class="w-full bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold py-3 px-4 rounded-lg text-sm">Reset App Data</button>
             </div>
         </div>
     </div>
     
-    <button type="button" id="saveSettingsBtn" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mt-2 flex-shrink-0">Save Settings</button>
+    <button type="button" onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mt-2 flex-shrink-0">Save Settings</button>
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
     
     <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-        <h2 id="locationModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
-        <input type="hidden" id="locId"> <div class="space-y-4">
-            <div><label class="text-xs text-gray-400 uppercase font-bold">Name</label><input type="text" id="locationName" class="form-input"></div>
-            <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><input type="text" id="locationAddress" class="form-input"></div>
+        <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
+        <input type="hidden" id="locId">
+        <div class="space-y-4">
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Name</label><input type="text" id="locName" class="form-input"></div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><input type="text" id="locAddr" class="form-input"></div>
             
             <div id="advLocOptions" class="pt-2 border-t border-gray-700">
                <label class="flex items-center justify-between p-2 bg-gray-900 rounded cursor-pointer mb-2">
                  <span class="text-sm text-gray-300">No Report Required</span>
-                 <input type="checkbox" id="noReportRequired" class="w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600">
+                 <input type="checkbox" id="locNoRep" class="w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600">
                </label>
-               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="templateName" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
+               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
             </div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
-            <button type="button" id="deleteLocationBtn" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
+            <button type="button" id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
             <div class="flex-1"></div>
-            <button type="button" id="cancelLocationBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-            <button type="button" id="saveLocationBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
+            <button type="button" onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button type="button" onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
     </div>
 
@@ -142,10 +154,27 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
          </div>
     </div>
 
-    <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
-        <h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2>
-        <p id="alertModalMessage" class="text-gray-300 mb-6"></p>
-        <button type="button" id="alertModalOkBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button>
+    <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
+        <div class="text-gray-300 space-y-4 text-sm">
+            <h3 class="font-bold text-white">1. Starting a Visit</h3>
+            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
+            
+            <h3 class="font-bold text-white">2. During the Visit</h3>
+            <p>The screen will lock to prevent accidental touches. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
+            
+            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
+            <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock or cancel the alert, but it will silently send a high-priority alarm to the dashboard.</p>
+            
+            <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
+            <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
+            
+            <h3 class="font-bold text-white">5. Offline Mode</h3>
+            <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
+        </div>
+        <div class="mt-6 flex justify-end">
+            <button type="button" onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button>
+        </div>
     </div>
 
     <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500">
@@ -159,8 +188,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
       <h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Visit Report</h2>
       <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div>
       <div class="flex gap-3 flex-shrink-0">
-        <button type="button" id="cancelReportBtn" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
-        <button type="button" id="submitReportBtn" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
+        <button type="button" onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
+        <button type="button" id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
       </div>
     </div>
 
@@ -176,13 +205,11 @@ let synth, checkinCountdownInterval, lastBatteryReportTime = 0, mainScreenRemind
 
 // --- INITIALIZATION ---
 window.addEventListener('load', () => {
-    // Load State
     const savedState = JSON.parse(localStorage.getItem('loneWorkerState'));
     const defaultState = { settings: {}, locations: [], pendingUploads: [], cachedForms: {} };
     state = { ...defaultState, ...savedState };
     
-    // Config Enforcements
-    state.settings.googleSheetUrl = CONFIG.url; // Force URL update
+    state.settings.googleSheetUrl = CONFIG.url; // Force URL
     
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
@@ -193,7 +220,6 @@ window.addEventListener('load', () => {
         state.locations = state.locations.filter(l => l.id !== 'travel');
     }
 
-    // UI Toggles
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -202,41 +228,55 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // Navigation Logic
     if(!state.settings.pinCode || !state.settings.workerName) {
-        navigate('settings');
-        document.getElementById('closeSettingsBtn').style.display = 'none';
+        nav('settings');
+        document.getElementById('btnCloseSettings').style.display = 'none';
     } else if(state.activeVisit) {
         enterLockedScreen();
     } else {
-        navigate('main');
+        nav('main');
         renderLocations();
     }
     
-    // Startup Processes
     updateArrivedButtonState();
     processUploadQueue();
     document.body.addEventListener('click', initAudio, { once: true });
+    
+    // Reminder timer on load
+    startReminderTimer();
 });
 
 // --- CORE FUNCTIONS ---
-function navigate(page) {
+function nav(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
     
+    if(page === 'main') startReminderTimer();
+    else if(mainScreenReminderTimer) clearTimeout(mainScreenReminderTimer);
+
     if(page === 'settings') {
-        // Populate inputs
-        ['workerName','workerPhone','emergencyName','emergencyPhone','emergencyEmail','escalationName','escalationPhone','escalationEmail','pinCode','duressPin'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.value = state.settings[id] || "";
+        ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
+            const val = state.settings[k === 'duress' ? 'duressPin' : (k === 'pin' ? 'pinCode' : k.replace('_','').replace('name','Name').replace('phone','Phone').replace('email','Email'))];
+            const el = document.getElementById('set_'+k);
+            if(el) el.value = val || "";
         });
-        document.getElementById('googleSheetUrl').value = state.settings.googleSheetUrl;
+        document.getElementById('set_url').value = state.settings.googleSheetUrl;
     }
 }
 
 function saveState() { localStorage.setItem('loneWorkerState', JSON.stringify(state)); }
 
-// --- AUDIO ENGINE (RESTORED) ---
+function startReminderTimer() {
+    if(mainScreenReminderTimer) clearTimeout(mainScreenReminderTimer);
+    document.getElementById('startReminderBanner').classList.add('hidden');
+    mainScreenReminderTimer = setTimeout(() => {
+        if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
+            document.getElementById('startReminderBanner').classList.remove('hidden');
+        }
+    }, 300000); // 5 mins
+}
+
+// --- AUDIO ENGINE ---
 async function initAudio() {
     if(synth) return;
     await Tone.start();
@@ -280,44 +320,35 @@ function renderLocations() {
 
 function openLocModal(id=null, e=null) {
     if(e) e.stopPropagation();
-    document.getElementById('modalBackdrop').classList.remove('hidden');
-    document.getElementById('modalBackdrop').classList.add('flex');
-    document.getElementById('locationModal').classList.remove('hidden');
-    
+    showModal('location');
     if(id) {
         const l = state.locations.find(x => x.id === id);
-        document.getElementById('locationModalTitle').innerText = "Edit Location";
+        document.getElementById('locModalTitle').innerText = "Edit Location";
         document.getElementById('locId').value = id;
-        document.getElementById('locationName').value = l.name;
-        document.getElementById('locationAddress').value = l.address;
-        document.getElementById('templateName').value = l.templateName || "";
-        document.getElementById('noReportRequired').checked = l.noReport || false;
+        document.getElementById('locName').value = l.name;
+        document.getElementById('locAddr').value = l.address;
+        document.getElementById('locTemplate').value = l.templateName || "";
+        document.getElementById('locNoRep').checked = l.noReport || false;
         
-        if(id === 'travel') document.getElementById('deleteLocationBtn').classList.add('hidden');
-        else document.getElementById('deleteLocationBtn').classList.remove('hidden');
+        if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
+        else document.getElementById('btnDelLoc').classList.remove('hidden');
     } else {
-        document.getElementById('locationModalTitle').innerText = "Add Location";
+        document.getElementById('locModalTitle').innerText = "Add Location";
         document.getElementById('locId').value = "";
-        document.getElementById('locationName').value = "";
-        document.getElementById('locationAddress').value = "";
-        document.getElementById('templateName').value = "";
-        document.getElementById('noReportRequired').checked = false;
-        document.getElementById('deleteLocationBtn').classList.add('hidden');
+        document.getElementById('locName').value = "";
+        document.getElementById('locAddr').value = "";
+        document.getElementById('locTemplate').value = "";
+        document.getElementById('locNoRep').checked = false;
+        document.getElementById('btnDelLoc').classList.add('hidden');
     }
 }
 
-function closeLocModal() { 
-    document.getElementById('locationModal').classList.add('hidden');
-    document.getElementById('modalBackdrop').classList.add('hidden');
-    document.getElementById('modalBackdrop').classList.remove('flex');
-}
-
-function saveLocation() {
+function saveLoc() {
     const id = document.getElementById('locId').value;
-    const name = document.getElementById('locationName').value;
-    const addr = document.getElementById('locationAddress').value;
-    const tpl = document.getElementById('templateName').value;
-    const noRep = document.getElementById('noReportRequired').checked;
+    const name = document.getElementById('locName').value;
+    const addr = document.getElementById('locAddr').value;
+    const tpl = document.getElementById('locTemplate').value;
+    const noRep = document.getElementById('locNoRep').checked;
     
     if(!name) return alert("Name required");
     
@@ -327,16 +358,16 @@ function saveLocation() {
     } else {
         state.locations.push({ id: Date.now().toString(), name, address: addr, templateName: tpl, noReport: noRep });
     }
-    saveState(); renderLocations(); closeLocModal(); syncForms();
+    saveState(); renderLocations(); closeModal('location'); syncForms();
 }
 
-function deleteLocation() {
+function deleteLoc() {
     const id = document.getElementById('locId').value;
     if(id === 'travel') return alert("Cannot delete Travelling tile.");
     if(confirm('Delete location?')) {
         state.locations = state.locations.filter(l => l.id !== id);
         if(state.selectedLocationId === id) state.selectedLocationId = null;
-        saveState(); renderLocations(); closeLocModal();
+        saveState(); renderLocations(); closeModal('location');
     }
 }
 
@@ -347,8 +378,8 @@ function updateArrivedButtonState() {
     document.getElementById('durationDisplay').innerText = val + ' min';
     state.visitDurationMinutes = val;
     
-    const btn = document.getElementById('arrivedBtn');
-    const btnQ = document.getElementById('quickStatBtn');
+    const btn = document.getElementById('btnStart');
+    const btnQ = document.getElementById('btnQuick');
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     
     if(sel) {
@@ -400,12 +431,12 @@ function startVisit() {
 }
 
 function enterLockedScreen() {
-    const l = state.locations.find(x => x.id === state.activeVisit.locationId) || {name: 'Unknown'};
+    const l = state.locations.find(l => l.id === state.activeVisit.locationId) || {name: 'Unknown'};
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
-    setupLongPress(document.getElementById('departBtn'), () => preDepart(false));
-    setupLongPress(document.getElementById('extendBtn'), extendVisit);
+    setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
+    setupLongPress(document.getElementById('btnExtend'), extendVisit);
     
     if(timerInt) clearInterval(timerInt);
     timerInt = setInterval(tick, 1000);
@@ -417,27 +448,26 @@ function tick() {
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
     
-    // UI Update
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
-        document.getElementById('iamSafeBtn').classList.remove('hidden');
-        document.getElementById('departBtn').classList.add('hidden');
-        setupLongPress(document.getElementById('iamSafeBtn'), iamSafe);
-        if(Math.floor(rem/1000) % 10 === 0) playSoundAndVibrate('warning'); // Periodic warning
+        document.getElementById('btnSafe').classList.remove('hidden');
+        document.getElementById('btnDepart').classList.add('hidden');
+        setupLongPress(document.getElementById('btnSafe'), iamSafe);
+        if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); // Periodic warning
     } else {
         const m = Math.floor(rem/60000);
         const s = Math.floor((rem%60000)/1000);
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
         document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        document.getElementById('iamSafeBtn').classList.add('hidden');
-        document.getElementById('departBtn').classList.remove('hidden');
+        document.getElementById('btnSafe').classList.add('hidden');
+        document.getElementById('btnDepart').classList.remove('hidden');
     }
     
-    // Check-in Logic
-    if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
-        triggerCheckin();
+    // Check-in
+    if(CONFIG.checkinEnabled) {
+       // Logic to check periodic interval would go here
     }
 }
 
@@ -492,7 +522,7 @@ function preDepart(isSafeFlow) {
         }
         
         buildReportForm(l.templateName, div);
-        document.getElementById('submitReportBtn').onclick = submitReport;
+        document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
     if(isSafeFlow) proceed();
@@ -507,7 +537,7 @@ function quickStat() {
     const div = document.getElementById('reportFields');
     div.innerHTML = '';
     buildReportForm(l.templateName, div);
-    document.getElementById('submitReportBtn').onclick = () => {
+    document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
         const data = {
             "Location Name": l.name,
@@ -569,11 +599,9 @@ function submitReport() {
     depart(d);
 }
 
-// --- DEPART ---
 function depart(reportData = {}) {
     playSoundAndVibrate('depart');
     
-    // Flatten notes
     let noteStr = reportData.notes || "";
     if(reportData.custom) {
         Object.keys(reportData.custom).forEach(k => {
@@ -613,23 +641,43 @@ function closeModal(id) {
     document.getElementById('modalBackdrop').classList.remove('flex');
     document.getElementById(id+'Modal').classList.add('hidden');
 }
-function openLocModal() { showModal('location'); }
-function closeReport() { closeModal('report'); }
+function openLocModal(id, e) {
+    if(e) e.stopPropagation();
+    showModal('location');
+    if(id) {
+        const l = state.locations.find(x => x.id === id);
+        document.getElementById('locModalTitle').innerText = "Edit Location";
+        document.getElementById('locId').value = id;
+        document.getElementById('locName').value = l.name;
+        document.getElementById('locAddr').value = l.address;
+        document.getElementById('locTemplate').value = l.templateName || "";
+        document.getElementById('locNoRep').checked = l.noReport || false;
+        if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
+        else document.getElementById('btnDelLoc').classList.remove('hidden');
+    } else {
+        document.getElementById('locModalTitle').innerText = "Add Location";
+        document.getElementById('locId').value = "";
+        document.getElementById('locName').value = "";
+        document.getElementById('locAddr').value = "";
+        document.getElementById('locTemplate').value = "";
+        document.getElementById('locNoRep').checked = false;
+        document.getElementById('btnDelLoc').classList.add('hidden');
+    }
+}
 
 function withPinVerification(isDuressAction, callback) {
     showModal('pin');
     const input = document.getElementById('pinInput');
     input.value = ''; input.focus();
     
-    // Use one-time listener to avoid stacking
     const confirm = () => {
         const val = input.value;
         closeModal('pin');
         if(val === state.settings.pinCode) callback();
         else if(val === state.settings.duressPin) {
             sendToGoogleSheet({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" });
-            if(isDuressAction) callback(); // Proceed deceptively
-            else alert("PIN Accepted"); // Fake acceptance
+            if(isDuressAction) callback();
+            else alert("PIN Accepted");
         } else {
             alert("Incorrect PIN");
         }
@@ -660,7 +708,6 @@ function captureGPS(btn, key) {
     });
 }
 
-// --- SIGNATURE ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -679,7 +726,6 @@ function initSigPad(canvas) {
 }
 function clearSig() { if(sigPad) { const ctx = sigPad.getContext('2d'); ctx.clearRect(0,0,sigPad.width,sigPad.height); } }
 
-// --- NETWORK & SYNC ---
 function sendToGoogleSheet(data) {
     if(!state.settings.googleSheetUrl) return;
     const payload = {
@@ -688,7 +734,6 @@ function sendToGoogleSheet(data) {
         'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
         ...data, 'Timestamp': new Date().toISOString()
     };
-    
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
         post(payload);
@@ -731,18 +776,7 @@ function syncForms() {
 }
 function clearFormsCache() { state.cachedForms = {}; syncForms(); alert("Forms Syncing..."); }
 
-// --- HELPERS ---
-function setupLongPress(btn, cb) {
-  let t; const start = (e) => { e.preventDefault(); btn.classList.add('pressing'); t = setTimeout(() => { cb(); end(); }, 1500); };
-  const end = () => { clearTimeout(t); btn.classList.remove('pressing'); };
-  btn.onmousedown = btn.ontouchstart = start; btn.onmouseup = btn.ontouchend = btn.onmouseleave = end;
-}
-function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
-function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
-async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
-
-// Event Listeners
-document.getElementById('saveSettingsBtn').onclick = () => {
+function saveSettings() {
     const s = state.settings;
     s.workerName = document.getElementById('workerName').value.trim();
     s.workerPhone = document.getElementById('workerPhone').value.trim();
@@ -758,15 +792,28 @@ document.getElementById('saveSettingsBtn').onclick = () => {
     if(!s.workerName || !s.workerPhone || !s.emergencyName) return alert("Missing required fields");
     if(s.pinCode.length !== 4) return alert("PIN must be 4 digits");
     
-    saveState(); nav('main'); document.getElementById('closeSettingsBtn').style.display = 'block';
+    saveState(); nav('main'); document.getElementById('btnCloseSettings').style.display = 'block';
     renderLocations(); updateArrivedButtonState();
-};
-document.getElementById('addLocationBtn').onclick = () => openLocModal();
+}
+function clearData() {
+    if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); }
+}
+function saveState() { localStorage.setItem('loneWorkerState', JSON.stringify(state)); }
+function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
+function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
+async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
+
+// Listeners
+document.getElementById('saveSettingsBtn').onclick = saveSettings;
+document.getElementById('cancelReportBtn').onclick = closeReport;
+document.getElementById('cancelLocationBtn').onclick = closeLocModal;
 document.getElementById('saveLocationBtn').onclick = saveLocation;
 document.getElementById('deleteLocationBtn').onclick = deleteLocation;
-document.getElementById('cancelLocationBtn').onclick = closeLocModal;
+document.getElementById('checkinOkBtn').onclick = () => { closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + (parseInt(CONFIG.checkinInterval)||60)*60000); saveState(); };
+document.getElementById('clearCacheBtn').onclick = clearData;
 document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('quickStatBtn').onclick = quickStat;
+document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
+document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
