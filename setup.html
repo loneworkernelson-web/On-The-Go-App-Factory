@@ -47,7 +47,7 @@
               <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key</label><input type="text" id="secretKey" class="input-field" value="ChangeMe123!"></div>
             </div>
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo</label>
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo (Optional)</label>
               <div class="relative cursor-pointer w-full" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-32 w-32 mx-auto bg-gray-800 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden hover:border-blue-500 transition"><span id="logoText" class="text-gray-500 text-sm">Click to Upload<br>(or use icon.png)</span><img id="logoImg" class="hidden h-full w-full object-cover"></div>
               </div>
@@ -168,9 +168,7 @@
           };
           reader.readAsDataURL(blob);
         }
-      } catch(e) {
-        console.log("No local icon.png found, using default.");
-      }
+      } catch(e) { console.log("No local icon.png found."); }
     };
 
     function gotoStep(n) {
@@ -257,7 +255,8 @@ $ - (Prefix) Saves as separate numeric column
       const code = tplBackend
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
-        .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value);
+        .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
+        .replace('%%PHOTOS_FOLDER_ID%%', ""); // FIX: Clear raw placeholder to avoid backend errors
       document.getElementById('codeDisplay').textContent = code.trim();
       gotoStep(3);
     }
@@ -308,9 +307,12 @@ $ - (Prefix) Saves as separate numeric column
       const isAdv = document.getElementById('chkAdvanced').checked;
       const mile = document.getElementById('chkMileage').checked;
 
+      // FIXED: Using %%GOOGLE_SHEET_URL%% to match the Worker Template!
+      // Also replacing both ORG_NAME tags to be safe.
       let wHtml = tplWorker
         .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%SHEET_URL%%/g, url)
+        .replace(/%%ORGANISATION_NAME%%/g, org)
+        .replace(/%%GOOGLE_SHEET_URL%%/g, url) 
         .replace(/%%LOGO_DATA%%/g, logoData)
         .replace('%%IS_ADVANCED%%', isAdv)
         .replace('%%ENABLE_MILEAGE%%', (isAdv && mile));
