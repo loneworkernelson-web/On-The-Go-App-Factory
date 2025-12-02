@@ -3,11 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>%%ORGANISATION_NAME%%</title>
+<title>%%ORG_NAME%%</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -28,8 +27,8 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
   <div id="page-main" class="page active h-full flex-col p-4 bg-gray-800">
     <header class="flex justify-between items-center mb-4">
       <div class="flex items-center gap-2">
-        <img src="https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png" class="w-8 h-8 rounded">
-        <h1 class="text-lg font-bold text-blue-400">%%ORGANISATION_NAME%%</h1>
+        <img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'">
+        <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
       </div>
       <button onclick="nav('settings')" class="p-2 bg-gray-700 rounded-full hover:bg-gray-600">⚙️</button>
     </header>
@@ -52,7 +51,7 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
     </div>
 
     <div class="flex gap-2">
-        <button id="btnQuick" onclick="quickStat()" class="flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50" disabled>Quick Stat</button>
+        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50" disabled>Quick Stat</button>
         <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
   </div>
@@ -90,7 +89,7 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
       
       <div class="pt-6 border-t border-gray-700">
         <p class="text-xs text-gray-500 mb-2">System URL</p>
-        <input id="set_url" disabled class="w-full p-3 bg-gray-900/50 rounded text-gray-500 text-xs font-mono" value="%%GOOGLE_SHEET_URL%%">
+        <input id="set_url" disabled class="w-full p-3 bg-gray-900/50 rounded text-gray-500 text-xs font-mono" value="%%SHEET_URL%%">
       </div>
        <button onclick="clearData()" class="w-full py-3 bg-red-900/50 text-red-400 rounded text-sm mt-4">Reset App Data</button>
     </div>
@@ -119,17 +118,17 @@ body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user
 const CONFIG = {
   isAdv: %%IS_ADVANCED%%,
   mileage: %%ENABLE_MILEAGE%%,
-  url: "%%GOOGLE_SHEET_URL%%",
-  org: "%%ORGANISATION_NAME%%"
+  url: "%%SHEET_URL%%",
+  org: "%%ORG_NAME%%"
 };
 
 const STEPS = [0,10,15,20,30,45,60,90,120,180,240,300];
 let state = { locs: [], active: null, settings: {}, queue: [] };
-let timerInt;
+let timerInt, tempPhoto=null;
 
 // --- INITIALIZATION ---
 window.onload = () => {
-  const s = localStorage.getItem('otg_state_v2');
+  const s = localStorage.getItem('otg_state_v3');
   if(s) state = { ...state, ...JSON.parse(s) };
 
   // Mileage Logic
@@ -142,6 +141,8 @@ window.onload = () => {
   }
 
   // Restore State
+  if(CONFIG.isAdv) document.getElementById('btnQuick').classList.remove('hidden');
+  
   if(!state.settings.pin) nav('settings');
   else if(state.active) startLockScreen();
   else nav('main');
@@ -237,9 +238,13 @@ function startVisit() {
       state.active.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
       send('ON SITE', 'Visit Started');
       save();
+    }, () => {
+      send('ON SITE', 'Visit Started (No GPS)');
+      save();
     });
   } else {
     send('ON SITE', 'Visit Started (No GPS)');
+    save();
   }
   
   save();
@@ -315,8 +320,7 @@ function iAmSafe() {
 
 function quickStat() {
     if(!state.sel) return;
-    const l = state.sel;
-    state.active = { lid: l.id, start: new Date().toISOString() }; // Mock active visit for logic
+    state.active = { lid: state.sel.id, start: new Date().toISOString() }; // Mock active visit for logic
     // Show Report Modal (Force Standard)
     const modal = document.getElementById('modal-report');
     const div = document.getElementById('reportFields');
@@ -326,14 +330,17 @@ function quickStat() {
     // Submit handler override for quick stat
     document.getElementById('btnSubmitRep').onclick = () => {
         let data = { notes: document.getElementById('rep_notes').value };
-        send('DATA_ENTRY_ONLY', data.notes);
+        if(tempPhoto) data.photo1 = tempPhoto;
+        send('DATA_ENTRY_ONLY', data.notes, data.photo1);
         state.active = null; 
+        tempPhoto = null;
         document.getElementById('modal-report').classList.add('hidden');
     };
 }
 
 // --- DEPART & REPORTING LOGIC ---
 function preDepart(isSafeFlow) {
+  // 1. Check PIN first (unless we just did it for I Am Safe)
   const pinProm = isSafeFlow ? Promise.resolve(true) : checkPin('normal');
   
   pinProm.then(ok => {
@@ -369,24 +376,27 @@ function preDepart(isSafeFlow) {
     } else {
        buildStandardReport(div);
     }
+    
+    // Restore normal submit handler
+    document.getElementById('btnSubmitRep').onclick = submitReport;
   });
 }
 
 function buildStandardReport(div) {
     div.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="w-full p-4 bg-gray-900 rounded-lg border border-gray-700 h-32 text-white"></textarea>';
     
-    // Photo Upload
+    // Photo Upload (Grok Feature)
     div.innerHTML += '<label class="block text-sm text-gray-400 mt-4">Attach Photo (Optional)</label><input id="rep_photo" type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2">';
     div.innerHTML += '<div id="photoPrev" class="mt-2 text-xs text-green-400 hidden">Photo compressed & ready.</div>';
     
-    // Compression
+    // Add compression listener
     setTimeout(() => {
         document.getElementById('rep_photo').addEventListener('change', async (e) => {
         if(e.target.files[0]) {
             document.getElementById('btnSubmitRep').innerText = 'Compressing...';
             document.getElementById('btnSubmitRep').disabled = true;
             try {
-                window.tempPhoto = await compressImg(e.target.files[0]);
+                tempPhoto = await compressImg(e.target.files[0]);
                 document.getElementById('photoPrev').classList.remove('hidden');
             } catch(err) { alert('Photo Error'); }
             document.getElementById('btnSubmitRep').innerText = 'Submit';
@@ -406,9 +416,9 @@ function submitReport() {
     data.notes = 'Distance Travelled: ' + (document.getElementById('rep_dist').value || '0') + ' km';
   } else {
     data.notes = document.getElementById('rep_notes').value;
-    if(window.tempPhoto) {
-      data.photo1 = window.tempPhoto;
-      window.tempPhoto = null; // Clear memory
+    if(tempPhoto) {
+      data.photo1 = tempPhoto;
+      tempPhoto = null; // Clear memory
     }
   }
   
@@ -542,7 +552,7 @@ function processQueue() {
   }
 }
 
-function save() { localStorage.setItem('otg_state_v2', JSON.stringify(state)); }
+function save() { localStorage.setItem('otg_state_v3', JSON.stringify(state)); }
 function saveSettings() {
   state.settings = {
     name: document.getElementById('set_name').value,
