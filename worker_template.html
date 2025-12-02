@@ -167,6 +167,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="space-y-4">
             <div><label class="text-xs text-gray-400 uppercase font-bold">Name</label><input type="text" id="locName" class="form-input"></div>
             <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><input type="text" id="locAddr" class="form-input"></div>
+            
             <div id="advLocOptions" class="pt-2 border-t border-gray-700">
                <label class="flex items-center justify-between p-2 bg-gray-900 rounded cursor-pointer mb-2">
                  <span class="text-sm text-gray-300">No Report Required</span>
@@ -178,7 +179,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="mt-6 flex justify-end space-x-3">
             <button type="button" id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
             <div class="flex-1"></div>
-            <button type="button" onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button type="button" id="cancelLocationBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
             <button type="button" onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
     </div>
@@ -227,7 +228,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
       <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2">
         </div>
       <div class="flex gap-3 flex-shrink-0">
-        <button type="button" onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
+        <button type="button" id="cancelReportBtn" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
         <button type="button" id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
       </div>
     </div>
@@ -271,18 +272,21 @@ let sigPad = null;
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
+    // 1. Load State
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
+    // 2. Enforce Config Updates
     state.settings.googleSheetUrl = CONFIG.url; 
 
+    // 3. Mileage Logic
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
             state.locations.unshift({ 
                 id: 'travel', 
                 name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
+                addr: 'Calculates Mileage via GPS', 
                 noReport: false, 
                 companyName: 'Internal', 
                 templateName: 'Travel Report' 
@@ -292,6 +296,7 @@ window.addEventListener('load', () => {
         state.locations = state.locations.filter(l => l.id !== 'travel');
     }
 
+    // 4. UI & Advanced Features
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -300,6 +305,7 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
+    // 5. Routing
     if(!state.settings.pinCode || !state.settings.workerName) {
         nav('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -310,6 +316,7 @@ window.addEventListener('load', () => {
         renderLocations();
     }
     
+    // 6. Background Tasks
     updateArrivedButtonState();
     processUploadQueue();
     document.body.addEventListener('click', initAudio, { once: true });
@@ -345,7 +352,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); 
+    }, 300000); // 5 Mins
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -711,6 +718,7 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
+    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -727,13 +735,18 @@ function buildReportForm(templateName, container) {
             else if(f.type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${f.text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button type="button" onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
             container.innerHTML += html;
         });
+        
+        // Auto-add notes field if missing
+        if(!tpl.find(f => f.text === 'Notes')) {
+             container.innerHTML += '<label class="block text-sm text-gray-400 mt-4">Additional Notes</label><textarea id="rep_notes_gen" class="form-input h-24"></textarea>';
+        }
     }
     
     const canvas = document.getElementById('sig-canvas');
     if(canvas) initSigPad(canvas);
 }
 
-// --- FORM HELPERS ---
+// --- SIGNATURE LOGIC ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -754,7 +767,7 @@ function clearSig() { if(sigPad) { const ctx = sigPad.getContext('2d'); ctx.clea
 
 function gatherFormData() {
     const data = { custom: {}, notes: '', sig: null, jsonPayload: {} };
-    const stdNotes = document.getElementById('rep_notes');
+    const stdNotes = document.getElementById('rep_notes') || document.getElementById('rep_notes_gen');
     if(stdNotes) data.notes = stdNotes.value;
 
     document.querySelectorAll('[data-key]').forEach(el => {
@@ -908,10 +921,7 @@ function post(data) {
         document.getElementById('uploadBanner').classList.remove('hidden');
         return;
     }
-
-    const fd = new FormData();
-    for(let k in data) fd.append(k, data[k]);
-    
+    const fd = new FormData(); for(let k in data) fd.append(k, data[k]);
     fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(() => {
         state.pendingUploads.push(data); saveState();
     });
