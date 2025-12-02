@@ -47,9 +47,9 @@
               <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key</label><input type="text" id="secretKey" class="input-field" value="ChangeMe123!"></div>
             </div>
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo (Optional)</label>
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo</label>
               <div class="relative cursor-pointer w-full" onclick="document.getElementById('logoInput').click()">
-                <div id="logoPreviewArea" class="h-32 w-32 mx-auto bg-gray-800 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden hover:border-blue-500 transition"><span class="text-gray-500 text-sm">Click to Upload</span><img id="logoImg" class="hidden h-full w-full object-cover"></div>
+                <div id="logoPreviewArea" class="h-32 w-32 mx-auto bg-gray-800 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden hover:border-blue-500 transition"><span id="logoText" class="text-gray-500 text-sm">Click to Upload<br>(or use icon.png)</span><img id="logoImg" class="hidden h-full w-full object-cover"></div>
               </div>
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
             </div>
@@ -84,7 +84,7 @@
             
             <div id="boxChecklists" class="highlight-box border-purple-500/50">
               <h3 class="font-bold text-lg mb-2 text-purple-400">3. 'Checklists' Tab</h3>
-              <p class="text-gray-400 text-sm mb-4">Create <strong>Checklists</strong> tab. Paste full setup (includes Mileage form) in A1.</p>
+              <p class="text-gray-400 text-sm mb-4">Create <strong>Checklists</strong> tab. Paste full setup in A1.</p>
               <button onclick="copyChecklistSetup()" class="w-full btn bg-gray-700 hover:bg-gray-600 text-white py-3">Copy Full Setup</button>
             </div>
           </div>
@@ -151,6 +151,27 @@
   <script>
     let logoData = "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png"; 
     let tplWorker = "", tplMonitor = "", tplBackend = "";
+
+    // --- ON LOAD: Try to find local icon.png ---
+    window.onload = async () => {
+      try {
+        const resp = await fetch('icon.png');
+        if(resp.ok) {
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          reader.onload = e => { 
+             logoData = e.target.result;
+             document.getElementById('logoImg').src = logoData;
+             document.getElementById('logoImg').classList.remove('hidden');
+             document.getElementById('logoText').textContent = "Loaded icon.png";
+             document.getElementById('logoPreviewArea').classList.add('border-blue-500');
+          };
+          reader.readAsDataURL(blob);
+        }
+      } catch(e) {
+        console.log("No local icon.png found, using default.");
+      }
+    };
 
     function gotoStep(n) {
       document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
