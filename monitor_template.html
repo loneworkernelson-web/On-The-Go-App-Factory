@@ -68,7 +68,7 @@ function login() {
     document.getElementById('dashboardPage').classList.remove('hidden'); 
     document.getElementById('dashboardPage').classList.add('flex'); 
     fetchData(); 
-    pollInt=setInterval(fetchData,15000); 
+    pollInt=setInterval(fetchData,10000); 
   }
 }
 
@@ -90,14 +90,10 @@ function fetchData() {
   window[cb] = (data) => {
     delete window[cb]; 
     document.body.removeChild(s);
+    if(data.status==='error') { alert('Access Denied. Check Key.'); logout(); return; }
     
-    if(data.status==='error') { 
-      alert('Access Denied. Check Key.'); 
-      logout(); 
-      return; 
-    }
+    processAndRender(data); 
     
-    render(data); 
     document.getElementById('status').className='w-3 h-3 rounded-full bg-green-500'; 
     document.getElementById('lastUpd').innerText=new Date().toLocaleTimeString();
   };
@@ -110,19 +106,36 @@ function fetchData() {
   document.body.appendChild(s);
 }
 
-function render(data) {
+function processAndRender(data) {
   const list = document.getElementById('workerList'); 
   list.innerHTML='';
   
-  // Filter active workers
-  const active = data.filter(w=>w['Alarm Status']!=='DEPARTED' && w['Alarm Status']!=='SAFE - MANUALLY CLEARED' && w['Alarm Status']!=='DATA_ENTRY_ONLY');
+  // 1. Group by Worker Name
+  const workers = {};
+  data.forEach(row => {
+    const name = row['Worker Name'];
+    // Assuming Timestamp is ISO string, string comparison works for sorting
+    if (!workers[name] || row['Timestamp'] > workers[name]['Timestamp']) {
+        workers[name] = row;
+    }
+  });
+
+  // 2. Filter for Active Statuses Only
+  const activeWorkers = Object.values(workers).filter(w => {
+      const status = w['Alarm Status'];
+      return status !== 'DEPARTED' && 
+             status !== 'SAFE - MANUALLY CLEARED' && 
+             status !== 'DATA_ENTRY_ONLY' &&
+             status !== 'CHECKLIST_SUBMITTED';
+  });
   
-  if(active.length === 0) {
+  if(activeWorkers.length === 0) {
     list.innerHTML = "<div class='col-span-full text-center text-gray-600 mt-20 text-xl'>No Active Workers</div>";
     return;
   }
 
-  active.forEach(w=>{
+  // 3. Render Cards
+  activeWorkers.forEach(w=>{
     const div = document.createElement('div');
     const isAlert = w['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/);
     
@@ -131,20 +144,31 @@ function render(data) {
     // Style card based on status
     let bgClass = 'bg-gray-700 border-blue-500 text-gray-200';
     if(isAlert) bgClass = 'bg-red-900 border-red-500 text-white animate-pulse';
+    else if(w['Location Name'] === 'Travelling') bgClass = 'bg-indigo-900 border-indigo-500 text-white';
     
-    div.className = `p-6 rounded-xl shadow-lg border-l-8 ${bgClass} flex flex-col justify-between`;
+    div.className = `p-6 rounded-xl shadow-lg border-l-8 ${bgClass} flex flex-col justify-between transition-all`;
     
+    // Calculate Time on Site
+    let timeDisplay = "";
+    if(w['Timestamp']) {
+        const start = new Date(w['Timestamp']);
+        const now = new Date();
+        const diffMins = Math.floor((now - start) / 60000);
+        timeDisplay = `${diffMins} min ago`;
+    }
+
     div.innerHTML = `
       <div>
         <div class="flex justify-between items-start">
-          <div class="font-bold text-2xl">${w['Worker Name']}</div>
-          <div class="text-xs font-mono opacity-50">${w['Timestamp'].split('T')[1]?.substring(0,5) || ''}</div>
+          <div class="font-bold text-2xl truncate w-3/4">${w['Worker Name']}</div>
+          <div class="text-xs font-mono opacity-50 whitespace-nowrap">${timeDisplay}</div>
         </div>
-        <div class="text-lg opacity-75 mb-4">${w['Location Name']}</div>
-        <div class="mt-2 font-mono font-bold bg-black/20 p-2 rounded text-center">${w['Alarm Status']}</div>
+        <div class="text-lg opacity-75 mb-4 truncate">${w['Location Name']}</div>
+        <div class="mt-2 font-mono font-bold bg-black/20 p-2 rounded text-center text-sm truncate">${w['Alarm Status']}</div>
       </div>
       <div class="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-sm">
-        <a href="tel:${w['Worker Phone']}" class="hover:text-blue-300">📞 Call</a>
+        <a href="tel:${w['Worker Phone']}" class="hover:text-blue-300 flex items-center gap-1">📞 Call</a>
+        <a href="tel:${w['Emergency Contact Number']}" class="hover:text-green-300 flex items-center gap-1 text-xs opacity-70">🚑 Emg.</a>
         <a target="_blank" href="http://maps.google.com/?q=${w['Last Known GPS']}" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 text-white">📍 Map</a>
       </div>
     `;
