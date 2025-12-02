@@ -21,7 +21,7 @@ body {
     -webkit-tap-highlight-color: transparent; 
     user-select: none; 
     overscroll-behavior-y: contain; 
-    background-color: #111827; /* Hardcoded Dark BG */
+    background-color: #111827; 
     color: white;
 }
 .page { display: none; height: 100%; flex-direction: column; }
@@ -41,45 +41,15 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- BULLETPROOF SETTINGS STYLES (v15 Fix) --- */
-/* Replacing @apply with standard CSS to ensure dark mode works even if CDN lags */
-.setting-card { 
-    background-color: #1f2937; /* Gray-800 */
-    padding: 1.25rem; 
-    border-radius: 0.75rem; 
-    border: 1px solid #374151; 
-    margin-bottom: 1rem; 
-}
-.setting-label { 
-    display: block;
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.5rem; 
-}
-.form-input { 
-    width: 100%; 
-    background-color: #111827; /* Gray-900 */
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem;
-    outline: none; 
-    margin-bottom: 0.75rem;
-    display: block;
-}
-.form-input:focus {
-    border-color: #3b82f6; /* Blue-500 */
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-}
-/* Colors for Labels */
-.lbl-blue { color: #60a5fa; }
-.lbl-green { color: #4ade80; }
-.lbl-purple { color: #c084fc; }
-.lbl-red { color: #f87171; }
-.lbl-gray { color: #9ca3af; }
+/* --- SETTINGS CARDS --- */
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+
+/* Colors */
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -94,7 +64,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
         <div class="flex gap-2">
             <button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button>
-            <button onclick="nav('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
+            <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
         </div>
     </header>
 
@@ -148,7 +118,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="settingsPage" class="page p-4 bg-gray-800">
     <header class="flex justify-between mb-4 flex-shrink-0 items-center">
         <h1 class="text-2xl font-bold text-white">Settings</h1>
-        <button id="btnCloseSettings" onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
+        <button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
     </header>
     
     <div class="flex-1 overflow-y-auto pb-4">
@@ -158,22 +128,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
         <div class="setting-card">
             <label class="setting-label lbl-blue">Your Details *</label>
-            <input id="set_name" class="form-input" placeholder="Full Name">
-            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+            <input id="set_name" class="form-input-card" placeholder="Full Name">
+            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
         </div>
 
         <div class="setting-card">
             <label class="setting-label lbl-green">Emergency Contact *</label>
-            <input id="set_emg_name" class="form-input" placeholder="Name">
-            <input id="set_emg_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
-            <input id="set_emg_email" type="email" class="form-input" placeholder="Email">
+            <input id="set_emg_name" class="form-input-card" placeholder="Name">
+            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email">
         </div>
 
         <div class="setting-card">
             <label class="setting-label lbl-purple">Escalation Contact</label>
-            <input id="set_esc_name" class="form-input" placeholder="Name">
-            <input id="set_esc_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
-            <input id="set_esc_email" type="email" class="form-input" placeholder="Email">
+            <input id="set_esc_name" class="form-input-card" placeholder="Name">
+            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email">
         </div>
 
         <div class="setting-card">
@@ -186,7 +156,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
         <div class="setting-card border-gray-600">
             <label class="setting-label lbl-gray">System URL</label>
-            <input id="set_url" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
+            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
             <div class="flex gap-2 mt-2">
                 <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
                 <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
@@ -349,12 +319,12 @@ window.addEventListener('load', () => {
 
     // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
-        nav('settings');
+        navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
     } else if(state.activeVisit) {
         enterLockedScreen();
     } else {
-        nav('main');
+        navigate('main');
         renderLocations();
     }
     
@@ -365,7 +335,7 @@ window.addEventListener('load', () => {
 });
 
 // ==================== NAVIGATION ====================
-function nav(page) {
+function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
     
@@ -447,7 +417,7 @@ function playSoundAndVibrate(action) {
 }
 
 // ==================== LOCATION LOGIC ====================
-function renderLocs() {
+function renderLocations() {
     const list = document.getElementById('locationList');
     list.innerHTML = '';
     if(!state.locations) state.locations = [];
@@ -466,7 +436,7 @@ function renderLocs() {
         el.onclick = (e) => {
             if(e.target.tagName !== 'BUTTON') { 
                 state.selectedLocationId = l.id; 
-                renderLocs(); 
+                renderLocations(); 
                 updateArrivedButtonState(); 
             }
         };
@@ -514,7 +484,7 @@ function saveLoc() {
     } else {
         state.locations.push({ id: Date.now().toString(), name, address: addr, templateName: tpl, noReport: noRep });
     }
-    saveState(); renderLocs(); closeModal('location'); syncForms();
+    saveState(); renderLocations(); closeModal('location'); syncForms();
 }
 
 function deleteLoc() {
@@ -523,7 +493,7 @@ function deleteLoc() {
     if(confirm('Delete location?')) {
         state.locations = state.locations.filter(l => l.id !== id);
         if(state.selectedLocationId === id) state.selectedLocationId = null;
-        saveState(); renderLocs(); closeModal('location');
+        saveState(); renderLocations(); closeModal('location');
     }
 }
 
@@ -568,7 +538,7 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic (v20 ENABLED FOR TRAVEL)
+        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
@@ -789,7 +759,6 @@ function quickStat() {
         };
         
         if(d.photo1) data["Photo 1"] = d.photo1;
-        // v20 FIX: Explicit Distance Mapping
         if(d.custom["$Distance (km)"]) data["Distance"] = d.custom["$Distance (km)"];
         
         sendToGoogleSheet(data);
@@ -956,7 +925,6 @@ function captureGPS(btn, key) {
 // --- NETWORK ---
 function sendToGoogleSheet(data) {
     if(!state.settings.googleSheetUrl) return;
-    
     const payload = {
         'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
         'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
@@ -978,7 +946,7 @@ function sendToGoogleSheet(data) {
 function finalizeSend(payload) {
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
-        processUploadQueue(payload);
+        processUploadQueue(payload); // v12 FIX
     }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; processUploadQueue(payload); });
 }
 
@@ -1009,7 +977,6 @@ function processUploadQueue(newData = null) {
                 processUploadQueue(); // Recursive
             })
             .catch(() => {
-                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
@@ -1043,7 +1010,7 @@ function saveSettings() {
     pinCode: pin, duressPin: duressPin,
     googleSheetUrl: CONFIG.url
   };
-  saveState(); nav('main'); 
+  saveState(); navigate('main'); 
   document.getElementById('btnCloseSettings').style.display = 'block';
   renderLocations(); updateArrivedButtonState();
 }
