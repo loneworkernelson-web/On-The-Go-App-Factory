@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OTG AppSuite Factory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .step-section { display: none; }
+    .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* High Contrast Inputs */
+    .input-field { 
+      width: 100%; background: #1e293b; border: 2px solid #475569; 
+      padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; 
+      transition: all 0.2s; 
+    }
+    .input-field:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+    
+    /* Code Window */
+    .code-scroll { 
+      background: #020617; border: 1px solid #334155; border-radius: 0.5rem; 
+      padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.85rem; 
+      color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; 
+    }
+  </style>
+</head>
+<body class="min-h-screen py-12 px-4">
+
+  <div class="max-w-4xl mx-auto">
+    <header class="text-center mb-12">
+      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-4">OTG AppSuite Factory</h1>
+      <p class="text-gray-400 text-lg">Build. Customize. Deploy.</p>
+    </header>
+
+    <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
+      
+      <div class="flex bg-gray-900 border-b border-gray-700">
+        <div id="tab1" class="flex-1 py-5 text-center font-bold text-blue-400 border-b-4 border-blue-500 bg-gray-800">1. Configuration</div>
+        <div id="tab2" class="flex-1 py-5 text-center font-bold text-gray-500">2. Backend Script</div>
+        <div id="tab3" class="flex-1 py-5 text-center font-bold text-gray-500">3. Download</div>
+      </div>
+
+      <div class="p-10">
+        
+        <div id="step1" class="step-section active space-y-8">
+          <div class="grid md:grid-cols-2 gap-8">
+            <div>
+              <label class="block text-blue-300 font-bold mb-2 uppercase tracking-wider text-sm">Organisation Name</label>
+              <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Safety" value="My Organisation">
+            </div>
+            <div>
+              <label class="block text-blue-300 font-bold mb-2 uppercase tracking-wider text-sm">Secret Key</label>
+              <input type="text" id="secretKey" class="input-field" placeholder="Secure Password" value="ChangeMe123!">
+            </div>
+          </div>
+
+          <div class="bg-gray-900/50 p-6 rounded-xl border border-gray-700 space-y-6">
+            <h3 class="text-xl font-bold text-white">Feature Selection</h3>
+            
+            <label class="flex items-center gap-4 cursor-pointer group">
+              <div class="relative">
+                <input type="checkbox" id="chkAdvanced" class="sr-only peer" checked onchange="toggleAdvanced()">
+                <div class="w-14 h-8 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-blue-600"></div>
+              </div>
+              <div>
+                <span class="block font-bold text-lg text-white group-hover:text-blue-300 transition">Advanced Mode</span>
+                <span class="text-gray-400 text-sm">Includes Photos, Signatures, Checklists, and Reports.</span>
+              </div>
+            </label>
+
+            <div id="advancedOptions" class="pl-4 ml-4 border-l-2 border-gray-700 space-y-5">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" id="chkMileage" class="w-6 h-6 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500">
+                <span class="text-gray-200 font-semibold">Enable Mileage / Travelling Feature</span>
+              </label>
+
+              <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService API Key (Optional)</label>
+                  <input type="text" id="orsKey" class="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm text-yellow-300 placeholder-gray-600" placeholder="For road-based distance">
+                </div>
+                <div>
+                  <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini API Key (Optional)</label>
+                  <input type="text" id="geminiKey" class="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm text-purple-300 placeholder-gray-600" placeholder="For AI grammar correction">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button onclick="generateBackend()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-xl text-xl shadow-lg transition transform hover:-translate-y-1">Next Step &rarr;</button>
+          </div>
+        </div>
+
+        <div id="step2" class="step-section space-y-8">
+          <div class="bg-blue-900/20 border border-blue-500/30 p-6 rounded-xl text-center">
+            <p class="text-xl text-blue-200 mb-2"><strong>Step 2.1:</strong> Deploy the Brain</p>
+            <p class="text-gray-400 text-sm">Copy the code below, paste it into <a href="https://script.new" target="_blank" class="text-blue-400 hover:underline font-bold">script.new</a>, and Deploy as Web App (Anyone).</p>
+          </div>
+
+          <div class="relative">
+            <div class="absolute top-2 right-2">
+              <button onclick="copyScript()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded border border-gray-600">COPY ALL CODE</button>
+            </div>
+            <pre id="codeDisplay" class="code-scroll">Loading template...</pre>
+          </div>
+
+          <div>
+            <label class="block text-green-400 font-bold mb-3 text-lg text-center">Step 2.2: Paste the Web App URL here</label>
+            <input type="text" id="webAppUrl" class="input-field text-center text-yellow-300 font-mono border-green-500/50" placeholder="https://script.google.com/macros/s/..../exec">
+          </div>
+
+          <div class="flex justify-between pt-4">
+            <button onclick="showStep(1)" class="text-gray-400 hover:text-white font-bold px-4">Back</button>
+            <button onclick="validateAndNext()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-10 rounded-xl text-xl shadow-lg transition transform hover:-translate-y-1">Generate App Package &rarr;</button>
+          </div>
+        </div>
+
+        <div id="step3" class="step-section text-center space-y-10 py-8">
+          <div>
+            <h2 class="text-4xl font-bold text-white mb-4">Ready to Build</h2>
+            <p class="text-gray-400">Your custom On-the-Go AppSuite is configured and ready.</p>
+          </div>
+
+          <button onclick="downloadZip()" class="w-full max-w-md mx-auto bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-bold py-6 rounded-2xl text-2xl shadow-2xl transition transform hover:scale-105 flex items-center justify-center gap-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Download ZIP
+          </button>
+
+          <div class="bg-gray-900 rounded-xl p-6 max-w-lg mx-auto text-left text-sm text-gray-400 border border-gray-700">
+            <p class="font-bold text-gray-300 mb-2">Next Steps:</p>
+            <ol class="list-decimal pl-5 space-y-1">
+              <li>Unzip the downloaded file.</li>
+              <li>Upload the <strong>WorkerApp</strong> and <strong>MonitorApp</strong> folders to GitHub.</li>
+              <li>Enable GitHub Pages.</li>
+              <li>Send the link to your team.</li>
+            </ol>
+          </div>
+          
+          <button onclick="showStep(2)" class="text-gray-500 hover:text-white text-sm">Back to Script</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+  let backendTemplate = "";
+  let workerTemplate = "";
+  let monitorTemplate = `<!DOCTYPE html><html><body style="background:#111;color:#fff;font-family:sans-serif;text-align:center;padding:50px;"><h1>Monitor</h1><p>Please use the files generated in the MonitorApp folder.</p></body></html>`;
+
+  // --- INITIALIZATION ---
+  window.onload = async () => {
+    try {
+      backendTemplate = await fetch('backend_template.gs').then(r => r.text());
+      workerTemplate = await fetch('worker_template.html').then(r => r.text());
+      // monitorTemplate = await fetch('monitor_template.html').then(r => r.text()); // Optional if you have it
+    } catch(e) {
+      alert("Error loading templates. Ensure setup.html, worker_template.html, and backend_template.gs are in the same folder.");
+    }
+  };
+
+  // --- NAVIGATION ---
+  function showStep(n) {
+    document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
+    document.getElementById('step'+n).classList.add('active');
+    
+    // Update Tabs
+    [1,2,3].forEach(i => {
+      const tab = document.getElementById('tab'+i);
+      if(i === n) {
+        tab.className = "flex-1 py-5 text-center font-bold text-blue-400 border-b-4 border-blue-500 bg-gray-800";
+      } else {
+        tab.className = "flex-1 py-5 text-center font-bold text-gray-500 hover:bg-gray-800/50 cursor-pointer";
+        tab.onclick = () => showStep(i);
+      }
+    });
+  }
+
+  function toggleAdvanced() {
+    const isAdv = document.getElementById('chkAdvanced').checked;
+    document.getElementById('advancedOptions').style.opacity = isAdv ? "1" : "0.3";
+    document.getElementById('advancedOptions').style.pointerEvents = isAdv ? "auto" : "none";
+  }
+
+  // --- GENERATION LOGIC ---
+  function generateBackend() {
+    const secret = document.getElementById('secretKey').value;
+    const ors = document.getElementById('orsKey').value;
+    const gemini = document.getElementById('geminiKey').value;
+    const isAdv = document.getElementById('chkAdvanced').checked;
+
+    let code = backendTemplate
+      .replace('%%SECRET_KEY%%', secret)
+      .replace('%%ORS_API_KEY%%', ors)
+      .replace('%%GEMINI_API_KEY%%', gemini);
+      
+    document.getElementById('codeDisplay').textContent = code;
+    showStep(2);
+  }
+
+  function copyScript() {
+    navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent);
+    alert("Script copied to clipboard!");
+  }
+
+  function validateAndNext() {
+    const url = document.getElementById('webAppUrl').value;
+    if(!url.includes('/exec')) {
+      alert("Please enter a valid Web App URL (ending in /exec)");
+      return;
+    }
+    showStep(3);
+  }
+
+  function downloadZip() {
+    const zip = new JSZip();
+    const org = document.getElementById('orgName').value;
+    const url = document.getElementById('webAppUrl').value;
+    const isAdv = document.getElementById('chkAdvanced').checked;
+    const mileage = document.getElementById('chkMileage').checked;
+
+    // 1. Worker App
+    let finalWorker = workerTemplate
+      .replace(/%%ORGANISATION_NAME%%/g, org)
+      .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+      .replace('%%IS_ADVANCED%%', isAdv)
+      .replace('%%ENABLE_MILEAGE%%', (isAdv && mileage));
+
+    const wFolder = zip.folder("WorkerApp");
+    wFolder.file("index.html", finalWorker);
+    wFolder.file("manifest.json", JSON.stringify({
+      name: org + " Safety",
+      short_name: "Safety",
+      start_url: "./index.html",
+      display: "standalone",
+      background_color: "#111827",
+      theme_color: "#1e40af",
+      icons: [{ src: "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png", sizes: "512x512", type: "image/png" }]
+    }, null, 2));
+    wFolder.file("sw.js", "self.addEventListener('fetch', () => {});"); // Basic SW
+
+    // 2. Monitor App (Basic placeholder for now, or use your monitor template if you save it)
+    const mFolder = zip.folder("MonitorApp");
+    mFolder.file("index.html", monitorTemplate.replace('%%ORGANISATION_NAME%%', org));
+
+    // 3. Backup
+    zip.file("AppsScript_Backup.txt", document.getElementById('codeDisplay').textContent);
+
+    zip.generateAsync({type:"blob"}).then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = org.replace(/[^a-z0-9]/gi, '_') + "_AppSuite.zip";
+      a.click();
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>%%ORGANISATION_NAME%%</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<style>
+body{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+.page{display:none}.page.active{display:flex}
+.long-press-btn{position:relative;overflow:hidden;transition:all 0.2s}
+.long-press-btn::after{content:'';position:absolute;top:0;left:0;width:0;height:100%;background:rgba(255,255,255,0.3);transition:width linear}
+.long-press-btn.pressing::after{width:100%}
+.spinner{border:3px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;width:20px;height:20px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body class="bg-gray-900 text-white h-full overflow-hidden">
+
+<div id="app" class="h-full flex flex-col">
+
+  <div id="page-main" class="page active h-full flex-col p-4 bg-gray-800">
+    <header class="flex justify-between items-center mb-4">
+      <div class="flex items-center gap-2">
+        <img src="https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png" class="w-8 h-8 rounded">
+        <h1 class="text-lg font-bold text-blue-400">%%ORGANISATION_NAME%%</h1>
+      </div>
+      <button onclick="nav('settings')" class="p-2 bg-gray-700 rounded-full hover:bg-gray-600">⚙️</button>
+    </header>
+
+    <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2">
+      <div class="spinner"></div> Syncing offline reports...
+    </div>
+
+    <div class="flex-1 overflow-y-auto mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700">
+      <div id="locationList" class="space-y-2"></div>
+      <button onclick="addLocation()" class="mt-4 w-full py-3 border-2 border-dashed border-gray-600 text-gray-400 rounded hover:border-gray-500 hover:text-white transition">+ Add Location</button>
+    </div>
+
+    <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700">
+      <div class="flex justify-between mb-2">
+        <span class="text-gray-400 text-sm uppercase font-bold">Duration</span>
+        <span id="durDisplay" class="font-bold text-blue-400">0 min</span>
+      </div>
+      <input type="range" id="durSlider" min="0" max="11" step="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" oninput="updateDur()">
+    </div>
+
+    <div class="flex gap-2">
+        <button id="btnQuick" onclick="quickStat()" class="flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50" disabled>Quick Stat</button>
+        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+    </div>
+  </div>
+
+  <div id="page-locked" class="page h-full flex-col p-6 text-center justify-between bg-gray-900">
+    <div class="flex justify-end">
+      <button onclick="triggerPanic()" class="w-16 h-16 bg-red-600 rounded-full font-bold text-white border-4 border-red-800 shadow-lg active:scale-95 transition">SOS</button>
+    </div>
+    
+    <div>
+      <p class="text-gray-500 text-sm uppercase tracking-widest">Currently At</p>
+      <h2 id="lockLoc" class="text-3xl font-bold text-white mb-6 mt-1"></h2>
+      <div id="timer" class="text-7xl font-bold font-mono text-white tracking-tighter">00:00</div>
+      <p class="text-gray-400 mt-2">Due: <span id="lockDue" class="text-blue-400 font-bold"></span></p>
+    </div>
+
+    <div class="space-y-3 w-full">
+      <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
+      <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
+      <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+    </div>
+  </div>
+
+  <div id="page-settings" class="page h-full flex-col p-6 bg-gray-800">
+    <header class="flex justify-between mb-8">
+      <h1 class="text-3xl font-bold text-white">Settings</h1>
+      <button onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
+    </header>
+    
+    <div class="space-y-5 flex-1 overflow-y-auto">
+      <div><label class="text-xs text-gray-400">Your Name</label><input id="set_name" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700"></div>
+      <div><label class="text-xs text-gray-400">Your Phone</label><input id="set_phone" type="tel" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700"></div>
+      <div><label class="text-xs text-gray-400">Normal PIN (4 digits)</label><input id="set_pin" type="tel" maxlength="4" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700"></div>
+      <div><label class="text-xs text-gray-400">Duress PIN (4 digits)</label><input id="set_duress" type="tel" maxlength="4" class="w-full p-4 bg-gray-900 rounded-lg text-white border border-gray-700"></div>
+      
+      <div class="pt-6 border-t border-gray-700">
+        <p class="text-xs text-gray-500 mb-2">System URL</p>
+        <input id="set_url" disabled class="w-full p-3 bg-gray-900/50 rounded text-gray-500 text-xs font-mono" value="%%GOOGLE_SHEET_URL%%">
+      </div>
+       <button onclick="clearData()" class="w-full py-3 bg-red-900/50 text-red-400 rounded text-sm mt-4">Reset App Data</button>
+    </div>
+    
+    <button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mt-4">Save Settings</button>
+  </div>
+
+  <div id="modal-report" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 animate-fade">
+    <div class="bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl">
+      <h2 class="text-2xl font-bold text-white mb-6" id="reportTitle">Visit Report</h2>
+      
+      <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2">
+        </div>
+
+      <div class="flex gap-3">
+        <button onclick="closeReport()" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
+        <button onclick="submitReport()" id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// --- INJECTED CONFIG ---
+const CONFIG = {
+  isAdv: %%IS_ADVANCED%%,
+  mileage: %%ENABLE_MILEAGE%%,
+  url: "%%GOOGLE_SHEET_URL%%",
+  org: "%%ORGANISATION_NAME%%"
+};
+
+const STEPS = [0,10,15,20,30,45,60,90,120,180,240,300];
+let state = { locs: [], active: null, settings: {}, queue: [] };
+let timerInt;
+
+// --- INITIALIZATION ---
+window.onload = () => {
+  const s = localStorage.getItem('otg_state_v2');
+  if(s) state = { ...state, ...JSON.parse(s) };
+
+  // Mileage Logic
+  if(CONFIG.mileage) {
+    if(!state.locs.find(l => l.id === 'travel')) {
+      state.locs.unshift({id: 'travel', name: 'Travelling', addr: 'GPS Tracking Active', noRep: false});
+    }
+  } else {
+    state.locs = state.locs.filter(l => l.id !== 'travel');
+  }
+
+  // Restore State
+  if(!state.settings.pin) nav('settings');
+  else if(state.active) startLockScreen();
+  else nav('main');
+
+  renderLocs();
+  processQueue();
+};
+
+function nav(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+}
+
+// --- LOCATION LOGIC ---
+function renderLocs() {
+  const list = document.getElementById('locationList');
+  list.innerHTML = '';
+  state.locs.forEach(l => {
+    const el = document.createElement('div');
+    el.className = 'p-4 bg-gray-800 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all';
+    if(state.sel && state.sel.id === l.id) el.classList.add('border-blue-500', 'bg-gray-700');
+    
+    let html = '<div><div class="font-bold text-white text-lg">'+l.name+'</div><div class="text-sm text-gray-400">'+l.addr+'</div></div>';
+    if(l.id !== 'travel') html += '<button class="text-gray-600 hover:text-red-400 px-3 py-2 text-xl font-bold" onclick="delLoc(\''+l.id+'\', event)">×</button>';
+    
+    el.innerHTML = html;
+    el.onclick = (e) => {
+      if(e.target.tagName === 'BUTTON') return;
+      state.sel = l;
+      renderLocs(); // Re-render to show selection
+      updateDur();
+    };
+    list.appendChild(el);
+  });
+}
+
+function addLoc() {
+  const n = prompt('Location Name:'); if(!n) return;
+  const a = prompt('Address:');
+  state.locs.push({id: Date.now().toString(), name: n, addr: a||''});
+  save(); renderLocs();
+}
+
+function delLoc(id, e) {
+  e.stopPropagation();
+  if(confirm('Delete this location?')) { state.locs = state.locs.filter(l => l.id !== id); save(); renderLocs(); }
+}
+
+// --- VISIT LOGIC ---
+function updateDur() {
+  const idx = document.getElementById('durSlider').value;
+  const min = STEPS[idx];
+  document.getElementById('durDisplay').innerText = min + ' min';
+  const btn = document.getElementById('btnStart');
+  const btnQ = document.getElementById('btnQuick');
+  
+  if(state.sel) {
+    if(CONFIG.isAdv && state.sel.id !== 'travel') {
+        btnQ.disabled = false; 
+        btnQ.classList.remove('opacity-50', 'bg-teal-900', 'text-teal-500');
+        btnQ.classList.add('bg-teal-600', 'text-white', 'hover:bg-teal-500');
+    }
+    
+    if(min > 0) {
+      btn.disabled = false;
+      btn.innerText = 'HOLD TO START';
+      btn.className = 'long-press-btn flex-[2] py-5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xl shadow-lg transition-all';
+      setupLongPress(btn, startVisit);
+    } else {
+      btn.disabled = true;
+      btn.innerText = 'Set Duration';
+      btn.className = 'long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all';
+    }
+  } else {
+    btn.disabled = true;
+    btn.innerText = 'Select Location';
+  }
+}
+
+function startVisit() {
+  const min = STEPS[document.getElementById('durSlider').value];
+  const now = new Date();
+  state.active = {
+    lid: state.sel.id,
+    start: now.toISOString(),
+    due: new Date(now.getTime() + min*60000).toISOString(),
+    gpsStart: null
+  };
+  
+  // Capture Start GPS for Mileage
+  if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      state.active.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
+      send('ON SITE', 'Visit Started');
+      save();
+    });
+  } else {
+    send('ON SITE', 'Visit Started (No GPS)');
+  }
+  
+  save();
+  startLockScreen();
+}
+
+function startLockScreen() {
+  const l = state.locs.find(x => x.id === state.active.lid) || {name: 'Unknown'};
+  document.getElementById('lockLoc').innerText = l.name;
+  nav('locked');
+  
+  setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
+  setupLongPress(document.getElementById('btnExtend'), extend);
+  
+  // Alert State Logic
+  const alertCont = document.getElementById('btnSafe');
+  const departBtn = document.getElementById('btnDepart');
+  
+  // Timer
+  if(timerInt) clearInterval(timerInt);
+  timerInt = setInterval(() => {
+    const now = new Date();
+    const due = new Date(state.active.due);
+    const rem = due - now;
+    
+    // Update Clock
+    if(rem < 0) {
+       document.getElementById('timer').innerText = 'OVERDUE';
+       document.getElementById('timer').classList.replace('text-white', 'text-red-500');
+       // Show Safe Button
+       alertCont.classList.remove('hidden');
+       setupLongPress(alertCont, () => iAmSafe());
+       departBtn.classList.add('hidden');
+    } else {
+       const m = Math.floor(rem/60000);
+       const s = Math.floor((rem%60000)/1000);
+       document.getElementById('timer').innerText = m + ':' + (s<10?'0':'')+s;
+       document.getElementById('timer').classList.replace('text-red-500', 'text-white');
+       document.getElementById('lockDue').innerText = due.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+       alertCont.classList.add('hidden');
+       departBtn.classList.remove('hidden');
+    }
+  }, 1000);
+}
+
+function extend() {
+  checkPin('normal').then(ok => {
+    if(ok) {
+      const due = new Date(state.active.due);
+      state.active.due = new Date(due.getTime() + 15*60000).toISOString();
+      save();
+      send('EXTENDED', 'Extended 15m');
+      alert('Extended 15 minutes.');
+    }
+  });
+}
+
+function triggerPanic() {
+  if(confirm('CONFIRM SOS ALERT?')) {
+    send('EMERGENCY - PANIC BUTTON', 'Panic Button Pressed');
+    alert('PANIC ALERT SENT');
+  }
+}
+
+function iAmSafe() {
+  checkPin('normal').then(ok => {
+    if(ok) {
+      send('SAFE - MANUALLY CLEARED', 'Worker confirmed safe');
+      preDepart(true); // Now go to report
+    }
+  });
+}
+
+function quickStat() {
+    if(!state.sel) return;
+    const l = state.sel;
+    state.active = { lid: l.id, start: new Date().toISOString() }; // Mock active visit for logic
+    // Show Report Modal (Force Standard)
+    const modal = document.getElementById('modal-report');
+    const div = document.getElementById('reportFields');
+    div.innerHTML = '';
+    modal.classList.remove('hidden');
+    buildStandardReport(div);
+    // Submit handler override for quick stat
+    document.getElementById('btnSubmitRep').onclick = () => {
+        let data = { notes: document.getElementById('rep_notes').value };
+        send('DATA_ENTRY_ONLY', data.notes);
+        state.active = null; 
+        document.getElementById('modal-report').classList.add('hidden');
+    };
+}
+
+// --- DEPART & REPORTING LOGIC ---
+function preDepart(isSafeFlow) {
+  const pinProm = isSafeFlow ? Promise.resolve(true) : checkPin('normal');
+  
+  pinProm.then(ok => {
+    if(!ok) return;
+    
+    // If not advanced, just end it
+    if(!CONFIG.isAdv) { completeDepart({}); return; }
+
+    // Setup Report Modal
+    const modal = document.getElementById('modal-report');
+    const div = document.getElementById('reportFields');
+    div.innerHTML = '';
+    modal.classList.remove('hidden');
+    
+    const l = state.locs.find(x => x.id === state.active.lid);
+
+    // A. MILEAGE REPORT
+    if(l.id === 'travel' && CONFIG.mileage) {
+       div.innerHTML = '<h3 class="font-bold text-blue-400">Mileage Report</h3><p class="text-sm text-gray-400">Confirm distance travelled.</p>';
+       div.innerHTML += '<label class="block text-sm text-gray-400 mt-4">Distance (km)</label><input id="rep_dist" type="number" step="0.1" class="w-full p-4 bg-gray-900 rounded-lg border border-gray-700 text-white text-xl">';
+       div.innerHTML += '<div id="distCalc" class="text-xs text-blue-400 mt-2">Calculating GPS distance...</div>';
+       
+       navigator.geolocation.getCurrentPosition(pos => {
+         const end = pos.coords.latitude + ',' + pos.coords.longitude;
+         if(state.active.gpsStart) {
+           const km = calcDist(state.active.gpsStart, end);
+           document.getElementById('rep_dist').value = km;
+           document.getElementById('distCalc').innerText = 'GPS Calculated: ' + km + ' km';
+         }
+       });
+
+    // B. STANDARD REPORT
+    } else {
+       buildStandardReport(div);
+    }
+  });
+}
+
+function buildStandardReport(div) {
+    div.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="w-full p-4 bg-gray-900 rounded-lg border border-gray-700 h-32 text-white"></textarea>';
+    
+    // Photo Upload
+    div.innerHTML += '<label class="block text-sm text-gray-400 mt-4">Attach Photo (Optional)</label><input id="rep_photo" type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2">';
+    div.innerHTML += '<div id="photoPrev" class="mt-2 text-xs text-green-400 hidden">Photo compressed & ready.</div>';
+    
+    // Compression
+    setTimeout(() => {
+        document.getElementById('rep_photo').addEventListener('change', async (e) => {
+        if(e.target.files[0]) {
+            document.getElementById('btnSubmitRep').innerText = 'Compressing...';
+            document.getElementById('btnSubmitRep').disabled = true;
+            try {
+                window.tempPhoto = await compressImg(e.target.files[0]);
+                document.getElementById('photoPrev').classList.remove('hidden');
+            } catch(err) { alert('Photo Error'); }
+            document.getElementById('btnSubmitRep').innerText = 'Submit';
+            document.getElementById('btnSubmitRep').disabled = false;
+        }
+        });
+    }, 100);
+}
+
+function closeReport() { document.getElementById('modal-report').classList.add('hidden'); }
+
+function submitReport() {
+  const l = state.locs.find(x => x.id === state.active.lid);
+  let data = {};
+
+  if(l.id === 'travel' && CONFIG.mileage) {
+    data.notes = 'Distance Travelled: ' + (document.getElementById('rep_dist').value || '0') + ' km';
+  } else {
+    data.notes = document.getElementById('rep_notes').value;
+    if(window.tempPhoto) {
+      data.photo1 = window.tempPhoto;
+      window.tempPhoto = null; // Clear memory
+    }
+  }
+  
+  completeDepart(data);
+  closeReport();
+}
+
+function completeDepart(data) {
+  send('DEPARTED', data.notes || '', data.photo1);
+  state.active = null;
+  save();
+  nav('main');
+}
+
+// --- UTILITIES ---
+function checkPin(type) {
+  return new Promise(resolve => {
+    const p = prompt(type==='normal' ? 'Enter PIN:' : 'Enter Duress PIN:');
+    if(p === state.settings.duressPin && state.settings.duressPin) {
+       send('DURESS_CODE_ACTIVATED', 'Silent Alarm Triggered');
+       alert('Alert Cancelled'); // Fake message
+       resolve(false);
+    } else if (p === state.settings.pin) {
+       resolve(true);
+    } else {
+       alert('Incorrect PIN');
+       resolve(false);
+    }
+  });
+}
+
+function setupLongPress(btn, cb) {
+  let t;
+  const start = (e) => { e.preventDefault(); btn.classList.add('pressing'); t = setTimeout(() => { cb(); end(); }, 1500); };
+  const end = () => { clearTimeout(t); btn.classList.remove('pressing'); };
+  btn.onmousedown = btn.ontouchstart = start;
+  btn.onmouseup = btn.ontouchend = btn.onmouseleave = end;
+}
+
+// GROK FEATURE: Image Compression
+function compressImg(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        const sc = Math.min(1024/img.width, 1024/img.height, 1);
+        c.width = img.width*sc; c.height = img.height*sc;
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL('image/jpeg', 0.6)); // 60% quality
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// MILEAGE FEATURE: Haversine
+function calcDist(p1, p2) {
+  if(!p1 || !p2) return 0;
+  const [lat1, lon1] = p1.split(',').map(Number);
+  const [lat2, lon2] = p2.split(',').map(Number);
+  const R = 6371; 
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return (R * c).toFixed(2);
+}
+
+// --- NETWORK ---
+function send(status, notes, photo) {
+  if(!CONFIG.url) return;
+  
+  const payload = {
+    'Worker Name': state.settings.name,
+    'Worker Phone Number': state.settings.phone,
+    'Alarm Status': status,
+    'Notes': notes || '',
+    'Timestamp': new Date().toISOString()
+  };
+  
+  if(photo) payload['Photo 1'] = photo; // Base64 string
+  
+  // Get GPS then Send
+  navigator.geolocation.getCurrentPosition(pos => {
+    payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
+    post(payload);
+  }, () => {
+    payload['Last Known GPS'] = 'GPS Unavailable';
+    post(payload);
+  });
+}
+
+function post(data) {
+  // Offline Queue Logic
+  if(!navigator.onLine) {
+    state.queue.push(data);
+    save();
+    return;
+  }
+
+  const fd = new FormData();
+  for(let k in data) fd.append(k, data[k]);
+  
+  fetch(CONFIG.url, { method: 'POST', mode: 'no-cors', body: fd })
+    .catch(() => {
+       state.queue.push(data); // Save if fail
+       save();
+    });
+}
+
+function processQueue() {
+  if(navigator.onLine && state.queue.length > 0) {
+    document.getElementById('uploadBanner').classList.remove('hidden');
+    const item = state.queue.shift();
+    save();
+    
+    const fd = new FormData();
+    for(let k in item) fd.append(k, item[k]);
+    
+    fetch(CONFIG.url, { method: 'POST', mode: 'no-cors', body: fd })
+      .then(() => processQueue())
+      .catch(() => {
+        state.queue.push(item);
+        save();
+      });
+  } else {
+    document.getElementById('uploadBanner').classList.add('hidden');
+  }
+}
+
+function save() { localStorage.setItem('otg_state_v2', JSON.stringify(state)); }
+function saveSettings() {
+  state.settings = {
+    name: document.getElementById('set_name').value,
+    phone: document.getElementById('set_phone').value,
+    pin: document.getElementById('set_pin').value,
+    duressPin: document.getElementById('set_duress').value
+  };
+  save(); nav('main');
+}
+function clearData() {
+    if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); }
+}
+</script>
+</body>
+</html>
