@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="%%LOGO_DATA%%">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -20,67 +22,26 @@ body {
     user-select: none; 
     overscroll-behavior-y: contain; 
 }
+.page { display: none; height: 100%; flex-direction: column; }
+.page.active { display: flex; }
 
-.page { 
-    display: none; 
-    height: 100%; 
-    flex-direction: column; 
-}
-.page.active { 
-    display: flex; 
-}
+/* --- UI COMPONENTS --- */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width linear; }
+.long-press-btn.pressing::after { width: 100%; }
 
-/* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { 
-    position: relative; 
-    overflow: hidden; 
-    transition: all 0.2s; 
-    user-select: none; 
-}
-.long-press-btn::after { 
-    content: ''; 
-    position: absolute; 
-    top: 0; left: 0; 
-    width: 0; height: 100%; 
-    background: rgba(255, 255, 255, 0.3); 
-    transition: width linear; 
-}
-.long-press-btn.pressing::after { 
-    width: 100%; 
-}
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
 
-.slider-thumb::-webkit-slider-thumb { 
-    -webkit-appearance: none; 
-    appearance: none; 
-    width: 24px; height: 24px; 
-    background: #3b82f6; 
-    cursor: pointer; 
-    border-radius: 50%; 
-    border: 2px solid white; 
-    box-shadow: 0 0 5px rgba(0,0,0,0.2); 
-}
-
-/* --- UTILITIES --- */
-.spinner { 
-    border: 3px solid rgba(255, 255, 255, 0.3); 
-    border-radius: 50%; 
-    border-top-color: #fff; 
-    width: 20px; height: 20px; 
-    animation: spin 1s linear infinite; 
-}
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.form-input { 
-    @apply w-full bg-gray-900 border border-gray-700 rounded p-3 text-white focus:border-blue-500 outline-none; 
-}
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SIGNATURE PAD --- */
-canvas { 
-    touch-action: none; 
-    background: #fff; 
-    border-radius: 0.5rem; 
-    cursor: crosshair; 
-}
+/* --- SETTINGS CARDS --- */
+.setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
+.setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
+.form-input { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none; }
+.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -146,59 +107,61 @@ canvas {
     </div>
 </div>
 
-<div id="settingsPage" class="page p-6 bg-gray-800">
-    <header class="flex justify-between mb-6 flex-shrink-0">
-        <h1 class="text-3xl font-bold text-white">Settings</h1>
+<div id="settingsPage" class="page p-4 bg-gray-800">
+    <header class="flex justify-between mb-4 flex-shrink-0 items-center">
+        <h1 class="text-2xl font-bold text-white">Settings</h1>
         <button type="button" id="btnCloseSettings" onclick="nav('main')" class="text-3xl text-gray-400 hover:text-white">×</button>
     </header>
     
-    <div class="space-y-6 flex-1 overflow-y-auto pb-4">
-        <p class="text-xs text-gray-400 bg-gray-900 p-2 rounded border border-gray-700">Please use international format for all phone numbers (e.g. +64 21...).</p>
-        
-        <div>
-            <label class="text-xs text-blue-400 uppercase font-bold">Your Details *</label>
-            <input id="set_name" class="form-input mb-2" placeholder="Full Name">
-            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+    <div class="flex-1 overflow-y-auto pb-4">
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
+            <p class="text-xs text-blue-200">Please use international format for phones (e.g. +64 21...).</p>
         </div>
 
-        <div>
-            <label class="text-xs text-green-400 uppercase font-bold">Emergency Contact *</label>
-            <input id="set_emg_name" class="form-input mb-2" placeholder="Name">
-            <input id="set_emg_phone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)">
-            <input id="set_emg_email" type="email" class="form-input" placeholder="Email">
+        <div class="setting-card">
+            <label class="setting-label text-blue-400">Your Details *</label>
+            <input id="set_name" class="form-input-card" placeholder="Full Name">
+            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
         </div>
 
-        <div>
-            <label class="text-xs text-purple-400 uppercase font-bold">Escalation Contact</label>
-            <input id="set_esc_name" class="form-input mb-2" placeholder="Name">
-            <input id="set_esc_phone" type="tel" class="form-input mb-2" placeholder="Phone (+64...)">
-            <input id="set_esc_email" type="email" class="form-input" placeholder="Email">
+        <div class="setting-card">
+            <label class="setting-label text-green-400">Emergency Contact *</label>
+            <input id="set_emg_name" class="form-input-card" placeholder="Name">
+            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email">
         </div>
 
-        <div>
-            <label class="text-xs text-red-400 uppercase font-bold">Security (4 Digits) *</label>
-            <input id="set_pin" type="tel" maxlength="4" class="form-input mb-2" placeholder="Normal PIN">
-            <input id="set_duress" type="tel" maxlength="4" class="form-input" placeholder="Duress PIN">
+        <div class="setting-card">
+            <label class="setting-label text-purple-400">Escalation Contact</label>
+            <input id="set_esc_name" class="form-input-card" placeholder="Name">
+            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email">
         </div>
-        
-        <div class="pt-6 border-t border-gray-700">
-            <p class="text-xs text-gray-500 mb-2">System URL (Injected by Config)</p>
-            <input id="set_url" disabled class="form-input text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
-            
-            <div class="mt-6 pt-4 border-t border-gray-700">
-                 <label class="block text-sm font-medium text-gray-400 mb-2">Troubleshooting</label>
-                 <button type="button" onclick="clearFormsCache()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg text-sm mb-2">Force Sync Forms</button>
-                 <button type="button" onclick="clearData()" class="w-full bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold py-3 px-4 rounded-lg text-sm">Reset App Data</button>
+
+        <div class="setting-card">
+            <label class="setting-label text-red-400">Security (4 Digits) *</label>
+            <div class="flex gap-2">
+                <input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN">
+                <input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress">
+            </div>
+        </div>
+
+        <div class="setting-card border-gray-600">
+            <label class="setting-label text-gray-400">System URL</label>
+            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500" value="%%GOOGLE_SHEET_URL%%">
+            <div class="flex gap-2 mt-2">
+                <button type="button" onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
+                <button type="button" onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
             </div>
         </div>
     </div>
     
-    <button type="button" onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mt-2 flex-shrink-0">Save Settings</button>
+    <button type="button" onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg mb-2 flex-shrink-0">Save Settings</button>
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
     
-    <div id="modal-location" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
+    <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
         <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
         <input type="hidden" id="locId">
         <div class="space-y-4">
@@ -210,12 +173,7 @@ canvas {
                  <span class="text-sm text-gray-300">No Report Required</span>
                  <input type="checkbox" id="locNoRep" class="w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600">
                </label>
-               
-               <div>
-                 <label class="text-xs text-gray-400 uppercase font-bold">Template Name</label>
-                 <input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)">
-                 <p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p>
-               </div>
+               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
             </div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
@@ -281,15 +239,15 @@ canvas {
 </div>
 
 <script>
-// --- CONFIG & STATE ---
+// ==================== CONFIGURATION ====================
 const CONFIG = { 
     isAdv: %%IS_ADVANCED%%, 
     mileage: %%ENABLE_MILEAGE%%, 
     url: "%%GOOGLE_SHEET_URL%%", 
     org: "%%ORGANISATION_NAME%%", 
-    checkinEnabled: %%CHECKIN_ENABLED%%,   // <--- INJECTED
-    checkinInterval: %%CHECKIN_INTERVAL%%  // <--- INJECTED
-};
+    checkinEnabled: %%CHECKIN_ENABLED%%,   
+    checkinInterval: %%CHECKIN_INTERVAL%%  
+}; 
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
 // ==================== STATE MANAGEMENT ====================
@@ -303,7 +261,7 @@ let state = {
     pendingUploads: [] 
 };
 
-// Globals for Timers & Elements
+// Globals
 let synth;
 let checkinIntervalId;
 let mainScreenReminderTimer;
@@ -314,17 +272,14 @@ let sigPad = null;
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
-    // 1. Load from LocalStorage
+    // 1. Load State
     const s = localStorage.getItem('loneWorkerState');
-    if(s) { 
-        try { state = { ...state, ...JSON.parse(s) }; } 
-        catch(e){ console.error("State Error", e); } 
-    }
+    if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
     // 2. Enforce Config Updates
     state.settings.googleSheetUrl = CONFIG.url; 
 
-    // 3. Handle Mileage Tile Logic
+    // 3. Mileage Logic
     if(CONFIG.mileage) {
         if(!state.locations) state.locations = [];
         if(!state.locations.find(l => l.id === 'travel')) {
@@ -364,8 +319,6 @@ window.addEventListener('load', () => {
     // 6. Background Tasks
     updateArrivedButtonState();
     processUploadQueue();
-    
-    // 7. Init Audio on First Click (Browser Policy)
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
 });
@@ -463,7 +416,7 @@ function renderLocs() {
         el.className = 'p-4 bg-gray-800 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all';
         if(state.selectedLocationId === l.id) el.classList.add('border-blue-500', 'bg-gray-700');
         
-        let html = `<div><div class="font-bold text-white text-lg">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
+        let html = `<div><div class="font-bold text-white text-lg">${l.name}</div><div class="text-sm text-gray-400">${l.addr}</div></div>`;
         html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
         
         el.innerHTML = html;
@@ -581,7 +534,7 @@ function startVisit() {
         anticipatedDepartureTime: new Date(now.getTime() + state.visitDurationMinutes * 60000),
         arrivalTimeForSheet: now.toISOString(),
         gpsStart: null,
-        nextCheckin: new Date(now.getTime() + CONFIG.checkinInterval * 60000)
+        nextCheckin: CONFIG.checkinEnabled ? new Date(now.getTime() + CONFIG.checkinInterval * 60000) : null
     };
     
     playSoundAndVibrate('arrive');
@@ -589,7 +542,7 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // GPS: Fast then Accurate
+    // Fast GPS
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
@@ -631,15 +584,15 @@ function tick() {
         alertCont.classList.remove('hidden');
         setupLongPress(alertCont, () => iAmSafe());
         departBtn.classList.add('hidden');
-        if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning');
+        if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); // Periodic warning
     } else {
         const m = Math.floor(rem/60000);
         const s = Math.floor((rem%60000)/1000);
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
-        document.getElementById('lockDue').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        document.getElementById('btnSafe').classList.add('hidden');
-        document.getElementById('btnDepart').classList.remove('hidden');
+        document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        alertCont.classList.add('hidden');
+        departBtn.classList.remove('hidden');
     }
     
     // Periodic Check-in
@@ -701,7 +654,7 @@ function iamSafe() {
     withPinVerification(false, () => {
         playSoundAndVibrate('safe');
         sendToGoogleSheet({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" });
-        preDepart(true); 
+        preDepart(true);
     });
 }
 
@@ -716,7 +669,7 @@ function preDepart(isSafeFlow) {
         const div = document.getElementById('reportFields');
         div.innerHTML = '';
         
-        // Mileage Autofill
+        // Mileage
         if(l.id === 'travel' && CONFIG.mileage) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
@@ -741,12 +694,11 @@ function preDepart(isSafeFlow) {
 function quickStat() {
     if(!state.selectedLocationId) return;
     const l = state.locations.find(x => x.id === state.selectedLocationId);
-    state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() }; // Mock visit
+    state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() };
     showModal('report');
     const div = document.getElementById('reportFields');
     div.innerHTML = '';
     buildReportForm(l.templateName, div);
-    
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
         const data = {
@@ -766,7 +718,7 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
-    // Fallback to simple notes if no template
+    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -794,7 +746,7 @@ function buildReportForm(templateName, container) {
     if(canvas) initSigPad(canvas);
 }
 
-// --- FORM HELPERS ---
+// --- SIGNATURE LOGIC ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -872,12 +824,12 @@ function depart(reportData = {}) {
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : 'infoModal').classList.remove('hidden');
+    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.remove('hidden');
 }
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : 'infoModal').classList.add('hidden');
+    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
 }
 function openLocModal(id, e) {
@@ -956,7 +908,6 @@ function sendToGoogleSheet(data) {
         'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
         ...data, 'Timestamp': new Date().toISOString()
     };
-    
     navigator.geolocation.getCurrentPosition(pos => {
         payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
         post(payload);
@@ -970,15 +921,10 @@ function post(data) {
         document.getElementById('uploadBanner').classList.remove('hidden');
         return;
     }
-
-    const fd = new FormData();
-    for(let k in data) fd.append(k, data[k]);
-    
-    fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
-      .catch(() => {
-         state.pendingUploads.push(data); 
-         saveState();
-      });
+    const fd = new FormData(); for(let k in data) fd.append(k, data[k]);
+    fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(() => {
+        state.pendingUploads.push(data); saveState();
+    });
 }
 
 function processQueue() {
@@ -1021,9 +967,9 @@ function saveSettings() {
     pinCode: pin, duressPin: duressPin,
     googleSheetUrl: CONFIG.url
   };
-  
   saveState(); nav('main'); 
   document.getElementById('btnCloseSettings').style.display = 'block';
+  renderLocations(); updateArrivedButtonState();
 }
 function clearData() {
     if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); }
@@ -1045,15 +991,16 @@ function syncForms() {
 function clearFormsCache() { state.cachedForms = {}; syncForms(); alert("Forms Syncing..."); }
 
 // Listeners
-document.getElementById('btnDelLoc').onclick = deleteLocation;
-document.getElementById('saveLocationBtn').onclick = saveLocation;
+document.getElementById('saveSettingsBtn').onclick = saveSettings;
 document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval * 60000); saveState(); };
+document.getElementById('saveLocationBtn').onclick = saveLocation;
+document.getElementById('deleteLocationBtn').onclick = deleteLocation;
+document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
+document.getElementById('clearCacheBtn').onclick = clearData;
 document.getElementById('durationSlider').oninput = updateArrivedButtonState;
 document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
 document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
+document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
 </script>
 </body>
 </html>
-
