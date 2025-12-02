@@ -57,6 +57,7 @@
 
           <div class="highlight-box">
             <h3 class="text-xl font-bold text-white mb-4">Features</h3>
+            
             <label class="flex items-center gap-4 cursor-pointer mb-4">
               <input type="checkbox" id="chkAdvanced" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" checked onchange="toggleAdv()">
               <div><span class="block font-bold text-white">Advanced Mode</span><span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting.</span></div>
@@ -68,6 +69,18 @@
                 <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="OpenRouteService API Key (Optional)">
               </div>
             </div>
+
+            <hr class="border-gray-600 my-4">
+
+            <label class="flex items-center gap-4 cursor-pointer mb-2">
+               <input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" onchange="toggleCheckin()">
+               <div><span class="block font-bold text-white">Periodic Safety Check-in</span><span class="text-sm text-gray-400">Ask "Are you OK?" at set intervals.</span></div>
+            </label>
+            <div id="checkinOptions" class="hidden pl-10 ml-3">
+                <label class="text-gray-300 text-sm font-bold mr-2">Frequency (Minutes):</label>
+                <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24">
+            </div>
+
           </div>
           <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
         </div>
@@ -185,6 +198,11 @@
       document.getElementById('boxChecklists').style.display = isAdv ? "block" : "none";
       document.getElementById('legendBox').style.display = isAdv ? "block" : "none";
     }
+    
+    function toggleCheckin() {
+        const isOn = document.getElementById('chkCheckin').checked;
+        document.getElementById('checkinOptions').style.display = isOn ? "block" : "none";
+    }
 
     function handleLogo(input) {
       const file = input.files[0];
@@ -256,7 +274,7 @@ $ - (Prefix) Saves as separate numeric column
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
         .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
-        .replace('%%PHOTOS_FOLDER_ID%%', ""); // FIX: Clear raw placeholder to avoid backend errors
+        .replace('%%PHOTOS_FOLDER_ID%%', ""); // Fix backend crash
       document.getElementById('codeDisplay').textContent = code.trim();
       gotoStep(3);
     }
@@ -306,16 +324,18 @@ $ - (Prefix) Saves as separate numeric column
       const url = document.getElementById('webAppUrl').value;
       const isAdv = document.getElementById('chkAdvanced').checked;
       const mile = document.getElementById('chkMileage').checked;
+      const chkEnabled = document.getElementById('chkCheckin').checked;
+      const chkMins = document.getElementById('checkinMins').value;
 
-      // FIXED: Using %%GOOGLE_SHEET_URL%% to match the Worker Template!
-      // Also replacing both ORG_NAME tags to be safe.
       let wHtml = tplWorker
         .replace(/%%ORG_NAME%%/g, org)
         .replace(/%%ORGANISATION_NAME%%/g, org)
-        .replace(/%%GOOGLE_SHEET_URL%%/g, url) 
+        .replace(/%%GOOGLE_SHEET_URL%%/g, url)
         .replace(/%%LOGO_DATA%%/g, logoData)
         .replace('%%IS_ADVANCED%%', isAdv)
-        .replace('%%ENABLE_MILEAGE%%', (isAdv && mile));
+        .replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
+        .replace('%%CHECKIN_ENABLED%%', chkEnabled)
+        .replace('%%CHECKIN_INTERVAL%%', chkMins);
       
       const wFolder = zip.folder("WorkerApp");
       wFolder.file("index.html", wHtml);
@@ -323,7 +343,7 @@ $ - (Prefix) Saves as separate numeric column
         name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af",
         icons: [{ src: logoData, sizes: "192x192", type: "image/png" }]
       }, null, 2));
-      wFolder.file("sw.js", "const C='v3.2';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v3.3';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor
         .replace(/%%ORG_NAME%%/g, org)
