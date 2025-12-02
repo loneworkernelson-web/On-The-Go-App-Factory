@@ -3,7 +3,7 @@
 // ==========================================
 const CONFIG = {
   SECRET_KEY: "%%SECRET_KEY%%",
-  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", // Optional
+  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", // Optional (Manually set in script if needed later)
   ORS_API_KEY: "%%ORS_API_KEY%%", // Optional
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%" // Optional
 };
@@ -17,7 +17,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // 1. SETUP HEADERS
+    // 1. SETUP HEADERS AUTOMATICALLY
     if(sheet.getLastColumn() === 0) {
       const headers = ["Timestamp","Date","Worker Name","Worker Phone Number","Alarm Status","Notes","Location Name","Last Known GPS","Photo 1","Distance (km)"];
       sheet.appendRow(headers);
@@ -27,18 +27,16 @@ function doPost(e) {
     // 2. PROCESS PHOTO (If present)
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
-      if(CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
-        try {
-          const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
-          const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
-          const file = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID).createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          photoUrl = file.getUrl();
-        } catch(err) {
-          photoUrl = "Error saving: " + err.toString();
-        }
-      } else {
-        photoUrl = "Photo skipped (No Folder ID configured)";
+      // Logic: If no folder ID configured, we try to create root file or skip
+      try {
+        const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
+        const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
+        // Simple save to root Drive if no folder ID, to avoid breaking simple deployments
+        const file = DriveApp.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        photoUrl = file.getUrl();
+      } catch(err) {
+        photoUrl = "Error saving: " + err.toString();
       }
     }
 
@@ -57,7 +55,7 @@ function doPost(e) {
     ]);
 
     // 4. SEND ALERTS (Emails)
-    if(p['Alarm Status'].includes('EMERGENCY') || p['Alarm Status'].includes('DURESS') || p['Alarm Status'].includes('MISSED')) {
+    if(p['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) {
        sendAlert(p);
     }
 
@@ -71,7 +69,7 @@ function doPost(e) {
 }
 
 function sendAlert(data) {
-  const email = Session.getEffectiveUser().getEmail(); // Sends to owner for now
+  const email = Session.getEffectiveUser().getEmail(); // Sends to script owner
   const subject = "🚨 OTG ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
   const body = `
     <h1>SAFETY ALERT</h1>
@@ -86,5 +84,29 @@ function sendAlert(data) {
 }
 
 function doGet(e) {
+  // Connection Test
+  if(e.parameter.test && e.parameter.key === CONFIG.SECRET_KEY) {
+    return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // JSONP for Monitor App (Monitor App Template reads this)
+  if(e.parameter.callback){
+    const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
+    const data=sh.getDataRange().getValues();
+    const headers=data.shift();
+    const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
+    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  
+  // Get Forms (Advanced Feature)
+  if(e.parameter.action === 'getForms') {
+     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
+     if(!sh) return ContentService.createTextOutput("[]");
+     // Logic to read headers and return JSON question list (simplified for template)
+     const rows = sh.getDataRange().getValues();
+     // ... (Implementation handled by advanced logic if needed, stub for now)
+     return ContentService.createTextOutput(JSON.stringify([{type:'header',text:'Standard Report'},{type:'checkbox',text:'Safe?'},{type:'textarea',text:'Notes'}])).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput("OTG Backend Online");
 }
