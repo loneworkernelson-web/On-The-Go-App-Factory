@@ -59,20 +59,36 @@
 
           <div class="highlight-box border-blue-500/30">
              <h3 class="text-xl font-bold text-white mb-4">Essential Safety Features</h3>
-             <label class="flex items-center gap-4 cursor-pointer mb-2">
+             
+             <div class="flex items-center gap-4 mb-4 opacity-75">
+                 <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">✓</div>
+                 <div>
+                     <span class="block font-bold text-white">Safety Timer & Panic Button</span>
+                     <span class="text-sm text-gray-400">Core functionality. Always enabled.</span>
+                 </div>
+             </div>
+
+             <label class="flex items-center gap-4 cursor-pointer mb-2 group">
                <input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" onchange="toggleCheckin()">
-               <div><span class="block font-bold text-white">Periodic Safety Check-in</span><span class="text-sm text-gray-400">Ask "Are you OK?" at set intervals.</span></div>
+               <div>
+                   <span class="block font-bold text-white group-hover:text-blue-300 transition">Enable Periodic Check-in?</span>
+                   <span class="text-sm text-gray-400">Optional. Asks "Are you OK?" at set intervals.</span>
+               </div>
              </label>
-             <div id="checkinOptions" class="hidden pl-10 ml-3 mb-4">
+             
+             <div id="checkinOptions" class="hidden pl-10 ml-3 mb-4 transition-all">
                 <label class="text-gray-300 text-sm font-bold mr-2">Frequency (Minutes):</label>
                 <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
              </div>
           </div>
 
           <div class="highlight-box">
-            <label class="flex items-center gap-4 cursor-pointer mb-4">
+            <label class="flex items-center gap-4 cursor-pointer mb-4 group">
               <input type="checkbox" id="chkAdvanced" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" checked onchange="toggleAdv()">
-              <div><span class="block font-bold text-white">Advanced Features</span><span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting, and Mileage.</span></div>
+              <div>
+                  <span class="block font-bold text-white group-hover:text-blue-300 transition">Advanced Features</span>
+                  <span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting, and Mileage.</span>
+              </div>
             </label>
             
             <div id="advOptions" class="pl-10 space-y-6 border-l-2 border-gray-700 ml-3">
@@ -80,11 +96,11 @@
               
               <div class="grid md:grid-cols-2 gap-4 mt-2">
                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService API Key <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">(Get Free Key)</a></label>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService API Key <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link ml-1">(Get Free Key ↗)</a></label>
                     <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For accurate road distance">
                 </div>
                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">(Get Free Key)</a></label>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link ml-1">(Get Free Key ↗)</a></label>
                     <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For AI Grammar Fixes">
                 </div>
               </div>
@@ -237,9 +253,16 @@
     }
 
     function copyChecklistSetup() {
-      const full = `Company Name\tTemplate Name\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details`;
-      navigator.clipboard.writeText(full);
-      alert("Full Setup Copied!\n(Includes 'Travel Report' for the Mileage feature)\n\nPaste into cell A1 of 'Checklists' tab.");
+      // GENERATE 30 QUESTION COLUMNS
+      let h = "Company Name\tTemplate Name";
+      for(let i=1; i<=30; i++) h += "\tQuestion " + i;
+      
+      // Sample Data
+      const rows = "\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + 
+                   "\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details";
+                   
+      navigator.clipboard.writeText(h + rows);
+      alert("Full Setup Copied! (Includes 30 Question Columns)\n\nPaste into cell A1 of 'Checklists' tab.");
     }
 
     function copyLegend() {
@@ -283,7 +306,7 @@ $ - (Prefix) Saves as separate numeric column
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
         .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
-        .replace('%%PHOTOS_FOLDER_ID%%', ""); // Fix backend crash
+        .replace('%%PHOTOS_FOLDER_ID%%', ""); 
       document.getElementById('codeDisplay').textContent = code.trim();
       gotoStep(3);
     }
@@ -353,7 +376,7 @@ $ - (Prefix) Saves as separate numeric column
         name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af",
         icons: [{ src: logoData, sizes: "192x192", type: "image/png" }]
       }, null, 2));
-      wFolder.file("sw.js", "const C='v4.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v5.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor
         .replace(/%%ORG_NAME%%/g, org)
