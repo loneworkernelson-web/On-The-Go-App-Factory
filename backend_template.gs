@@ -1,5 +1,5 @@
 // ==========================================
-// OTG APPSUITE - MASTER BACKEND v3.0
+// OTG APPSUITE - MASTER BACKEND v3.1
 // ==========================================
 const CONFIG = {
   SECRET_KEY: "%%SECRET_KEY%%",
@@ -17,36 +17,45 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // 1. HEADERS
+    // 1. SETUP HEADERS (Auto-detect)
     if(sheet.getLastColumn() === 0) {
       const headers = ["Timestamp","Date","Worker Name","Worker Phone Number","Emergency Contact Name","Emergency Contact Number","Emergency Contact Email","Escalation Contact Name","Escalation Contact Number","Escalation Contact Email","Alarm Status","Notes","Location Name","Location Address","Last Known GPS","GPS Timestamp","Battery Level","Photo 1","Distance (km)"];
       sheet.appendRow(headers);
       sheet.getRange(1,1,1,headers.length).setFontWeight("bold").setBackground("#e2e8f0");
     }
     
-    // 2. PHOTOS
+    // 2. PROCESS PHOTO
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
       try {
         const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
         const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
-        const file = DriveApp.createFile(blob);
+        
+        // Advanced: Use Folder ID if provided, else Root
+        let file;
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
+           file = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID).createFile(blob);
+        } else {
+           file = DriveApp.createFile(blob);
+        }
+        
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         photoUrl = file.getUrl();
       } catch(err) { photoUrl = "Err: "+err; }
     }
 
-    // 3. LOGGING
+    // 3. APPEND ROW
+    // FIX: Prepend "'" to phone numbers so Sheets treats them as Text, not Formulas
     const row = [
       new Date(),
       Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
       p['Worker Name'],
-      p['Worker Phone Number'],
+      "'" + (p['Worker Phone Number'] || ""), 
       p['Emergency Contact Name'] || '',
-      p['Emergency Contact Number'] || '',
+      "'" + (p['Emergency Contact Number'] || ""), 
       p['Emergency Contact Email'] || '',
       p['Escalation Contact Name'] || '',
-      p['Escalation Contact Number'] || '',
+      "'" + (p['Escalation Contact Number'] || ""), 
       p['Escalation Contact Email'] || '',
       p['Alarm Status'],
       p['Notes'],
@@ -60,7 +69,7 @@ function doPost(e) {
     ];
     sheet.appendRow(row);
 
-    // 4. ALERTS
+    // 4. SEND ALERTS (To contacts + Owner)
     if(p['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) {
        sendAlert(p);
     }
@@ -75,7 +84,10 @@ function doPost(e) {
 }
 
 function sendAlert(data) {
-  let recipients = [Session.getEffectiveUser().getEmail()]; 
+  // Logic: Send to Emergency Contact + Script Owner
+  // If Escalation, send to Escalation Contact instead
+  
+  let recipients = [Session.getEffectiveUser().getEmail()]; // Always notify admin
   
   if (data['Alarm Status'] === 'ESCALATION_SENT') {
      if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
@@ -83,16 +95,21 @@ function sendAlert(data) {
      if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
   }
   
+  // Remove duplicates and empty strings
   recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
   
   const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
   const body = `
-    <h1 style="color:red;">${data['Alarm Status']}</h1>
+    <h1 style="color:red;font-weight:bold;">${data['Alarm Status']}</h1>
     <p><strong>Worker:</strong> ${data['Worker Name']}</p>
+    <p><strong>Phone:</strong> <a href="tel:${data['Worker Phone Number']}">${data['Worker Phone Number']}</a></p>
     <p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p>
-    <p><strong>GPS:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
+    <p><strong>Address:</strong> ${data['Location Address'] || ''}</p>
+    <p><strong>Notes:</strong> ${data['Notes']}</p>
+    <p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p>
+    <p><strong>GPS Map:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
     <hr>
-    <p>Time: ${new Date().toLocaleString()}</p>
+    <p><em>This is an automated safety alert. Please verify worker safety immediately.</em></p>
   `;
   
   if(recipients.length > 0) {
@@ -115,7 +132,7 @@ function doGet(e) {
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
-  // 3. FORM ENGINE (Fixes the "Unexpected Token O" Error)
+  // 3. FORM ENGINE (Advanced Feature)
   if(e.parameter.action === 'getForms') {
      const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
      const company = e.parameter.companyName;
