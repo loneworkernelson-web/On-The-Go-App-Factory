@@ -94,7 +94,7 @@ function doPost(e) {
         const rowStatus = data[i][10]; // Col K
         
         // Update if active visit found
-        if (rowWorker === worker && !['DEPARTED', 'COMPLETED', 'SAFE - MANUALLY CLEARED'].includes(rowStatus)) {
+        if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED')) {
              const realRowIndex = startRow + i;
              
              sheet.getRange(realRowIndex, 11).setValue(newStatus); 
@@ -407,3 +407,4 @@ function generateVisitPdf(rowIndex) {
     // 4. Save as PDF
     // 5. Email
 }
+
