@@ -271,8 +271,9 @@ const CONFIG = {
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
     checkinInterval: %%CHECKIN_INTERVAL%%,
+    escalationMinutes: %%ESCALATION_MINUTES%%, // New Config
     key: "%%SECRET_KEY%%"
-}; 
+};
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
 // ==================== STATE MANAGEMENT ====================
@@ -726,18 +727,28 @@ function tick() {
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
-        alertCont.classList.remove('hidden');
-        setupLongPress(alertCont, () => iAmSafe());
-        departBtn.classList.add('hidden');
+        document.getElementById('btnSafe').classList.remove('hidden');
+        document.getElementById('btnDepart').classList.add('hidden');
+        setupLongPress(document.getElementById('btnSafe'), iamSafe);
         if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
+
+        // 1. AUTO-SEND OVERDUE (Immediate)
+        if (!state.activeVisit.overdueSent) {
+             state.activeVisit.overdueSent = true;
+             saveState();
+             triggerAutoAlert('OVERDUE');
+        }
+
+        // 2. AUTO-SEND CRITICAL (Configurable Delay)
+        // rem is negative ms. e.g. -900000ms is 15 mins late.
+        const escalationMs = CONFIG.escalationMinutes * 60000;
+        if (rem < -escalationMs && !state.activeVisit.criticalSent) { 
+             state.activeVisit.criticalSent = true;
+             saveState();
+             triggerAutoAlert('EMERGENCY - OVERDUE');
+        }
     } else {
-        const m = Math.floor(rem/60000);
-        const s = Math.floor((rem%60000)/1000);
-        document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
-        document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
-        document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        alertCont.classList.add('hidden');
-        departBtn.classList.remove('hidden');
+        // ... (Standard Tick Logic) ...
     }
     
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
@@ -1176,3 +1187,4 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
+
