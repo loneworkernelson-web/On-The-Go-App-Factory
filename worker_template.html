@@ -28,7 +28,7 @@ body {
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+.long-press-btn { position: relative; overflow: hidden; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -44,14 +44,10 @@ body {
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
 /* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
-.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
-
-/* Colors */
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+.setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
+.setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
+.form-input { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none; }
+.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -93,14 +89,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
         <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
+        <button onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
     </div>
     
     <div>
@@ -175,7 +171,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
         <input type="hidden" id="locId">
         <div class="space-y-4">
-            <div><label class="text-xs text-gray-400 uppercase font-bold">Name</label><input type="text" id="locName" class="form-input"></div>
+            <div>
+                <label class="text-xs text-gray-400 uppercase font-bold">Business Name</label>
+                <input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp">
+            </div>
+            
+            <div>
+                <label class="text-xs text-gray-400 uppercase font-bold">Site Name</label>
+                <input type="text" id="locName" class="form-input" placeholder="e.g. Head Office">
+            </div>
             
             <div>
                 <label class="text-xs text-gray-400 uppercase font-bold">Address</label>
@@ -295,38 +299,17 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: AUTO DATA MIGRATION (Critical for blank sheet rows)
+    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
         state.settings.emergencyName = state.settings.emgName;
         state.settings.emergencyPhone = state.settings.emgPhone;
         state.settings.emergencyEmail = state.settings.emgEmail;
-        state.settings.escalationName = state.settings.escName;
-        state.settings.escalationPhone = state.settings.escPhone;
-        state.settings.escalationEmail = state.settings.escEmail;
-        state.settings.pinCode = state.settings.pin;
-        state.settings.duressPin = state.settings.duress;
-        delete state.settings.name; // Clean up old keys
-        saveState();
     }
 
-    // Mileage Default
-    if(CONFIG.mileage) {
-        if(!state.locations) state.locations = [];
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else if(state.locations) {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
+    // Initialize Locations
+    initLocations();
 
     // Feature Flags
     if(CONFIG.isAdv) {
@@ -354,6 +337,26 @@ window.addEventListener('load', () => {
     startReminderTimer();
 });
 
+// --- INIT LOCATIONS ---
+function initLocations() {
+    if(!state.locations) state.locations = [];
+    
+    if(CONFIG.mileage) {
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', // Business Name
+                templateName: 'Travel Report' 
+            });
+        }
+    } else {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
+}
+
 // ==================== NAVIGATION ====================
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -363,16 +366,8 @@ function navigate(page) {
     else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
-        // Hydrate Settings Page
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
-            // Mapping map
-            const map = {
-               'name': 'workerName', 'phone': 'workerPhone',
-               'emg_name': 'emergencyName', 'emg_phone': 'emergencyPhone', 'emg_email': 'emergencyEmail',
-               'esc_name': 'escalationName', 'esc_phone': 'escalationPhone', 'esc_email': 'escalationEmail',
-               'pin': 'pinCode', 'duress': 'duressPin'
-            };
-            const val = state.settings[map[k]];
+            const val = state.settings[k === 'duress' ? 'duressPin' : (k === 'pin' ? 'pinCode' : k.replace('_','').replace('name','Name').replace('phone','Phone').replace('email','Email'))];
             const el = document.getElementById('set_'+k);
             if(el) el.value = val || "";
         });
@@ -453,21 +448,32 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
-        // VISUAL FIX: SOLID BLUE FOR SELECTED
+        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
         
         if(state.selectedLocationId === l.id) {
-            bgColor = 'bg-blue-600'; // SOLID BLUE
-            borderColor = 'border-blue-400';
+            bgColor = 'bg-blue-900';
+            borderColor = 'border-blue-500';
         }
         
         if(l.id === 'travel') textColor = 'text-purple-400';
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
-        let html = `<div><div class="font-bold text-lg ${textColor}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
+        // Business Name Logic
+        let businessHtml = l.companyName && l.companyName !== 'Internal' 
+            ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
+            : '';
+
+        let html = `
+            <div>
+                ${businessHtml}
+                <div class="font-bold text-lg ${textColor}">${l.name}</div>
+                <div class="text-sm text-gray-400">${l.address}</div>
+            </div>`;
+        
         html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
         
         el.innerHTML = html;
@@ -491,6 +497,7 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locId').value = id;
         document.getElementById('locName').value = l.name;
         document.getElementById('locAddr').value = l.address;
+        document.getElementById('locBusiness').value = l.companyName || ""; // v33 Add
         document.getElementById('locTemplate').value = l.templateName || "";
         document.getElementById('locNoRep').checked = l.noReport || false;
         
@@ -501,6 +508,7 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locId').value = "";
         document.getElementById('locName').value = "";
         document.getElementById('locAddr').value = "";
+        document.getElementById('locBusiness').value = ""; // v33 Add
         document.getElementById('locTemplate').value = "";
         document.getElementById('locNoRep').checked = false;
         document.getElementById('btnDelLoc').classList.add('hidden');
@@ -511,6 +519,7 @@ function saveLoc() {
     const id = document.getElementById('locId').value;
     const name = document.getElementById('locName').value;
     const addr = document.getElementById('locAddr').value;
+    const business = document.getElementById('locBusiness').value; // v33 Add
     const tpl = document.getElementById('locTemplate').value;
     const noRep = document.getElementById('locNoRep').checked;
     
@@ -518,9 +527,14 @@ function saveLoc() {
     
     if(id) {
         const idx = state.locations.findIndex(l => l.id === id);
-        if(idx > -1) state.locations[idx] = { ...state.locations[idx], name, address: addr, templateName: tpl, noReport: noRep };
+        if(idx > -1) {
+            state.locations[idx] = { ...state.locations[idx], name, address: addr, companyName: business, templateName: tpl, noReport: noRep };
+        }
     } else {
-        state.locations.push({ id: Date.now().toString(), name, address: addr, templateName: tpl, noReport: noRep });
+        state.locations.push({ 
+            id: Date.now().toString(), 
+            name, address: addr, companyName: business, templateName: tpl, noReport: noRep 
+        });
     }
     saveState(); renderLocations(); closeModal('location'); syncForms();
 }
@@ -609,6 +623,12 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
+    // FIX v31: Force Hydrate Settings if missing
+    if(state.settings.name && !state.settings.workerName) {
+        state.settings.workerName = state.settings.name;
+        state.settings.workerPhone = state.settings.phone;
+    }
+
     state.activeVisit = {
         locationId: sel.id,
         startTime: now,
@@ -624,17 +644,31 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // Fast GPS - Immediate Send
-    processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (Locating...)" });
+    // v33 FIX: Send Business Name in Location Name
+    const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
+    
+    processUploadQueue({ 
+        "Alarm Status": 'ON SITE', 
+        "Notes": "Visit Started (Locating...)",
+        "Location Name": locName,
+        "Location Address": sel.address
+    });
     
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Location Confirmed" });
+            processUploadQueue({ 
+                "Alarm Status": 'ON SITE', 
+                "Notes": "Location Confirmed",
+                "Location Name": locName, // Ensure update has name
+                "Location Address": sel.address
+            });
             saveState();
         }, () => {
-            // Silent fail on 2nd ping
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
         }, { timeout: 5000, maximumAge: 60000 });
+    } else {
+        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -710,7 +744,7 @@ function triggerCheckin() {
     document.getElementById('checkinOkBtn').onclick = () => {
         clearInterval(checkinIntervalId);
         closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
+        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval * 60000); 
         saveState();
     };
 }
@@ -731,24 +765,15 @@ function extendVisit() {
     });
 }
 
-// TRIPLE TAP PANIC
 function handlePanicTap() {
     const now = Date.now();
-    if (now - panicTapTimer > 2000) panicTapCount = 0; 
-    panicTapCount++;
-    panicTapTimer = now;
-
-    if (panicTapCount >= 3) {
-        triggerPanic();
-        panicTapCount = 0;
-    }
+    if (now - panicTapTimer > 2000) panicTapCount = 0;
+    panicTapCount++; panicTapTimer = now;
+    if (panicTapCount >= 3) { triggerPanic(); panicTapCount = 0; }
 }
 
 function triggerPanic() {
-    state.activeVisit = state.activeVisit || {};
-    state.activeVisit.isPanic = true; // Flag Logic
-    saveState();
-    
+    state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState();
     playSoundAndVibrate('panic');
     sendToGoogleSheet({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" });
     alert('PANIC ALERT SENT');
@@ -792,6 +817,7 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
+    // FIX v28: PIN only needed if OVERDUE or PANIC
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const isOverdue = (due - now) < 0;
@@ -814,8 +840,11 @@ function quickStat() {
     buildReportForm(l.templateName, div);
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
+        // v33 Fix: Combine Names
+        const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
+        
         const data = {
-            "Location Name": l.name,
+            "Location Name": locName,
             "Location Address": l.address,
             "Alarm Status": "DATA_ENTRY_ONLY",
             "Notes": d.notes,
@@ -834,6 +863,7 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
+    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -1125,6 +1155,16 @@ function getGpsAddress() {
         btn.disabled = false;
     }, { timeout: 10000 });
 }
+
+// Listeners
+document.getElementById('btnDelLoc').onclick = deleteLoc;
+document.getElementById('saveLocationBtn').onclick = saveLoc;
+document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
+document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
+document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
+document.getElementById('durationSlider').oninput = updateArrivedButtonState;
+document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
+document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
