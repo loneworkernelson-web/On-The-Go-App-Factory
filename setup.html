@@ -1,3 +1,17 @@
+You are right. It is very helpful to have the exact script file (`Code.gs`) included in the download so you don't have to copy-paste it manually if you lose it.
+
+I have updated the **Setup Tool (v8.0)**.
+
+### Changes:
+
+1.  **Backup Included:** The generated ZIP file now explicitly includes a file named **`Code.gs`**. This contains the fully customized Apps Script code (with your keys and settings injected).
+2.  **Manifest Update:** I also ensured the `manifest.json` is generated cleanly in the zip.
+
+### File: `setup.html` (v8.0 - With Code Backup)
+
+*Replace your existing `setup.html`.*
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -130,13 +144,14 @@
             </div>
             <p class="text-xs text-gray-400 mb-4">Tip: Paste this legend into your spreadsheet (e.g., cell A20) as a permanent reference.</p>
             <div class="grid md:grid-cols-3 gap-4 text-sm text-gray-300">
-              <div class="p-2 bg-gray-800 rounded"><strong>[YESNO]</strong><br>Yes/No radio buttons</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[YESNO]</strong><br>Yes/No Radio</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[CHECK]</strong><br>Single Checkbox</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[TEXT]</strong><br>Large text box</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[NUMBER]</strong><br>Numeric input</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[PHOTO]</strong><br>Camera button</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Section Title</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[GPS]</strong><br>Capture Location</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[TEXT]</strong><br>Large Text</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[NUMBER]</strong><br>Numeric</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[PHOTO]</strong><br>Camera</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Header</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[GPS]</strong><br>Location</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[SIGN]</strong><br>Signature</div>
             </div>
           </div>
 
@@ -168,7 +183,7 @@
           <button onclick="downloadZip()" class="w-full max-w-md mx-auto btn btn-success py-5 text-2xl shadow-xl transform hover:scale-105">Download AppSuite.zip</button>
           <div class="max-w-lg mx-auto bg-gray-900 p-6 rounded-xl border border-gray-700 text-left text-sm text-gray-400">
             <p class="font-bold text-gray-300 mb-2">Next:</p>
-            <ul class="list-disc pl-5 space-y-1"><li>Unzip the file.</li><li>Upload <strong>WorkerApp</strong> and <strong>MonitorApp</strong> folders to GitHub.</li><li>Enable GitHub Pages.</li></ul>
+            <ul class="list-disc pl-5 space-y-1"><li>Unzip the file.</li><li>Upload <strong>WorkerApp</strong> and <strong>MonitorApp</strong> folders to GitHub.</li><li>Enable GitHub Pages.</li><li><strong>Note:</strong> 'Code.gs' is included in the zip as a backup.</li></ul>
           </div>
           <button onclick="gotoStep(3)" class="text-gray-500 hover:text-white text-sm">Back</button>
         </div>
@@ -181,6 +196,7 @@
     let logoData = "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png"; 
     let tplWorker = "", tplMonitor = "", tplBackend = "";
 
+    // --- ON LOAD: Try to find local icon.png ---
     window.onload = async () => {
       try {
         const resp = await fetch('icon.png');
@@ -251,7 +267,7 @@
     }
 
     function copyLegend() {
-      const legend = `Template Code Legend:\n[YESNO] - Yes/No Radio\n[CHECK] - Checkbox\n[TEXT] - Text Area\n[NUMBER] - Numeric\n[PHOTO] - Camera\n[GPS] - Location\n[HEADING] - Header\n[NOTE] - Instruction\n$ - Numeric Column`;
+      const legend = `Template Code Legend:\n[YESNO] - Yes/No Radio\n[CHECK] - Checkbox\n[TEXT] - Text Area\n[NUMBER] - Numeric\n[PHOTO] - Camera\n[GPS] - Location\n[HEADING] - Header\n[NOTE] - Instruction\n[SIGN] - Signature\n$ - Numeric Column`;
       navigator.clipboard.writeText(legend);
       alert("Legend copied!");
     }
@@ -285,6 +301,8 @@
         const url = document.getElementById('webAppUrl').value;
         const result = document.getElementById('testResult');
         const btnNext = document.getElementById('btnNextDownload');
+        const key = document.getElementById('secretKey').value;
+        
         if(!url.includes('/exec')) { alert('Invalid URL'); return; }
         
         result.classList.remove('hidden'); result.textContent = "Testing..."; result.className = "text-center font-bold text-lg text-yellow-400 p-3 rounded-lg bg-gray-900 inline-block";
@@ -317,13 +335,17 @@
       
       const wFolder = zip.folder("WorkerApp"); wFolder.file("index.html", wHtml);
       wFolder.file("manifest.json", JSON.stringify({ name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{ src: logoData, sizes: "192x192", type: "image/png" }] }, null, 2));
-      wFolder.file("sw.js", "const C='v7.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v8.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
-      zip.file("Backend_Script.js", document.getElementById('codeDisplay').textContent);
+      
+      // ADD BACKUP SCRIPT
+      zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
+
       zip.generateAsync({type:"blob"}).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = org.replace(/[^a-z0-9]/gi, '_') + "_AppSuite.zip"; a.click(); });
     }
   </script>
 </body>
 </html>
+```
