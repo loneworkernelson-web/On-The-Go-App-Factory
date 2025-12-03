@@ -27,8 +27,8 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+/* --- UI COMPONENTS --- */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -43,14 +43,14 @@ body {
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS (Visuals) --- */
+/* --- SETTINGS CARDS --- */
 .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
 .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 
-/* Colors for Labels */
+/* Colors */
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -93,14 +93,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
         <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
+        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
     </div>
     
     <div>
@@ -266,7 +266,8 @@ const CONFIG = {
     url: "%%GOOGLE_SHEET_URL%%", 
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
-    checkinInterval: %%CHECKIN_INTERVAL%%  
+    checkinInterval: %%CHECKIN_INTERVAL%%,
+    key: "%%SECRET_KEY%%"
 }; 
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
@@ -293,8 +294,10 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
+    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
+    // State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -304,22 +307,9 @@ window.addEventListener('load', () => {
     }
 
     // Mileage Default
-    if(CONFIG.mileage) {
-        if(!state.locations) state.locations = [];
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else if(state.locations) {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
+    initLocations();
 
+    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -328,6 +318,7 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
+    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -343,6 +334,26 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
 });
+
+// --- INIT LOCATIONS ---
+function initLocations() {
+    if(!state.locations) state.locations = [];
+    
+    if(CONFIG.mileage) {
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
+}
 
 // ==================== NAVIGATION ====================
 function navigate(page) {
@@ -435,7 +446,6 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
-        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -449,7 +459,6 @@ function renderLocations() {
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
-        // Business Name Logic
         let businessHtml = l.companyName && l.companyName !== 'Internal' 
             ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
             : '';
@@ -610,11 +619,6 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
-    if(state.settings.name && !state.settings.workerName) {
-        state.settings.workerName = state.settings.name;
-        state.settings.workerPhone = state.settings.phone;
-    }
-
     state.activeVisit = {
         locationId: sel.id,
         startTime: now,
@@ -630,12 +634,9 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // v32 FIX: Explicitly use 'buildPayload' helper in processUploadQueue instead
-    // (Implemented directly here for simplicity in this template)
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     
-    // First Ping (Instant)
-    sendToGoogleSheet({ 
+    processUploadQueue({ 
         "Alarm Status": 'ON SITE', 
         "Notes": "Visit Started (Locating...)",
         "Location Name": locName,
@@ -645,15 +646,16 @@ function startVisit() {
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            // Second Ping (Accurate)
-            sendToGoogleSheet({ 
+            processUploadQueue({ 
                 "Alarm Status": 'ON SITE', 
                 "Notes": "Location Confirmed",
-                "Location Name": locName
+                "Location Name": locName,
+                "Location Address": sel.address,
+                "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`
             });
             saveState();
         }, () => {
-            // Fail silent
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
         }, { timeout: 5000, maximumAge: 60000 });
     }
 }
@@ -665,9 +667,6 @@ function enterLockedScreen() {
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
-    
-    const alertCont = document.getElementById('btnSafe');
-    const departBtn = document.getElementById('btnDepart');
     
     if(timerInt) clearInterval(timerInt);
     timerInt = setInterval(tick, 1000);
@@ -682,9 +681,9 @@ function tick() {
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
-        alertCont.classList.remove('hidden');
-        setupLongPress(alertCont, () => iAmSafe());
-        departBtn.classList.add('hidden');
+        document.getElementById('btnSafe').classList.remove('hidden');
+        document.getElementById('btnDepart').classList.add('hidden');
+        setupLongPress(document.getElementById('btnSafe'), iamSafe);
         if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
     } else {
         const m = Math.floor(rem/60000);
@@ -692,8 +691,8 @@ function tick() {
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
         document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        alertCont.classList.add('hidden');
-        departBtn.classList.remove('hidden');
+        document.getElementById('btnSafe').classList.add('hidden');
+        document.getElementById('btnDepart').classList.remove('hidden');
     }
     
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
@@ -783,7 +782,6 @@ function preDepart(isSafeFlow) {
         const div = document.getElementById('reportFields');
         div.innerHTML = '';
         
-        // Mileage
         if(l.id === 'travel' && CONFIG.mileage) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
@@ -823,7 +821,6 @@ function quickStat() {
     buildReportForm(l.templateName, div);
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
-        // v33 Fix
         const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
         
         const data = {
@@ -863,6 +860,7 @@ function buildReportForm(templateName, container) {
             container.innerHTML += html;
         });
     }
+    
     const canvas = document.getElementById('sig-canvas');
     if(canvas) initSigPad(canvas);
 }
@@ -897,6 +895,7 @@ function gatherFormData() {
         else if(el.type === 'radio') { if(!el.checked) return; val = el.value; }
         data.custom[key] = val; data.jsonPayload[key] = val;
     });
+    
     if(sigPad) data.sig = sigPad.toDataURL('image/png');
     return data;
 }
@@ -908,6 +907,7 @@ function submitReport() {
 
 function depart(reportData = {}) {
     playSoundAndVibrate('depart');
+    
     let noteStr = reportData.notes || "";
     if(reportData.custom) {
         Object.keys(reportData.custom).forEach(k => {
@@ -928,6 +928,7 @@ function depart(reportData = {}) {
     }
 
     sendToGoogleSheet(data);
+    
     state.activeVisit = null; tempPhoto = null; sigPad = null;
     saveState();
     closeModal('report');
@@ -935,7 +936,6 @@ function depart(reportData = {}) {
     updateArrivedButtonState();
 }
 
-// --- MODALS & UTILS ---
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
@@ -990,18 +990,16 @@ function captureGPS(btn, key) {
     });
 }
 
-// --- NETWORK ---
 function sendToGoogleSheet(data) {
     if(!state.settings.googleSheetUrl) return;
-    
     const payload = {
+        'key': CONFIG.key,
         'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
         'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
         'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
         ...data, 'Timestamp': new Date().toISOString()
     };
     
-    // v34 NO-CORS REMOVED: Allows data to flow even if console shows red error
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             payload['Battery Level'] = Math.round(b.level * 100) + "%";
@@ -1039,18 +1037,14 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
-        // FIX: Removed no-cors to ensure payload is sent correctly
-        fetch(state.settings.googleSheetUrl, { method: 'POST', body: fd })
+        fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
                 state.pendingUploads.shift(); 
                 saveState();
                 processUploadQueue();
             })
             .catch(() => {
-                // Ignore CORS error (it means success in this context)
-                state.pendingUploads.shift();
-                saveState();
-                processUploadQueue();
+                document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
         document.getElementById('uploadBanner').classList.add('hidden');
