@@ -143,8 +143,9 @@
               <div class="p-2 bg-gray-800 rounded"><strong>[TEXT]</strong><br>Large Text</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[NUMBER]</strong><br>Numeric</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[PHOTO]</strong><br>Camera</div>
-              <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Header</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[GPS]</strong><br>Location</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[HEADING]</strong><br>Header</div>
+              <div class="p-2 bg-gray-800 rounded"><strong>[NOTE]</strong><br>Instruction</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[SIGN]</strong><br>Signature</div>
             </div>
           </div>
@@ -243,12 +244,13 @@
     }
 
     function copyVisitsHeaders() {
-      const isAdv = document.getElementById('chkAdvanced').checked;
+      // UPDATED HEADERS LIST (Matches Backend v16.0)
       const contacts = "Emergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email";
-      const basic = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
-      const adv = "\tPhoto 1\tDistance (km)";
-      navigator.clipboard.writeText(basic + (isAdv ? adv : ""));
-      alert("Headers copied! (Includes contact columns)\n\nPaste into cell A1 of 'Visits' tab.");
+      const standard = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
+      const advanced = "\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time"; // Added Col 21
+      
+      navigator.clipboard.writeText(standard + advanced);
+      alert("Headers copied! (Includes all 21 columns)\n\nPaste into cell A1 of 'Visits' tab.");
     }
 
     function copyChecklistSetup() {
@@ -320,19 +322,19 @@
       const mile = document.getElementById('chkMileage').checked;
       const chkEnabled = document.getElementById('chkCheckin').checked;
       const chkMins = document.getElementById('checkinMins').value;
-      const escMins = document.getElementById('escalationMins').value; // New Config
+      const escMins = document.getElementById('escalationMins').value;
       const secret = document.getElementById('secretKey').value;
 
       let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org).replace(/%%ORGANISATION_NAME%%/g, org)
         .replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData)
         .replace('%%IS_ADVANCED%%', isAdv).replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
         .replace('%%CHECKIN_ENABLED%%', chkEnabled).replace('%%CHECKIN_INTERVAL%%', chkMins)
-        .replace('%%ESCALATION_MINUTES%%', escMins) // Inject Escalation
+        .replace('%%ESCALATION_MINUTES%%', escMins)
         .replace('%%SECRET_KEY%%', secret);
       
       const wFolder = zip.folder("WorkerApp"); wFolder.file("index.html", wHtml);
       wFolder.file("manifest.json", JSON.stringify({ name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{ src: logoData, sizes: "192x192", type: "image/png" }] }, null, 2));
-      wFolder.file("sw.js", "const C='v10.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v11.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
