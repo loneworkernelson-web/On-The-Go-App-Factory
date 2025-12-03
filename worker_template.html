@@ -27,7 +27,7 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- INTERACTIVE ELEMENTS --- */
+/* --- UI COMPONENTS --- */
 .long-press-btn { position: relative; overflow: hidden; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
@@ -37,6 +37,7 @@ body {
 .long-press-btn.pressing::after { width: 100%; }
 
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -93,7 +94,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
     <div class="flex gap-2 flex-shrink-0">
         <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
@@ -291,9 +292,32 @@ window.addEventListener('load', () => {
     
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
+    
+    // FIX: State Migration (Map old 'name' key to new 'workerName' key)
+    if(state.settings.name && !state.settings.workerName) {
+        state.settings.workerName = state.settings.name;
+        state.settings.workerPhone = state.settings.phone;
+        state.settings.emergencyName = state.settings.emgName;
+        state.settings.emergencyPhone = state.settings.emgPhone;
+        state.settings.emergencyEmail = state.settings.emgEmail;
+    }
 
-    // FIX: Initialize Locations (v26.0)
-    initLocations();
+    // Mileage Default
+    if(CONFIG.mileage) {
+        if(!state.locations) state.locations = [];
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else if(state.locations) {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
 
     // Feature Flags
     if(CONFIG.isAdv) {
@@ -320,26 +344,6 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
 });
-
-// --- INIT LOCATIONS ---
-function initLocations() {
-    if(!state.locations) state.locations = [];
-    
-    if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
-}
 
 // ==================== NAVIGATION ====================
 function navigate(page) {
@@ -431,12 +435,22 @@ function renderLocations() {
     
     state.locations.forEach(l => {
         const el = document.createElement('div');
-        el.className = 'p-4 bg-gray-900 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all mb-2';
-        if(state.selectedLocationId === l.id) el.classList.add('border-blue-500', 'bg-gray-800');
         
-        let styleClass = l.id === 'travel' ? "text-purple-400" : "text-white";
+        // TILE STYLE LOGIC
+        let bgColor = 'bg-gray-900';
+        let borderColor = 'border-transparent';
+        let textColor = 'text-white';
         
-        let html = `<div><div class="font-bold text-lg ${styleClass}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
+        if(state.selectedLocationId === l.id) {
+            bgColor = 'bg-blue-900';
+            borderColor = 'border-blue-500';
+        }
+        
+        if(l.id === 'travel') textColor = 'text-purple-400';
+        
+        el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
+        
+        let html = `<div><div class="font-bold text-lg ${textColor}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
         html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
         
         el.innerHTML = html;
@@ -591,18 +605,17 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // FIX v26: SEND SIGNAL IMMEDIATELY
-    processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (Locating...)" });
-    
+    // Fast GPS
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            // Send second update with GPS
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Location Confirmed" });
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" });
             saveState();
         }, () => {
-            // Ignore error, first ping covers it
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
         }, { timeout: 5000, maximumAge: 60000 });
+    } else {
+        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
