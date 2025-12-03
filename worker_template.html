@@ -28,7 +28,7 @@ body {
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -43,11 +43,15 @@ body {
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS --- */
-.setting-card { @apply bg-gray-900 p-4 rounded-lg border border-gray-700 mb-4; }
-.setting-label { @apply block text-xs font-bold uppercase tracking-wider mb-2; }
-.form-input { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none; }
-.form-input-card { @apply w-full bg-gray-800 border border-gray-600 rounded p-3 text-white focus:border-blue-500 outline-none mb-2; }
+/* --- SETTINGS CARDS (v15 Visuals) --- */
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
+
+/* Colors */
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -96,7 +100,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
+        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
     </div>
     
     <div>
@@ -171,15 +175,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
         <input type="hidden" id="locId">
         <div class="space-y-4">
-            <div>
-                <label class="text-xs text-gray-400 uppercase font-bold">Business Name</label>
-                <input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp">
-            </div>
-            
-            <div>
-                <label class="text-xs text-gray-400 uppercase font-bold">Site Name</label>
-                <input type="text" id="locName" class="form-input" placeholder="e.g. Head Office">
-            </div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div>
             
             <div>
                 <label class="text-xs text-gray-400 uppercase font-bold">Address</label>
@@ -308,8 +305,22 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Initialize Locations
-    initLocations();
+    // Mileage Default
+    if(CONFIG.mileage) {
+        if(!state.locations) state.locations = [];
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else if(state.locations) {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
 
     // Feature Flags
     if(CONFIG.isAdv) {
@@ -336,26 +347,6 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
 });
-
-// --- INIT LOCATIONS ---
-function initLocations() {
-    if(!state.locations) state.locations = [];
-    
-    if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', // Business Name
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
-}
 
 // ==================== NAVIGATION ====================
 function navigate(page) {
@@ -497,7 +488,7 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locId').value = id;
         document.getElementById('locName').value = l.name;
         document.getElementById('locAddr').value = l.address;
-        document.getElementById('locBusiness').value = l.companyName || ""; // v33 Add
+        document.getElementById('locBusiness').value = l.companyName || ""; 
         document.getElementById('locTemplate').value = l.templateName || "";
         document.getElementById('locNoRep').checked = l.noReport || false;
         
@@ -508,7 +499,7 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locId').value = "";
         document.getElementById('locName').value = "";
         document.getElementById('locAddr').value = "";
-        document.getElementById('locBusiness').value = ""; // v33 Add
+        document.getElementById('locBusiness').value = ""; 
         document.getElementById('locTemplate').value = "";
         document.getElementById('locNoRep').checked = false;
         document.getElementById('btnDelLoc').classList.add('hidden');
@@ -519,7 +510,7 @@ function saveLoc() {
     const id = document.getElementById('locId').value;
     const name = document.getElementById('locName').value;
     const addr = document.getElementById('locAddr').value;
-    const business = document.getElementById('locBusiness').value; // v33 Add
+    const business = document.getElementById('locBusiness').value; 
     const tpl = document.getElementById('locTemplate').value;
     const noRep = document.getElementById('locNoRep').checked;
     
@@ -590,7 +581,6 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
@@ -623,7 +613,7 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
-    // FIX v31: Force Hydrate Settings if missing
+    // v32 FIX: Hydrate Name if missing
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -644,14 +634,15 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // v33 FIX: Send Business Name in Location Name
+    // v32 FIX: Immediate Send with Name
+    // v33 FIX: Include Business Name
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     
     processUploadQueue({ 
         "Alarm Status": 'ON SITE', 
         "Notes": "Visit Started (Locating...)",
         "Location Name": locName,
-        "Location Address": sel.address
+        "Location Address": sel.address 
     });
     
     if(navigator.geolocation) {
@@ -660,15 +651,12 @@ function startVisit() {
             processUploadQueue({ 
                 "Alarm Status": 'ON SITE', 
                 "Notes": "Location Confirmed",
-                "Location Name": locName, // Ensure update has name
-                "Location Address": sel.address
+                "Location Name": locName
             });
             saveState();
         }, () => {
             processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
         }, { timeout: 5000, maximumAge: 60000 });
-    } else {
-        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -693,7 +681,6 @@ function tick() {
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
     
-    // UI Update
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
@@ -711,7 +698,6 @@ function tick() {
         departBtn.classList.remove('hidden');
     }
     
-    // Periodic Check-in
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
         triggerCheckin();
     }
@@ -744,7 +730,7 @@ function triggerCheckin() {
     document.getElementById('checkinOkBtn').onclick = () => {
         clearInterval(checkinIntervalId);
         closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval * 60000); 
+        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
         saveState();
     };
 }
@@ -765,6 +751,7 @@ function extendVisit() {
     });
 }
 
+// v31 FIX: Triple Tap
 function handlePanicTap() {
     const now = Date.now();
     if (now - panicTapTimer > 2000) panicTapCount = 0;
@@ -817,7 +804,6 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
-    // FIX v28: PIN only needed if OVERDUE or PANIC
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const isOverdue = (due - now) < 0;
@@ -863,7 +849,6 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
-    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -1155,16 +1140,6 @@ function getGpsAddress() {
         btn.disabled = false;
     }, { timeout: 10000 });
 }
-
-// Listeners
-document.getElementById('btnDelLoc').onclick = deleteLoc;
-document.getElementById('saveLocationBtn').onclick = saveLoc;
-document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
-document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
