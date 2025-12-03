@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>%%ORG_NAME%%</title>
+<title>%%ORGANISATION_NAME%%</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#111827">
@@ -28,7 +28,7 @@ body {
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+.long-press-btn { position: relative; overflow: hidden; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -36,22 +36,79 @@ body {
 }
 .long-press-btn.pressing::after { width: 100%; }
 
-.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+.slider-thumb::-webkit-slider-thumb { 
+    -webkit-appearance: none; appearance: none; 
+    width: 28px; height: 28px; 
+    background: #3b82f6; 
+    cursor: pointer; 
+    border-radius: 50%; border: 2px solid white; 
+    box-shadow: 0 0 10px rgba(0,0,0,0.3); 
+}
 
-.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+.spinner { 
+    border: 3px solid rgba(255, 255, 255, 0.3); 
+    border-radius: 50%; 
+    border-top-color: #fff; 
+    width: 20px; height: 20px; 
+    animation: spin 1s linear infinite; 
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 
-canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+canvas { 
+    touch-action: none; 
+    background: #fff; 
+    border-radius: 0.5rem; 
+    cursor: crosshair; 
+}
 
 /* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.setting-card { 
+    background-color: #1f2937; 
+    padding: 1.25rem; 
+    border-radius: 0.75rem; 
+    border: 1px solid #374151; 
+    margin-bottom: 1rem; 
+}
+.setting-label { 
+    display: block; 
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-bottom: 0.5rem; 
+}
+.form-input { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.75rem; 
+    display: block; 
+}
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
+.form-input-card { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.5rem; 
+    display: block; 
+}
 
-/* Colors */
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+/* --- COLORS --- */
+.lbl-blue { color: #60a5fa; } 
+.lbl-green { color: #4ade80; } 
+.lbl-purple { color: #c084fc; } 
+.lbl-red { color: #f87171; } 
+.lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -302,7 +359,6 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
-    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
     // FIX: State Migration
@@ -314,24 +370,8 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Mileage Default
-    if(CONFIG.mileage) {
-        if(!state.locations) state.locations = [];
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else if(state.locations) {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
+    initLocations();
 
-    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -340,7 +380,6 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -356,7 +395,6 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
     
-    // Wake Lock Logic (Restored)
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
@@ -379,9 +417,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
-    
-    if(page === 'main') startReminderTimer();
-    else clearTimeout(mainScreenReminderTimer);
+    if(page === 'main') startReminderTimer(); else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
@@ -393,8 +429,14 @@ function navigate(page) {
     }
 }
 
-// --- DATA BUILDER (CRITICAL v37 FIX) ---
+// --- DATA BUILDER (v37) ---
 function buildPayload(data) {
+    // Calculate Due Time (v47)
+    let dueTime = "";
+    if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
+        dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
+    }
+    
     return {
         'key': CONFIG.key,
         'Worker Name': state.settings.workerName, 
@@ -405,6 +447,7 @@ function buildPayload(data) {
         'Escalation Contact Name': state.settings.escalationName, 
         'Escalation Contact Number': state.settings.escalationPhone, 
         'Escalation Contact Email': state.settings.escalationEmail,
+        'Anticipated Departure Time': dueTime, // v47
         ...data, 
         'Timestamp': new Date().toISOString()
     };
@@ -421,7 +464,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); // 5 Mins
+    }, 300000); 
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -483,7 +526,6 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
-        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -497,7 +539,6 @@ function renderLocations() {
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
-        // Business Name Logic
         let businessHtml = l.companyName && l.companyName !== 'Internal' 
             ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
             : '';
@@ -625,7 +666,6 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
@@ -658,7 +698,6 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
-    // FIX v31: Force Hydrate Settings if missing
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -681,7 +720,6 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // v33 FIX: Include Business Name
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     
     processUploadQueue(buildPayload({ 
@@ -712,8 +750,7 @@ function enterLockedScreen() {
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
-    // FIX v45.0: Update Timer Immediately
-    tick();
+    tick(); // Instant update
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
@@ -728,7 +765,6 @@ function tick() {
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
     
-    // FIX v45.0: Always show time, even if overdue
     document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 
     if(rem < 0) {
@@ -739,16 +775,14 @@ function tick() {
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
         if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
 
-        // 1. AUTO-SEND OVERDUE (Immediate)
         if (!state.activeVisit.overdueSent) {
              state.activeVisit.overdueSent = true;
              saveState();
              triggerAutoAlert('OVERDUE');
         }
-
-        // 2. AUTO-SEND CRITICAL (Configurable Delay)
-        const escalationMs = CONFIG.escalationMinutes * 60000;
-        if (rem < -escalationMs && !state.activeVisit.criticalSent) { 
+        
+        const escTime = CONFIG.escalationMinutes * 60000;
+        if (rem < -escTime && !state.activeVisit.criticalSent) { 
              state.activeVisit.criticalSent = true;
              saveState();
              triggerAutoAlert('EMERGENCY - OVERDUE');
@@ -757,6 +791,7 @@ function tick() {
         const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
+        document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
         document.getElementById('btnSafe').classList.add('hidden');
         document.getElementById('btnDepart').classList.remove('hidden');
     }
@@ -824,7 +859,6 @@ function extendVisit() {
     });
 }
 
-// v31 FIX: Triple Tap Panic Logic
 function handlePanicTap() {
     const now = Date.now();
     if (now - panicTapTimer > 2000) panicTapCount = 0;
@@ -849,7 +883,6 @@ function iamSafe() {
 }
 
 // ==================== REPORTING ENGINE ====================
-// v41 NEW FEATURE: Mid-Visit Update
 function openMidVisitUpdate() {
     isMidVisitUpdate = true;
     const l = state.locations.find(l => l.id === state.activeVisit.locationId);
@@ -892,7 +925,6 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
-    // FIX v28: PIN only needed if OVERDUE or PANIC
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const isOverdue = (due - now) < 0;
