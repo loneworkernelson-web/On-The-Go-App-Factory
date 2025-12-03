@@ -62,33 +62,29 @@
              
              <div class="flex items-center gap-4 mb-4 opacity-75">
                  <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">✓</div>
-                 <div>
-                     <span class="block font-bold text-white">Safety Timer & Panic Button</span>
-                     <span class="text-sm text-gray-400">Core functionality. Always enabled.</span>
-                 </div>
+                 <div><span class="block font-bold text-white">Safety Timer & Panic Button</span><span class="text-sm text-gray-400">Core functionality. Always enabled.</span></div>
              </div>
 
              <label class="flex items-center gap-4 cursor-pointer mb-2 group">
                <input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" onchange="toggleCheckin()">
-               <div>
-                   <span class="block font-bold text-white group-hover:text-blue-300 transition">Enable Periodic Check-in?</span>
-                   <span class="text-sm text-gray-400">Optional. Asks "Are you OK?" at set intervals.</span>
-               </div>
+               <div><span class="block font-bold text-white group-hover:text-blue-300 transition">Enable Periodic Check-in?</span><span class="text-sm text-gray-400">Optional. Asks "Are you OK?" at set intervals.</span></div>
              </label>
              
              <div id="checkinOptions" class="hidden pl-10 ml-3 mb-4 transition-all">
                 <label class="text-gray-300 text-sm font-bold mr-2">Frequency (Minutes):</label>
                 <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
              </div>
+
+             <div class="mt-4 pt-4 border-t border-gray-600">
+                 <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Textbelt API Key (SMS) <a href="https://textbelt.com/" target="_blank" class="link ml-1">(Get Key ↗)</a></label>
+                 <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: Leave blank to use Free Tier (1 SMS/day)">
+             </div>
           </div>
 
           <div class="highlight-box">
             <label class="flex items-center gap-4 cursor-pointer mb-4 group">
               <input type="checkbox" id="chkAdvanced" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" checked onchange="toggleAdv()">
-              <div>
-                  <span class="block font-bold text-white group-hover:text-blue-300 transition">Advanced Features</span>
-                  <span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting, and Mileage.</span>
-              </div>
+              <div><span class="block font-bold text-white group-hover:text-blue-300 transition">Advanced Features</span><span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting, and Mileage.</span></div>
             </label>
             
             <div id="advOptions" class="pl-10 space-y-6 border-l-2 border-gray-700 ml-3">
@@ -129,10 +125,7 @@
 
           <div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
             <div class="flex justify-between items-center mb-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">ℹ️</span>
-                    <h4 class="font-bold text-gray-200">Template Code Legend</h4>
-                </div>
+                <div class="flex items-center gap-2"><span class="text-xl">ℹ️</span><h4 class="font-bold text-gray-200">Template Code Legend</h4></div>
                 <button onclick="copyLegend()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded shadow">Copy Legend to Clipboard</button>
             </div>
             <p class="text-xs text-gray-400 mb-4">Tip: Paste this legend into your spreadsheet (e.g., cell A20) as a permanent reference.</p>
@@ -162,9 +155,7 @@
             <label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label>
             <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()">
           </div>
-          <div class="flex justify-center">
-             <button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button>
-          </div>
+          <div class="flex justify-center"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button></div>
           <div id="testResult" class="text-center font-bold text-lg hidden"></div>
           <div class="flex justify-between pt-6">
             <button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button>
@@ -190,7 +181,6 @@
     let logoData = "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png"; 
     let tplWorker = "", tplMonitor = "", tplBackend = "";
 
-    // --- ON LOAD: Try to find local icon.png ---
     window.onload = async () => {
       try {
         const resp = await fetch('icon.png');
@@ -253,52 +243,28 @@
     }
 
     function copyChecklistSetup() {
-      // GENERATE 30 QUESTION COLUMNS
       let h = "Company Name\tTemplate Name";
       for(let i=1; i<=30; i++) h += "\tQuestion " + i;
-      
-      // Sample Data
-      const rows = "\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + 
-                   "\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details";
-                   
+      const rows = "\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + "\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details";
       navigator.clipboard.writeText(h + rows);
       alert("Full Setup Copied! (Includes 30 Question Columns)\n\nPaste into cell A1 of 'Checklists' tab.");
     }
 
     function copyLegend() {
-      const legend = `Template Code Legend:
-[YESNO] - Yes/No Radio Buttons
-[CHECK] - Single Checkbox
-[TEXT] - Large Text Area
-[NUMBER] - Numeric Input
-[PHOTO] - Camera Upload
-[GPS] - Capture GPS Coords
-[HEADING] - Section Header
-[NOTE] - Instructional Text
-$ - (Prefix) Saves as separate numeric column
-# - (Prefix) Same as [HEADING]
-% - (Prefix) Same as [TEXT]`;
+      const legend = `Template Code Legend:\n[YESNO] - Yes/No Radio\n[CHECK] - Checkbox\n[TEXT] - Text Area\n[NUMBER] - Numeric\n[PHOTO] - Camera\n[GPS] - Location\n[HEADING] - Header\n[NOTE] - Instruction\n$ - Numeric Column`;
       navigator.clipboard.writeText(legend);
-      alert("Legend copied!\n\nPaste it into your spreadsheet (e.g., cell A20) as a reference.");
+      alert("Legend copied!");
     }
 
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([
-          fetch('worker_template.html'),
-          fetch('monitor_template.html'),
-          fetch('backend_template.gs')
+          fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.gs')
         ]);
-        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing template files. Ensure all 4 files are in the same folder.");
-        
-        tplWorker = await resW.text();
-        tplMonitor = await resM.text();
-        tplBackend = await resB.text();
-        
+        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing templates");
+        tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
         generateScript();
-      } catch(e) {
-        alert("Error loading templates: " + e.message + "\nEnsure you are running via a server (not file://).");
-      }
+      } catch(e) { alert("Error: " + e.message); }
     }
 
     function generateScript() {
@@ -306,47 +272,32 @@ $ - (Prefix) Saves as separate numeric column
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
         .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
+        .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
         .replace('%%PHOTOS_FOLDER_ID%%', ""); 
       document.getElementById('codeDisplay').textContent = code.trim();
       gotoStep(3);
     }
 
-    function copyScript() {
-      navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent);
-      alert("Code copied!");
-    }
-
-    function resetTest() {
-        document.getElementById('btnNextDownload').disabled = true;
-        document.getElementById('testResult').classList.add('hidden');
-    }
-
+    function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Code copied!"); }
+    function resetTest() { document.getElementById('btnNextDownload').disabled = true; document.getElementById('testResult').classList.add('hidden'); }
+    
     function testConnection() {
         const url = document.getElementById('webAppUrl').value;
         const result = document.getElementById('testResult');
         const btnNext = document.getElementById('btnNextDownload');
-        const key = document.getElementById('secretKey').value;
-        
         if(!url.includes('/exec')) { alert('Invalid URL'); return; }
         
-        result.classList.remove('hidden');
-        result.textContent = "Testing...";
-        result.className = "text-center font-bold text-lg text-yellow-400 p-3 rounded-lg bg-gray-900 inline-block";
-
-        fetch(url + '?test=1&key=' + encodeURIComponent(key))
+        result.classList.remove('hidden'); result.textContent = "Testing..."; result.className = "text-center font-bold text-lg text-yellow-400 p-3 rounded-lg bg-gray-900 inline-block";
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value))
             .then(res => res.json())
             .then(data => {
                 if(data.status === "success") {
-                  result.textContent = "✅ Connection Successful!";
-                  result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
-                  btnNext.disabled = false;
-                  btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
+                  result.textContent = "✅ Connection Successful!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
+                  btnNext.disabled = false; btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
                   document.getElementById('finalAppName').innerText = document.getElementById('orgName').value + " Safety";
                 } else { throw new Error("Invalid Key"); }
-            })
-            .catch(() => {
-                result.textContent = "❌ Connection Failed.";
-                result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block";
+            }).catch(() => {
+                result.textContent = "❌ Connection Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block";
             });
     }
 
@@ -359,37 +310,19 @@ $ - (Prefix) Saves as separate numeric column
       const chkEnabled = document.getElementById('chkCheckin').checked;
       const chkMins = document.getElementById('checkinMins').value;
 
-      // INJECT ALL CONFIG
-      let wHtml = tplWorker
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%ORGANISATION_NAME%%/g, org)
-        .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-        .replace(/%%LOGO_DATA%%/g, logoData)
-        .replace('%%IS_ADVANCED%%', isAdv)
-        .replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
-        .replace('%%CHECKIN_ENABLED%%', chkEnabled)
-        .replace('%%CHECKIN_INTERVAL%%', chkMins);
+      let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org).replace(/%%ORGANISATION_NAME%%/g, org)
+        .replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData)
+        .replace('%%IS_ADVANCED%%', isAdv).replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
+        .replace('%%CHECKIN_ENABLED%%', chkEnabled).replace('%%CHECKIN_INTERVAL%%', chkMins);
       
-      const wFolder = zip.folder("WorkerApp");
-      wFolder.file("index.html", wHtml);
-      wFolder.file("manifest.json", JSON.stringify({
-        name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af",
-        icons: [{ src: logoData, sizes: "192x192", type: "image/png" }]
-      }, null, 2));
-      wFolder.file("sw.js", "const C='v5.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      const wFolder = zip.folder("WorkerApp"); wFolder.file("index.html", wHtml);
+      wFolder.file("manifest.json", JSON.stringify({ name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{ src: logoData, sizes: "192x192", type: "image/png" }] }, null, 2));
+      wFolder.file("sw.js", "const C='v7.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
-      let mHtml = tplMonitor
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%SHEET_URL%%/g, url)
-        .replace(/%%LOGO_URL%%/g, logoData);
-      const mFolder = zip.folder("MonitorApp");
-      mFolder.file("index.html", mHtml);
-
+      let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
+      const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
       zip.file("Backend_Script.js", document.getElementById('codeDisplay').textContent);
-
-      zip.generateAsync({type:"blob"}).then(blob => {
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = org.replace(/[^a-z0-9]/gi, '_') + "_AppSuite.zip"; a.click();
-      });
+      zip.generateAsync({type:"blob"}).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = org.replace(/[^a-z0-9]/gi, '_') + "_AppSuite.zip"; a.click(); });
     }
   </script>
 </body>
