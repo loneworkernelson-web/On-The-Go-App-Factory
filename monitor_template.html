@@ -5,60 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>%%ORG_NAME%% Monitor</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 <style>
 body{font-family:'Inter',sans-serif}
-@keyframes flash-red{0%,100%{background:#991b1b}50%{background:#ef4444}}
-@keyframes flash-purple{0%,100%{background:#5b21b6}50%{background:#a78bfa}}
+@keyframes flash-red{0%,100%{background:#7f1d1d}50%{background:#ef4444}}
+@keyframes flash-purple{0%,100%{background:#581c87}50%{background:#a855f7}}
 .flashing-alert{animation:flash-red 1s infinite}
 .flashing-duress{animation:flash-purple 1s infinite}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #1f2937; }
+::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden">
 
-<div id="setupPage" class="h-full flex items-center justify-center p-4">
-  <div class="text-center space-y-4 max-w-md w-full bg-gray-800 p-8 rounded-xl shadow-2xl">
-    <h1 class="text-3xl font-bold text-blue-400">Security Login</h1>
-    <p class="text-gray-400 mb-4">Enter Secret Key to monitor %%ORG_NAME%%</p>
-    <input type="password" id="secretKeyInput" class="w-full bg-gray-900 p-4 rounded text-white border border-gray-600 focus:border-blue-500 outline-none" placeholder="Enter Secret Key">
-    <button onclick="login()" class="w-full bg-blue-600 p-4 rounded font-bold hover:bg-blue-500 transition shadow-lg">Connect Securely</button>
+<div id="setupPage" class="h-full flex items-center justify-center p-4 z-50 bg-gray-900 absolute inset-0">
+  <div class="text-center space-y-6 max-w-md w-full bg-gray-800 p-10 rounded-2xl shadow-2xl border border-gray-700">
+    <div>
+        <img src="%%LOGO_URL%%" class="h-20 mx-auto mb-4 object-contain">
+        <h1 class="text-3xl font-extrabold text-blue-400 tracking-tight">Security Login</h1>
+        <p class="text-gray-500 text-sm mt-2">%%ORG_NAME%% Safety Dashboard</p>
+    </div>
+    <input type="password" id="secretKeyInput" class="w-full bg-gray-900 p-4 rounded-xl text-white border border-gray-600 focus:border-blue-500 outline-none text-center tracking-widest text-xl transition-all focus:ring-2 focus:ring-blue-500/50" placeholder="Enter Key">
+    <button onclick="login()" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 p-4 rounded-xl font-bold hover:from-blue-500 hover:to-blue-400 transition shadow-lg text-lg uppercase tracking-wide">Connect</button>
   </div>
 </div>
 
 <div id="dashboardPage" class="hidden h-full flex flex-col">
-  <header class="bg-gray-800 p-4 shadow-lg flex justify-between items-center z-10">
-    <div class="flex items-center gap-2">
-      <img src="%%LOGO_URL%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'">
-      <h1 class="text-2xl font-bold text-blue-400">%%ORG_NAME%% Monitor</h1>
-    </div>
+  <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
     <div class="flex items-center gap-3">
-      <span id="status" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></span>
-      <span id="lastUpd" class="text-xs text-gray-400">Connecting...</span>
-      <button onclick="logout()" class="p-2 text-gray-400 hover:text-white border border-gray-600 rounded">Logout</button>
+      <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain" onerror="this.style.display='none'">
+      <div>
+          <h1 class="text-xl font-bold text-white leading-none">%%ORG_NAME%%</h1>
+          <span class="text-xs text-blue-400 font-mono">LIVE MONITOR</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="text-right hidden md:block">
+          <div id="clock" class="text-lg font-bold font-mono">00:00:00</div>
+          <div id="lastUpd" class="text-xs text-gray-500">Connecting...</div>
+      </div>
+      <div class="h-8 w-px bg-gray-700 mx-2"></div>
+      <button onclick="logout()" class="text-gray-400 hover:text-white text-sm font-bold uppercase tracking-wider">Logout</button>
     </div>
   </header>
   
-  <div class="bg-gray-800 border-t border-gray-700 p-2">
-    <details>
-      <summary class="text-xs text-gray-400 cursor-pointer hover:text-white">Event Log</summary>
-      <div id="logPanel" class="text-xs text-gray-500 h-24 overflow-y-auto mt-2 p-2 bg-black rounded font-mono"></div>
+  <div class="bg-gray-900 border-b border-gray-800">
+    <details class="group" open>
+      <summary class="p-2 text-xs text-gray-500 cursor-pointer hover:text-gray-300 bg-gray-800/50 select-none flex justify-between px-4">
+          <span>EVENT LOG</span>
+          <span class="group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div id="logPanel" class="h-32 overflow-y-auto p-2 font-mono text-xs space-y-1 bg-black/20"></div>
     </details>
   </div>
 
-  <main id="workerList" class="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-20"></main>
+  <main id="workerList" class="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto pb-32"></main>
 </div>
 
-<div id="alertOverlay" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-8 bg-red-900 text-white">
-  <h2 class="text-9xl font-bold animate-pulse mb-4">ALERT</h2>
-  <div id="alertDetails" class="text-3xl mt-8 font-mono text-center"></div>
-  <button onclick="ackAlert()" class="mt-12 bg-white text-black font-bold py-6 px-12 rounded-xl text-2xl shadow-2xl hover:scale-105 transition">ACKNOWLEDGE ALERT</button>
+<div id="alertOverlay" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-8 bg-red-900/95 backdrop-blur-sm text-white transition-all duration-300">
+  <div class="bg-red-950 p-12 rounded-3xl shadow-2xl text-center max-w-2xl w-full border-4 border-red-500 animate-pulse">
+      <h2 class="text-9xl mb-4">🚨</h2>
+      <h2 class="text-6xl font-black uppercase tracking-tighter mb-8">EMERGENCY</h2>
+      <div id="alertDetails" class="text-2xl font-mono text-red-200 mb-12 space-y-2"></div>
+      <button onclick="silenceAlarm()" class="w-full bg-white text-red-900 font-black py-6 px-12 rounded-xl text-2xl shadow-2xl hover:scale-105 transition transform active:scale-95">SILENCE & ACKNOWLEDGE</button>
+      <p class="mt-4 text-red-300 text-sm">Use dashboard to resolve.</p>
+  </div>
+</div>
+
+<div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-600">
+        <h2 class="text-2xl font-bold text-white mb-2">Resolve Incident</h2>
+        <p class="text-gray-400 text-sm mb-6">To verify this is not an accidental dismissal, please type the worker's name exactly as shown below:</p>
+        
+        <div id="resolveNameTarget" class="bg-gray-900 p-4 rounded border border-gray-700 text-center text-xl font-mono font-bold text-blue-400 mb-4 select-all"></div>
+        
+        <input id="resolveInput" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-center font-bold" placeholder="Type Name Here">
+        
+        <div class="flex gap-3">
+            <button onclick="closeResolve()" class="flex-1 py-3 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold">Cancel</button>
+            <button onclick="confirmResolve()" class="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded text-white font-bold shadow-lg">DECLARE SAFE</button>
+        </div>
+    </div>
 </div>
 
 <script>
 const URL = "%%SHEET_URL%%";
 let SECRET = "";
 let pollInt, alarm;
+let lastState = {}; 
+let activeWorkerToResolve = null; // Stores name of worker being resolved
 
 function login() {
   const k = document.getElementById('secretKeyInput').value;
@@ -67,135 +104,231 @@ function login() {
     document.getElementById('setupPage').classList.add('hidden'); 
     document.getElementById('dashboardPage').classList.remove('hidden'); 
     document.getElementById('dashboardPage').classList.add('flex'); 
+    Tone.start();
     fetchData(); 
-    pollInt=setInterval(fetchData,10000); 
+    pollInt=setInterval(fetchData, 10000); 
+    setInterval(updateClock, 1000);
   }
 }
 
-function logout(){ 
-  clearInterval(pollInt); 
-  location.reload(); 
-}
+function logout(){ clearInterval(pollInt); location.reload(); }
 
-function log(msg) {
+function log(msg, type="info") {
   const p = document.createElement('div');
-  p.innerText = new Date().toLocaleTimeString() + ": " + msg;
-  document.getElementById('logPanel').prepend(p);
+  let color = "text-gray-400";
+  if(type==="alert") color = "text-red-400 font-bold";
+  if(type==="success") color = "text-green-400";
+  p.className = `border-b border-gray-800 pb-1 ${color}`;
+  p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  const panel = document.getElementById('logPanel');
+  panel.prepend(p);
+  if(panel.children.length > 50) panel.lastChild.remove();
 }
 
 function fetchData() {
   const s = document.createElement('script');
   const cb = 'cb_'+Date.now();
-  
   window[cb] = (data) => {
-    delete window[cb]; 
-    document.body.removeChild(s);
-    if(data.status==='error') { alert('Access Denied. Check Key.'); logout(); return; }
-    
+    delete window[cb]; document.body.removeChild(s);
+    if(data.status==='error') { alert('Access Denied.'); logout(); return; }
     processAndRender(data); 
-    
-    document.getElementById('status').className='w-3 h-3 rounded-full bg-green-500'; 
-    document.getElementById('lastUpd').innerText=new Date().toLocaleTimeString();
+    document.getElementById('lastUpd').innerText = "Updated: " + new Date().toLocaleTimeString();
+    document.getElementById('lastUpd').className = "text-xs text-green-500 font-bold";
   };
-  
-  s.src = URL + '?callback='+cb+'&token='+encodeURIComponent(SECRET);
+  s.src = URL + '?callback='+cb+'&key='+encodeURIComponent(SECRET);
   s.onerror = () => { 
-    document.getElementById('status').className='w-3 h-3 rounded-full bg-red-500'; 
-    log("Connection Failed");
+    document.getElementById('lastUpd').innerText = "Connection Failed";
+    document.getElementById('lastUpd').className = "text-xs text-red-500 font-bold";
   };
   document.body.appendChild(s);
 }
 
 function processAndRender(data) {
   const list = document.getElementById('workerList'); 
-  list.innerHTML='';
-  
-  // 1. Group by Worker Name
   const workers = {};
+  
   data.forEach(row => {
-    const name = row['Worker Name'];
-    // Assuming Timestamp is ISO string, string comparison works for sorting
-    if (!workers[name] || row['Timestamp'] > workers[name]['Timestamp']) {
-        workers[name] = row;
+    if(!row['Worker Name']) return;
+    if (!workers[row['Worker Name']] || row['Timestamp'] > workers[row['Worker Name']]['Timestamp']) {
+        workers[row['Worker Name']] = row;
     }
   });
 
-  // 2. Filter for Active Statuses Only
-  const activeWorkers = Object.values(workers).filter(w => {
+  let activeAlertFound = false;
+  
+  Object.values(workers).forEach(w => {
+      const name = w['Worker Name'];
       const status = w['Alarm Status'];
-      return status !== 'DEPARTED' && 
-             status !== 'SAFE - MANUALLY CLEARED' && 
-             status !== 'DATA_ENTRY_ONLY' &&
-             status !== 'CHECKLIST_SUBMITTED';
+      const location = w['Location Name'];
+      
+      if(lastState[name] && lastState[name] !== status) {
+          let type = "info";
+          if(status.match(/EMERGENCY|DURESS|PANIC/)) type = "alert";
+          if(status === "DEPARTED" || status.includes("SAFE")) type = "success";
+          log(`${name}: ${lastState[name]} -> ${status} (${location})`, type);
+      } else if(!lastState[name]) {
+          log(`${name} connected: ${status}`, "info");
+      }
+      lastState[name] = status;
+      
+      if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
+          activeAlertFound = true;
+          playAlarm(w);
+      }
   });
   
-  if(activeWorkers.length === 0) {
-    list.innerHTML = "<div class='col-span-full text-center text-gray-600 mt-20 text-xl'>No Active Workers</div>";
-    return;
+  if(!activeAlertFound) stopAlarm();
+
+  list.innerHTML = '';
+  const sortedWorkers = Object.values(workers).filter(w => {
+      const s = w['Alarm Status'];
+      return s !== 'DEPARTED' && s !== 'COMPLETED';
+  }).sort((a,b) => {
+      const aBad = a['Alarm Status'].match(/EMERGENCY|DURESS|OVERDUE/) ? 1 : 0;
+      const bBad = b['Alarm Status'].match(/EMERGENCY|DURESS|OVERDUE/) ? 1 : 0;
+      return bBad - aBad;
+  });
+
+  if(sortedWorkers.length === 0) {
+      list.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center h-64 text-gray-600"><div class="text-6xl mb-4">☕</div><div class="text-xl">No Active Visits</div></div>`;
+      return;
   }
 
-  // 3. Render Cards
-  activeWorkers.forEach(w=>{
-    const div = document.createElement('div');
-    const isAlert = w['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/);
+  sortedWorkers.forEach(w => {
+    const status = w['Alarm Status'];
+    const isAlert = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/);
     
-    if(isAlert) playAlarm(w);
+    let cardClass = "bg-gray-800 border-l-4 border-blue-500";
+    let statusClass = "text-blue-400";
+    let resolveBtn = "";
     
-    // Style card based on status
-    let bgClass = 'bg-gray-700 border-blue-500 text-gray-200';
-    if(isAlert) bgClass = 'bg-red-900 border-red-500 text-white animate-pulse';
-    else if(w['Location Name'] === 'Travelling') bgClass = 'bg-indigo-900 border-indigo-500 text-white';
-    
-    div.className = `p-6 rounded-xl shadow-lg border-l-8 ${bgClass} flex flex-col justify-between transition-all`;
-    
-    // Calculate Time on Site
-    let timeDisplay = "";
-    if(w['Timestamp']) {
-        const start = new Date(w['Timestamp']);
-        const now = new Date();
-        const diffMins = Math.floor((now - start) / 60000);
-        timeDisplay = `${diffMins} min ago`;
+    if(isAlert) {
+        cardClass = status.includes('DURESS') ? "bg-purple-900 border-l-8 border-purple-500 animate-pulse" : "bg-red-900 border-l-8 border-red-500 animate-pulse";
+        statusClass = "text-white font-black bg-red-600 px-2 rounded";
+        // ADD RESOLVE BUTTON FOR ALERTS
+        resolveBtn = `<button onclick="initiateResolve('${w['Worker Name'].replace(/'/g, "\\'")}')" class="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg animate-none">✅ RESOLVE INCIDENT</button>`;
+    } else if(w['Location Name'] && w['Location Name'].includes('Travelling')) {
+        cardClass = "bg-indigo-900/40 border-l-4 border-indigo-500";
+        statusClass = "text-indigo-300";
     }
 
+    const start = new Date(w['Timestamp']);
+    const mins = Math.floor((new Date() - start)/60000);
+    
+    const div = document.createElement('div');
+    div.className = `rounded-xl shadow-lg p-5 flex flex-col justify-between ${cardClass} transition-all hover:scale-[1.02]`;
+    
     div.innerHTML = `
       <div>
-        <div class="flex justify-between items-start">
-          <div class="font-bold text-2xl truncate w-3/4">${w['Worker Name']}</div>
-          <div class="text-xs font-mono opacity-50 whitespace-nowrap">${timeDisplay}</div>
+        <div class="flex justify-between items-start mb-2">
+            <h3 class="text-2xl font-bold text-white truncate">${w['Worker Name']}</h3>
+            <span class="text-xs font-mono opacity-50 bg-black/30 px-2 py-1 rounded">${mins}m ago</span>
         </div>
-        <div class="text-lg opacity-75 mb-4 truncate">${w['Location Name']}</div>
-        <div class="mt-2 font-mono font-bold bg-black/20 p-2 rounded text-center text-sm truncate">${w['Alarm Status']}</div>
+        <div class="text-gray-300 text-sm mb-1 truncate">📍 ${w['Location Name'] || 'Unknown'}</div>
+        <div class="text-xs text-gray-500 mb-4 truncate">${w['Location Address'] || ''}</div>
+        
+        <div class="flex items-center justify-between bg-black/20 p-3 rounded-lg">
+            <span class="${statusClass} uppercase text-sm font-bold tracking-wider">${status}</span>
+            <span class="text-xs font-mono ${getBatColor(w['Battery Level'])}">🔋 ${w['Battery Level'] || '?'}</span>
+        </div>
+        ${w['Notes'] ? `<div class="mt-3 text-xs text-gray-400 italic border-l-2 border-gray-600 pl-2 line-clamp-2">"${w['Notes']}"</div>` : ''}
+        ${resolveBtn}
       </div>
-      <div class="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-sm">
-        <a href="tel:${w['Worker Phone']}" class="hover:text-blue-300 flex items-center gap-1">📞 Call</a>
-        <a href="tel:${w['Emergency Contact Number']}" class="hover:text-green-300 flex items-center gap-1 text-xs opacity-70">🚑 Emg.</a>
-        <a target="_blank" href="http://maps.google.com/?q=${w['Last Known GPS']}" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 text-white">📍 Map</a>
+      
+      <div class="mt-6 pt-4 border-t border-white/10 grid grid-cols-3 gap-2">
+         <a href="tel:${w['Worker Phone Number']}" class="col-span-1 bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold">📞 Call</a>
+         <a href="tel:${w['Emergency Contact Number']}" class="col-span-1 bg-gray-700 hover:bg-gray-600 text-red-300 text-center py-2 rounded text-xs font-bold">🚑 ICE</a>
+         <a href="https://www.google.com/maps/search/?api=1&query=${w['Last Known GPS']}" target="_blank" class="col-span-1 bg-blue-700 hover:bg-blue-600 text-white text-center py-2 rounded text-xs font-bold">🗺 Map</a>
       </div>
     `;
     list.appendChild(div);
   });
 }
 
+function getBatColor(bat) {
+    if(!bat) return "text-gray-600";
+    const n = parseInt(bat);
+    if(n < 20) return "text-red-500 animate-pulse";
+    if(n < 50) return "text-yellow-500";
+    return "text-green-500";
+}
+
 async function playAlarm(w) {
   const ov = document.getElementById('alertOverlay');
   if(ov.classList.contains('hidden')){
     ov.classList.remove('hidden');
-    ov.className = w['Alarm Status'].includes('DURESS') ? 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white' : 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white';
+    const isDuress = w['Alarm Status'].includes('DURESS');
+    ov.className = isDuress ? 
+       'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white' : 
+       'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white';
     
     document.getElementById('alertDetails').innerHTML = `
-      <p>${w['Worker Name']}</p>
-      <p class="mt-4 text-xl">${w['Location Name']}</p>
-      <p class="mt-8 font-mono bg-black/30 p-4 rounded">${w['Alarm Status']}</p>
+      <div class="text-4xl font-bold">${w['Worker Name']}</div>
+      <div class="text-xl opacity-75 mt-2">${w['Location Name']}</div>
+      <div class="mt-6 bg-black/40 px-6 py-2 rounded-full inline-block">${w['Alarm Status']}</div>
     `;
     
-    await Tone.start();
+    if(Tone.context.state !== 'running') await Tone.start();
     alarm = new Tone.Oscillator(440, "square").toDestination().start();
+    const lfo = new Tone.LFO("2n", 400, 800).start();
+    lfo.connect(alarm.frequency);
   }
 }
 
-function ackAlert(){
-  document.getElementById('alertOverlay').classList.add('hidden');
-  if(alarm) alarm.stop();
+function silenceAlarm() {
+    document.getElementById('alertOverlay').classList.add('hidden');
+    stopAlarmSound();
+}
+
+function stopAlarm() {
+    silenceAlarm();
+    stopAlarmSound();
+}
+
+function stopAlarmSound() {
+    if(alarm) { alarm.stop(); alarm.dispose(); alarm = null; }
+}
+
+// --- INCIDENT RESOLUTION ---
+function initiateResolve(workerName) {
+    activeWorkerToResolve = workerName;
+    document.getElementById('resolveNameTarget').innerText = workerName;
+    document.getElementById('resolveInput').value = "";
+    document.getElementById('resolveModal').classList.remove('hidden');
+}
+
+function closeResolve() {
+    document.getElementById('resolveModal').classList.add('hidden');
+    activeWorkerToResolve = null;
+}
+
+function confirmResolve() {
+    const input = document.getElementById('resolveInput').value.trim();
+    if (input === activeWorkerToResolve) {
+        // Send Safe Signal to Backend
+        const formData = new FormData();
+        formData.append('Worker Name', activeWorkerToResolve);
+        formData.append('Alarm Status', 'SAFE - MONITOR CLEARED');
+        formData.append('Notes', 'Incident resolved by Monitor Dashboard');
+        formData.append('key', SECRET);
+
+        // Use fetch to send POST
+        fetch(URL, { method: 'POST', body: formData, mode: 'no-cors' })
+            .then(() => {
+                alert("Resolution Sent. Dashboard will update shortly.");
+                closeResolve();
+                silenceAlarm();
+                // Optimistic update
+                lastState[activeWorkerToResolve] = 'SAFE - MONITOR CLEARED';
+            })
+            .catch(e => alert("Connection Failed: " + e));
+    } else {
+        alert("Name does not match. Please type exactly: " + activeWorkerToResolve);
+    }
+}
+
+function updateClock() {
+    document.getElementById('clock').innerText = new Date().toLocaleTimeString();
 }
 </script>
 </body>
