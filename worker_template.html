@@ -26,8 +26,8 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+/* --- UI COMPONENTS --- */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -42,19 +42,39 @@ body {
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+/* --- SETTINGS CARDS (Visual Fix) --- */
+.setting-card { 
+    background-color: #1f2937; 
+    padding: 1.25rem; 
+    border-radius: 0.75rem; 
+    border: 1px solid #374151; 
+    margin-bottom: 1rem; 
+}
+.setting-label { 
+    display: block;
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-bottom: 0.5rem; 
+}
+.form-input { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem;
+    outline: none; 
+    margin-bottom: 0.75rem;
+    display: block;
+}
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 
 /* Colors for Labels */
-.lbl-blue { color: #60a5fa; }
-.lbl-green { color: #4ade80; }
-.lbl-purple { color: #c084fc; }
-.lbl-red { color: #f87171; }
-.lbl-gray { color: #9ca3af; }
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -296,22 +316,8 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
 
-    // Mileage Default
-    if(CONFIG.mileage) {
-        if(!state.locations) state.locations = [];
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else if(state.locations) {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
+    // Initialize Locations Logic (Moved to dedicated function for safety)
+    initLocations();
 
     // Feature Flags
     if(CONFIG.isAdv) {
@@ -338,6 +344,26 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
 });
+
+// --- INIT LOCATIONS ---
+function initLocations() {
+    if(!state.locations) state.locations = [];
+    
+    if(CONFIG.mileage) {
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
+}
 
 // ==================== NAVIGATION ====================
 function navigate(page) {
@@ -422,7 +448,7 @@ function playSoundAndVibrate(action) {
 }
 
 // ==================== LOCATION LOGIC ====================
-function renderLocs() {
+function renderLocations() {
     const list = document.getElementById('locationList');
     list.innerHTML = '';
     if(!state.locations) state.locations = [];
@@ -441,7 +467,7 @@ function renderLocs() {
         el.onclick = (e) => {
             if(e.target.tagName !== 'BUTTON') { 
                 state.selectedLocationId = l.id; 
-                renderLocs(); 
+                renderLocations(); 
                 updateArrivedButtonState(); 
             }
         };
@@ -485,11 +511,11 @@ function saveLoc() {
     
     if(id) {
         const idx = state.locations.findIndex(l => l.id === id);
-        if(idx > -1) state.locations[idx] = { ...state.locations[idx], name, address: addr, templateName: tpl, noReport: noRep };
+        if(idx > -1) state.locations[idx] = { ...state.locations[idx], name, address: addr, templateName: tpl, noRep };
     } else {
         state.locations.push({ id: Date.now().toString(), name, address: addr, templateName: tpl, noReport: noRep });
     }
-    saveState(); renderLocs(); closeModal('location'); syncForms();
+    saveState(); renderLocations(); closeModal('location'); syncForms();
 }
 
 function deleteLoc() {
@@ -498,7 +524,7 @@ function deleteLoc() {
     if(confirm('Delete location?')) {
         state.locations = state.locations.filter(l => l.id !== id);
         if(state.selectedLocationId === id) state.selectedLocationId = null;
-        saveState(); renderLocs(); closeModal('location');
+        saveState(); renderLocations(); closeModal('location');
     }
 }
 
@@ -589,17 +615,18 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // Fast GPS
+    // FAST GPS SEND (Fix: Send immediately, then update if needed)
+    processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (Locating...)" });
+    
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" });
+            // Send second ping with accurate GPS
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Location Confirmed" });
             saveState();
         }, () => {
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
+            // Fail silently, first ping covered it
         }, { timeout: 5000, maximumAge: 60000 });
-    } else {
-        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -741,19 +768,8 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
-    // FIX v26: Don't ask for PIN on normal departure if not overdue
-    const now = new Date();
-    const due = new Date(state.activeVisit.anticipatedDepartureTime);
-    const isOverdue = (due - now) < 0;
-    
-    // Logic: 
-    // 1. If isSafeFlow (User clicked "I am Safe" during alarm), they already passed PIN in iamSafe().
-    // 2. If manual Depart (isSafeFlow=false), we only check PIN if they are actually Overdue.
-    if (isSafeFlow || !isOverdue) {
-        proceed();
-    } else {
-        withPinVerification(false, proceed);
-    }
+    if(isSafeFlow) proceed();
+    else withPinVerification(false, proceed);
 }
 
 function quickStat() {
@@ -775,7 +791,6 @@ function quickStat() {
         };
         
         if(d.photo1) data["Photo 1"] = d.photo1;
-        // v20 FIX: Explicit Distance Mapping
         if(d.custom["$Distance (km)"]) data["Distance"] = d.custom["$Distance (km)"];
         
         sendToGoogleSheet(data);
