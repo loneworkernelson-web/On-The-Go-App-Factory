@@ -27,7 +27,7 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- UI COMPONENTS --- */
+/* --- INTERACTIVE ELEMENTS --- */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
@@ -100,7 +100,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
+        <button onclick="triggerPanic()" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center">SOS</button>
     </div>
     
     <div>
@@ -266,8 +266,7 @@ const CONFIG = {
     url: "%%GOOGLE_SHEET_URL%%", 
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
-    checkinInterval: %%CHECKIN_INTERVAL%%,
-    key: "%%SECRET_KEY%%"
+    checkinInterval: %%CHECKIN_INTERVAL%%  
 }; 
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
@@ -297,7 +296,7 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // State Migration
+    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -306,7 +305,7 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Mileage Default
+    // FIX: Force-Rebuild Travelling Tile every load to ensure it uses correct template
     initLocations();
 
     // Feature Flags
@@ -335,23 +334,22 @@ window.addEventListener('load', () => {
     startReminderTimer();
 });
 
-// --- INIT LOCATIONS ---
+// --- INIT LOCATIONS (FIX v36) ---
 function initLocations() {
     if(!state.locations) state.locations = [];
     
+    // Always remove old Travel tile to force update with new settings
+    state.locations = state.locations.filter(l => l.id !== 'travel');
+
     if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
+        state.locations.unshift({ 
+            id: 'travel', 
+            name: 'Travelling', 
+            address: 'Calculates Mileage via GPS', 
+            noReport: false, 
+            companyName: 'Internal', 
+            templateName: 'Travel Report' 
+        });
     }
 }
 
@@ -446,6 +444,7 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
+        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -459,6 +458,7 @@ function renderLocations() {
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
+        // Business Name Logic
         let businessHtml = l.companyName && l.companyName !== 'Internal' 
             ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
             : '';
@@ -619,6 +619,11 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
+    if(state.settings.name && !state.settings.workerName) {
+        state.settings.workerName = state.settings.name;
+        state.settings.workerPhone = state.settings.phone;
+    }
+
     state.activeVisit = {
         locationId: sel.id,
         startTime: now,
@@ -649,9 +654,7 @@ function startVisit() {
             processUploadQueue({ 
                 "Alarm Status": 'ON SITE', 
                 "Notes": "Location Confirmed",
-                "Location Name": locName,
-                "Location Address": sel.address,
-                "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`
+                "Location Name": locName
             });
             saveState();
         }, () => {
@@ -893,7 +896,9 @@ function gatherFormData() {
         let val = el.value;
         if(el.type === 'checkbox') val = el.checked ? 'Yes' : 'No';
         else if(el.type === 'radio') { if(!el.checked) return; val = el.value; }
-        data.custom[key] = val; data.jsonPayload[key] = val;
+        
+        data.custom[key] = val;
+        data.jsonPayload[key] = val;
     });
     
     if(sigPad) data.sig = sigPad.toDataURL('image/png');
@@ -936,6 +941,7 @@ function depart(reportData = {}) {
     updateArrivedButtonState();
 }
 
+// --- MODALS & UTILS ---
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
@@ -990,16 +996,17 @@ function captureGPS(btn, key) {
     });
 }
 
+// --- NETWORK ---
 function sendToGoogleSheet(data) {
     if(!state.settings.googleSheetUrl) return;
     const payload = {
-        'key': CONFIG.key,
         'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
         'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
         'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
         ...data, 'Timestamp': new Date().toISOString()
     };
     
+    // v21 FIX: ADD BATTERY
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             payload['Battery Level'] = Math.round(b.level * 100) + "%";
@@ -1039,11 +1046,12 @@ function processUploadQueue(newData = null) {
         
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
-                state.pendingUploads.shift(); 
+                state.pendingUploads.shift(); // Remove on success
                 saveState();
-                processUploadQueue();
+                processUploadQueue(); // Recursive
             })
             .catch(() => {
+                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
