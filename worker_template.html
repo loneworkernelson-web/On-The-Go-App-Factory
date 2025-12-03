@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="%%LOGO_DATA%%">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -26,8 +27,8 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- UI COMPONENTS --- */
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+/* --- INTERACTIVE ELEMENTS --- */
+.long-press-btn { position: relative; overflow: hidden; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -36,44 +37,19 @@ body {
 .long-press-btn.pressing::after { width: 100%; }
 
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
-
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS (Visual Fix) --- */
-.setting-card { 
-    background-color: #1f2937; 
-    padding: 1.25rem; 
-    border-radius: 0.75rem; 
-    border: 1px solid #374151; 
-    margin-bottom: 1rem; 
-}
-.setting-label { 
-    display: block;
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.5rem; 
-}
-.form-input { 
-    width: 100%; 
-    background-color: #111827; 
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem;
-    outline: none; 
-    margin-bottom: 0.75rem;
-    display: block;
-}
+/* --- SETTINGS CARDS --- */
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 
-/* Colors for Labels */
+/* Colors */
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -116,7 +92,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
         <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
@@ -316,7 +292,7 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
 
-    // Initialize Locations Logic (Moved to dedicated function for safety)
+    // FIX: Initialize Locations (v26.0)
     initLocations();
 
     // Feature Flags
@@ -511,7 +487,7 @@ function saveLoc() {
     
     if(id) {
         const idx = state.locations.findIndex(l => l.id === id);
-        if(idx > -1) state.locations[idx] = { ...state.locations[idx], name, address: addr, templateName: tpl, noRep };
+        if(idx > -1) state.locations[idx] = { ...state.locations[idx], name, address: addr, templateName: tpl, noReport: noRep };
     } else {
         state.locations.push({ id: Date.now().toString(), name, address: addr, templateName: tpl, noReport: noRep });
     }
@@ -615,17 +591,17 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // FAST GPS SEND (Fix: Send immediately, then update if needed)
+    // FIX v26: SEND SIGNAL IMMEDIATELY
     processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (Locating...)" });
     
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            // Send second ping with accurate GPS
+            // Send second update with GPS
             processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Location Confirmed" });
             saveState();
         }, () => {
-            // Fail silently, first ping covered it
+            // Ignore error, first ping covers it
         }, { timeout: 5000, maximumAge: 60000 });
     }
 }
@@ -768,8 +744,16 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
-    if(isSafeFlow) proceed();
-    else withPinVerification(false, proceed);
+    // FIX v28: PIN only needed if OVERDUE, unless already verified (isSafeFlow)
+    const now = new Date();
+    const due = new Date(state.activeVisit.anticipatedDepartureTime);
+    const isOverdue = (due - now) < 0;
+    
+    if(isSafeFlow || !isOverdue) {
+        proceed();
+    } else {
+        withPinVerification(false, proceed);
+    }
 }
 
 function quickStat() {
