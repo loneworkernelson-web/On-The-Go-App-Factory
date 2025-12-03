@@ -1,5 +1,5 @@
 // ==========================================
-// OTG APPSUITE - MASTER BACKEND v7.0 (Full Suite)
+// OTG APPSUITE - MASTER BACKEND v8.0 (Secure)
 // ==========================================
 const CONFIG = {
   SECRET_KEY: "%%SECRET_KEY%%",
@@ -9,17 +9,22 @@ const CONFIG = {
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%"
 };
 
-// --- CORE HANDLERS ---
 function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.tryLock(30000); 
   
   try {
     const p = e.parameter;
+    
+    // 1. SECURITY CHECK (Grok Fix)
+    if (p.key !== CONFIG.SECRET_KEY) {
+       return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Invalid Key"}));
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // 1. SETUP HEADERS
+    // 2. SETUP HEADERS
     if(sheet.getLastColumn() === 0) {
       const headers = ["Timestamp","Date","Worker Name","Worker Phone Number","Emergency Contact Name","Emergency Contact Number","Emergency Contact Email","Escalation Contact Name","Escalation Contact Number","Escalation Contact Email","Alarm Status","Notes","Location Name","Location Address","Last Known GPS","GPS Timestamp","Battery Level","Photo 1","Distance (km)"];
       sheet.appendRow(headers);
@@ -27,7 +32,7 @@ function doPost(e) {
       sheet.setFrozenRows(1);
     }
     
-    // 2. PHOTO HANDLING
+    // 3. PHOTO HANDLING
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
       try {
@@ -41,32 +46,30 @@ function doPost(e) {
       } catch(err) { photoUrl = "Err: "+err; }
     }
 
-    // 3. SMART ROW UPDATE LOGIC (De-Duplication)
+    // 4. SMART ROW UPDATE (Dynamic Columns Fix)
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
     
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      // Search deeper (last 50 rows) to find active visits
       const searchDepth = Math.min(lastRow - 1, 50); 
       const startRow = lastRow - searchDepth + 1;
-      const data = sheet.getRange(startRow, 1, searchDepth, 19).getValues(); 
+      // FIX: Get ALL columns dynamically, not just 19
+      const maxCols = sheet.getLastColumn(); 
+      const data = sheet.getRange(startRow, 1, searchDepth, maxCols).getValues();
       
       for (let i = data.length - 1; i >= 0; i--) {
         const rowWorker = data[i][2]; // Col C
         const rowStatus = data[i][10]; // Col K
         
-        // Update if we find an open visit (Not Departed/Completed/Safe)
         if (rowWorker === worker && !['DEPARTED', 'COMPLETED', 'SAFE - MANUALLY CLEARED'].includes(rowStatus)) {
              const realRowIndex = startRow + i;
              
-             // Update Status & Vitals
              sheet.getRange(realRowIndex, 11).setValue(newStatus); 
              if (p['Last Known GPS']) sheet.getRange(realRowIndex, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(realRowIndex, 17).setValue(p['Battery Level']);
              
-             // Append Notes intelligently
              if (p['Notes'] && !p['Notes'].includes("Locating") && !p['Notes'].includes("GPS Slow")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) { 
@@ -74,7 +77,6 @@ function doPost(e) {
                 }
              }
              
-             // Update Assets
              if (photoUrl) sheet.getRange(realRowIndex, 18).setValue(photoUrl);
              if (p['Distance']) sheet.getRange(realRowIndex, 19).setValue(p['Distance']);
 
@@ -84,7 +86,7 @@ function doPost(e) {
       }
     }
 
-    // 4. NEW ROW (If no active visit found)
+    // 5. NEW ROW
     if (!rowUpdated) {
         const row = [
           new Date(),
@@ -101,7 +103,7 @@ function doPost(e) {
         sheet.appendRow(row);
     }
 
-    // 5. ALERTS
+    // 6. ALERTS
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -113,55 +115,6 @@ function doPost(e) {
   }
 }
 
-function doGet(e) {
-  if(e.parameter.test && e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
-  
-  if(e.parameter.callback){
-    const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
-    const data=sh.getDataRange().getValues();
-    const headers=data.shift();
-    const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
-    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  if(e.parameter.action === 'getForms') {
-     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
-     if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
-     const data = sh.getDataRange().getValues();
-     let foundRow = data.find(r => r[0] === e.parameter.companyName);
-     if(!foundRow) foundRow = data.find(r => r[0] === '(Standard)');
-     if(!foundRow) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
-     
-     const questions = [];
-     for(let i=2; i<data[0].length; i++) {
-         const val = foundRow[i];
-         if(val && val !== "") {
-             let type='check', text=val;
-             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').replace('%','').trim(); }
-             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
-             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
-             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').replace('$','').trim(); }
-             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); }
-             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
-             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').replace('#','').trim(); }
-             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
-             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
-             questions.push({type, text});
-         }
-     }
-     return ContentService.createTextOutput(JSON.stringify(questions)).setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  // TRIGGER ADVANCED REPORTS (Manually run)
-  if(e.parameter.runReport === 'longitudinal') {
-     runAllLongitudinalReports();
-     return ContentService.createTextOutput("Reports Generated");
-  }
-
-  return ContentService.createTextOutput("OTG Online");
-}
-
-// --- MESSAGING ---
 function sendAlert(data) {
   let emailRecipients = [Session.getEffectiveUser().getEmail()];
   let smsNumbers = [];
@@ -196,31 +149,44 @@ function sendSms(phone, msg) {
   } catch(e) { console.log("SMS Fail", e); }
 }
 
-// --- ADVANCED REPORTING (RESTORED) ---
-function createLongitudinalWorkbook() {
-  const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM");
-  const ssName = `Longitudinal Report - ${dateStr}`;
-  const files = DriveApp.getFilesByName(ssName);
-  if (files.hasNext()) return files.next();
-  const newSS = SpreadsheetApp.create(ssName);
-  return DriveApp.getFileById(newSS.getId());
-}
+function doGet(e) {
+  if(e.parameter.test && e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
+  
+  if(e.parameter.callback){
+    const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
+    const data=sh.getDataRange().getValues();
+    const headers=data.shift();
+    const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
+    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
 
-function runAllLongitudinalReports() {
-   // Logic to aggregate data from Visits tab and create summary pivot tables
-   // This is a placeholder for the 200+ lines of logic from the original advanced script
-   // ensuring the file size matches your expectation.
-   const ss = SpreadsheetApp.getActiveSpreadsheet();
-   const sheet = ss.getSheetByName("Visits");
-   if(!sheet) return;
-   // ... (Full aggregation logic assumed here)
-   console.log("Reports generated");
-}
-
-function archiveOldData() {
-   // Logic to move rows older than 30 days to an Archive sheet
-   const ss = SpreadsheetApp.getActiveSpreadsheet();
-   const sheet = ss.getSheetByName("Visits");
-   const archive = ss.getSheetByName("Archive") || ss.insertSheet("Archive");
-   // ... (Archiving logic)
+  if(e.parameter.action === 'getForms') {
+     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
+     const company = e.parameter.companyName;
+     if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+     const data = sh.getDataRange().getValues();
+     let foundRow = data.find(r => r[0] === company);
+     if(!foundRow) foundRow = data.find(r => r[0] === '(Standard)');
+     if(!foundRow) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
+     
+     const questions = [];
+     for(let i=2; i<data[0].length; i++) {
+         const val = foundRow[i];
+         if(val && val !== "") {
+             let type='check', text=val;
+             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').replace('%','').trim(); }
+             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
+             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
+             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').replace('$','').trim(); }
+             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); }
+             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
+             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').replace('#','').trim(); }
+             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
+             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
+             questions.push({type, text});
+         }
+     }
+     return ContentService.createTextOutput(JSON.stringify(questions)).setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput("OTG Online");
 }
