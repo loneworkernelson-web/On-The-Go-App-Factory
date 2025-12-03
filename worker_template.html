@@ -43,7 +43,7 @@ body {
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS (v15 Visuals) --- */
+/* --- SETTINGS CARDS --- */
 .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
 .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
@@ -100,7 +100,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
+        <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
     </div>
     
     <div>
@@ -110,8 +110,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p>
     </div>
 
-    <div class="space-y-4 w-full">
+    <div class="space-y-3 w-full">
         <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
+        <button onclick="openMidVisitUpdate()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">📝 Add Notes / Checklist</button>
         <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
         <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
     </div>
@@ -271,9 +272,9 @@ const CONFIG = {
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
     checkinInterval: %%CHECKIN_INTERVAL%%,
-    escalationMinutes: %%ESCALATION_MINUTES%%, // New Config
+    escalationMinutes: %%ESCALATION_MINUTES%%, 
     key: "%%SECRET_KEY%%"
-};
+}; 
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
 // ==================== STATE MANAGEMENT ====================
@@ -294,6 +295,7 @@ let sigPad = null;
 let panicTapCount = 0;
 let panicTapTimer;
 let deferredPrompt;
+let isMidVisitUpdate = false; 
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
@@ -354,7 +356,7 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
     
-    // Wake Lock
+    // Wake Lock Logic (Restored)
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
@@ -669,7 +671,9 @@ function startVisit() {
         arrivalTimeForSheet: now.toISOString(),
         gpsStart: null,
         isPanic: false,
-        nextCheckin: CONFIG.checkinEnabled ? new Date(now.getTime() + CONFIG.checkinInterval * 60000) : null
+        nextCheckin: CONFIG.checkinEnabled ? new Date(now.getTime() + CONFIG.checkinInterval * 60000) : null,
+        overdueSent: false,
+        criticalSent: false
     };
     
     playSoundAndVibrate('arrive');
@@ -708,11 +712,11 @@ function enterLockedScreen() {
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
+    // FIX v45.0: Update Timer Immediately
+    tick();
+    
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
-    
-    const alertCont = document.getElementById('btnSafe');
-    const departBtn = document.getElementById('btnDepart');
     
     if(timerInt) clearInterval(timerInt);
     timerInt = setInterval(tick, 1000);
@@ -724,6 +728,9 @@ function tick() {
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
     
+    // FIX v45.0: Always show time, even if overdue
+    document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
@@ -740,7 +747,6 @@ function tick() {
         }
 
         // 2. AUTO-SEND CRITICAL (Configurable Delay)
-        // rem is negative ms. e.g. -900000ms is 15 mins late.
         const escalationMs = CONFIG.escalationMinutes * 60000;
         if (rem < -escalationMs && !state.activeVisit.criticalSent) { 
              state.activeVisit.criticalSent = true;
@@ -748,12 +754,26 @@ function tick() {
              triggerAutoAlert('EMERGENCY - OVERDUE');
         }
     } else {
-        // ... (Standard Tick Logic) ...
+        const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
+        document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
+        document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
+        document.getElementById('btnSafe').classList.add('hidden');
+        document.getElementById('btnDepart').classList.remove('hidden');
     }
     
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
         triggerCheckin();
     }
+}
+
+function triggerAutoAlert(status) {
+    const sel = state.locations.find(l => l.id === state.activeVisit.locationId);
+    const locName = sel ? (sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name) : "Unknown";
+    navigator.geolocation.getCurrentPosition(pos => {
+        processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert", "Location Name": locName, "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}` }));
+    }, () => {
+        processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert (GPS Fail)", "Location Name": locName }));
+    });
 }
 
 function triggerCheckin() {
@@ -804,6 +824,7 @@ function extendVisit() {
     });
 }
 
+// v31 FIX: Triple Tap Panic Logic
 function handlePanicTap() {
     const now = Date.now();
     if (now - panicTapTimer > 2000) panicTapCount = 0;
@@ -828,7 +849,21 @@ function iamSafe() {
 }
 
 // ==================== REPORTING ENGINE ====================
+// v41 NEW FEATURE: Mid-Visit Update
+function openMidVisitUpdate() {
+    isMidVisitUpdate = true;
+    const l = state.locations.find(l => l.id === state.activeVisit.locationId);
+    showModal('report');
+    const div = document.getElementById('reportFields');
+    div.innerHTML = '';
+    document.getElementById('reportTitle').innerText = "Update Notes";
+    buildReportForm(l.templateName, div);
+    document.getElementById('btnSubmitRep').innerText = "Send Update";
+    document.getElementById('btnSubmitRep').onclick = submitReport;
+}
+
 function preDepart(isSafeFlow) {
+    isMidVisitUpdate = false;
     const proceed = () => {
         if(!CONFIG.isAdv) { depart(); return; }
         const l = state.locations.find(l => l.id === state.activeVisit.locationId);
@@ -837,8 +872,8 @@ function preDepart(isSafeFlow) {
         showModal('report');
         const div = document.getElementById('reportFields');
         div.innerHTML = '';
+        document.getElementById('reportTitle').innerText = "Visit Report";
         
-        // Mileage
         if(l.id === 'travel' && CONFIG.mileage) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
@@ -853,6 +888,7 @@ function preDepart(isSafeFlow) {
         }
         
         buildReportForm(l.templateName, div);
+        document.getElementById('btnSubmitRep').innerText = "Submit";
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
@@ -879,7 +915,6 @@ function quickStat() {
     buildReportForm(l.templateName, div);
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
-        // v33 Fix: Combine Names
         const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
         
         const data = buildPayload({
@@ -902,7 +937,6 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
-    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -965,6 +999,22 @@ function gatherFormData() {
 
 function submitReport() {
     const d = gatherFormData();
+    
+    if (isMidVisitUpdate) {
+        const noteStr = d.notes || "Mid-visit update";
+        const data = buildPayload({ 
+            "Alarm Status": "ON SITE", 
+            "Notes": noteStr, 
+            "Visit Report Data": JSON.stringify(d.jsonPayload || {}) 
+        });
+        if(tempPhoto) data["Photo 1"] = tempPhoto;
+        
+        processUploadQueue(data);
+        alert("Update Sent!");
+        closeModal('report');
+        return;
+    }
+    
     depart(d);
 }
 
@@ -989,6 +1039,8 @@ function depart(reportData = {}) {
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
         else data["Notes"] += " [Signature Included]";
     }
+    
+    if(reportData.custom && reportData.custom["$Distance (km)"]) data["Distance"] = reportData.custom["$Distance (km)"];
 
     processUploadQueue(data);
     
@@ -1187,4 +1239,3 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
-
