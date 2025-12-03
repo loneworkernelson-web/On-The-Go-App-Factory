@@ -15,7 +15,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 
 <style>
-/* --- CORE LAYOUT --- */
+/* --- CORE STYLES --- */
 body { 
     font-family: 'Inter', sans-serif; 
     -webkit-tap-highlight-color: transparent; 
@@ -27,8 +27,8 @@ body {
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
-/* --- ANIMATIONS & INTERACTIONS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+/* --- INTERACTIVE ELEMENTS --- */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -36,79 +36,22 @@ body {
 }
 .long-press-btn.pressing::after { width: 100%; }
 
-.slider-thumb::-webkit-slider-thumb { 
-    -webkit-appearance: none; appearance: none; 
-    width: 28px; height: 28px; 
-    background: #3b82f6; 
-    cursor: pointer; 
-    border-radius: 50%; border: 2px solid white; 
-    box-shadow: 0 0 10px rgba(0,0,0,0.3); 
-}
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
 
-.spinner { 
-    border: 3px solid rgba(255, 255, 255, 0.3); 
-    border-radius: 50%; 
-    border-top-color: #fff; 
-    width: 20px; height: 20px; 
-    animation: spin 1s linear infinite; 
-}
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-canvas { 
-    touch-action: none; 
-    background: #fff; 
-    border-radius: 0.5rem; 
-    cursor: crosshair; 
-}
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS --- */
-.setting-card { 
-    background-color: #1f2937; 
-    padding: 1.25rem; 
-    border-radius: 0.75rem; 
-    border: 1px solid #374151; 
-    margin-bottom: 1rem; 
-}
-.setting-label { 
-    display: block; 
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.5rem; 
-}
-.form-input { 
-    width: 100%; 
-    background-color: #111827; 
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem; 
-    outline: none; 
-    margin-bottom: 0.75rem; 
-    display: block; 
-}
+/* --- SETTINGS CARDS (v15 Visuals) --- */
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { 
-    width: 100%; 
-    background-color: #111827; 
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem; 
-    outline: none; 
-    margin-bottom: 0.5rem; 
-    display: block; 
-}
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 
-/* --- COLORS --- */
-.lbl-blue { color: #60a5fa; } 
-.lbl-green { color: #4ade80; } 
-.lbl-purple { color: #c084fc; } 
-.lbl-red { color: #f87171; } 
-.lbl-gray { color: #9ca3af; }
+/* Colors */
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -128,7 +71,7 @@ canvas {
     </header>
 
     <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">
-        Reminder: Don't forget to start your timer.
+        Reminder: Don't forget to start your timer when you arrive.
     </div>
     
     <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 flex-shrink-0">
@@ -157,7 +100,7 @@ canvas {
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900">
     <div class="flex justify-end">
-        <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
+        <button onclick="handlePanicTap()" id="btnPanic" class="w-20 h-20 bg-red-600 rounded-full font-bold text-white text-xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
     </div>
     
     <div>
@@ -359,15 +302,13 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: State Migration (Map old names)
+    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
         state.settings.emergencyName = state.settings.emgName;
         state.settings.emergencyPhone = state.settings.emgPhone;
         state.settings.emergencyEmail = state.settings.emgEmail;
-        state.settings.pinCode = state.settings.pin;
-        state.settings.duressPin = state.settings.duress;
     }
 
     // Mileage Default
@@ -714,6 +655,7 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
+    // FIX v31: Force Hydrate Settings if missing
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -734,9 +676,9 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
+    // v33 FIX: Include Business Name
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     
-    // v37 FIX: Unified Payload Builder
     processUploadQueue(buildPayload({ 
         "Alarm Status": 'ON SITE', 
         "Notes": "Visit Started (Locating...)",
@@ -768,6 +710,9 @@ function enterLockedScreen() {
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
     
+    const alertCont = document.getElementById('btnSafe');
+    const departBtn = document.getElementById('btnDepart');
+    
     if(timerInt) clearInterval(timerInt);
     timerInt = setInterval(tick, 1000);
 }
@@ -781,9 +726,9 @@ function tick() {
     if(rem < 0) {
         document.getElementById('countdownTimer').innerText = 'OVERDUE';
         document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
-        document.getElementById('btnSafe').classList.remove('hidden');
-        document.getElementById('btnDepart').classList.add('hidden');
-        setupLongPress(document.getElementById('btnSafe'), iamSafe);
+        alertCont.classList.remove('hidden');
+        setupLongPress(alertCont, () => iAmSafe());
+        departBtn.classList.add('hidden');
         if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
     } else {
         const m = Math.floor(rem/60000);
@@ -791,8 +736,8 @@ function tick() {
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
         document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-        document.getElementById('btnSafe').classList.add('hidden');
-        document.getElementById('btnDepart').classList.remove('hidden');
+        alertCont.classList.add('hidden');
+        departBtn.classList.remove('hidden');
     }
     
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
@@ -882,6 +827,7 @@ function preDepart(isSafeFlow) {
         const div = document.getElementById('reportFields');
         div.innerHTML = '';
         
+        // Mileage
         if(l.id === 'travel' && CONFIG.mileage) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
@@ -899,6 +845,7 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
+    // FIX v28: PIN only needed if OVERDUE or PANIC
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const isOverdue = (due - now) < 0;
@@ -921,6 +868,7 @@ function quickStat() {
     buildReportForm(l.templateName, div);
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
+        // v33 Fix: Combine Names
         const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
         
         const data = buildPayload({
@@ -943,6 +891,7 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
+    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -965,6 +914,7 @@ function buildReportForm(templateName, container) {
     if(canvas) initSigPad(canvas);
 }
 
+// --- SIGNATURE LOGIC ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -1028,8 +978,6 @@ function depart(reportData = {}) {
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
         else data["Notes"] += " [Signature Included]";
     }
-    
-    if(reportData.custom && reportData.custom["$Distance (km)"]) data["Distance"] = reportData.custom["$Distance (km)"];
 
     processUploadQueue(data);
     
@@ -1123,6 +1071,7 @@ function processUploadQueue(newData = null) {
                 processUploadQueue(); 
             })
             .catch(() => {
+                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
@@ -1214,6 +1163,16 @@ function getGpsAddress() {
         btn.disabled = false;
     }, { timeout: 10000 });
 }
+
+// Listeners
+document.getElementById('btnDelLoc').onclick = deleteLoc;
+document.getElementById('saveLocationBtn').onclick = saveLoc;
+document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
+document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
+document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
+document.getElementById('durationSlider').oninput = updateArrivedButtonState;
+document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
+document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
