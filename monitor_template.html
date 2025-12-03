@@ -13,6 +13,11 @@ body{font-family:'Inter',sans-serif}
 @keyframes flash-purple{0%,100%{background:#581c87}50%{background:#a855f7}}
 .flashing-alert{animation:flash-red 1s infinite}
 .flashing-duress{animation:flash-purple 1s infinite}
+/* Connection Dot Animation */
+@keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+.dot-online { background-color: #4ade80; animation: pulse-green 2s infinite; }
+.dot-offline { background-color: #ef4444; }
+.dot-connecting { background-color: #eab308; }
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #1f2937; }
 ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
@@ -44,10 +49,14 @@ body{font-family:'Inter',sans-serif}
     </div>
     <div class="flex items-center gap-4">
       <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase font-bold border border-gray-600 px-2 py-1 rounded">Enable Desktop Alerts</button>
-      <div class="text-right hidden md:block">
-          <div id="clock" class="text-lg font-bold font-mono">00:00:00</div>
-          <div id="lastUpd" class="text-xs text-gray-500">Connecting...</div>
+      
+      <div class="flex items-center gap-2 bg-gray-900 px-3 py-1 rounded-full border border-gray-700">
+          <div id="connectionDot" class="w-3 h-3 rounded-full dot-connecting"></div>
+          <div class="text-right">
+              <div id="clock" class="text-xs font-bold font-mono text-gray-300">00:00:00</div>
+          </div>
       </div>
+
       <div class="h-8 w-px bg-gray-700 mx-2"></div>
       <button onclick="logout()" class="text-gray-400 hover:text-white text-sm font-bold uppercase tracking-wider">Logout</button>
     </div>
@@ -148,50 +157,37 @@ function addLogEntry(msg, type="info") {
 }
 
 function fetchData() {
-  // ROBUST SCRIPT LOADER RESTORED
-  const script = document.createElement('script');
-  const callbackName = 'cb_' + Date.now();
-  let timeout;
+  const s = document.createElement('script');
+  const cb = 'cb_'+Date.now();
+  
+  // Reset Dot
+  // document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-connecting";
 
-  // Cleanup function to avoid memory leaks
-  const cleanup = () => {
-      clearTimeout(timeout);
-      delete window[callbackName];
-      if(document.body.contains(script)) document.body.removeChild(script);
-  };
-
-  window[callbackName] = (data) => {
-    cleanup();
+  window[cb] = (data) => {
+    delete window[cb]; document.body.removeChild(s);
     if(data.status==='error') { 
+        document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
         if(data.message === 'Invalid Key') { alert('Access Denied: Wrong Secret Key'); logout(); return; }
     }
     
     if(data.length > 2500) document.getElementById('dbWarning').classList.remove('hidden');
     else document.getElementById('dbWarning').classList.add('hidden');
 
+    // Success -> Green Dot
+    document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
+
     processAndRender(data); 
     document.getElementById('lastUpd').innerText = "Updated: " + new Date().toLocaleTimeString();
     document.getElementById('lastUpd').className = "text-xs text-green-500 font-bold";
   };
   
-  script.src = URL + '?callback=' + callbackName + '&key=' + encodeURIComponent(SECRET);
-  script.onerror = () => { 
-    cleanup();
+  s.src = URL + '?callback='+cb+'&key='+encodeURIComponent(SECRET);
+  s.onerror = () => { 
+    document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
     document.getElementById('lastUpd').innerText = "Connection Failed";
     document.getElementById('lastUpd').className = "text-xs text-red-500 font-bold";
   };
-  
-  // 20s Timeout
-  timeout = setTimeout(() => {
-      if(window[callbackName]) {
-          console.warn("Polling timed out");
-          cleanup();
-          document.getElementById('lastUpd').innerText = "Timeout";
-          document.getElementById('lastUpd').className = "text-xs text-yellow-500 font-bold";
-      }
-  }, 20000);
-
-  document.body.appendChild(script);
+  document.body.appendChild(s);
 }
 
 function processAndRender(data) {
@@ -213,14 +209,16 @@ function processAndRender(data) {
       const status = w['Alarm Status'];
       const location = w['Location Name'] || 'Unknown';
       
+      // FIX: Log State Changes
       if(lastState[name] && lastState[name] !== status) {
           let type = "info";
-          if(status.match(/EMERGENCY|DURESS|PANIC/)) type = "alert";
+          if(status.match(/EMERGENCY|DURESS|PANIC|OVERDUE/)) type = "alert";
           if(status === "DEPARTED" || status.includes("SAFE")) type = "success";
           
           addLogEntry(`${name}: ${status} @ ${location}`, type);
           
-          if (status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/)) {
+          // If moving into alert, clear silence so it rings
+          if (status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
              acknowledgedList.delete(name); 
           }
       } 
@@ -229,7 +227,8 @@ function processAndRender(data) {
       }
       lastState[name] = status;
       
-      if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/)) {
+      // Alert Logic
+      if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
           anyCritical = true;
           if (!acknowledgedList.has(name)) {
               activeAlertFound = true;
@@ -260,7 +259,8 @@ function processAndRender(data) {
 
   sortedWorkers.forEach(w => {
     const status = w['Alarm Status'];
-    const isAlert = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/);
+    // v10 Fix: Differentiate Amber vs Red
+    const isAlert = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/);
     
     let cardClass = "bg-gray-800 border-l-4 border-blue-500";
     let statusClass = "text-blue-400";
@@ -269,11 +269,14 @@ function processAndRender(data) {
     if(isAlert) {
         cardClass = status.includes('DURESS') ? "bg-purple-900 border-l-8 border-purple-500 animate-pulse" : "bg-red-900 border-l-8 border-red-500 animate-pulse";
         statusClass = "text-white font-black bg-red-600 px-2 rounded";
-        
-        // Safe Quote Replacement
-        const safeName = w['Worker Name'].replace(/'/g, "\\'");
-        resolveBtn = `<button onclick="initiateResolve('${safeName}')" class="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg animate-none cursor-pointer pointer-events-auto relative z-10">✅ RESOLVE INCIDENT</button>`;
+        resolveBtn = `<button onclick="initiateResolve('${w['Worker Name'].replace(/'/g, "\\'")}')" class="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg animate-none cursor-pointer pointer-events-auto relative z-10">✅ RESOLVE INCIDENT</button>`;
     
+    } else if (status === 'OVERDUE') {
+        // v10 Fix: Amber Protocol
+        cardClass = "bg-amber-900 border-l-8 border-amber-500";
+        statusClass = "text-white font-bold bg-amber-600 px-2 rounded";
+        resolveBtn = `<button onclick="initiateResolve('${w['Worker Name'].replace(/'/g, "\\'")}')" class="w-full mt-4 bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 rounded shadow-lg">RESOLVE OVERDUE</button>`;
+
     } else if(w['Location Name'] && w['Location Name'].includes('Travelling')) {
         cardClass = "bg-indigo-900/40 border-l-4 border-indigo-500";
         statusClass = "text-indigo-300";
