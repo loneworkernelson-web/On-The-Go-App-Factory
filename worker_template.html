@@ -43,7 +43,7 @@ body {
 
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS (v15 Visuals) --- */
+/* --- SETTINGS CARDS --- */
 .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
 .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
@@ -283,17 +283,15 @@ let state = {
 };
 
 // Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, tempPhoto=null, sigPad=null, panicTapCount=0, panicTapTimer;
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
-    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -302,10 +300,23 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Initialize Locations (v26.0)
-    initLocations();
+    // Mileage Default
+    if(CONFIG.mileage) {
+        if(!state.locations) state.locations = [];
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else if(state.locations) {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
 
-    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -314,7 +325,6 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -331,24 +341,15 @@ window.addEventListener('load', () => {
     startReminderTimer();
 });
 
-// --- INIT LOCATIONS ---
-function initLocations() {
-    if(!state.locations) state.locations = [];
-    
-    if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
+// --- DATA BUILDER (v37) ---
+function buildPayload(data) {
+    return {
+        'key': CONFIG.key,
+        'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
+        'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
+        'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
+        ...data, 'Timestamp': new Date().toISOString()
+    };
 }
 
 // ==================== NAVIGATION ====================
@@ -442,7 +443,6 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
-        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -456,7 +456,6 @@ function renderLocations() {
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
-        // Business Name Logic
         let businessHtml = l.companyName && l.companyName !== 'Internal' 
             ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
             : '';
@@ -584,7 +583,6 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
@@ -617,12 +615,6 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
-    // FIX v31: Force Hydrate Settings if missing
-    if(state.settings.name && !state.settings.workerName) {
-        state.settings.workerName = state.settings.name;
-        state.settings.workerPhone = state.settings.phone;
-    }
-
     state.activeVisit = {
         locationId: sel.id,
         startTime: now,
@@ -638,32 +630,29 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // v33 FIX: Include Business Name
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     
-    processUploadQueue({ 
+    // IMMEDIATE SEND (Fixed in v37: Uses buildPayload)
+    processUploadQueue(buildPayload({ 
         "Alarm Status": 'ON SITE', 
         "Notes": "Visit Started (Locating...)",
         "Location Name": locName,
-        "Location Address": sel.address
-    });
+        "Location Address": sel.address 
+    }));
     
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue({ 
+            processUploadQueue(buildPayload({ 
                 "Alarm Status": 'ON SITE', 
                 "Notes": "Location Confirmed",
                 "Location Name": locName,
-                "Location Address": sel.address,
-                "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`
-            });
+                "Last Known GPS": state.activeVisit.gpsStart
+            }));
             saveState();
         }, () => {
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
+            processUploadQueue(buildPayload({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" }));
         }, { timeout: 5000, maximumAge: 60000 });
-    } else {
-        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -705,7 +694,6 @@ function tick() {
         departBtn.classList.remove('hidden');
     }
     
-    // Periodic Check-in
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
         triggerCheckin();
     }
@@ -730,7 +718,7 @@ function triggerCheckin() {
         if(rem <= 0) {
             clearInterval(checkinIntervalId);
             closeModal('checkin');
-            sendToGoogleSheet({ "Alarm Status": 'MISSED_CHECKIN', "Notes": "Worker failed to respond to check-in" });
+            sendToGoogleSheet(buildPayload({ "Alarm Status": 'MISSED_CHECKIN', "Notes": "Worker failed to respond to check-in" }));
             alert('MISSED CHECK-IN ALERT SENT');
         }
     }, 1000);
@@ -755,7 +743,7 @@ function extendVisit() {
         state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + 15 * 60000);
         saveState();
         playSoundAndVibrate('extend');
-        sendToGoogleSheet({ "Alarm Status": 'EXTENDED', "Notes": "Extended 15m" });
+        processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended 15m" }));
     });
 }
 
@@ -769,14 +757,14 @@ function handlePanicTap() {
 function triggerPanic() {
     state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState();
     playSoundAndVibrate('panic');
-    sendToGoogleSheet({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" });
+    processUploadQueue(buildPayload({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" }));
     alert('PANIC ALERT SENT');
 }
 
 function iamSafe() {
     withPinVerification(false, () => {
         playSoundAndVibrate('safe');
-        sendToGoogleSheet({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" });
+        processUploadQueue(buildPayload({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" }));
         state.activeVisit.isPanic = false;
         preDepart(true);
     });
@@ -793,7 +781,6 @@ function preDepart(isSafeFlow) {
         const div = document.getElementById('reportFields');
         div.innerHTML = '';
         
-        // Mileage
         if(l.id === 'travel' && CONFIG.mileage) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
@@ -833,21 +820,20 @@ function quickStat() {
     buildReportForm(l.templateName, div);
     document.getElementById('btnSubmitRep').onclick = () => {
         const d = gatherFormData();
-        // v33 Fix: Combine Names
         const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
         
-        const data = {
+        const data = buildPayload({
             "Location Name": locName,
             "Location Address": l.address,
             "Alarm Status": "DATA_ENTRY_ONLY",
             "Notes": d.notes,
             "Visit Report Data": JSON.stringify(d.jsonPayload)
-        };
+        });
         
         if(d.photo1) data["Photo 1"] = d.photo1;
         if(d.custom["$Distance (km)"]) data["Distance"] = d.custom["$Distance (km)"];
         
-        sendToGoogleSheet(data);
+        processUploadQueue(data);
         state.activeVisit = null; tempPhoto = null; sigPad = null;
         closeModal('report');
     };
@@ -878,7 +864,6 @@ function buildReportForm(templateName, container) {
     if(canvas) initSigPad(canvas);
 }
 
-// --- SIGNATURE LOGIC ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -931,11 +916,11 @@ function depart(reportData = {}) {
         });
     }
 
-    const data = {
+    const data = buildPayload({
         "Alarm Status": 'DEPARTED',
         "Notes": noteStr,
         "Visit Report Data": JSON.stringify(reportData.jsonPayload || {})
-    };
+    });
     
     if(tempPhoto) data["Photo 1"] = tempPhoto;
     if(reportData.sig) {
@@ -943,7 +928,7 @@ function depart(reportData = {}) {
         else data["Notes"] += " [Signature Included]";
     }
 
-    sendToGoogleSheet(data);
+    processUploadQueue(data);
     
     state.activeVisit = null; tempPhoto = null; sigPad = null;
     saveState();
@@ -974,7 +959,7 @@ function withPinVerification(isDuressAction, callback) {
         closeModal('pin');
         if(val === state.settings.pinCode) callback();
         else if(val === state.settings.duressPin) {
-            sendToGoogleSheet({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" });
+            processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" }));
             if(isDuressAction) callback();
             else alert("PIN Accepted");
         } else {
@@ -1008,34 +993,6 @@ function captureGPS(btn, key) {
 }
 
 // --- NETWORK ---
-function sendToGoogleSheet(data) {
-    if(!state.settings.googleSheetUrl) return;
-    const payload = {
-        'key': CONFIG.key,
-        'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone,
-        'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail,
-        'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail,
-        ...data, 'Timestamp': new Date().toISOString()
-    };
-    
-    // v21 FIX: ADD BATTERY
-    if(navigator.getBattery) {
-        navigator.getBattery().then(b => {
-            payload['Battery Level'] = Math.round(b.level * 100) + "%";
-            finalizeSend(payload);
-        });
-    } else {
-        finalizeSend(payload);
-    }
-}
-
-function finalizeSend(payload) {
-    navigator.geolocation.getCurrentPosition(pos => {
-        payload['Last Known GPS'] = pos.coords.latitude + ',' + pos.coords.longitude;
-        processUploadQueue(payload);
-    }, () => { payload['Last Known GPS'] = 'GPS Unavailable'; processUploadQueue(payload); });
-}
-
 function processUploadQueue(newData = null) {
     if(newData) {
         state.pendingUploads.push(newData);
@@ -1056,7 +1013,8 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
-        fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
+        // v34 FIX: Remove no-cors
+        fetch(state.settings.googleSheetUrl, { method: 'POST', body: fd })
             .then(() => {
                 state.pendingUploads.shift(); // Remove on success
                 saveState();
@@ -1148,16 +1106,6 @@ function getGpsAddress() {
         btn.disabled = false;
     }, { timeout: 10000 });
 }
-
-// Listeners
-document.getElementById('btnDelLoc').onclick = deleteLoc;
-document.getElementById('saveLocationBtn').onclick = saveLoc;
-document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
-document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
