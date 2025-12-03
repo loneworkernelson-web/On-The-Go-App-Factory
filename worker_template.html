@@ -93,8 +93,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
-        <button id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
-        <button id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+        <button type="button" id="btnQuick" onclick="quickStat()" class="hidden flex-1 py-5 bg-teal-900 text-teal-500 font-bold rounded-xl text-lg opacity-50 transition" disabled>Quick Stat</button>
+        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
     </div>
 </div>
 
@@ -284,7 +284,7 @@ let state = {
 let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt;
 let tempPhoto = null;
 let sigPad = null;
-let panicTapCount = 0; // For Triple Tap Logic
+let panicTapCount = 0;
 let panicTapTimer;
 
 // ==================== INITIALIZATION ====================
@@ -295,13 +295,20 @@ window.addEventListener('load', () => {
     // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: State Migration
+    // FIX: AUTO DATA MIGRATION (Critical for blank sheet rows)
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
         state.settings.emergencyName = state.settings.emgName;
         state.settings.emergencyPhone = state.settings.emgPhone;
         state.settings.emergencyEmail = state.settings.emgEmail;
+        state.settings.escalationName = state.settings.escName;
+        state.settings.escalationPhone = state.settings.escPhone;
+        state.settings.escalationEmail = state.settings.escEmail;
+        state.settings.pinCode = state.settings.pin;
+        state.settings.duressPin = state.settings.duress;
+        delete state.settings.name; // Clean up old keys
+        saveState();
     }
 
     // Mileage Default
@@ -356,8 +363,16 @@ function navigate(page) {
     else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
+        // Hydrate Settings Page
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
-            const val = state.settings[k === 'duress' ? 'duressPin' : (k === 'pin' ? 'pinCode' : k.replace('_','').replace('name','Name').replace('phone','Phone').replace('email','Email'))];
+            // Mapping map
+            const map = {
+               'name': 'workerName', 'phone': 'workerPhone',
+               'emg_name': 'emergencyName', 'emg_phone': 'emergencyPhone', 'emg_email': 'emergencyEmail',
+               'esc_name': 'escalationName', 'esc_phone': 'escalationPhone', 'esc_email': 'escalationEmail',
+               'pin': 'pinCode', 'duress': 'duressPin'
+            };
+            const val = state.settings[map[k]];
             const el = document.getElementById('set_'+k);
             if(el) el.value = val || "";
         });
@@ -437,12 +452,22 @@ function renderLocations() {
     
     state.locations.forEach(l => {
         const el = document.createElement('div');
-        el.className = 'p-4 bg-gray-900 rounded-lg border-2 border-transparent hover:border-blue-500 cursor-pointer flex justify-between items-center group transition-all mb-2';
-        if(state.selectedLocationId === l.id) el.classList.add('border-blue-500', 'bg-gray-800');
         
-        let styleClass = l.id === 'travel' ? "text-purple-400" : "text-white";
+        // VISUAL FIX: SOLID BLUE FOR SELECTED
+        let bgColor = 'bg-gray-900';
+        let borderColor = 'border-transparent';
+        let textColor = 'text-white';
         
-        let html = `<div><div class="font-bold text-lg ${styleClass}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
+        if(state.selectedLocationId === l.id) {
+            bgColor = 'bg-blue-600'; // SOLID BLUE
+            borderColor = 'border-blue-400';
+        }
+        
+        if(l.id === 'travel') textColor = 'text-purple-400';
+        
+        el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
+        
+        let html = `<div><div class="font-bold text-lg ${textColor}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div>`;
         html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
         
         el.innerHTML = html;
@@ -584,19 +609,13 @@ function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
     const now = new Date();
     
-    // FIX v31: Force Hydrate Settings if missing (prevents blank data send)
-    if(state.settings.name && !state.settings.workerName) {
-        state.settings.workerName = state.settings.name;
-        state.settings.workerPhone = state.settings.phone;
-    }
-
     state.activeVisit = {
         locationId: sel.id,
         startTime: now,
         anticipatedDepartureTime: new Date(now.getTime() + state.visitDurationMinutes * 60000),
         arrivalTimeForSheet: now.toISOString(),
         gpsStart: null,
-        isPanic: false, // Track panic state
+        isPanic: false,
         nextCheckin: CONFIG.checkinEnabled ? new Date(now.getTime() + CONFIG.checkinInterval * 60000) : null
     };
     
@@ -605,17 +624,17 @@ function startVisit() {
     enterLockedScreen();
     requestWakeLock();
 
-    // Fast GPS
+    // Fast GPS - Immediate Send
+    processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (Locating...)" });
+    
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started" });
+            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Location Confirmed" });
             saveState();
         }, () => {
-            processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" });
+            // Silent fail on 2nd ping
         }, { timeout: 5000, maximumAge: 60000 });
-    } else {
-        processUploadQueue({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (No GPS)" });
     }
 }
 
@@ -712,11 +731,10 @@ function extendVisit() {
     });
 }
 
-// FIX v31: Triple Tap Panic Logic
+// TRIPLE TAP PANIC
 function handlePanicTap() {
     const now = Date.now();
-    if (now - panicTapTimer > 2000) panicTapCount = 0; // Reset if too slow
-    
+    if (now - panicTapTimer > 2000) panicTapCount = 0; 
     panicTapCount++;
     panicTapTimer = now;
 
@@ -727,8 +745,8 @@ function handlePanicTap() {
 }
 
 function triggerPanic() {
-    state.activeVisit = state.activeVisit || {}; // Ensure obj exists if panic from main screen
-    state.activeVisit.isPanic = true; // FIX v31: Set Panic Flag
+    state.activeVisit = state.activeVisit || {};
+    state.activeVisit.isPanic = true; // Flag Logic
     saveState();
     
     playSoundAndVibrate('panic');
@@ -740,7 +758,7 @@ function iamSafe() {
     withPinVerification(false, () => {
         playSoundAndVibrate('safe');
         sendToGoogleSheet({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" });
-        state.activeVisit.isPanic = false; // Clear panic flag
+        state.activeVisit.isPanic = false;
         preDepart(true);
     });
 }
@@ -774,13 +792,11 @@ function preDepart(isSafeFlow) {
         document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
-    // FIX v31: Check PANIC flag
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const isOverdue = (due - now) < 0;
     const isPanic = state.activeVisit.isPanic === true;
     
-    // Require PIN if Overdue OR Panic
     if(isSafeFlow || (!isOverdue && !isPanic)) {
         proceed();
     } else {
@@ -818,7 +834,6 @@ function quickStat() {
 function buildReportForm(templateName, container) {
     const tpl = state.cachedForms[templateName] || state.cachedForms["(Standard)"] || [];
     
-    // Fallback if empty
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
@@ -900,7 +915,6 @@ function depart(reportData = {}) {
         "Visit Report Data": JSON.stringify(reportData.jsonPayload || {})
     };
     
-    // v21 FIX: ADD BATTERY
     if(tempPhoto) data["Photo 1"] = tempPhoto;
     if(reportData.sig) {
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
@@ -981,6 +995,7 @@ function sendToGoogleSheet(data) {
         ...data, 'Timestamp': new Date().toISOString()
     };
     
+    // v21 FIX: ADD BATTERY
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             payload['Battery Level'] = Math.round(b.level * 100) + "%";
