@@ -64,6 +64,14 @@
                  <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">✓</div>
                  <div><span class="block font-bold text-white">Safety Timer & Panic Button</span><span class="text-sm text-gray-400">Core functionality. Always enabled.</span></div>
              </div>
+             
+             <div class="mb-4 ml-10">
+                <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold">
+                    <span class="text-xs text-gray-400">Time between "Overdue" (Amber) and "Emergency" (Red).</span>
+                </div>
+             </div>
 
              <label class="flex items-center gap-4 cursor-pointer mb-2 group">
                <input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" onchange="toggleCheckin()">
@@ -312,18 +320,19 @@
       const mile = document.getElementById('chkMileage').checked;
       const chkEnabled = document.getElementById('chkCheckin').checked;
       const chkMins = document.getElementById('checkinMins').value;
-      // FIX: Inject Secret Key
+      const escMins = document.getElementById('escalationMins').value; // New Config
       const secret = document.getElementById('secretKey').value;
 
       let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org).replace(/%%ORGANISATION_NAME%%/g, org)
         .replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData)
         .replace('%%IS_ADVANCED%%', isAdv).replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
         .replace('%%CHECKIN_ENABLED%%', chkEnabled).replace('%%CHECKIN_INTERVAL%%', chkMins)
-        .replace('%%SECRET_KEY%%', secret); // Injected Here
+        .replace('%%ESCALATION_MINUTES%%', escMins) // Inject Escalation
+        .replace('%%SECRET_KEY%%', secret);
       
       const wFolder = zip.folder("WorkerApp"); wFolder.file("index.html", wHtml);
       wFolder.file("manifest.json", JSON.stringify({ name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{ src: logoData, sizes: "192x192", type: "image/png" }] }, null, 2));
-      wFolder.file("sw.js", "const C='v8.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v10.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
