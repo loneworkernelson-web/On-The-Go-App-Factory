@@ -62,14 +62,53 @@ canvas {
 }
 
 /* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.setting-card { 
+    background-color: #1f2937; 
+    padding: 1.25rem; 
+    border-radius: 0.75rem; 
+    border: 1px solid #374151; 
+    margin-bottom: 1rem; 
+}
+.setting-label { 
+    display: block; 
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-bottom: 0.5rem; 
+}
+.form-input { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.75rem; 
+    display: block; 
+}
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
+.form-input-card { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.5rem; 
+    display: block; 
+}
 
-/* Colors */
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+/* --- COLORS --- */
+.lbl-blue { color: #60a5fa; } 
+.lbl-green { color: #4ade80; } 
+.lbl-purple { color: #c084fc; } 
+.lbl-red { color: #f87171; } 
+.lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -244,11 +283,14 @@ canvas {
         <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
         <div class="text-gray-300 space-y-4 text-sm">
             <h3 class="font-bold text-white">1. Starting a Visit</h3>
-            <p>Select a location. Press START (1.5s).</p>
+            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
+            
             <h3 class="font-bold text-white">2. During Visit</h3>
             <p>Use <strong>Extend</strong> or <strong>Depart</strong>.</p>
+            
             <h3 class="font-bold text-white">3. Duress</h3>
             <p>Enter <strong>Duress PIN</strong> to silently alarm.</p>
+            
             <h3 class="font-bold text-white">4. Offline</h3>
             <p>Works offline. Uploads automatically.</p>
         </div>
@@ -308,7 +350,11 @@ let state = {
 };
 
 // Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, tempPhoto=null, sigPad=null, panicTapCount=0, panicTapTimer;
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt;
+let tempPhoto = null;
+let sigPad = null;
+let panicTapCount = 0;
+let panicTapTimer;
 let deferredPrompt;
 let isMidVisitUpdate = false; 
 
@@ -317,8 +363,10 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
+    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
+    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -327,8 +375,10 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
+    // Mileage Default
     initLocations();
 
+    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -337,6 +387,7 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
+    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -352,10 +403,31 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
     
+    // Wake Lock Logic
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
 });
+
+// --- INIT LOCATIONS (Fixed) ---
+function initLocations() {
+    if(!state.locations) state.locations = [];
+    
+    if(CONFIG.mileage) {
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
+}
 
 // --- PWA INSTALL ---
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -374,7 +446,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
-    if(page === 'main') startReminderTimer(); else clearTimeout(mainScreenReminderTimer);
+    
+    if(page === 'main') startReminderTimer();
+    else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
@@ -386,7 +460,7 @@ function navigate(page) {
     }
 }
 
-// --- DATA BUILDER ---
+// --- DATA BUILDER (v37/47) ---
 function buildPayload(data) {
     let dueTime = "";
     if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
@@ -482,7 +556,6 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
-        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -496,7 +569,6 @@ function renderLocations() {
         
         el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
         
-        // Business Name Logic
         let businessHtml = l.companyName && l.companyName !== 'Internal' 
             ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
             : '';
@@ -624,6 +696,7 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
+        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
