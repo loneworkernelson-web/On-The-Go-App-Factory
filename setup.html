@@ -22,6 +22,9 @@
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
     a.link:hover { color: #93c5fd; }
+    /* Trigger Guide Styles */
+    details > summary { list-style: none; outline: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4">
@@ -131,22 +134,15 @@
             </div>
           </div>
 
-<div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
+          <div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
             <div class="flex justify-between items-center mb-4">
                 <div class="flex items-center gap-2"><span class="text-xl">ℹ️</span><h4 class="font-bold text-gray-200">Template Code Legend</h4></div>
                 <button onclick="copyLegend()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded shadow">Copy Legend to Clipboard</button>
             </div>
             <p class="text-xs text-gray-400 mb-4">Tip: Paste this legend into your spreadsheet (e.g., cell A20).</p>
-            
             <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4 text-xs text-blue-200">
-                <strong>NEW: Global Forms</strong><br>
-                To create a form available to ALL workers (e.g. "Accident Report"), set <strong>Column A</strong> to <code>FORMS</code> and <strong>Column B</strong> to the name of the form.
+                <strong>NEW: Global Forms</strong><br>To create a form available to ALL workers (e.g. "Accident Report"), set <strong>Column A</strong> to <code>FORMS</code> and <strong>Column B</strong> to the name of the form.
             </div>
-
-            <div class="grid md:grid-cols-3 gap-4 text-sm text-gray-300">
-              </div>
-          </div>
-            <p class="text-xs text-gray-400 mb-4">Tip: Paste this legend into your spreadsheet (e.g., cell A20) as a permanent reference.</p>
             <div class="grid md:grid-cols-3 gap-4 text-sm text-gray-300">
               <div class="p-2 bg-gray-800 rounded"><strong>[YESNO]</strong><br>Yes/No Radio</div>
               <div class="p-2 bg-gray-800 rounded"><strong>[CHECK]</strong><br>Single Checkbox</div>
@@ -171,6 +167,41 @@
           <div class="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg text-sm text-gray-300">
             <strong>Deploy:</strong> Paste into <a href="https://script.new" target="_blank" class="text-blue-400 underline">script.new</a> → Deploy as Web App → Access: Anyone.
           </div>
+
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-4 rounded-lg mt-4">
+             <details class="group">
+                <summary class="flex items-center justify-between font-bold text-yellow-400 text-lg hover:text-yellow-300">
+                   <span>⚠️ Vital Step: Set up Automation Triggers</span>
+                   <span class="transform group-open:rotate-180 transition">▼</span>
+                </summary>
+                <div class="mt-4 text-gray-300 space-y-4 text-sm">
+                   <p>Without triggers, the Watchdog (Safety Check) and Archiver will not run.</p>
+                   <ol class="list-decimal pl-5 space-y-2">
+                      <li>In the Apps Script editor, click the <strong>Alarm Clock icon</strong> (Triggers) on the left.</li>
+                      <li>Click <strong>+ Add Trigger</strong> (bottom right).</li>
+                      <li class="bg-gray-800 p-2 rounded">
+                         <strong class="text-white">Trigger 1: Safety Watchdog</strong><br>
+                         Function: <code>checkOverdueVisits</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Minutes timer</code> -> <code>Every 10 minutes</code>
+                      </li>
+                      <li class="bg-gray-800 p-2 rounded">
+                         <strong class="text-white">Trigger 2: Auto-Archiver</strong><br>
+                         Function: <code>archiveOldData</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Week timer</code> -> <code>Every Sunday</code>
+                      </li>
+                      <li id="advancedTriggerInfo" class="bg-gray-800 p-2 rounded hidden">
+                         <strong class="text-purple-300">Trigger 3: Monthly Report (Advanced Only)</strong><br>
+                         Function: <code>runAllLongitudinalReports</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Month timer</code> -> <code>1st of month</code>
+                      </li>
+                   </ol>
+                </div>
+             </details>
+          </div>
+
           <div>
             <label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label>
             <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()">
@@ -232,6 +263,10 @@
       document.getElementById('advOptions').style.display = isAdv ? "block" : "none";
       document.getElementById('boxChecklists').style.display = isAdv ? "block" : "none";
       document.getElementById('legendBox').style.display = isAdv ? "block" : "none";
+      
+      // Toggle Advanced Trigger Info
+      const advTrigger = document.getElementById('advancedTriggerInfo');
+      if(advTrigger) advTrigger.style.display = isAdv ? "block" : "none";
     }
     
     function toggleCheckin() {
@@ -244,12 +279,11 @@
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          // FIX: Resize logo to avoid 'TransactionTooLarge' error in Android WebAPK builder
+          // Resize to 192x192 for reliability
           const img = new Image();
           img.onload = function() {
             const canvas = document.createElement('canvas');
-            canvas.width = 192;
-            canvas.height = 192;
+            canvas.width = 192; canvas.height = 192;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, 192, 192);
             logoData = canvas.toDataURL('image/png');
@@ -364,7 +398,7 @@
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
-      wFolder.file("sw.js", "const C='v12.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v14.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
@@ -376,4 +410,3 @@
   </script>
 </body>
 </html>
-
