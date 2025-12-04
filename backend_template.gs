@@ -1,45 +1,47 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v13.0 (Full Advanced + Secure)
- * * INCLUDES:
- * 1. Secure Data Entry (Key Validation)
- * 2. Smart Row Updating (Prevents Duplicate Rows)
- * 3. Textbelt SMS Integration
- * 4. Full Longitudinal Reporting Engine (Monthly Stats)
- * 5. Automated Archiving Engine
- * 6. PDF Generation Engine
+ * ON-THE-GO APPSUITE - MASTER BACKEND v17.0 (Full Advanced + Secure)
+ * * INTEGRATES:
+ * 1. Core Security (Secret Key Validation)
+ * 2. Smart Data Handling (De-duplication, Photo Decoding)
+ * 3. Alerting (Email + Textbelt SMS)
+ * 4. Advanced Reporting (Monthly Stats, Archiving, PDFs)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. CONFIGURATION
 // ─────────────────────────────────────────────────────────────────────────────
 const CONFIG = {
+  // Security
   SECRET_KEY: "%%SECRET_KEY%%",
-  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
+  
+  // API Keys
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%",
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
+  
+  // Folder IDs (for Advanced Features)
+  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
+  PDF_FOLDER_ID: "",        // Optional: Folder for PDF Reports
+  REPORT_TEMPLATE_ID: "",   // Optional: Google Doc Template ID
+  
+  // Settings
   ORG_NAME: "%%ORGANISATION_NAME%%",
   TIMEZONE: Session.getScriptTimeZone(),
-  
-  // Advanced Reporting Config
-  ARCHIVE_DAYS: 30,         // Move rows to Archive after 30 days
-  PDF_FOLDER_ID: "",        // (Optional) Folder to save PDF reports
-  REPORT_TEMPLATE_ID: ""    // (Optional) Google Doc ID to use as template
+  ARCHIVE_DAYS: 30
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. API HANDLERS
+// 2. INCOMING DATA HANDLER (doPost)
 // ─────────────────────────────────────────────────────────────────────────────
-
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(30000); 
+  lock.tryLock(30000); // Wait up to 30s
   
   try {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
     const p = e.parameter;
     
-    // [SECURITY FIX]
+    // [SECURITY CHECK]
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) {
        return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Invalid Key"}));
     }
@@ -47,7 +49,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // [SCHEMA] Ensure Headers
+    // [SCHEMA SETUP] 21 Columns
     if(sheet.getLastColumn() === 0) {
       const headers = [
         "Timestamp", "Date", "Worker Name", "Worker Phone Number", 
@@ -55,14 +57,14 @@ function doPost(e) {
         "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email",
         "Alarm Status", "Notes", "Location Name", "Location Address", 
         "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", 
-        "Distance (km)", "Visit Report Data"
+        "Distance (km)", "Visit Report Data", "Anticipated Departure Time"
       ];
       sheet.appendRow(headers);
       sheet.getRange(1,1,1,headers.length).setFontWeight("bold").setBackground("#e2e8f0");
       sheet.setFrozenRows(1);
     }
     
-    // [PHOTO HANDLING]
+    // [PHOTO PROCESSING]
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
       try {
@@ -77,7 +79,7 @@ function doPost(e) {
       } catch(err) { photoUrl = "Err: "+err; }
     }
 
-    // [SMART UPDATE LOGIC]
+    // [SMART ROW UPDATE]
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
@@ -86,22 +88,28 @@ function doPost(e) {
     if (lastRow > 1) {
       const searchDepth = Math.min(lastRow - 1, 50); 
       const startRow = lastRow - searchDepth + 1;
-      const maxCols = sheet.getLastColumn(); 
+      const maxCols = sheet.getLastColumn();
       const data = sheet.getRange(startRow, 1, searchDepth, maxCols).getValues(); 
       
       for (let i = data.length - 1; i >= 0; i--) {
         const rowWorker = data[i][2]; // Col C
         const rowStatus = data[i][10]; // Col K
         
-        // Update if active visit found
+        // Update if active, OR if this is a Monitor Resolution event
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED')) {
              const realRowIndex = startRow + i;
              
+             // 1. Update Status
              sheet.getRange(realRowIndex, 11).setValue(newStatus); 
+             
+             // 2. Update Vitals
              if (p['Last Known GPS']) sheet.getRange(realRowIndex, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(realRowIndex, 17).setValue(p['Battery Level']);
              
-             // Append Notes (Prevent Duplicates)
+             // 3. Update Due Time (Col 21)
+             if (p['Anticipated Departure Time']) sheet.getRange(realRowIndex, 21).setValue(p['Anticipated Departure Time']);
+
+             // 4. Append Notes (if new)
              if (p['Notes'] && !p['Notes'].includes("Locating") && !p['Notes'].includes("GPS Slow")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) { 
@@ -109,6 +117,7 @@ function doPost(e) {
                 }
              }
              
+             // 5. Update Assets
              if (photoUrl) sheet.getRange(realRowIndex, 18).setValue(photoUrl);
              if (p['Distance']) sheet.getRange(realRowIndex, 19).setValue(p['Distance']);
              if (p['Visit Report Data']) sheet.getRange(realRowIndex, 20).setValue(p['Visit Report Data']);
@@ -119,7 +128,7 @@ function doPost(e) {
       }
     }
 
-    // [NEW ROW]
+    // [NEW ROW FALLBACK]
     if (!rowUpdated) {
         const row = [
           new Date(),
@@ -132,7 +141,8 @@ function doPost(e) {
           p['Location Name'] || '', p['Location Address'] || '',
           p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(),
           p['Battery Level'] || '', photoUrl, 
-          p['Distance'] || '', p['Visit Report Data'] || ''
+          p['Distance'] || '', p['Visit Report Data'] || '',
+          p['Anticipated Departure Time'] || ''
         ];
         sheet.appendRow(row);
     }
@@ -146,6 +156,9 @@ function doPost(e) {
   finally { lock.releaseLock(); }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. MONITOR & FORM HANDLERS (doGet)
+// ─────────────────────────────────────────────────────────────────────────────
 function doGet(e) {
   // Connection Test
   if(e.parameter.test) {
@@ -162,22 +175,26 @@ function doGet(e) {
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
-  // Form Engine
+  // Form Engine (Advanced)
   if(e.parameter.action === 'getForms') {
      return getChecklistForm(e.parameter.companyName);
   }
   
-  // Manual Trigger for Reports
-  if(e.parameter.runReport === 'longitudinal') {
-     runAllLongitudinalReports();
-     return ContentService.createTextOutput("Reports Generated");
+  // Manual Triggers
+  if(e.parameter.run === 'reports') {
+      runAllLongitudinalReports();
+      return ContentService.createTextOutput("Reports Generated");
+  }
+  if(e.parameter.run === 'archive') {
+      archiveOldData();
+      return ContentService.createTextOutput("Archive Complete");
   }
 
   return ContentService.createTextOutput("OTG Online");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. UTILITIES
+// 4. UTILITIES & MESSAGING
 // ─────────────────────────────────────────────────────────────────────────────
 
 function sendAlert(data) {
@@ -241,14 +258,10 @@ function getChecklistForm(companyName) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. ADVANCED REPORTING (FULL ENGINE RESTORED)
+// 5. ADVANCED REPORTING (FULL ENGINE RESTORED)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * ARCHIVE OLD DATA
- * Moves rows older than 30 days (CONFIG.ARCHIVE_DAYS) to an 'Archive' sheet.
- * Keeps the 'Visits' sheet lean for faster performance.
- */
+// Archive rows > 30 days old
 function archiveOldData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -256,49 +269,28 @@ function archiveOldData() {
   if (!archive) archive = ss.insertSheet('Archive');
   
   const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return; // Only headers found
+  if (data.length <= 1) return;
   
-  const today = new Date();
-  const rowsToKeep = [data[0]]; // Keep headers
-  const rowsToArchive = [];
-  
+  const today = new Date(), keep = [data[0]], move = [];
   for (let i = 1; i < data.length; i++) {
-    const rowDateStr = data[i][0]; // Timestamp is usually Col A
-    const rowDate = new Date(rowDateStr);
-    const status = data[i][10]; // Alarm Status is Col K (index 10)
-    
-    // Calculate age in days
-    const ageInDays = (today - rowDate) / (1000 * 60 * 60 * 24);
-    
-    // Archive if old AND status indicates completion
-    if (ageInDays > CONFIG.ARCHIVE_DAYS && (status === 'DEPARTED' || status === 'COMPLETED' || status.includes('SAFE'))) {
-      rowsToArchive.push(data[i]);
+    const date = new Date(data[i][0]);
+    const diff = (today - date) / (1000 * 60 * 60 * 24);
+    if (diff > CONFIG.ARCHIVE_DAYS && data[i][10] === 'DEPARTED') {
+       rowsToArchive.push(data[i]);
     } else {
-      rowsToKeep.push(data[i]);
+       rowsToKeep.push(data[i]);
     }
   }
   
   if (rowsToArchive.length > 0) {
-    // If Archive sheet is empty, add headers first
-    if (archive.getLastRow() === 0) {
-      archive.appendRow(data[0]);
-    }
-    
-    // Bulk write archived rows
+    if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
-    
-    // Clear main sheet and rewrite kept rows
     sheet.clearContents();
     sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
-    console.log(`Archived ${rowsToArchive.length} rows.`);
   }
 }
 
-/**
- * LONGITUDINAL REPORTS
- * Creates a new Spreadsheet for the current month (e.g., "Safety Report - 2024-10")
- * and populates it with Pivot Tables and stats.
- */
+// Generate Longitudinal Workbook
 function runAllLongitudinalReports() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -307,86 +299,62 @@ function runAllLongitudinalReports() {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
 
-  // 1. Get or Create Report Workbook
   const reportFile = createLongitudinalWorkbook();
   const reportSS = SpreadsheetApp.open(reportFile);
   
-  // 2. Generate Tabs
   generateWorkerActivityReport(data, reportSS);
   generateTravelReport(data, reportSS);
   
-  // 3. Email Link to Admin
   const recipient = Session.getEffectiveUser().getEmail();
   MailApp.sendEmail({
     to: recipient,
     subject: `Monthly Safety Report Generated - ${CONFIG.ORG_NAME}`,
-    htmlBody: `<p>Your longitudinal report is ready.</p><p><a href="${reportSS.getUrl()}">Click here to view Report</a></p>`
+    htmlBody: `<p>Your longitudinal report is ready.</p><p><a href="${reportSS.getUrl()}">View Report</a></p>`
   });
 }
 
 function createLongitudinalWorkbook() {
   const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM");
   const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`;
-  
-  // Check if exists
   const files = DriveApp.getFilesByName(name);
   if (files.hasNext()) return files.next();
-  
-  // Create new
-  const newSS = SpreadsheetApp.create(name);
-  return DriveApp.getFileById(newSS.getId());
+  return DriveApp.getFileById(SpreadsheetApp.create(name).getId());
 }
 
 function generateWorkerActivityReport(data, reportSS) {
   let sheet = reportSS.getSheetByName('Worker Activity');
-  if (sheet) sheet.clear();
-  else sheet = reportSS.insertSheet('Worker Activity');
+  if (sheet) sheet.clear(); else sheet = reportSS.insertSheet('Worker Activity');
   
   sheet.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Avg Duration (mins)"]);
   sheet.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dbeafe");
   
   const stats = {};
   
-  // Skip header (i=1)
   for (let i = 1; i < data.length; i++) {
     const worker = data[i][2];
     const status = data[i][10];
-    
     if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 };
-    
     stats[worker].visits++;
-    if (status.includes("EMERGENCY") || status.includes("OVERDUE") || status.includes("DURESS")) {
-      stats[worker].alerts++;
-    }
+    if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++;
   }
   
-  const output = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "TBD"]);
+  const output = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]);
   if (output.length > 0) sheet.getRange(2, 1, output.length, 4).setValues(output);
 }
 
 function generateTravelReport(data, reportSS) {
   let sheet = reportSS.getSheetByName('Travel Stats');
-  if (sheet) sheet.clear();
-  else sheet = reportSS.insertSheet('Travel Stats');
+  if (sheet) sheet.clear(); else sheet = reportSS.insertSheet('Travel Stats');
   
-  sheet.appendRow(["Worker Name", "Total Distance (km)", "Trips Recorded"]);
+  sheet.appendRow(["Worker Name", "Total Distance (km)", "Trips"]);
   sheet.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7");
   
   const stats = {};
-  
   for (let i = 1; i < data.length; i++) {
     const worker = data[i][2];
-    // Distance is Column 19 (Index 18) in our new schema
-    // Ensure we don't crash if column doesn't exist yet
-    const distVal = data[i].length > 18 ? data[i][18] : 0; 
-    const dist = parseFloat(distVal) || 0;
-    
+    const dist = parseFloat(data[i][18]) || 0; 
     if (!stats[worker]) stats[worker] = { km: 0, trips: 0 };
-    
-    if (dist > 0) {
-      stats[worker].km += dist;
-      stats[worker].trips++;
-    }
+    if (dist > 0) { stats[worker].km += dist; stats[worker].trips++; }
   }
   
   const output = Object.keys(stats).map(w => [w, stats[w].km.toFixed(2), stats[w].trips]);
@@ -394,17 +362,49 @@ function generateTravelReport(data, reportSS) {
 }
 
 /**
- * PDF GENERATION (Stub for stability)
- * Full implementation requires specific template IDs which causes errors
- * if not set up. This stub holds the place for future expansion.
+ * PDF GENERATION (Full Implementation)
+ * Creates a Google Doc from template, fills it, saves as PDF.
  */
 function generateVisitPdf(rowIndex) {
-    if (!CONFIG.REPORT_TEMPLATE_ID) return;
-    // Logic:
-    // 1. Open Template Doc
-    // 2. Make Copy
-    // 3. Replace {{Worker}} with data[rowIndex][2]
-    // 4. Save as PDF
-    // 5. Email
+    if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits');
+    const data = sheet.getDataRange().getValues();
+    const row = data[rowIndex]; // Array of cell values
+    const headers = data[0];
+    
+    try {
+      // 1. Copy Template
+      const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
+      const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
+      const copy = templateFile.makeCopy(`Report - ${row[2]} - ${row[1]}`, folder);
+      const doc = DocumentApp.openById(copy.getId());
+      const body = doc.getBody();
+      
+      // 2. Replace Text
+      headers.forEach((header, i) => {
+          body.replaceText(`{{${header}}}`, String(row[i]));
+      });
+      
+      // 3. Insert Photo
+      if (row[17]) { // Photo URL is Col 18
+         try {
+             const imgBlob = UrlFetchApp.fetch(row[17]).getBlob();
+             body.appendImage(imgBlob).setWidth(300);
+         } catch(e) {}
+      }
+      
+      doc.saveAndClose();
+      
+      // 4. Convert to PDF
+      const pdf = copy.getAs(MimeType.PDF);
+      folder.createFile(pdf);
+      
+      // 5. Cleanup Temp Doc
+      copy.setTrashed(true);
+      
+    } catch(e) {
+      console.log("PDF Gen Error: " + e.toString());
+    }
 }
-
