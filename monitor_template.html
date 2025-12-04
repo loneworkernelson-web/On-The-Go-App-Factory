@@ -51,10 +51,11 @@ body{font-family:'Inter',sans-serif}
     <div class="flex items-center gap-4">
       <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase font-bold border border-gray-600 px-2 py-1 rounded">Enable Desktop Alerts</button>
       
-      <div class="flex items-center gap-2 bg-gray-900 px-3 py-1 rounded-full border border-gray-700">
+      <div class="flex items-center gap-3 bg-gray-900 px-4 py-2 rounded-full border border-gray-700">
           <div id="connectionDot" class="w-3 h-3 rounded-full dot-connecting"></div>
-          <div class="text-right">
-              <div id="clock" class="text-xs font-bold font-mono text-gray-300">00:00:00</div>
+          <div class="text-right flex flex-col justify-center">
+              <div id="clock" class="text-xs font-bold font-mono text-gray-300 leading-none mb-1">00:00:00</div>
+              <div id="lastUpd" class="text-[10px] text-gray-500 leading-none font-mono">Init...</div>
           </div>
       </div>
 
@@ -166,7 +167,7 @@ function fetchData() {
   const cb = 'cb_'+Date.now();
   
   // Set Dot Yellow (Connecting)
-  // document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-connecting";
+  document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-connecting";
 
   window[cb] = (data) => {
     delete window[cb]; document.body.removeChild(s);
@@ -183,8 +184,13 @@ function fetchData() {
 
     // Success -> Green Dot
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
-    document.getElementById('lastUpd').innerText = "Updated: " + new Date().toLocaleTimeString();
-    document.getElementById('lastUpd').className = "text-xs text-green-500 font-bold";
+    
+    // FIX: Ensure element exists before setting text
+    const lastUpd = document.getElementById('lastUpd');
+    if(lastUpd) {
+        lastUpd.innerText = "Updated: " + new Date().toLocaleTimeString();
+        lastUpd.className = "text-[10px] text-green-500 leading-none font-mono font-bold";
+    }
 
     processAndRender(data); 
   };
@@ -193,8 +199,11 @@ function fetchData() {
   s.onerror = () => { 
     // Error -> Red Dot
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
-    document.getElementById('lastUpd').innerText = "Connection Failed";
-    document.getElementById('lastUpd').className = "text-xs text-red-500 font-bold";
+    const lastUpd = document.getElementById('lastUpd');
+    if(lastUpd) {
+        lastUpd.innerText = "Conn Failed";
+        lastUpd.className = "text-[10px] text-red-500 leading-none font-mono font-bold";
+    }
   };
   document.body.appendChild(s);
 }
@@ -226,9 +235,9 @@ function processAndRender(data) {
           if(status.match(/EMERGENCY|DURESS|PANIC|OVERDUE/)) type = "alert";
           if(status === "DEPARTED" || status.includes("SAFE")) type = "success";
           
-          addLogEntry(`${name}: ${status} @ ${location}`, type);
+          addLogEntry(`${name}: ${status}`, type);
           
-          // If new alarm, ensure it rings
+          // If moving into alert, clear silence so it rings
           if (status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/)) {
              acknowledgedList.delete(name); 
           }
@@ -238,7 +247,7 @@ function processAndRender(data) {
       }
       lastState[name] = status;
       
-      // Check for Red Alerts
+      // Alert Logic (Red Only triggers siren)
       if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
           anyCritical = true;
           if (!acknowledgedList.has(name)) {
@@ -250,16 +259,14 @@ function processAndRender(data) {
   
   if(!anyCritical) {
       stopAlarm();
-      acknowledgedList.clear(); // Safe to clear history if board is green
+      acknowledgedList.clear();
   }
 
-  // Render Grid
   list.innerHTML = '';
   const sortedWorkers = Object.values(workers).filter(w => {
       const s = w['Alarm Status'];
       return s !== 'DEPARTED' && s !== 'COMPLETED';
   }).sort((a,b) => {
-      // Sort Order: Duress > Red Alert > Amber > Normal
       const scoreA = getPriorityScore(a['Alarm Status']);
       const scoreB = getPriorityScore(b['Alarm Status']);
       return scoreB - scoreA;
@@ -284,7 +291,7 @@ function processAndRender(data) {
         statusClass = "text-white font-black bg-red-600 px-2 rounded";
         resolveBtn = makeResolveBtn(w);
     }
-    // Amber Alert
+    // Amber Alert (Visual Only)
     else if (status === 'OVERDUE') {
         cardClass = "bg-amber-900 border-l-8 border-amber-500";
         statusClass = "text-white font-bold bg-amber-600 px-2 rounded";
@@ -299,7 +306,7 @@ function processAndRender(data) {
     const start = new Date(w['Timestamp']);
     const mins = Math.floor((new Date() - start)/60000);
     
-    // DUE TIME DISPLAY (Restored Feature)
+    // DUE TIME
     let dueHtml = "";
     if (w['Anticipated Departure Time']) {
         const due = new Date(w['Anticipated Departure Time']);
@@ -413,7 +420,6 @@ function confirmResolve() {
         params.append('Notes', 'Incident resolved by Monitor Dashboard');
         params.append('key', SECRET);
 
-        // Standard CORS POST for backend v15+
         fetch(URL, { method: 'POST', body: params })
             .then(() => {
                 alert("Resolution Sent.");
