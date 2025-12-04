@@ -185,7 +185,6 @@ function fetchData() {
     // Success -> Green Dot
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
     
-    // FIX: Ensure element exists before setting text
     const lastUpd = document.getElementById('lastUpd');
     if(lastUpd) {
         lastUpd.innerText = "Updated: " + new Date().toLocaleTimeString();
@@ -262,11 +261,13 @@ function processAndRender(data) {
       acknowledgedList.clear();
   }
 
+  // Render Grid
   list.innerHTML = '';
   const sortedWorkers = Object.values(workers).filter(w => {
       const s = w['Alarm Status'];
       return s !== 'DEPARTED' && s !== 'COMPLETED';
   }).sort((a,b) => {
+      // Sort Order: Duress > Red Alert > Amber > Normal
       const scoreA = getPriorityScore(a['Alarm Status']);
       const scoreB = getPriorityScore(b['Alarm Status']);
       return scoreB - scoreA;
@@ -306,15 +307,23 @@ function processAndRender(data) {
     const start = new Date(w['Timestamp']);
     const mins = Math.floor((new Date() - start)/60000);
     
-    // DUE TIME
+    // DUE TIME / TIME REMAINING (New v14 Logic)
     let dueHtml = "";
     if (w['Anticipated Departure Time']) {
         const due = new Date(w['Anticipated Departure Time']);
         if (!isNaN(due.getTime())) {
-            const dueStr = due.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const isLate = new Date() > due;
-            const color = isLate ? "text-red-400 font-bold animate-pulse" : "text-blue-300";
-            dueHtml = `<div class="text-xs ${color} mt-1">Due: ${dueStr}</div>`;
+            const now = new Date();
+            const diffMs = due - now;
+            const diffMins = Math.floor(Math.abs(diffMs) / 60000);
+            
+            if (diffMs > 0) {
+                // Future: Green
+                dueHtml = `<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${diffMins}m remaining</div>`;
+            } else {
+                // Overdue: Amber/Red based on severity
+                const color = diffMins > 15 ? "bg-red-900/80 text-red-200 animate-pulse" : "bg-amber-900/80 text-amber-200";
+                dueHtml = `<div class="mt-2 text-xs ${color} px-2 py-1 rounded inline-block font-bold font-mono">⚠️ Overdue by ${diffMins}m</div>`;
+            }
         }
     }
     
@@ -327,7 +336,6 @@ function processAndRender(data) {
             <h3 class="text-2xl font-bold text-white truncate">${w['Worker Name']}</h3>
             <div class="text-right">
                 <span class="text-xs font-mono opacity-50 bg-black/30 px-2 py-1 rounded">${mins}m ago</span>
-                ${dueHtml}
             </div>
         </div>
         <div class="text-gray-300 text-sm mb-1 truncate">📍 ${w['Location Name'] || 'Unknown'}</div>
@@ -337,7 +345,8 @@ function processAndRender(data) {
             <span class="${statusClass} uppercase text-sm font-bold tracking-wider">${status}</span>
             <span class="text-xs font-mono ${getBatColor(w['Battery Level'])}">🔋 ${w['Battery Level'] || '?'}</span>
         </div>
-        ${w['Notes'] ? `<div class="mt-3 text-xs text-gray-400 italic border-l-2 border-gray-600 pl-2 line-clamp-2">"${w['Notes']}"</div>` : ''}
+        
+        ${dueHtml} ${w['Notes'] ? `<div class="mt-3 text-xs text-gray-400 italic border-l-2 border-gray-600 pl-2 line-clamp-2">"${w['Notes']}"</div>` : ''}
         
         <div class="mt-2 pointer-events-auto">
             ${resolveBtn}
@@ -379,6 +388,7 @@ async function playAlarm(w) {
   if(Notification.permission === "granted") {
       new Notification(`🚨 ${w['Alarm Status']}: ${w['Worker Name']}`, { body: `Location: ${w['Location Name']}`, icon: '%%LOGO_URL%%' });
   }
+
   const ov = document.getElementById('alertOverlay');
   if(ov.classList.contains('hidden')){
     ov.classList.remove('hidden');
@@ -414,6 +424,7 @@ function closeResolve() { document.getElementById('resolveModal').classList.add(
 function confirmResolve() {
     const input = document.getElementById('resolveInput').value.trim();
     if (input === activeWorkerToResolve) {
+        // USE URLSearchParams (Standard CORS-friendly POST)
         const params = new URLSearchParams();
         params.append('Worker Name', activeWorkerToResolve);
         params.append('Alarm Status', 'SAFE - MONITOR CLEARED');
