@@ -244,13 +244,19 @@ canvas {
         <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
         <div class="text-gray-300 space-y-4 text-sm">
             <h3 class="font-bold text-white">1. Starting a Visit</h3>
-            <p>Select a location. Press START (1.5s).</p>
-            <h3 class="font-bold text-white">2. During Visit</h3>
-            <p>Use <strong>Extend</strong> or <strong>Depart</strong>.</p>
-            <h3 class="font-bold text-white">3. Duress</h3>
-            <p>Enter <strong>Duress PIN</strong> to silently alarm.</p>
-            <h3 class="font-bold text-white">4. Offline</h3>
-            <p>Works offline. Uploads automatically.</p>
+            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
+            
+            <h3 class="font-bold text-white">2. During the Visit</h3>
+            <p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
+            
+            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
+            <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
+            
+            <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
+            <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
+            
+            <h3 class="font-bold text-white">5. Offline Mode</h3>
+            <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
         </div>
         <div class="mt-6 flex justify-end"><button onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div>
     </div>
@@ -308,7 +314,11 @@ let state = {
 };
 
 // Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, tempPhoto=null, sigPad=null, panicTapCount=0, panicTapTimer;
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt;
+let tempPhoto = null;
+let sigPad = null;
+let panicTapCount = 0;
+let panicTapTimer;
 let deferredPrompt;
 let isMidVisitUpdate = false; 
 
@@ -317,8 +327,10 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
+    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
+    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -327,8 +339,10 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
+    // Mileage Default
     initLocations();
 
+    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -337,6 +351,7 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
+    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -352,6 +367,7 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
     
+    // Wake Lock Logic
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
@@ -477,9 +493,8 @@ function playSoundAndVibrate(action) {
                 if(navigator.vibrate) navigator.vibrate([50,50,50]); 
                 break;
             case 'warning': 
-                synth.triggerAttackRelease("E5", "16n", now); 
-                synth.triggerAttackRelease("G5", "16n", now+0.2); 
-                if(navigator.vibrate) navigator.vibrate([800,200]); 
+                // v57 FIX: Subtle Vibration if Overdue (No Sound)
+                if(navigator.vibrate) navigator.vibrate([200, 100, 200]); 
                 break;
             case 'panic': 
                 synth.triggerAttackRelease("G5", "16n", now); 
@@ -753,7 +768,9 @@ function tick() {
         document.getElementById('btnSafe').classList.remove('hidden');
         document.getElementById('btnDepart').classList.add('hidden');
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
-        if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
+        
+        // v57 FIX: Discreet Vibration (1x/min)
+        if(Math.floor(rem/1000) % 60 === 0) playSoundAndVibrate('warning'); 
 
         if (!state.activeVisit.overdueSent) {
              state.activeVisit.overdueSent = true;
@@ -928,9 +945,6 @@ function preDepart(isSafeFlow) {
              }
            });
         }
-        
-        buildReportForm(l.templateName, div); // Redundant but safe
-        document.getElementById('btnSubmitRep').onclick = submitReport;
     };
 
     const now = new Date();
@@ -1091,7 +1105,6 @@ function depart(reportData = {}) {
         else data["Notes"] += " [Signature Included]";
     }
     
-    // v56 FIX: Use correct key (stripped of $)
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
     processUploadQueue(data);
@@ -1245,6 +1258,7 @@ function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
 function syncForms() {
     if(!CONFIG.url) return;
+    // 1. Standard Sync (Local)
     const comps = [...new Set(state.locations.map(l => l.templateName).filter(Boolean))];
     comps.push("(Standard)", "Travel Report");
     comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); });
