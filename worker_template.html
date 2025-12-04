@@ -68,7 +68,7 @@ canvas {
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 
-/* Colors */
+/* --- COLORS --- */
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -327,10 +327,8 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
-    // Force Config
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -339,10 +337,8 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Mileage Default
     initLocations();
 
-    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -351,7 +347,6 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -367,31 +362,10 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click', initAudio, { once: true });
     startReminderTimer();
     
-    // Wake Lock Logic
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
 });
-
-// --- INIT LOCATIONS (Fixed) ---
-function initLocations() {
-    if(!state.locations) state.locations = [];
-    
-    if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
-}
 
 // --- PWA INSTALL ---
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -410,9 +384,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
-    
-    if(page === 'main') startReminderTimer();
-    else clearTimeout(mainScreenReminderTimer);
+    if(page === 'main') startReminderTimer(); else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
@@ -458,7 +430,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); // 5 Mins
+    }, 300000); 
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -493,8 +465,9 @@ function playSoundAndVibrate(action) {
                 if(navigator.vibrate) navigator.vibrate([50,50,50]); 
                 break;
             case 'warning': 
-                // v57 FIX: Subtle Vibration if Overdue (No Sound)
-                if(navigator.vibrate) navigator.vibrate([200, 100, 200]); 
+                synth.triggerAttackRelease("E5", "16n", now); 
+                synth.triggerAttackRelease("G5", "16n", now+0.2); 
+                if(navigator.vibrate) navigator.vibrate([800,200]); 
                 break;
             case 'panic': 
                 synth.triggerAttackRelease("G5", "16n", now); 
@@ -660,7 +633,6 @@ function updateArrivedButtonState() {
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         
-        // Quick Stat Logic
         if(CONFIG.isAdv && !l.noReport) {
             btnQ.disabled = false; 
             btnQ.classList.replace('opacity-50','hover:bg-teal-500');
@@ -768,9 +740,7 @@ function tick() {
         document.getElementById('btnSafe').classList.remove('hidden');
         document.getElementById('btnDepart').classList.add('hidden');
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
-        
-        // v57 FIX: Discreet Vibration (1x/min)
-        if(Math.floor(rem/1000) % 60 === 0) playSoundAndVibrate('warning'); 
+        if(Math.floor(rem/1000) % 15 === 0) playSoundAndVibrate('warning'); 
 
         if (!state.activeVisit.overdueSent) {
              state.activeVisit.overdueSent = true;
@@ -878,8 +848,7 @@ function iamSafe() {
     });
 }
 
-// ==================== REPORTING ENGINE ====================
-// v53: Mid-Visit Menu
+// ==================== REPORTING ENGINE (v57 - Self-Healing) ====================
 function openMidVisitMenu() {
     isMidVisitUpdate = true;
     showModal('template');
@@ -981,7 +950,7 @@ function quickStat() {
         });
         
         if(d.photo1) data["Photo 1"] = d.photo1;
-        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; // v56 Fix
+        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; 
         
         processUploadQueue(data);
         state.activeVisit = null; tempPhoto = null; sigPad = null;
@@ -989,9 +958,8 @@ function quickStat() {
     };
 }
 
-// v53: Enhanced Form Builder (Parses [CODES])
 function buildReportForm(tplName, container) {
-    // 1. Check Global Forms (synced from backend)
+    // 1. Check Global Forms
     let tpl = (state.globalForms && state.globalForms.find(f => f.name === tplName))?.questions;
     // 2. Check Local Cache
     if (!tpl) tpl = state.cachedForms[tplName];
@@ -1002,9 +970,20 @@ function buildReportForm(tplName, container) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
         tpl.forEach(f => {
-            // Handle Object format (from Global) or raw string (from Cache)
-            const type = f.type || 'check'; 
-            const text = f.text || f; // Support legacy string-only array
+            // v57 FIX: Self-Healing Parser (Handles strings vs objects)
+            let type = f.type || 'check'; 
+            let text = f.text || f; 
+            
+            if (typeof f === 'string') {
+                if(f.includes('[TEXT]')) { type='text'; text=f.replace('[TEXT]','').trim(); }
+                else if(f.includes('[PHOTO]')) { type='photo'; text=f.replace('[PHOTO]','').trim(); }
+                else if(f.includes('[YESNO]')) { type='yesno'; text=f.replace('[YESNO]','').trim(); }
+                else if(f.includes('[NUMBER]')) { type='number'; text=f.replace('[NUMBER]','').trim(); }
+                else if(f.includes('[GPS]')) { type='gps'; text=f.replace('[GPS]','').trim(); }
+                else if(f.includes('[HEADING]')) { type='header'; text=f.replace('[HEADING]','').trim(); }
+                else if(f.includes('[NOTE]')) { type='note'; text=f.replace('[NOTE]','').trim(); }
+                else if(f.includes('[SIGN]')) { type='signature'; text=f.replace('[SIGN]','').trim(); }
+            }
             
             let html = '';
             if(type==='header') html = `<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${text}</h3>`;
@@ -1072,7 +1051,12 @@ function submitReport() {
             "Notes": noteStr, 
             "Visit Report Data": JSON.stringify(d.jsonPayload || {}) 
         });
+        // v57 FIX: Save Sig to JSON if Photo1 taken
         if(tempPhoto) data["Photo 1"] = tempPhoto;
+        if(d.sig) {
+             if(!data["Photo 1"]) data["Photo 1"] = d.sig;
+             else d.jsonPayload['Signature_Image'] = d.sig;
+        }
         
         processUploadQueue(data);
         alert("Update Sent!");
@@ -1100,9 +1084,13 @@ function depart(reportData = {}) {
     });
     
     if(tempPhoto) data["Photo 1"] = tempPhoto;
+    // v57 FIX: Logic for Signature Saving
     if(reportData.sig) {
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
-        else data["Notes"] += " [Signature Included]";
+        else {
+             reportData.jsonPayload['Signature_Image'] = reportData.sig;
+             data["Notes"] += " [Signature Included]";
+        }
     }
     
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
@@ -1121,14 +1109,14 @@ function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.remove('hidden');
-    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); // v53
+    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); 
 }
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
-    document.getElementById('templateModal').classList.add('hidden'); // v53
+    document.getElementById('templateModal').classList.add('hidden'); 
 }
 function withPinVerification(isDuressAction, callback) {
     showModal('pin');
@@ -1256,6 +1244,7 @@ function setupLongPress(btn, cb) {
 function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
 function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
+
 function syncForms() {
     if(!CONFIG.url) return;
     // 1. Standard Sync (Local)
