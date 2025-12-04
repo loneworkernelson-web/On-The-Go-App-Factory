@@ -459,3 +459,76 @@ function generateVisitPdf(rowIndex) {
       
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
+// ... (Keep existing CONFIG and doPost/doGet from v18) ...
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. SERVER-SIDE WATCHDOG (THE SAFETY NET)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function checkOverdueVisits() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Visits');
+  if(!sheet) return;
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); // Get all data including Col 21 (Due Time)
+  const now = new Date();
+  const nowTime = now.getTime();
+  
+  // CONFIG: Escalation delay in minutes
+  const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const rowIndex = i + 2; // Real sheet row number
+    
+    const status = row[10]; // Col K (Alarm Status)
+    const dueTimeStr = row[20]; // Col U (Anticipated Departure Time)
+    
+    // Skip if already safe/departed or if no due time set
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) {
+      continue;
+    }
+
+    const dueTime = new Date(dueTimeStr).getTime();
+    if (isNaN(dueTime)) continue; // Invalid date
+
+    // Logic: Calculate how late they are
+    const timeOverdue = nowTime - dueTime;
+
+    // CHECK 1: CRITICAL ESCALATION (Red)
+    // If overdue by more than escalation time (e.g. 15m) AND not already marked Emergency
+    if (timeOverdue > escalationMs) {
+       if (!status.includes('EMERGENCY')) {
+          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
+          sheet.getRange(rowIndex, 11).setValue(newStatus);
+          
+          // Build alert object manually since we don't have 'e.parameter' here
+          const alertData = {
+             'Worker Name': row[2],
+             'Worker Phone Number': row[3],
+             'Alarm Status': newStatus,
+             'Location Name': row[12],
+             'Last Known GPS': row[14],
+             'Notes': "Worker failed to check in. Phone may be offline.",
+             'Emergency Contact Email': row[6],
+             'Emergency Contact Number': row[5],
+             'Escalation Contact Email': row[9],
+             'Escalation Contact Number': row[8]
+          };
+          sendAlert(alertData); // Triggers SMS/Email
+          console.log(`Critical Alert triggered for ${row[2]}`);
+       }
+    }
+    // CHECK 2: INITIAL OVERDUE (Amber)
+    // If overdue by any amount AND currently just 'ON SITE'
+    else if (timeOverdue > 0) {
+       if (status === 'ON SITE') {
+          sheet.getRange(rowIndex, 11).setValue("OVERDUE");
+          console.log(`Marked ${row[2]} as Overdue`);
+       }
+    }
+  }
+}
