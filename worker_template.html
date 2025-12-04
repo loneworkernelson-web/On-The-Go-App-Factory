@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>%%ORGANISATION_NAME%%</title>
+<title>%%ORG_NAME%%</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#111827">
@@ -28,7 +28,7 @@ body {
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { 
     content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
     background: rgba(255, 255, 255, 0.3); 
@@ -257,7 +257,7 @@ canvas {
             </div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
-            <button id="btnDelLoc" onclick="deleteLoc()" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
+            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
             <div class="flex-1"></div>
             <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
             <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
@@ -361,7 +361,7 @@ window.addEventListener('load', () => {
     
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: State Migration
+    // State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -370,6 +370,7 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
+    // FIX v48: Restore initLocations function
     initLocations();
 
     if(CONFIG.isAdv) {
@@ -400,6 +401,26 @@ window.addEventListener('load', () => {
     });
 });
 
+// --- INIT LOCATIONS (Fixed) ---
+function initLocations() {
+    if(!state.locations) state.locations = [];
+    
+    if(CONFIG.mileage) {
+        if(!state.locations.find(l => l.id === 'travel')) {
+            state.locations.unshift({ 
+                id: 'travel', 
+                name: 'Travelling', 
+                address: 'Calculates Mileage via GPS', 
+                noReport: false, 
+                companyName: 'Internal', 
+                templateName: 'Travel Report' 
+            });
+        }
+    } else {
+        state.locations = state.locations.filter(l => l.id !== 'travel');
+    }
+}
+
 // --- PWA INSTALL ---
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -417,7 +438,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(page + 'Page').classList.add('active');
-    if(page === 'main') startReminderTimer(); else clearTimeout(mainScreenReminderTimer);
+    
+    if(page === 'main') startReminderTimer();
+    else clearTimeout(mainScreenReminderTimer);
 
     if(page === 'settings') {
         ['name','phone','emg_name','emg_phone','emg_email','esc_name','esc_phone','esc_email','pin','duress'].forEach(k => {
@@ -429,9 +452,8 @@ function navigate(page) {
     }
 }
 
-// --- DATA BUILDER (v37) ---
+// --- DATA BUILDER ---
 function buildPayload(data) {
-    // Calculate Due Time (v47)
     let dueTime = "";
     if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
         dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
@@ -447,7 +469,7 @@ function buildPayload(data) {
         'Escalation Contact Name': state.settings.escalationName, 
         'Escalation Contact Number': state.settings.escalationPhone, 
         'Escalation Contact Email': state.settings.escalationEmail,
-        'Anticipated Departure Time': dueTime, // v47
+        'Anticipated Departure Time': dueTime,
         ...data, 
         'Timestamp': new Date().toISOString()
     };
@@ -464,7 +486,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000); 
+    }, 300000); // 5 Mins
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -526,6 +548,7 @@ function renderLocations() {
     state.locations.forEach(l => {
         const el = document.createElement('div');
         
+        // TILE STYLE LOGIC
         let bgColor = 'bg-gray-900';
         let borderColor = 'border-transparent';
         let textColor = 'text-white';
@@ -750,7 +773,7 @@ function enterLockedScreen() {
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
-    tick(); // Instant update
+    tick(); 
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
@@ -791,7 +814,6 @@ function tick() {
         const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
         document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
         document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
-        document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
         document.getElementById('btnSafe').classList.add('hidden');
         document.getElementById('btnDepart').classList.remove('hidden');
     }
@@ -991,7 +1013,6 @@ function buildReportForm(templateName, container) {
     if(canvas) initSigPad(canvas);
 }
 
-// --- SIGNATURE LOGIC ---
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
@@ -1159,6 +1180,7 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
+        // v34 FIX: Remove no-cors
         fetch(state.settings.googleSheetUrl, { method: 'POST', body: fd })
             .then(() => {
                 state.pendingUploads.shift(); 
@@ -1260,14 +1282,9 @@ function getGpsAddress() {
 }
 
 // Listeners
-document.getElementById('btnDelLoc').onclick = deleteLoc;
-document.getElementById('saveLocationBtn').onclick = saveLoc;
-document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
-document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
+// REMOVED: Conflicting bottom listeners that caused "null" errors
+// Instead, the HTML inline 'onclick' handles the events.
+// document.getElementById('btnDelLoc').onclick = deleteLoc; // REMOVED
 </script>
 </body>
 </html>
