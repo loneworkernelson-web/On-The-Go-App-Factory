@@ -234,22 +234,31 @@
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          logoData = e.target.result;
-          document.getElementById('logoImg').src = logoData;
-          document.getElementById('logoImg').classList.remove('hidden');
-          document.getElementById('logoPreviewArea').classList.add('border-blue-500');
+          // FIX: Resize logo to avoid 'TransactionTooLarge' error in Android WebAPK builder
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 192;
+            canvas.height = 192;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, 192, 192);
+            logoData = canvas.toDataURL('image/png');
+            document.getElementById('logoImg').src = logoData;
+            document.getElementById('logoImg').classList.remove('hidden');
+            document.getElementById('logoPreviewArea').classList.add('border-blue-500');
+          }
+          img.src = e.target.result;
         };
         reader.readAsDataURL(file);
       }
     }
 
     function copyVisitsHeaders() {
-      // UPDATED HEADERS LIST (Matches Backend v16.0)
+      const isAdv = document.getElementById('chkAdvanced').checked;
       const contacts = "Emergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email";
-      const standard = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
-      const advanced = "\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time"; // Added Col 21
-      
-      navigator.clipboard.writeText(standard + advanced);
+      const basic = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
+      const adv = "\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time";
+      navigator.clipboard.writeText(basic + (isAdv ? adv : ""));
       alert("Headers copied! (Includes all 21 columns)\n\nPaste into cell A1 of 'Visits' tab.");
     }
 
@@ -333,8 +342,19 @@
         .replace('%%SECRET_KEY%%', secret);
       
       const wFolder = zip.folder("WorkerApp"); wFolder.file("index.html", wHtml);
-      wFolder.file("manifest.json", JSON.stringify({ name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{ src: logoData, sizes: "192x192", type: "image/png" }] }, null, 2));
-      wFolder.file("sw.js", "const C='v11.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("manifest.json", JSON.stringify({ 
+          name: org, 
+          short_name: "Safety", 
+          start_url: "./index.html", 
+          display: "standalone", 
+          background_color: "#111827", 
+          theme_color: "#1e40af", 
+          icons: [
+              { src: logoData, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+              { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+          ] 
+      }, null, 2));
+      wFolder.file("sw.js", "const C='v12.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
