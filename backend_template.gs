@@ -1,13 +1,12 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v18.0 (Full Advanced + Secure)
- * * FEATURES:
- * 1. Secure Data Entry (Key Validation)
- * 2. Smart Row Updating (Prevents Duplicate Rows)
- * 3. Textbelt SMS Integration
- * 4. Global Form Serving (Action: getGlobalForms)
- * 5. Full Longitudinal Reporting Engine (Monthly Stats)
- * 6. Automated Archiving Engine
- * 7. PDF Generation Engine
+ * ON-THE-GO APPSUITE - MASTER BACKEND v21.0 (Full Advanced)
+ * * INTEGRATES:
+ * 1. Security (Key Check)
+ * 2. Smart Data (De-duplication + 21 Columns)
+ * 3. Alerting (Watchdog + SMS/Email)
+ * 4. Reporting (PDFs + Monthly Stats)
+ * 5. Maintenance (Archiving)
+ * 6. Dynamic Forms (Global + Local)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,13 +23,14 @@ const CONFIG = {
   
   // --- FOLDER IDs (For Advanced Features) ---
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
-  PDF_FOLDER_ID: "",        // (Optional) ID of Drive Folder to save PDF reports
-  REPORT_TEMPLATE_ID: "",   // (Optional) ID of Google Doc Template for PDFs
+  PDF_FOLDER_ID: "",        // Optional: Folder for PDF Reports
+  REPORT_TEMPLATE_ID: "",   // Optional: Google Doc Template ID
   
   // --- SETTINGS ---
   ORG_NAME: "%%ORGANISATION_NAME%%",
   TIMEZONE: Session.getScriptTimeZone(),
-  ARCHIVE_DAYS: 30
+  ARCHIVE_DAYS: 30,
+  ESCALATION_MINUTES: 15
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +128,12 @@ function doPost(e) {
              if (p['Visit Report Data']) sheet.getRange(realRowIndex, 20).setValue(p['Visit Report Data']);
 
              rowUpdated = true;
+             
+             // [PDF TRIGGER] If departing and using Advanced Features, generate PDF
+             if ((newStatus === 'DEPARTED' || newStatus === 'COMPLETED') && CONFIG.REPORT_TEMPLATE_ID) {
+                 generateVisitPdf(realRowIndex);
+             }
+
              break; 
         }
       }
@@ -233,6 +239,10 @@ function doGet(e) {
       archiveOldData();
       return ContentService.createTextOutput("Archive Complete");
   }
+  if(e.parameter.run === 'watchdog') {
+      checkOverdueVisits();
+      return ContentService.createTextOutput("Watchdog Run Complete");
+  }
 
   return ContentService.createTextOutput("OTG Online");
 }
@@ -299,14 +309,7 @@ function sendAlert(data) {
 function sendSms(phone, msg) {
   const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
   const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt';
-  try { 
-    UrlFetchApp.fetch('https://textbelt.com/text', { 
-      method: 'post', 
-      contentType: 'application/json',
-      payload: JSON.stringify({ phone: clean, message: msg, key: key }),
-      muteHttpExceptions: true
-    }); 
-  } catch(e) { console.log("SMS Fail", e); }
+  try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -412,41 +415,52 @@ function runAllLongitudinalReports() {
   const recipient = Session.getEffectiveUser().getEmail();
   MailApp.sendEmail({
     to: recipient,
-    subject: `Monthly Safety Report Generated`,
+    subject: `Monthly Safety Report Generated - ${CONFIG.ORG_NAME}`,
     htmlBody: `<p>Your report is ready.</p><p><a href="${reportSS.getUrl()}">View Report</a></p>`
   });
 }
 
 /**
- * PDF GENERATION
- * Full logic to create PDFs from Google Docs templates.
+ * PDF GENERATION (Full Implementation)
+ * Creates a Google Doc from template, fills it, saves as PDF, and Emails it.
  */
 function generateVisitPdf(rowIndex) {
+    // Requires these IDs to be set in CONFIG to work
     if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
+    
+    // Convert 1-based index (if passed that way) to 0-based data array index
+    // Note: 'rowIndex' here refers to the spreadsheet row number (e.g., 2, 3, 4)
+    // The data array index is rowIndex - 1 (because we grabbed the whole range)
+    // But let's grab fresh to be safe
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
-    const data = sheet.getDataRange().getValues();
-    const row = data[rowIndex];
-    const headers = data[0];
+    const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
+    const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
     
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
-      const copy = templateFile.makeCopy(`Report - ${row[2]} - ${row[1]}`, folder);
+      const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
       
       // Replace {{Header}} with Value
       headers.forEach((header, i) => {
-          body.replaceText(`{{${header}}}`, String(row[i]));
+          // Clean header for tag (remove special chars)
+          const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
+          // Replace {{WorkerName}}, {{Date}}, etc.
+          body.replaceText(`{{${tag}}}`, String(rowValues[i]));
+          // Also try direct match {{Header}}
+          body.replaceText(`{{${header}}}`, String(rowValues[i]));
       });
       
       // Insert Photo if available
-      if (row[17]) { // Photo URL Col 18
+      if (rowValues[17]) { // Photo URL Col 18 (Index 17)
          try {
-             const imgBlob = UrlFetchApp.fetch(row[17]).getBlob();
-             body.appendImage(imgBlob).setWidth(300);
+             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
+             body.appendParagraph("Site Photo:");
+             body.appendImage(imgBlob).setWidth(400);
          } catch(e) {}
       }
       
@@ -454,12 +468,22 @@ function generateVisitPdf(rowIndex) {
       
       // PDF Convert
       const pdf = copy.getAs(MimeType.PDF);
-      folder.createFile(pdf);
-      copy.setTrashed(true); // Delete temp doc
+      const pdfFile = folder.createFile(pdf);
+      
+      // Email PDF
+      const recipient = Session.getEffectiveUser().getEmail(); // Or specific admin
+      MailApp.sendEmail({
+        to: recipient,
+        subject: `Visit Report: ${rowValues[2]}`,
+        body: "Please find the visit report attached.",
+        attachments: [pdf]
+      });
+
+      // Cleanup Temp Doc
+      copy.setTrashed(true);
       
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
-// ... (Keep existing CONFIG and doPost/doGet from v18) ...
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. SERVER-SIDE WATCHDOG (THE SAFETY NET)
@@ -473,11 +497,9 @@ function checkOverdueVisits() {
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); // Get all data including Col 21 (Due Time)
-  const now = new Date();
-  const nowTime = now.getTime();
+  const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
+  const now = new Date().getTime();
   
-  // CONFIG: Escalation delay in minutes
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
@@ -496,16 +518,14 @@ function checkOverdueVisits() {
     if (isNaN(dueTime)) continue; // Invalid date
 
     // Logic: Calculate how late they are
-    const timeOverdue = nowTime - dueTime;
+    const timeOverdue = now - dueTime;
 
     // CHECK 1: CRITICAL ESCALATION (Red)
-    // If overdue by more than escalation time (e.g. 15m) AND not already marked Emergency
     if (timeOverdue > escalationMs) {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
           sheet.getRange(rowIndex, 11).setValue(newStatus);
           
-          // Build alert object manually since we don't have 'e.parameter' here
           const alertData = {
              'Worker Name': row[2],
              'Worker Phone Number': row[3],
@@ -518,12 +538,11 @@ function checkOverdueVisits() {
              'Escalation Contact Email': row[9],
              'Escalation Contact Number': row[8]
           };
-          sendAlert(alertData); // Triggers SMS/Email
+          sendAlert(alertData);
           console.log(`Critical Alert triggered for ${row[2]}`);
        }
     }
     // CHECK 2: INITIAL OVERDUE (Amber)
-    // If overdue by any amount AND currently just 'ON SITE'
     else if (timeOverdue > 0) {
        if (status === 'ON SITE') {
           sheet.getRange(rowIndex, 11).setValue("OVERDUE");
