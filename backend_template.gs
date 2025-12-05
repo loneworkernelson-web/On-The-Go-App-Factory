@@ -52,7 +52,10 @@ function doPost(e) {
   // if (!sheetDebug) { sheetDebug = ssDebug.insertSheet('Debug'); sheetDebug.appendRow(['Timestamp', 'Data']); }
   // sheetDebug.appendRow([new Date(), JSON.stringify(e.parameter)]);
   // -----------------------------------------------------------------
-
+if (p['Template Name']) {
+      logDebug("Received Form: " + p['Template Name']);
+      processFormEmail(p);
+  }
   try {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
     const p = e.parameter;
@@ -622,3 +625,4 @@ function checkOverdueVisits() {
     }
   }
 }
+
