@@ -22,9 +22,10 @@
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
     a.link:hover { color: #93c5fd; }
-    /* Tab Styles */
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
+    details > summary { list-style: none; outline: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4">
@@ -63,6 +64,7 @@
 
           <div class="highlight-box border-blue-500/30">
              <h3 class="text-xl font-bold text-white mb-4">Essential Safety Features</h3>
+             
              <div class="mb-4 ml-10">
                 <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
                 <div class="flex items-center gap-2">
@@ -70,14 +72,17 @@
                     <span class="text-xs text-gray-400">Time between "Overdue" (Amber) and "Emergency" (Red).</span>
                 </div>
              </div>
+
              <label class="flex items-center gap-4 cursor-pointer mb-2 group">
                <input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" onchange="toggleCheckin()">
                <div><span class="block font-bold text-white group-hover:text-blue-300 transition">Enable Periodic Check-in?</span><span class="text-sm text-gray-400">Optional. Asks "Are you OK?" at set intervals.</span></div>
              </label>
+             
              <div id="checkinOptions" class="hidden pl-10 ml-3 mb-4 transition-all">
                 <label class="text-gray-300 text-sm font-bold mr-2">Frequency (Minutes):</label>
                 <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
              </div>
+
              <div class="mt-4 pt-4 border-t border-gray-600">
                  <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Textbelt API Key (SMS) <a href="https://textbelt.com/" target="_blank" class="link ml-1">(Get Key ↗)</a></label>
                  <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: Leave blank to use Free Tier (1 SMS/day)">
@@ -89,8 +94,10 @@
               <input type="checkbox" id="chkAdvanced" class="w-6 h-6 rounded bg-gray-700 text-blue-600 focus:ring-blue-500" checked onchange="toggleAdv()">
               <div><span class="block font-bold text-white group-hover:text-blue-300 transition">Advanced Features</span><span class="text-sm text-gray-400">Enable Photos, Checklists, Reporting, and Mileage.</span></div>
             </label>
+            
             <div id="advOptions" class="pl-10 space-y-6 border-l-2 border-gray-700 ml-3">
               <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" class="w-5 h-5 rounded bg-gray-700 text-blue-600"><span class="text-gray-300">Enable "Travelling" / Mileage Tile</span></label>
+              
               <div class="grid md:grid-cols-2 gap-4 mt-2">
                 <div>
                     <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService API Key <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link ml-1">(Get Free Key ↗)</a></label>
@@ -103,6 +110,7 @@
               </div>
             </div>
           </div>
+          
           <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
         </div>
 
@@ -127,9 +135,9 @@
                 <li>Rename it to <strong>Checklists</strong>.</li>
                 <li>Paste the setup below into cell <strong>A1</strong>.</li>
             </ol>
-            <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy Checklist Setup</button>
+            <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy Full Setup (v16)</button>
           </div>
-          
+
           <div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="font-bold text-gray-200">Template Code Legend</h4>
@@ -137,7 +145,9 @@
             </div>
             <p class="text-xs text-gray-400 mb-2">Tip: Paste this into your spreadsheet (e.g., cell A20) for reference.</p>
             <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4 text-xs text-blue-200">
-                <strong>NEW: Global Forms</strong><br>To create a form available to ALL workers (e.g. "Accident Report"), set <strong>Column A</strong> to <code>FORMS</code> and <strong>Column B</strong> to the name of the form.
+                <strong>NEW: Global Forms</strong><br>
+                Set <strong>Column A</strong> to <code>FORMS</code> and <strong>Column B</strong> to the name (e.g. "Accident Report").<br>
+                Add an <strong>Email Address</strong> in Column C to auto-email completed reports.
             </div>
             <div class="grid grid-cols-3 gap-2 text-xs text-gray-300">
                <div>[YESNO] Yes/No</div><div>[CHECK] Checkbox</div><div>[TEXT] Text Box</div>
@@ -176,6 +186,40 @@
              <div class="bg-yellow-900/30 p-3 rounded border border-yellow-600/50 text-xs">
                  <strong>Lost the URL?</strong> In Apps Script, click <strong>Deploy > Manage Deployments</strong> to find it again.
              </div>
+          </div>
+          
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-4 rounded-lg mt-4">
+             <details class="group">
+                <summary class="flex items-center justify-between font-bold text-yellow-400 text-lg hover:text-yellow-300">
+                   <span>⚠️ Vital Step: Set up Automation Triggers</span>
+                   <span class="transform group-open:rotate-180 transition">▼</span>
+                </summary>
+                <div class="mt-4 text-gray-300 space-y-4 text-sm">
+                   <p>Without triggers, the Watchdog (Safety Check) and Archiver will not run.</p>
+                   <ol class="list-decimal pl-5 space-y-2">
+                      <li>In the Apps Script editor, click the <strong>Alarm Clock icon</strong> (Triggers) on the left.</li>
+                      <li>Click <strong>+ Add Trigger</strong> (bottom right).</li>
+                      <li class="bg-gray-800 p-2 rounded">
+                         <strong class="text-white">Trigger 1: Safety Watchdog</strong><br>
+                         Function: <code>checkOverdueVisits</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Minutes timer</code> -> <code>Every 10 minutes</code>
+                      </li>
+                      <li class="bg-gray-800 p-2 rounded">
+                         <strong class="text-white">Trigger 2: Auto-Archiver</strong><br>
+                         Function: <code>archiveOldData</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Week timer</code> -> <code>Every Sunday</code>
+                      </li>
+                      <li id="advancedTriggerInfo" class="bg-gray-800 p-2 rounded hidden">
+                         <strong class="text-purple-300">Trigger 3: Monthly Report (Advanced Only)</strong><br>
+                         Function: <code>runAllLongitudinalReports</code><br>
+                         Event Source: <code>Time-driven</code><br>
+                         Type: <code>Month timer</code> -> <code>1st of month</code>
+                      </li>
+                   </ol>
+                </div>
+             </details>
           </div>
 
           <div>
@@ -269,20 +313,14 @@
     function gotoStep(n) {
       document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
       document.getElementById('step'+n).classList.add('active');
-      
-      // Update Tabs
       for(let i=1; i<=5; i++) {
           const tab = document.getElementById('tab'+i);
           if(i===n) {
              tab.classList.add('active');
-             tab.style.color = '#60a5fa';
-             tab.style.borderColor = '#3b82f6';
-             tab.style.background = '#1f2937';
+             tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937';
           } else {
              tab.classList.remove('active');
-             tab.style.color = '#6b7280';
-             tab.style.borderColor = 'transparent';
-             tab.style.background = 'transparent';
+             tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent';
           }
       }
     }
@@ -292,10 +330,9 @@
       document.getElementById('advOptions').style.display = isAdv ? "block" : "none";
       document.getElementById('boxChecklists').style.display = isAdv ? "block" : "none";
       document.getElementById('legendBox').style.display = isAdv ? "block" : "none";
-      const advTrigger = document.getElementById('advancedTriggerInfo'); // Backend step
+      const advTrigger = document.getElementById('advancedTriggerInfo');
       if(advTrigger) advTrigger.style.display = isAdv ? "block" : "none";
     }
-    
     function toggleCheckin() {
         const isOn = document.getElementById('chkCheckin').checked;
         document.getElementById('checkinOptions').style.display = isOn ? "block" : "none";
@@ -333,11 +370,14 @@
     }
 
     function copyChecklistSetup() {
-      let h = "Company Name\tTemplate Name";
+      let h = "Company Name\tTemplate Name\tEmail Recipient";
       for(let i=1; i<=30; i++) h += "\tQuestion " + i;
-      const rows = "\n(Standard)\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + "\nInternal\tTravel Report\t$Distance (km)\t[TEXT] Details";
+      const rows = 
+        "\n(Standard)\t\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + 
+        "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
+        "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
       navigator.clipboard.writeText(h + rows);
-      alert("Full Setup Copied! (Includes 30 Question Columns)\n\nPaste into cell A1 of 'Checklists' tab.");
+      alert("Full Setup Copied! (Includes 'FORMS' example)\n\nPaste into cell A1 of 'Checklists' tab.");
     }
 
     function copyLegend() {
@@ -424,7 +464,7 @@
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
-      wFolder.file("sw.js", "const C='v15.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v16.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
