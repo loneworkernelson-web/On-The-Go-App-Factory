@@ -62,53 +62,14 @@ canvas {
 }
 
 /* --- SETTINGS CARDS --- */
-.setting-card { 
-    background-color: #1f2937; 
-    padding: 1.25rem; 
-    border-radius: 0.75rem; 
-    border: 1px solid #374151; 
-    margin-bottom: 1rem; 
-}
-.setting-label { 
-    display: block; 
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em; 
-    margin-bottom: 0.5rem; 
-}
-.form-input { 
-    width: 100%; 
-    background-color: #111827; 
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem; 
-    outline: none; 
-    margin-bottom: 0.75rem; 
-    display: block; 
-}
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { 
-    width: 100%; 
-    background-color: #111827; 
-    border: 1px solid #4b5563; 
-    border-radius: 0.5rem; 
-    padding: 0.75rem; 
-    color: white; 
-    font-size: 1rem; 
-    outline: none; 
-    margin-bottom: 0.5rem; 
-    display: block; 
-}
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 
 /* --- COLORS --- */
-.lbl-blue { color: #60a5fa; } 
-.lbl-green { color: #4ade80; } 
-.lbl-purple { color: #c084fc; } 
-.lbl-red { color: #f87171; } 
-.lbl-gray { color: #9ca3af; }
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -379,7 +340,6 @@ window.addEventListener('load', () => {
         state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Mileage Default
     initLocations();
 
     // Feature Flags
@@ -413,7 +373,7 @@ window.addEventListener('load', () => {
     });
 });
 
-// --- INIT LOCATIONS ---
+// --- INIT LOCATIONS (Fixed) ---
 function initLocations() {
     if(!state.locations) state.locations = [];
     
@@ -433,7 +393,7 @@ function initLocations() {
     }
 }
 
-// --- BATTERY SAVER ---
+// --- BATTERY SAVER (v58) ---
 function toggleBatterySaver() {
     const overlay = document.getElementById('batterySaver');
     if(overlay.classList.contains('hidden')) {
@@ -481,7 +441,7 @@ function navigate(page) {
     }
 }
 
-// --- DATA BUILDER (v61) ---
+// --- DATA BUILDER (v37/47/61) ---
 function buildPayload(data) {
     let dueTime = "";
     if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
@@ -814,6 +774,7 @@ function enterLockedScreen() {
     timerInt = setInterval(tick, 1000);
 }
 
+// --- SILENT NUDGE LOGIC (v60) ---
 function tick() {
     if(!state.activeVisit) { clearInterval(timerInt); return; }
     const now = new Date();
@@ -834,15 +795,16 @@ function tick() {
         const minsOver = Math.floor(Math.abs(rem) / 60000);
         
         if (minsOver < CONFIG.escalationMinutes) {
+             // Only sound ONCE when it first goes overdue
              if (!state.activeVisit.overdueSent) {
                  state.activeVisit.overdueSent = true;
                  saveState();
                  triggerAutoAlert('OVERDUE');
                  playSoundAndVibrate('warning'); // Sound once
              }
-             // Minute vibe nudge
+             // Vibrate nudge every minute
              if (Math.floor(Math.abs(rem)/1000) % 60 === 0) {
-                 if(navigator.vibrate) navigator.vibrate([500,200,500]);
+                 if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
              }
         } 
         // 15+ Mins: Critical (Silent on Phone, Loud on Monitor)
@@ -1053,7 +1015,7 @@ function quickStat() {
         });
         
         if(d.photo1) data["Photo 1"] = d.photo1;
-        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; 
+        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; // v56 Fix
         
         processUploadQueue(data);
         state.activeVisit = null; tempPhoto = null; sigPad = null;
@@ -1213,14 +1175,14 @@ function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.remove('hidden');
-    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); 
+    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); // v53
 }
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
-    document.getElementById('templateModal').classList.add('hidden'); 
+    document.getElementById('templateModal').classList.add('hidden'); // v53
 }
 function withPinVerification(isDuressAction, callback) {
     showModal('pin');
@@ -1265,7 +1227,7 @@ function captureGPS(btn, key) {
     });
 }
 
-// --- NETWORK (Fixed v62.0) ---
+// --- NETWORK ---
 function processUploadQueue(newData = null) {
     if(newData) {
         state.pendingUploads.push(newData);
@@ -1286,10 +1248,9 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
-        // FIX: Added mode: 'no-cors' to bypass browser security blocks
+        // v62 FIX: Restore no-cors for robust connection
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
-                // In no-cors, we can't read the response, so we assume success if no network error
                 state.pendingUploads.shift(); 
                 saveState();
                 processUploadQueue(); 
@@ -1301,6 +1262,7 @@ function processUploadQueue(newData = null) {
         document.getElementById('uploadBanner').classList.add('hidden');
     }
 }
+
 // If Battery
 if(navigator.getBattery) {
     navigator.getBattery().then(b => {
@@ -1349,10 +1311,8 @@ function setupLongPress(btn, cb) {
 function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
 function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
-
 function syncForms() {
     if(!CONFIG.url) return;
-    // 1. Standard Sync (Local)
     const comps = [...new Set(state.locations.map(l => l.templateName).filter(Boolean))];
     comps.push("(Standard)", "Travel Report");
     comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); });
@@ -1408,4 +1368,3 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
-
