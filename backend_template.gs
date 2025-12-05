@@ -1,12 +1,14 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v21.0 (Full Advanced)
- * * INTEGRATES:
- * 1. Security (Key Check)
- * 2. Smart Data (De-duplication + 21 Columns)
- * 3. Alerting (Watchdog + SMS/Email)
- * 4. Reporting (PDFs + Monthly Stats)
- * 5. Maintenance (Archiving)
- * 6. Dynamic Forms (Global + Local)
+ * ON-THE-GO APPSUITE - MASTER BACKEND v23.0 (Full Advanced + Secure)
+ * * FEATURES INCLUDED:
+ * 1. Secure Data Entry (Key Validation)
+ * 2. Smart Row Updating (Prevents Duplicate Rows for same visit)
+ * 3. Server-Side Watchdog (Checks for overdue workers even if phone dies)
+ * 4. Global Form Serving (Serves 'FORMS' rows to app)
+ * 5. Full Longitudinal Reporting (Monthly Stats Workbooks)
+ * 6. PDF Generation (Converts Visit Reports to PDF & Emails)
+ * 7. Automated Archiving (Keeps sheet fast)
+ * 8. Textbelt SMS & Email Alerting
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,9 +24,10 @@ const CONFIG = {
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
   
   // --- FOLDER IDs (For Advanced Features) ---
+  // Required for Photo/PDF features to work
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
-  PDF_FOLDER_ID: "",        // Optional: Folder for PDF Reports
-  REPORT_TEMPLATE_ID: "",   // Optional: Google Doc Template ID
+  PDF_FOLDER_ID: "",        // (Optional) ID of Drive Folder to save PDF reports
+  REPORT_TEMPLATE_ID: "",   // (Optional) ID of Google Doc Template for PDFs
   
   // --- SETTINGS ---
   ORG_NAME: "%%ORGANISATION_NAME%%",
@@ -35,10 +38,12 @@ const CONFIG = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. DATA INGESTION (doPost)
+// Handles all incoming data from the Worker App
 // ─────────────────────────────────────────────────────────────────────────────
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(30000); // Wait up to 30s to prevent write collisions
+  // Wait up to 30s to prevent write collisions
+  lock.tryLock(30000); 
   
   try {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
@@ -130,16 +135,18 @@ function doPost(e) {
              rowUpdated = true;
              
              // [PDF TRIGGER] If departing and using Advanced Features, generate PDF
+             // This happens only if a template ID is set and the user is departing
              if ((newStatus === 'DEPARTED' || newStatus === 'COMPLETED') && CONFIG.REPORT_TEMPLATE_ID) {
                  generateVisitPdf(realRowIndex);
              }
-
+             
              break; 
         }
       }
     }
 
     // [NEW ROW FALLBACK]
+    // If no active visit found, create a new row
     if (!rowUpdated) {
         const row = [
           new Date(),
@@ -157,8 +164,15 @@ function doPost(e) {
         ];
         sheet.appendRow(row);
     }
+    
+    // [NEW FEATURE] EMAIL DISPATCHER
+    // If this is a "Global Form" submission, email it immediately
+    if (p['Template Name'] && p['Visit Report Data']) {
+        processFormEmail(p);
+    }
 
     // [ALERTS]
+    // Check if status requires urgent notification
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -169,6 +183,7 @@ function doPost(e) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. DATA RETRIEVAL (doGet)
+// Handles Monitor Polling and App Syncing
 // ─────────────────────────────────────────────────────────────────────────────
 function doGet(e) {
   // 1. Connection Test
@@ -178,6 +193,7 @@ function doGet(e) {
   }
   
   // 2. Monitor App Polling (JSONP)
+  // This wraps the JSON data in a callback function to bypass CORS on the dashboard
   if(e.parameter.callback){
     const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
     const data=sh.getDataRange().getValues();
@@ -200,6 +216,7 @@ function doGet(e) {
      for(let r=1; r<data.length; r++) {
          if(String(data[r][0]).toUpperCase().trim() === 'FORMS') {
              const tplName = data[r][1]; // Name is in Col B
+             // Parse Questions starting from Col D (Index 3)
              const questions = parseQuestions(data[r]);
              globalForms.push({ name: tplName, questions: questions });
          }
@@ -230,7 +247,7 @@ function doGet(e) {
      return ContentService.createTextOutput(JSON.stringify(questions)).setMimeType(ContentService.MimeType.JSON);
   }
   
-  // 4. Manual Triggers (for testing)
+  // 4. Manual Triggers (for testing via browser)
   if(e.parameter.run === 'reports') {
       runAllLongitudinalReports();
       return ContentService.createTextOutput("Reports Generated");
@@ -248,10 +265,11 @@ function doGet(e) {
 }
 
 // Helper: Parse Row into Question Objects
+// Updates for v22: Skip first 3 columns (Company, Template, Email)
 function parseQuestions(row) {
      const questions = [];
-     // Questions start at Column C (Index 2)
-     for(let i=2; i<row.length; i++) {
+     // Questions start at Column D (Index 3)
+     for(let i=3; i<row.length; i++) {
          const val = row[i];
          if(val && val !== "") {
              let type='check', text=val;
@@ -259,7 +277,7 @@ function parseQuestions(row) {
              else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
              else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
              else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
-             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } // Mileage syntax
+             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } 
              else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
              else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
              else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
@@ -312,14 +330,57 @@ function sendSms(phone, msg) {
   try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
 }
 
+// Email Dispatcher for Forms
+function processFormEmail(p) {
+    try {
+        const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
+        const data = sh.getDataRange().getValues();
+        const row = data.find(r => r[1] === p['Template Name']); // Find template
+        if (!row) return;
+        
+        const recipient = row[2]; // Col C is Email Recipient
+        if (!recipient || !recipient.includes('@')) return;
+        
+        const reportData = JSON.parse(p['Visit Report Data']);
+        const worker = p['Worker Name'];
+        const loc = p['Location Name'];
+        
+        let html = `<div style="font-family: sans-serif; max-width: 600px; border: 1px solid #ddd; padding: 20px;">
+            <h2 style="color: #2563eb;">${p['Template Name']}</h2>
+            <p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p><hr><table style="width:100%; border-collapse: collapse;">`;
+        
+        for (const [key, val] of Object.entries(reportData)) {
+            if (key === 'Signature_Image') continue;
+            html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${val}</td></tr>`;
+        }
+        html += `</table>`;
+        
+        const blobs = [];
+        if (p['Photo 1'] && p['Photo 1'].includes('base64')) {
+             const b = Utilities.newBlob(Utilities.base64Decode(p['Photo 1'].split(',')[1]), 'image/jpeg', 'photo.jpg');
+             blobs.push(b);
+             html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo0" style="max-width:300px;"></p>`;
+        }
+        if (reportData['Signature_Image']) {
+             const b = Utilities.newBlob(Utilities.base64Decode(reportData['Signature_Image'].split(',')[1]), 'image/png', 'sig.png');
+             blobs.push(b);
+             html += `<p><strong>Signature:</strong><br><img src="cid:sig0" style="max-width:200px; border:1px solid #ccc;"></p>`;
+        }
+        html += `</div>`;
+        
+        MailApp.sendEmail({
+            to: recipient,
+            subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`,
+            htmlBody: html,
+            inlineImages: { photo0: blobs[0] || null, sig0: blobs[1] || (blobs.length===1 && !p['Photo 1'] ? blobs[0] : null) }
+        });
+    } catch(e) { console.log("Form Email Error: " + e); }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. ADVANCED REPORTING & MAINTENANCE (Full Engine)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * ARCHIVE OLD DATA
- * Moves rows older than CONFIG.ARCHIVE_DAYS to 'Archive' sheet.
- */
 function archiveOldData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -347,18 +408,11 @@ function archiveOldData() {
   if (rowsToArchive.length > 0) {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
-    
-    // Rewrite main sheet (Clear & Paste)
     sheet.clearContents();
     sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
-    console.log(`Archived ${rowsToArchive.length} rows.`);
   }
 }
 
-/**
- * LONGITUDINAL REPORTS
- * Creates monthly spreadsheets for data analysis.
- */
 function runAllLongitudinalReports() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -367,7 +421,6 @@ function runAllLongitudinalReports() {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
 
-  // Create Report File
   const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM");
   const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`;
   let reportFile;
@@ -425,42 +478,33 @@ function runAllLongitudinalReports() {
  * Creates a Google Doc from template, fills it, saves as PDF, and Emails it.
  */
 function generateVisitPdf(rowIndex) {
-    // Requires these IDs to be set in CONFIG to work
     if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
-    
-    // Convert 1-based index (if passed that way) to 0-based data array index
-    // Note: 'rowIndex' here refers to the spreadsheet row number (e.g., 2, 3, 4)
-    // The data array index is rowIndex - 1 (because we grabbed the whole range)
-    // But let's grab fresh to be safe
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
-    const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
-    const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
+    const data = sheet.getDataRange().getValues();
+    const row = data[rowIndex];
+    const headers = data[0];
     
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
-      const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
+      const copy = templateFile.makeCopy(`Report - ${row[2]} - ${row[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
       
       // Replace {{Header}} with Value
       headers.forEach((header, i) => {
-          // Clean header for tag (remove special chars)
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
-          // Replace {{WorkerName}}, {{Date}}, etc.
-          body.replaceText(`{{${tag}}}`, String(rowValues[i]));
-          // Also try direct match {{Header}}
-          body.replaceText(`{{${header}}}`, String(rowValues[i]));
+          body.replaceText(`{{${tag}}}`, String(row[i]));
+          body.replaceText(`{{${header}}}`, String(row[i]));
       });
       
       // Insert Photo if available
-      if (rowValues[17]) { // Photo URL Col 18 (Index 17)
+      if (row[17]) { // Photo URL Col 18
          try {
-             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
-             body.appendParagraph("Site Photo:");
-             body.appendImage(imgBlob).setWidth(400);
+             const imgBlob = UrlFetchApp.fetch(row[17]).getBlob();
+             body.appendImage(imgBlob).setWidth(300);
          } catch(e) {}
       }
       
@@ -471,16 +515,15 @@ function generateVisitPdf(rowIndex) {
       const pdfFile = folder.createFile(pdf);
       
       // Email PDF
-      const recipient = Session.getEffectiveUser().getEmail(); // Or specific admin
+      const recipient = Session.getEffectiveUser().getEmail();
       MailApp.sendEmail({
         to: recipient,
-        subject: `Visit Report: ${rowValues[2]}`,
+        subject: `Visit Report: ${row[2]}`,
         body: "Please find the visit report attached.",
         attachments: [pdf]
       });
 
-      // Cleanup Temp Doc
-      copy.setTrashed(true);
+      copy.setTrashed(true); // Cleanup
       
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
@@ -499,25 +542,19 @@ function checkOverdueVisits() {
 
   const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
   const now = new Date().getTime();
-  
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
-    const rowIndex = i + 2; // Real sheet row number
+    const rowIndex = i + 2;
+    const status = row[10];
+    const dueTimeStr = row[20];
     
-    const status = row[10]; // Col K (Alarm Status)
-    const dueTimeStr = row[20]; // Col U (Anticipated Departure Time)
-    
-    // Skip if already safe/departed or if no due time set
-    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) {
-      continue;
-    }
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
 
     const dueTime = new Date(dueTimeStr).getTime();
-    if (isNaN(dueTime)) continue; // Invalid date
+    if (isNaN(dueTime)) continue;
 
-    // Logic: Calculate how late they are
     const timeOverdue = now - dueTime;
 
     // CHECK 1: CRITICAL ESCALATION (Red)
@@ -527,15 +564,15 @@ function checkOverdueVisits() {
           sheet.getRange(rowIndex, 11).setValue(newStatus);
           
           const alertData = {
-             'Worker Name': row[2],
+             'Worker Name': row[2], 
              'Worker Phone Number': row[3],
-             'Alarm Status': newStatus,
-             'Location Name': row[12],
-             'Last Known GPS': row[14],
+             'Alarm Status': newStatus, 
+             'Location Name': row[12], 
+             'Last Known GPS': row[14], 
              'Notes': "Worker failed to check in. Phone may be offline.",
-             'Emergency Contact Email': row[6],
+             'Emergency Contact Email': row[6], 
              'Emergency Contact Number': row[5],
-             'Escalation Contact Email': row[9],
+             'Escalation Contact Email': row[9], 
              'Escalation Contact Number': row[8]
           };
           sendAlert(alertData);
