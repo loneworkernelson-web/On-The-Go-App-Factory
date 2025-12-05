@@ -54,17 +54,61 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+canvas { 
+    touch-action: none; 
+    background: #fff; 
+    border-radius: 0.5rem; 
+    cursor: crosshair; 
+}
 
 /* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.setting-card { 
+    background-color: #1f2937; 
+    padding: 1.25rem; 
+    border-radius: 0.75rem; 
+    border: 1px solid #374151; 
+    margin-bottom: 1rem; 
+}
+.setting-label { 
+    display: block; 
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em; 
+    margin-bottom: 0.5rem; 
+}
+.form-input { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.75rem; 
+    display: block; 
+}
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
+.form-input-card { 
+    width: 100%; 
+    background-color: #111827; 
+    border: 1px solid #4b5563; 
+    border-radius: 0.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    font-size: 1rem; 
+    outline: none; 
+    margin-bottom: 0.5rem; 
+    display: block; 
+}
 
-/* Colors */
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+/* --- COLORS --- */
+.lbl-blue { color: #60a5fa; } 
+.lbl-green { color: #4ade80; } 
+.lbl-purple { color: #c084fc; } 
+.lbl-red { color: #f87171; } 
+.lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full overflow-hidden">
@@ -316,6 +360,7 @@ let panicTapCount = 0;
 let panicTapTimer;
 let deferredPrompt;
 let isMidVisitUpdate = false; 
+let currentActiveTemplate = ""; // v61
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
@@ -388,7 +433,7 @@ function initLocations() {
     }
 }
 
-// --- BATTERY SAVER (v58) ---
+// --- BATTERY SAVER ---
 function toggleBatterySaver() {
     const overlay = document.getElementById('batterySaver');
     if(overlay.classList.contains('hidden')) {
@@ -436,7 +481,7 @@ function navigate(page) {
     }
 }
 
-// --- DATA BUILDER ---
+// --- DATA BUILDER (v61) ---
 function buildPayload(data) {
     let dueTime = "";
     if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
@@ -454,6 +499,7 @@ function buildPayload(data) {
         'Escalation Contact Number': state.settings.escalationPhone, 
         'Escalation Contact Email': state.settings.escalationEmail,
         'Anticipated Departure Time': dueTime,
+        'Template Name': currentActiveTemplate, // v61
         ...data, 
         'Timestamp': new Date().toISOString()
     };
@@ -758,7 +804,8 @@ function enterLockedScreen() {
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
-    tick(); 
+    // FIX v45.0: Update Timer Immediately
+    tick();
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
@@ -767,13 +814,13 @@ function enterLockedScreen() {
     timerInt = setInterval(tick, 1000);
 }
 
-// --- SILENT NUDGE LOGIC (v60) ---
 function tick() {
     if(!state.activeVisit) { clearInterval(timerInt); return; }
     const now = new Date();
     const due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
     
+    // FIX v45.0: Always show time, even if overdue
     document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 
     if(rem < 0) {
@@ -783,20 +830,19 @@ function tick() {
         document.getElementById('btnDepart').classList.add('hidden');
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
         
-        // 0-15 Mins: Amber "Nudge"
+        // 0-15 Mins: Amber "Nudge" (Sound ONCE, Vibe Repeats)
         const minsOver = Math.floor(Math.abs(rem) / 60000);
         
         if (minsOver < CONFIG.escalationMinutes) {
-             // Only sound ONCE when it first goes overdue
              if (!state.activeVisit.overdueSent) {
                  state.activeVisit.overdueSent = true;
                  saveState();
                  triggerAutoAlert('OVERDUE');
                  playSoundAndVibrate('warning'); // Sound once
              }
-             // Vibrate nudge every minute
+             // Minute vibe nudge
              if (Math.floor(Math.abs(rem)/1000) % 60 === 0) {
-                 if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
+                 if(navigator.vibrate) navigator.vibrate([500,200,500]);
              }
         } 
         // 15+ Mins: Critical (Silent on Phone, Loud on Monitor)
@@ -934,6 +980,9 @@ function createTemplateBtn(label, value) {
 }
 
 function loadFormAndShow(tplName) {
+    // v61 FIX: Save active template name
+    currentActiveTemplate = tplName;
+    
     showModal('report');
     const div = document.getElementById('reportFields');
     div.innerHTML = '';
@@ -1147,6 +1196,7 @@ function depart(reportData = {}) {
         }
     }
     
+    // v56 FIX: Use correct key (stripped of $)
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
     processUploadQueue(data);
@@ -1163,14 +1213,14 @@ function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.remove('hidden');
-    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); // v53
+    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); 
 }
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
     document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
-    document.getElementById('templateModal').classList.add('hidden'); // v53
+    document.getElementById('templateModal').classList.add('hidden'); 
 }
 function withPinVerification(isDuressAction, callback) {
     showModal('pin');
@@ -1243,6 +1293,7 @@ function processUploadQueue(newData = null) {
                 processUploadQueue(); 
             })
             .catch(() => {
+                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
