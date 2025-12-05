@@ -424,14 +424,14 @@ function closeResolve() { document.getElementById('resolveModal').classList.add(
 function confirmResolve() {
     const input = document.getElementById('resolveInput').value.trim();
     if (input === activeWorkerToResolve) {
-        // USE URLSearchParams (Standard CORS-friendly POST)
         const params = new URLSearchParams();
         params.append('Worker Name', activeWorkerToResolve);
         params.append('Alarm Status', 'SAFE - MONITOR CLEARED');
         params.append('Notes', 'Incident resolved by Monitor Dashboard');
         params.append('key', SECRET);
 
-        fetch(URL, { method: 'POST', body: params })
+        // FIX: Added mode: 'no-cors'
+        fetch(URL, { method: 'POST', body: params, mode: 'no-cors' })
             .then(() => {
                 alert("Resolution Sent.");
                 closeResolve();
@@ -440,9 +440,9 @@ function confirmResolve() {
                 acknowledgedList.add(activeWorkerToResolve);
             })
             .catch(e => {
-                 console.log("Sent resolve signal (blind): " + e);
+                 console.log("Resolve Error: " + e);
+                 // Even if error, close modal to prevent getting stuck
                  closeResolve();
-                 silenceAlarm();
             });
     } else {
         alert("Name does not match. Please type exactly: " + activeWorkerToResolve);
