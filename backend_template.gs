@@ -1,12 +1,15 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v25.0 (Bug Fixes)
- * * INTEGRATES:
- * 1. Security (Key Check)
- * 2. Smart Data (De-duplication + 21 Columns)
- * 3. Alerting (Watchdog + SMS/Email)
- * 4. Reporting (PDFs + Monthly Stats)
- * 5. Maintenance (Archiving)
- * 6. Dynamic Forms (Global + Local)
+ * ON-THE-GO APPSUITE - MASTER BACKEND v26.0 (Email Fix)
+ * * FEATURES INCLUDED:
+ * 1. Secure Data Entry (Key Validation)
+ * 2. Smart Row Updating (Prevents Duplicate Rows)
+ * 3. Textbelt SMS Integration
+ * 4. Global Form Serving (Action: getGlobalForms)
+ * 5. Full Longitudinal Reporting Engine
+ * 6. Automated Archiving
+ * 7. PDF Generation
+ * 8. Server-Side Watchdog
+ * 9. Robust Form Emailing (Fixed null image crash)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,11 +37,9 @@ function doPost(e) {
   lock.tryLock(30000); 
   
   try {
-    // FIX: Define 'p' immediately
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
     const p = e.parameter;
     
-    // [SECURITY CHECK]
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) {
        return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Invalid Key"}));
     }
@@ -46,7 +47,6 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // [SCHEMA] Ensure 21 Columns
     if(sheet.getLastColumn() === 0) {
       const headers = [
         "Timestamp", "Date", "Worker Name", "Worker Phone Number", 
@@ -61,7 +61,6 @@ function doPost(e) {
       sheet.setFrozenRows(1);
     }
     
-    // [PHOTO PROCESSING]
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
       try {
@@ -76,7 +75,6 @@ function doPost(e) {
       } catch(err) { photoUrl = "Err: "+err; }
     }
 
-    // [SMART ROW UPDATE]
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
@@ -122,7 +120,6 @@ function doPost(e) {
       }
     }
 
-    // [NEW ROW FALLBACK]
     if (!rowUpdated) {
         const row = [
           new Date(),
@@ -141,13 +138,11 @@ function doPost(e) {
         sheet.appendRow(row);
     }
     
-    // [NEW FEATURE] EMAIL DISPATCHER
+    // [NEW] EMAIL DISPATCHER
     if (p['Template Name'] && p['Visit Report Data']) {
         processFormEmail(p);
     }
 
-    // [ALERTS]
-    // FIX: p is now correctly defined in scope
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -204,6 +199,7 @@ function doGet(e) {
   return ContentService.createTextOutput("OTG Online");
 }
 
+// Updates for v22+: Skip first 3 columns (Company, Template, Email)
 function parseQuestions(row) {
      const questions = [];
      for(let i=3; i<row.length; i++) {
@@ -226,52 +222,19 @@ function parseQuestions(row) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. ALERTS & MESSAGING
+// 4. ALERTS & MESSAGING (FIXED v26)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function sendAlert(data) {
-  let recipients = [Session.getEffectiveUser().getEmail()];
-  let smsNumbers = [];
-  
-  if (data['Alarm Status'] === 'ESCALATION_SENT') {
-     if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
-     if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']);
-  } else {
-     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
-     if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
-  }
-  
-  recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
-  const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
-  const body = `
-    <h1 style="color:red;">${data['Alarm Status']}</h1>
-    <p><strong>Worker:</strong> ${data['Worker Name']}</p>
-    <p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p>
-    <p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p>
-    <p><strong>Map:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
-    <hr><p><i>OTG Safety System</i></p>
-  `;
-  if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
-
-  smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
-  const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}. Map: http://maps.google.com/?q=${data['Last Known GPS']}`;
-  smsNumbers.forEach(phone => sendSms(phone, smsMsg));
-}
-
-function sendSms(phone, msg) {
-  const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
-  const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt';
-  try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
-}
-
-// Email Dispatcher for Forms
 function processFormEmail(p) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
         const data = sh.getDataRange().getValues();
+        
+        // Find Template
         const row = data.find(r => r[1] === p['Template Name']); 
         if (!row) return;
         
+        // Find Email (Col C)
         const recipient = row[2]; 
         if (!recipient || !recipient.includes('@')) return;
         
@@ -289,26 +252,52 @@ function processFormEmail(p) {
         }
         html += `</table>`;
         
-        const blobs = [];
+        // Dynamic Image Construction (Fixed v26)
+        const inlineImages = {};
+        
         if (p['Photo 1'] && p['Photo 1'].includes('base64')) {
              const b = Utilities.newBlob(Utilities.base64Decode(p['Photo 1'].split(',')[1]), 'image/jpeg', 'photo.jpg');
-             blobs.push(b);
+             inlineImages['photo0'] = b;
              html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo0" style="max-width:300px;"></p>`;
         }
+        
         if (reportData['Signature_Image']) {
              const b = Utilities.newBlob(Utilities.base64Decode(reportData['Signature_Image'].split(',')[1]), 'image/png', 'sig.png');
-             blobs.push(b);
+             inlineImages['sig0'] = b;
              html += `<p><strong>Signature:</strong><br><img src="cid:sig0" style="max-width:200px; border:1px solid #ccc;"></p>`;
         }
+        
         html += `</div>`;
         
         MailApp.sendEmail({
             to: recipient,
             subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`,
             htmlBody: html,
-            inlineImages: { photo0: blobs[0] || null, sig0: blobs[1] || (blobs.length===1 && !p['Photo 1'] ? blobs[0] : null) }
+            inlineImages: inlineImages // Safe now
         });
     } catch(e) { console.log("Form Email Error: " + e); }
+}
+
+function sendAlert(data) {
+  let recipients = [Session.getEffectiveUser().getEmail()];
+  let smsNumbers = [];
+  if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } 
+  else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); }
+  
+  recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
+  const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
+  const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p>Worker: ${data['Worker Name']}</p><p>Location: ${data['Location Name']}</p><p>Map: <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
+  if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
+
+  smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
+  const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}. Map: http://maps.google.com/?q=${data['Last Known GPS']}`;
+  smsNumbers.forEach(phone => sendSms(phone, smsMsg));
+}
+
+function sendSms(phone, msg) {
+  const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
+  const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt';
+  try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,11 +314,7 @@ function archiveOldData() {
   const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = [];
   for (let i = 1; i < data.length; i++) {
     const diff = (today - new Date(data[i][0])) / (1000 * 60 * 60 * 24);
-    if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) {
-       rowsToArchive.push(data[i]);
-    } else {
-       rowsToKeep.push(data[i]);
-    }
+    if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) rowsToArchive.push(data[i]); else rowsToKeep.push(data[i]);
   }
   if (rowsToArchive.length > 0) {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
@@ -344,28 +329,23 @@ function runAllLongitudinalReports() {
   if (!sheet) return;
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
-
   const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM");
   const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`;
   let reportFile;
   const files = DriveApp.getFilesByName(name);
   if (files.hasNext()) reportFile = files.next();
   else reportFile = DriveApp.getFileById(SpreadsheetApp.create(name).getId());
-  
   const reportSS = SpreadsheetApp.open(reportFile);
   
   let sheetAct = reportSS.getSheetByName('Worker Activity');
   if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity');
   sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Avg Duration (mins)"]);
   sheetAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dbeafe");
-  
   const stats = {};
   for (let i = 1; i < data.length; i++) {
-    const worker = data[i][2];
-    const status = data[i][10];
+    const worker = data[i][2]; const status = data[i][10];
     if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 };
-    stats[worker].visits++;
-    if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++;
+    stats[worker].visits++; if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++;
   }
   const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]);
   if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 4).setValues(actRows);
@@ -374,60 +354,41 @@ function runAllLongitudinalReports() {
   if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats');
   sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]);
   sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7");
-  
   const tStats = {};
   for (let i = 1; i < data.length; i++) {
-    const worker = data[i][2];
-    const dist = parseFloat(data[i][18]) || 0; 
+    const worker = data[i][2]; const dist = parseFloat(data[i][18]) || 0; 
     if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 };
     if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; }
   }
   const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]);
   if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows);
   
-  const recipient = Session.getEffectiveUser().getEmail();
-  MailApp.sendEmail({ to: recipient, subject: `Monthly Safety Report Generated - ${CONFIG.ORG_NAME}`, htmlBody: `<p>Your report is ready.</p><p><a href="${reportSS.getUrl()}">View Report</a></p>` });
+  MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` });
 }
 
 function generateVisitPdf(rowIndex) {
     if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
-    
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
     const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
-    
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
       const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
-      
       headers.forEach((header, i) => {
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
           body.replaceText(`{{${tag}}}`, String(rowValues[i]));
           body.replaceText(`{{${header}}}`, String(rowValues[i]));
       });
-      
       if (rowValues[17]) { 
-         try {
-             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
-             body.appendImage(imgBlob).setWidth(300);
-         } catch(e) {}
+         try { const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob(); body.appendImage(imgBlob).setWidth(300); } catch(e) {}
       }
-      
       doc.saveAndClose();
-      const pdf = copy.getAs(MimeType.PDF);
-      folder.createFile(pdf);
-      
-      const recipient = Session.getEffectiveUser().getEmail();
-      MailApp.sendEmail({
-        to: recipient,
-        subject: `Visit Report: ${rowValues[2]}`,
-        body: "Please find the visit report attached.",
-        attachments: [pdf]
-      });
+      const pdf = copy.getAs(MimeType.PDF); folder.createFile(pdf);
+      MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Visit Report: ${rowValues[2]}`, body: "Report Attached", attachments: [pdf] });
       copy.setTrashed(true);
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
@@ -439,22 +400,15 @@ function checkOverdueVisits() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
   if(!sheet) return;
-  
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
-
   const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
   const now = new Date().getTime();
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    const rowIndex = i + 2;
-    const status = row[10];
-    const dueTimeStr = row[20];
-    
+    const row = data[i]; const rowIndex = i + 2; const status = row[10]; const dueTimeStr = row[20];
     if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
-
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
     const timeOverdue = now - dueTime;
@@ -463,12 +417,10 @@ function checkOverdueVisits() {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
           sheet.getRange(rowIndex, 11).setValue(newStatus);
-          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in. Phone may be offline.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8] });
+          sendAlert({ 'Worker Name': row[2], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5] });
        }
     } else if (timeOverdue > 0) {
-       if (status === 'ON SITE') {
-          sheet.getRange(rowIndex, 11).setValue("OVERDUE");
-       }
+       if (status === 'ON SITE') sheet.getRange(rowIndex, 11).setValue("OVERDUE");
     }
   }
 }
