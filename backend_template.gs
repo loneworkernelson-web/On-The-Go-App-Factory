@@ -1,14 +1,15 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v23.0 (Full Advanced + Secure)
+ * ON-THE-GO APPSUITE - MASTER BACKEND v24.0 (Full Advanced + Secure)
  * * FEATURES INCLUDED:
  * 1. Secure Data Entry (Key Validation)
  * 2. Smart Row Updating (Prevents Duplicate Rows for same visit)
- * 3. Server-Side Watchdog (Checks for overdue workers even if phone dies)
- * 4. Global Form Serving (Serves 'FORMS' rows to app)
- * 5. Full Longitudinal Reporting (Monthly Stats Workbooks)
- * 6. PDF Generation (Converts Visit Reports to PDF & Emails)
- * 7. Automated Archiving (Keeps sheet fast)
- * 8. Textbelt SMS & Email Alerting
+ * 3. Textbelt SMS Integration
+ * 4. Global Form Serving (Action: getGlobalForms)
+ * 5. Full Longitudinal Reporting Engine (Monthly Stats)
+ * 6. Automated Archiving Engine
+ * 7. PDF Generation Engine
+ * 8. Server-Side Watchdog
+ * 9. Immediate Form Emailing
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@ const CONFIG = {
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
   
   // --- FOLDER IDs (For Advanced Features) ---
-  // Required for Photo/PDF features to work
+  // Required for Photo/PDF features to work. Leave blank if not using.
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
   PDF_FOLDER_ID: "",        // (Optional) ID of Drive Folder to save PDF reports
   REPORT_TEMPLATE_ID: "",   // (Optional) ID of Google Doc Template for PDFs
@@ -45,6 +46,13 @@ function doPost(e) {
   // Wait up to 30s to prevent write collisions
   lock.tryLock(30000); 
   
+  // --- DEBUG LOGGING (Optional - for troubleshooting connection) ---
+  // const ssDebug = SpreadsheetApp.getActiveSpreadsheet();
+  // let sheetDebug = ssDebug.getSheetByName('Debug');
+  // if (!sheetDebug) { sheetDebug = ssDebug.insertSheet('Debug'); sheetDebug.appendRow(['Timestamp', 'Data']); }
+  // sheetDebug.appendRow([new Date(), JSON.stringify(e.parameter)]);
+  // -----------------------------------------------------------------
+
   try {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
     const p = e.parameter;
@@ -78,10 +86,19 @@ function doPost(e) {
       try {
         const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
         const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
+        
         // Use configured folder or root
-        let folder = (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) 
-          ? DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID)
-          : DriveApp.getRootFolder();
+        let folder;
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
+             try {
+                 folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
+             } catch(err) {
+                 folder = DriveApp.getRootFolder(); // Fallback
+             }
+        } else {
+             folder = DriveApp.getRootFolder();
+        }
+
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         photoUrl = file.getUrl();
@@ -165,8 +182,8 @@ function doPost(e) {
         sheet.appendRow(row);
     }
     
-    // [NEW FEATURE] EMAIL DISPATCHER
-    // If this is a "Global Form" submission, email it immediately
+    // [NEW FEATURE] EMAIL DISPATCHER (v22+)
+    // If this is a "Global Form" submission (has 'Template Name' and 'Visit Report Data'), email it immediately
     if (p['Template Name'] && p['Visit Report Data']) {
         processFormEmail(p);
     }
@@ -277,7 +294,7 @@ function parseQuestions(row) {
              else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
              else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
              else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
-             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } 
+             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } // Mileage syntax
              else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
              else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
              else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
@@ -330,15 +347,18 @@ function sendSms(phone, msg) {
   try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
 }
 
-// Email Dispatcher for Forms
+// Email Dispatcher for Forms (v22+)
 function processFormEmail(p) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
         const data = sh.getDataRange().getValues();
-        const row = data.find(r => r[1] === p['Template Name']); // Find template
+        
+        // Find the template row (Col B is index 1)
+        const row = data.find(r => r[1] === p['Template Name']); 
         if (!row) return;
         
-        const recipient = row[2]; // Col C is Email Recipient
+        // Col C is Email Recipient (Index 2)
+        const recipient = row[2]; 
         if (!recipient || !recipient.includes('@')) return;
         
         const reportData = JSON.parse(p['Visit Report Data']);
@@ -381,6 +401,10 @@ function processFormEmail(p) {
 // 5. ADVANCED REPORTING & MAINTENANCE (Full Engine)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * ARCHIVE OLD DATA
+ * Moves rows older than CONFIG.ARCHIVE_DAYS to 'Archive' sheet.
+ */
 function archiveOldData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -408,11 +432,18 @@ function archiveOldData() {
   if (rowsToArchive.length > 0) {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
+    
+    // Rewrite main sheet (Clear & Paste)
     sheet.clearContents();
     sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
+    console.log(`Archived ${rowsToArchive.length} rows.`);
   }
 }
 
+/**
+ * LONGITUDINAL REPORTS
+ * Creates monthly spreadsheets for data analysis.
+ */
 function runAllLongitudinalReports() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -482,28 +513,28 @@ function generateVisitPdf(rowIndex) {
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
-    const data = sheet.getDataRange().getValues();
-    const row = data[rowIndex];
-    const headers = data[0];
+    // Convert 1-based index to 0-based data fetch
+    const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
+    const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
     
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
-      const copy = templateFile.makeCopy(`Report - ${row[2]} - ${row[1]}`, folder);
+      const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
       
       // Replace {{Header}} with Value
       headers.forEach((header, i) => {
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
-          body.replaceText(`{{${tag}}}`, String(row[i]));
-          body.replaceText(`{{${header}}}`, String(row[i]));
+          body.replaceText(`{{${tag}}}`, String(rowValues[i]));
+          body.replaceText(`{{${header}}}`, String(rowValues[i]));
       });
       
       // Insert Photo if available
-      if (row[17]) { // Photo URL Col 18
+      if (rowValues[17]) { // Photo URL Col 18
          try {
-             const imgBlob = UrlFetchApp.fetch(row[17]).getBlob();
+             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
              body.appendImage(imgBlob).setWidth(300);
          } catch(e) {}
       }
@@ -518,7 +549,7 @@ function generateVisitPdf(rowIndex) {
       const recipient = Session.getEffectiveUser().getEmail();
       MailApp.sendEmail({
         to: recipient,
-        subject: `Visit Report: ${row[2]}`,
+        subject: `Visit Report: ${rowValues[2]}`,
         body: "Please find the visit report attached.",
         attachments: [pdf]
       });
@@ -542,6 +573,7 @@ function checkOverdueVisits() {
 
   const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
   const now = new Date().getTime();
+  
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
@@ -550,7 +582,9 @@ function checkOverdueVisits() {
     const status = row[10];
     const dueTimeStr = row[20];
     
-    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) {
+      continue;
+    }
 
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
