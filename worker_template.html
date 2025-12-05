@@ -1265,7 +1265,7 @@ function captureGPS(btn, key) {
     });
 }
 
-// --- NETWORK ---
+// --- NETWORK (Fixed v62.0) ---
 function processUploadQueue(newData = null) {
     if(newData) {
         state.pendingUploads.push(newData);
@@ -1286,21 +1286,21 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
-        fetch(state.settings.googleSheetUrl, { method: 'POST', body: fd })
+        // FIX: Added mode: 'no-cors' to bypass browser security blocks
+        fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
+                // In no-cors, we can't read the response, so we assume success if no network error
                 state.pendingUploads.shift(); 
                 saveState();
                 processUploadQueue(); 
             })
             .catch(() => {
-                // Keep in queue on fail
                 document.getElementById('uploadBanner').classList.remove('hidden');
             });
     } else {
         document.getElementById('uploadBanner').classList.add('hidden');
     }
 }
-
 // If Battery
 if(navigator.getBattery) {
     navigator.getBattery().then(b => {
@@ -1408,3 +1408,4 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
+
