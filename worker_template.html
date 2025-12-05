@@ -956,28 +956,54 @@ function loadFormAndShow(tplName) {
     btn.onclick = submitReport;
 }
 
+// ==================== REPORTING ENGINE (Robust Mileage) ====================
 function preDepart(isSafeFlow) {
     isMidVisitUpdate = false;
+    
     const proceed = () => {
         if(!CONFIG.isAdv) { depart(); return; }
         const l = state.locations.find(l => l.id === state.activeVisit.locationId);
         if(l && l.noReport) { depart(); return; }
 
-        // Default to location form
+        // Load Form
         loadFormAndShow(l.templateName || "(Standard)");
         
+        // MILEAGE LOGIC (Improved v63)
         if(l.id === 'travel' && CONFIG.mileage) {
+           // 1. Find input and set state
+           setTimeout(() => {
+               const inp = document.querySelector('input[data-key="Distance (km)"]');
+               if(inp) {
+                   inp.value = ""; // Clear old
+                   inp.placeholder = "Calculating...";
+                   inp.disabled = true; // Prevent typing while thinking
+               }
+           }, 100); // Small delay to ensure DOM render
+
+           // 2. Get GPS
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
              if(state.activeVisit.gpsStart) {
                const km = calcDist(state.activeVisit.gpsStart, end);
-               setTimeout(() => { 
-                   // v56 FIX: Correct Selector
-                   const inp = document.querySelector('input[data-key="Distance (km)"]');
-                   if(inp) inp.value = km; 
-               }, 500);
+               
+               // 3. Update Input
+               const inp = document.querySelector('input[data-key="Distance (km)"]');
+               if(inp) {
+                   inp.value = km;
+                   inp.disabled = false;
+                   inp.placeholder = "";
+                   // Visual confirmation
+                   inp.style.borderColor = "#4ade80"; // Green border
+               }
              }
-           });
+           }, (err) => {
+               // Handle Error
+               const inp = document.querySelector('input[data-key="Distance (km)"]');
+               if(inp) {
+                   inp.placeholder = "GPS Error - Enter Manually";
+                   inp.disabled = false;
+               }
+           }, { enableHighAccuracy: true, timeout: 10000 });
         }
     };
 
@@ -1368,3 +1394,4 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
+
