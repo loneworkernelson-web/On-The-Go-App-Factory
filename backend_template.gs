@@ -47,6 +47,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
+    // [SCHEMA] Ensure 22 Columns (Added Signature)
     if(sheet.getLastColumn() === 0) {
       const headers = [
         "Timestamp", "Date", "Worker Name", "Worker Phone Number", 
@@ -54,27 +55,26 @@ function doPost(e) {
         "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email",
         "Alarm Status", "Notes", "Location Name", "Location Address", 
         "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", 
-        "Distance (km)", "Visit Report Data", "Anticipated Departure Time"
+        "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature"
       ];
       sheet.appendRow(headers);
       sheet.getRange(1,1,1,headers.length).setFontWeight("bold").setBackground("#e2e8f0");
       sheet.setFrozenRows(1);
     }
     
+    // 1. Process Photo
     let photoUrl = "";
     if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
-      try {
-        const data = Utilities.base64Decode(p['Photo 1'].split(',')[1]);
-        const blob = Utilities.newBlob(data, 'image/jpeg', p['Worker Name'] + '_' + Date.now() + '.jpg');
-        let folder = (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) 
-          ? DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID)
-          : DriveApp.getRootFolder();
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        photoUrl = file.getUrl();
-      } catch(err) { photoUrl = "Err: "+err; }
+      photoUrl = saveImageToDrive(p['Photo 1'], p['Worker Name'] + '_Photo_' + Date.now() + '.jpg');
     }
 
+    // 2. Process Signature (NEW)
+    let sigUrl = "";
+    if(p['Signature'] && p['Signature'].includes('base64')) {
+      sigUrl = saveImageToDrive(p['Signature'], p['Worker Name'] + '_Sig_' + Date.now() + '.png');
+    }
+
+    // [SMART ROW UPDATE]
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
@@ -83,8 +83,7 @@ function doPost(e) {
     if (lastRow > 1) {
       const searchDepth = Math.min(lastRow - 1, 50); 
       const startRow = lastRow - searchDepth + 1;
-      const maxCols = sheet.getLastColumn();
-      const data = sheet.getRange(startRow, 1, searchDepth, maxCols).getValues(); 
+      const data = sheet.getRange(startRow, 1, searchDepth, 22).getValues(); 
       
       for (let i = data.length - 1; i >= 0; i--) {
         const rowWorker = data[i][2]; 
@@ -98,56 +97,64 @@ function doPost(e) {
              if (p['Battery Level']) sheet.getRange(realRowIndex, 17).setValue(p['Battery Level']);
              if (p['Anticipated Departure Time']) sheet.getRange(realRowIndex, 21).setValue(p['Anticipated Departure Time']);
 
-             if (p['Notes'] && !p['Notes'].includes("Locating") && !p['Notes'].includes("GPS Slow")) {
+             if (p['Notes'] && !p['Notes'].includes("Locating")) {
                 const oldNotes = data[i][11];
-                if (!oldNotes.includes(p['Notes'])) { 
-                   sheet.getRange(realRowIndex, 12).setValue(oldNotes + " | " + p['Notes']);
-                }
+                if (!oldNotes.includes(p['Notes'])) sheet.getRange(realRowIndex, 12).setValue(oldNotes + " | " + p['Notes']);
              }
              
              if (photoUrl) sheet.getRange(realRowIndex, 18).setValue(photoUrl);
              if (p['Distance']) sheet.getRange(realRowIndex, 19).setValue(p['Distance']);
              if (p['Visit Report Data']) sheet.getRange(realRowIndex, 20).setValue(p['Visit Report Data']);
+             
+             // Update Signature (Col 22)
+             if (sigUrl) sheet.getRange(realRowIndex, 22).setValue(sigUrl);
 
              rowUpdated = true;
              
              if ((newStatus === 'DEPARTED' || newStatus === 'COMPLETED') && CONFIG.REPORT_TEMPLATE_ID) {
                  generateVisitPdf(realRowIndex);
              }
-             
              break; 
         }
       }
     }
 
+    // [NEW ROW FALLBACK]
     if (!rowUpdated) {
         const row = [
-          new Date(),
-          Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
+          new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
           p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), 
           p['Emergency Contact Name'] || '', "'" + (p['Emergency Contact Number'] || ""), p['Emergency Contact Email'] || '',
           p['Escalation Contact Name'] || '', "'" + (p['Escalation Contact Number'] || ""), p['Escalation Contact Email'] || '',
-          newStatus,
-          p['Notes'],
-          p['Location Name'] || '', p['Location Address'] || '',
+          newStatus, p['Notes'], p['Location Name'] || '', p['Location Address'] || '',
           p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(),
           p['Battery Level'] || '', photoUrl, 
           p['Distance'] || '', p['Visit Report Data'] || '',
-          p['Anticipated Departure Time'] || ''
+          p['Anticipated Departure Time'] || '', sigUrl // Col 22
         ];
         sheet.appendRow(row);
     }
     
-    if (p['Template Name'] && p['Visit Report Data']) {
-        processFormEmail(p);
-    }
-
+    if (p['Template Name'] && p['Visit Report Data']) processFormEmail(p);
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
 
   } catch(e) { return ContentService.createTextOutput("Error: " + e.toString()); } 
   finally { lock.releaseLock(); }
+}
+
+// Helper to save images
+function saveImageToDrive(base64String, filename) {
+    try {
+        const data = Utilities.base64Decode(base64String.split(',')[1]);
+        const blob = Utilities.newBlob(data, 'image/jpeg', filename); // PNGs save as JPEG/PNG blob fine
+        let folder = (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) 
+          ? DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID) : DriveApp.getRootFolder();
+        const file = folder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return file.getUrl();
+    } catch(e) { return "Error Saving Image"; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -489,5 +496,6 @@ function checkOverdueVisits() {
     }
   }
 }
+
 
 
