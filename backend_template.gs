@@ -1,5 +1,5 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v26.0 (Email Fix)
+ * ON-THE-GO APPSUITE - MASTER BACKEND v28.0 (Setup Fixes)
  * * FEATURES INCLUDED:
  * 1. Secure Data Entry (Key Validation)
  * 2. Smart Row Updating (Prevents Duplicate Rows)
@@ -9,7 +9,7 @@
  * 6. Automated Archiving
  * 7. PDF Generation
  * 8. Server-Side Watchdog
- * 9. Robust Form Emailing (Fixed null image crash)
+ * 9. Robust Form Emailing
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,10 +23,10 @@ const CONFIG = {
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%",
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
-  ORG_NAME: "%%ORGANISATION_NAME%%",
+  ORG_NAME: "%%ORGANISATION_NAME%%", // Placeholder restored
   TIMEZONE: Session.getScriptTimeZone(),
   ARCHIVE_DAYS: 30,
-  ESCALATION_MINUTES: 15
+  ESCALATION_MINUTES: %%ESCALATION_MINUTES%% // Placeholder restored
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,7 +138,6 @@ function doPost(e) {
         sheet.appendRow(row);
     }
     
-    // [NEW] EMAIL DISPATCHER
     if (p['Template Name'] && p['Visit Report Data']) {
         processFormEmail(p);
     }
@@ -199,7 +198,6 @@ function doGet(e) {
   return ContentService.createTextOutput("OTG Online");
 }
 
-// Updates for v22+: Skip first 3 columns (Company, Template, Email)
 function parseQuestions(row) {
      const questions = [];
      for(let i=3; i<row.length; i++) {
@@ -222,15 +220,13 @@ function parseQuestions(row) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. ALERTS & MESSAGING (FIXED v26)
+// 4. ALERTS & MESSAGING
 // ─────────────────────────────────────────────────────────────────────────────
 
-// UPDATED: Robust Email Handler (Fixes Signature & Location)
 function processFormEmail(p) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
         const data = sh.getDataRange().getValues();
-        
         const row = data.find(r => r[1] === p['Template Name']); 
         if (!row) return;
         
@@ -239,63 +235,62 @@ function processFormEmail(p) {
         
         const reportData = JSON.parse(p['Visit Report Data']);
         const worker = p['Worker Name'];
-        
-        // FIX 1: Location Fallback
         const loc = p['Location Name'] || p['Location Address'] || "Unknown Location";
         
-        // HTML Header
         let html = `<div style="font-family: sans-serif; max-width: 600px; border: 1px solid #ddd; padding: 20px;">
             <h2 style="color: #2563eb;">${p['Template Name']}</h2>
-            <p><strong>Submitted by:</strong> ${worker}<br>
-            <strong>Location:</strong> ${loc}<br>
-            <strong>Time:</strong> ${new Date().toLocaleString()}</p>
-            <hr><table style="width:100%; border-collapse: collapse;">`;
+            <p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p><hr><table style="width:100%; border-collapse: collapse;">`;
         
-        // Table Body
         for (const [key, val] of Object.entries(reportData)) {
             if (key === 'Signature_Image') continue;
             html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${val}</td></tr>`;
         }
         html += `</table>`;
         
-        // FIX 2: Robust Image Handling
         const inlineImages = {};
-        
-        // Process Photo 1
         if (p['Photo 1'] && p['Photo 1'].includes('base64')) {
              const b = Utilities.newBlob(Utilities.base64Decode(p['Photo 1'].split(',')[1]), 'image/jpeg', 'photo.jpg');
              inlineImages['photo0'] = b;
-             html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo0" style="max-width:300px; border-radius:8px;"></p>`;
+             html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo0" style="max-width:300px;"></p>`;
         }
-        
-        // Process Signature (Explicit Check)
-        if (reportData['Signature_Image'] && reportData['Signature_Image'].includes('base64')) {
-             const sigBlob = Utilities.newBlob(Utilities.base64Decode(reportData['Signature_Image'].split(',')[1]), 'image/png', 'sig.png');
-             inlineImages['sig0'] = sigBlob;
-             html += `<p><strong>Signature:</strong><br><img src="cid:sig0" style="max-width:200px; border:1px solid #ccc; padding:5px;"></p>`;
+        if (reportData['Signature_Image']) {
+             const b = Utilities.newBlob(Utilities.base64Decode(reportData['Signature_Image'].split(',')[1]), 'image/png', 'sig.png');
+             inlineImages['sig0'] = b;
+             html += `<p><strong>Signature:</strong><br><img src="cid:sig0" style="max-width:200px; border:1px solid #ccc;"></p>`;
         }
-        
-        html += `</div><p style="font-size:10px; color:#999;">Generated by OTG AppSuite</p>`;
+        html += `</div>`;
         
         MailApp.sendEmail({
             to: recipient,
             subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`,
             htmlBody: html,
-            inlineImages: inlineImages // Now safely populated
+            inlineImages: inlineImages
         });
-        
     } catch(e) { console.log("Form Email Error: " + e); }
 }
 
 function sendAlert(data) {
   let recipients = [Session.getEffectiveUser().getEmail()];
   let smsNumbers = [];
-  if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } 
-  else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); }
+  
+  if (data['Alarm Status'] === 'ESCALATION_SENT') {
+     if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
+     if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']);
+  } else {
+     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
+     if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
+  }
   
   recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
   const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
-  const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p>Worker: ${data['Worker Name']}</p><p>Location: ${data['Location Name']}</p><p>Map: <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
+  const body = `
+    <h1 style="color:red;">${data['Alarm Status']}</h1>
+    <p><strong>Worker:</strong> ${data['Worker Name']}</p>
+    <p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p>
+    <p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p>
+    <p><strong>Map:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
+    <hr><p><i>OTG Safety System</i></p>
+  `;
   if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
 
   smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
@@ -323,12 +318,17 @@ function archiveOldData() {
   const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = [];
   for (let i = 1; i < data.length; i++) {
     const diff = (today - new Date(data[i][0])) / (1000 * 60 * 60 * 24);
-    if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) rowsToArchive.push(data[i]); else rowsToKeep.push(data[i]);
+    if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) {
+       rowsToArchive.push(data[i]);
+    } else {
+       rowsToKeep.push(data[i]);
+    }
   }
   if (rowsToArchive.length > 0) {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
     sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
+    console.log(`Archived ${rowsToArchive.length} rows.`);
   }
 }
 
@@ -338,6 +338,7 @@ function runAllLongitudinalReports() {
   if (!sheet) return;
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
+
   const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM");
   const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`;
   let reportFile;
@@ -350,11 +351,14 @@ function runAllLongitudinalReports() {
   if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity');
   sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Avg Duration (mins)"]);
   sheetAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dbeafe");
+  
   const stats = {};
   for (let i = 1; i < data.length; i++) {
-    const worker = data[i][2]; const status = data[i][10];
+    const worker = data[i][2];
+    const status = data[i][10];
     if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 };
-    stats[worker].visits++; if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++;
+    stats[worker].visits++;
+    if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++;
   }
   const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]);
   if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 4).setValues(actRows);
@@ -363,9 +367,11 @@ function runAllLongitudinalReports() {
   if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats');
   sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]);
   sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7");
+  
   const tStats = {};
   for (let i = 1; i < data.length; i++) {
-    const worker = data[i][2]; const dist = parseFloat(data[i][18]) || 0; 
+    const worker = data[i][2];
+    const dist = parseFloat(data[i][18]) || 0; 
     if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 };
     if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; }
   }
@@ -377,60 +383,111 @@ function runAllLongitudinalReports() {
 
 function generateVisitPdf(rowIndex) {
     if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
+    
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
     const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
+    
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
       const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
+      
       headers.forEach((header, i) => {
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
           body.replaceText(`{{${tag}}}`, String(rowValues[i]));
           body.replaceText(`{{${header}}}`, String(rowValues[i]));
       });
+      
       if (rowValues[17]) { 
-         try { const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob(); body.appendImage(imgBlob).setWidth(300); } catch(e) {}
+         try {
+             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
+             body.appendImage(imgBlob).setWidth(300);
+         } catch(e) {}
       }
+      
       doc.saveAndClose();
-      const pdf = copy.getAs(MimeType.PDF); folder.createFile(pdf);
-      MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Visit Report: ${rowValues[2]}`, body: "Report Attached", attachments: [pdf] });
-      copy.setTrashed(true);
+      const pdf = copy.getAs(MimeType.PDF);
+      folder.createFile(pdf);
+      
+      const recipient = Session.getEffectiveUser().getEmail();
+      MailApp.sendEmail({
+        to: recipient,
+        subject: `Visit Report: ${rowValues[2]}`,
+        body: "Please find the visit report attached.",
+        attachments: [pdf]
+      });
+
+      copy.setTrashed(true); // Cleanup
+      
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. SERVER-SIDE WATCHDOG
+// 6. SERVER-SIDE WATCHDOG (THE SAFETY NET)
 // ─────────────────────────────────────────────────────────────────────────────
+
 function checkOverdueVisits() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
   if(!sheet) return;
+  
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
+
   const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
   const now = new Date().getTime();
+  
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
-    const row = data[i]; const rowIndex = i + 2; const status = row[10]; const dueTimeStr = row[20];
-    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
+    const row = data[i];
+    const rowIndex = i + 2;
+    const status = row[10];
+    const dueTimeStr = row[20];
+    
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) {
+      continue;
+    }
+
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
+
     const timeOverdue = now - dueTime;
 
+    // CHECK 1: CRITICAL ESCALATION (Red)
     if (timeOverdue > escalationMs) {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
           sheet.getRange(rowIndex, 11).setValue(newStatus);
-          sendAlert({ 'Worker Name': row[2], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5] });
+          
+          const alertData = {
+             'Worker Name': row[2], 
+             'Worker Phone Number': row[3],
+             'Alarm Status': newStatus, 
+             'Location Name': row[12], 
+             'Last Known GPS': row[14], 
+             'Notes': "Worker failed to check in. Phone may be offline.",
+             'Emergency Contact Email': row[6], 
+             'Emergency Contact Number': row[5],
+             'Escalation Contact Email': row[9], 
+             'Escalation Contact Number': row[8]
+          };
+          sendAlert(alertData);
+          console.log(`Critical Alert triggered for ${row[2]}`);
        }
-    } else if (timeOverdue > 0) {
-       if (status === 'ON SITE') sheet.getRange(rowIndex, 11).setValue("OVERDUE");
+    }
+    // CHECK 2: INITIAL OVERDUE (Amber)
+    else if (timeOverdue > 0) {
+       if (status === 'ON SITE') {
+          sheet.getRange(rowIndex, 11).setValue("OVERDUE");
+          console.log(`Marked ${row[2]} as Overdue`);
+       }
     }
   }
 }
+
 
