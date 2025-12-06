@@ -250,19 +250,13 @@ canvas {
         <h2 class="text-2xl font-bold mb-4 text-blue-400">User Guide</h2>
         <div class="text-gray-300 space-y-4 text-sm">
             <h3 class="font-bold text-white">1. Starting a Visit</h3>
-            <p>Select a location from the list. Adjust the duration slider. Press and hold the green <strong>START</strong> button for 1.5 seconds.</p>
-            
-            <h3 class="font-bold text-white">2. During the Visit</h3>
-            <p>The screen will lock for safety. You can <strong>Extend</strong> time or <strong>Depart</strong> using your Normal PIN.</p>
-            
-            <h3 class="font-bold text-white">3. Duress (Silent Alarm)</h3>
-            <p>If you are forced to unlock the app, enter your <strong>Duress PIN</strong> instead of your Normal PIN. The app will appear to unlock normally but will silently send a high-priority alarm to the dashboard.</p>
-            
-            <h3 class="font-bold text-white">4. Mileage / Travelling</h3>
-            <p>Use the "Travelling" tile for journeys. Start when you leave, Depart when you arrive. The app will calculate the GPS distance for your report.</p>
-            
-            <h3 class="font-bold text-white">5. Offline Mode</h3>
-            <p>The app works offline. Reports and photos are saved to your phone and will upload automatically when internet is restored.</p>
+            <p>Select a location. Press START (1.5s).</p>
+            <h3 class="font-bold text-white">2. During Visit</h3>
+            <p>Use <strong>Extend</strong> or <strong>Depart</strong>.</p>
+            <h3 class="font-bold text-white">3. Duress</h3>
+            <p>Enter <strong>Duress PIN</strong> to silently alarm.</p>
+            <h3 class="font-bold text-white">4. Offline</h3>
+            <p>Works offline. Uploads automatically.</p>
         </div>
         <div class="mt-6 flex justify-end"><button onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div>
     </div>
@@ -292,7 +286,6 @@ canvas {
 
 </div>
 </div>
-
 <script>
 // ==================== CONFIGURATION ====================
 const CONFIG = { 
@@ -327,7 +320,7 @@ let panicTapCount = 0;
 let panicTapTimer;
 let deferredPrompt;
 let isMidVisitUpdate = false; 
-let currentActiveTemplate = ""; // v61
+let currentActiveTemplate = "";
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
@@ -336,7 +329,6 @@ window.addEventListener('load', () => {
     
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // FIX: State Migration
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -347,7 +339,6 @@ window.addEventListener('load', () => {
 
     initLocations();
 
-    // Feature Flags
     if(CONFIG.isAdv) {
         document.getElementById('btnQuick').classList.remove('hidden');
         document.getElementById('advLocOptions').classList.remove('hidden');
@@ -356,7 +347,6 @@ window.addEventListener('load', () => {
         document.getElementById('advLocOptions').classList.add('hidden');
     }
 
-    // Route
     if(!state.settings.pinCode || !state.settings.workerName) {
         navigate('settings');
         document.getElementById('btnCloseSettings').style.display = 'none';
@@ -376,6 +366,13 @@ window.addEventListener('load', () => {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
     });
+    
+    // Service Worker Registration (Fixed v66)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('SW Registered', reg))
+        .catch(err => console.warn('SW Failed', err));
+    }
 });
 
 // --- INIT LOCATIONS ---
@@ -398,7 +395,7 @@ function initLocations() {
     }
 }
 
-// --- BATTERY SAVER (v58) ---
+// --- BATTERY SAVER ---
 function toggleBatterySaver() {
     const overlay = document.getElementById('batterySaver');
     if(overlay.classList.contains('hidden')) {
@@ -464,7 +461,7 @@ function buildPayload(data) {
         'Escalation Contact Number': state.settings.escalationPhone, 
         'Escalation Contact Email': state.settings.escalationEmail,
         'Anticipated Departure Time': dueTime,
-        'Template Name': currentActiveTemplate, // v61
+        'Template Name': currentActiveTemplate,
         ...data, 
         'Timestamp': new Date().toISOString()
     };
@@ -769,8 +766,7 @@ function enterLockedScreen() {
     document.getElementById('lockedLocationName').innerText = l.name;
     navigate('locked');
     
-    // FIX v45.0: Update Timer Immediately
-    tick();
+    tick(); 
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
     setupLongPress(document.getElementById('btnExtend'), extendVisit);
@@ -796,7 +792,7 @@ function tick() {
         document.getElementById('btnDepart').classList.add('hidden');
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
         
-        // 0-15 Mins: Amber "Nudge" (Sound ONCE, Vibe Repeats)
+        // 0-15 Mins: Amber "Nudge"
         const minsOver = Math.floor(Math.abs(rem) / 60000);
         
         if (minsOver < CONFIG.escalationMinutes) {
@@ -809,7 +805,7 @@ function tick() {
              }
              // Vibrate nudge every minute
              if (Math.floor(Math.abs(rem)/1000) % 60 === 0) {
-                 if(navigator.vibrate) navigator.vibrate([500,200,500]);
+                 if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
              }
         } 
         // 15+ Mins: Critical (Silent on Phone, Loud on Monitor)
@@ -1081,26 +1077,46 @@ function buildReportForm(tplName, container) {
     if(canvas) initSigPad(canvas);
 }
 
-// v60 FIX: Correct Canvas Retrieval
+// v65 FIX: Re-integrated Signature Logic
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2; ctx.strokeStyle = "#000";
     let drawing = false;
+    
+    // Desktop
+    const start = (e) => { drawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
+    const move = (e) => { if(!drawing) return; e.preventDefault(); const {x,y} = getPos(e); ctx.lineTo(x,y); ctx.stroke(); };
+    const end = () => { drawing = false; };
+    
+    // Mobile Touch Fixes
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches ? e.touches[0] : e;
         return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
     };
-    const start = (e) => { drawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
-    const move = (e) => { if(!drawing) return; e.preventDefault(); const {x,y} = getPos(e); ctx.lineTo(x,y); ctx.stroke(); };
-    const end = () => { drawing = false; };
-    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); canvas.addEventListener('mouseup', end);
-    canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move); canvas.addEventListener('touchend', end);
-    // No global var needed if we querySelector later
-}
-function clearSig() { const c = document.getElementById('sig-canvas'); if(c) { const ctx = c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); } }
 
-// v60 FIX: Robust Data Gatherer
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    
+    canvas.addEventListener('touchstart', start);
+    canvas.addEventListener('touchmove', move);
+    canvas.addEventListener('touchend', end);
+    
+    canvas.isDirty = false; 
+    canvas.addEventListener('mousedown', () => canvas.isDirty = true);
+    canvas.addEventListener('touchstart', () => canvas.isDirty = true);
+}
+
+function clearSig() { 
+    const c = document.getElementById('sig-canvas'); 
+    if(c) { 
+        const ctx = c.getContext('2d'); 
+        ctx.clearRect(0,0,c.width,c.height); 
+        c.isDirty = false;
+    } 
+}
+
 function gatherFormData() {
     const data = { custom: {}, notes: '', sig: null, jsonPayload: {} };
     const stdNotes = document.getElementById('rep_notes');
@@ -1116,7 +1132,7 @@ function gatherFormData() {
         data.jsonPayload[key] = val;
     });
     
-    // 3. Signature (The Fix)
+    // v65 FIX: Robust Sig Capture
     const canvas = document.getElementById('sig-canvas');
     if (canvas) {
         data.sig = canvas.toDataURL('image/png');
@@ -1136,10 +1152,10 @@ function submitReport() {
             "Visit Report Data": JSON.stringify(d.jsonPayload || {}) 
         });
         if(tempPhoto) data["Photo 1"] = tempPhoto;
-        // v57/60 FIX: Save Sig to JSON
+        
+        // v65 FIX: Send Signature explicitly
         if(d.sig) {
-             if(!data["Photo 1"]) data["Photo 1"] = d.sig;
-             else d.jsonPayload['Signature_Image'] = d.sig;
+             data["Signature"] = d.sig;
         }
         
         processUploadQueue(data);
@@ -1169,19 +1185,13 @@ function depart(reportData = {}) {
     
     if(tempPhoto) data["Photo 1"] = tempPhoto;
     
-    // v57/60 FIX: Logic for Signature Saving
+    // v65 FIX: Send Sig explicitly
     if(reportData.sig) {
+        data["Signature"] = reportData.sig;
+        // Logic: If Photo 1 is empty, backfill it for spreadsheet visibility
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
-        else {
-             // Must parse JSON to inject sig
-             const json = JSON.parse(data["Visit Report Data"]);
-             json['Signature_Image'] = reportData.sig;
-             data["Visit Report Data"] = JSON.stringify(json);
-             data["Notes"] += " [Signature Included]";
-        }
     }
     
-    // v56 FIX: Use correct key (stripped of $)
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
     processUploadQueue(data);
@@ -1271,7 +1281,6 @@ function processUploadQueue(newData = null) {
         const fd = new FormData();
         for(let k in item) fd.append(k, item[k]);
         
-        // v62 FIX: Restore no-cors for robust connection
         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
             .then(() => {
                 state.pendingUploads.shift(); 
@@ -1334,6 +1343,7 @@ function setupLongPress(btn, cb) {
 function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
 function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
+
 function syncForms() {
     if(!CONFIG.url) return;
     // 1. Standard Sync (Local)
