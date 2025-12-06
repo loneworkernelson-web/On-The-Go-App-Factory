@@ -1,15 +1,12 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v28.0 (Setup Fixes)
- * * FEATURES INCLUDED:
- * 1. Secure Data Entry (Key Validation)
- * 2. Smart Row Updating (Prevents Duplicate Rows)
- * 3. Textbelt SMS Integration
- * 4. Global Form Serving (Action: getGlobalForms)
- * 5. Full Longitudinal Reporting Engine
- * 6. Automated Archiving
- * 7. PDF Generation
- * 8. Server-Side Watchdog
- * 9. Robust Form Emailing
+ * ON-THE-GO APPSUITE - MASTER BACKEND v28.0 (Full Heavy Version)
+ * * FEATURES:
+ * 1. Security: Secret Key Validation
+ * 2. Database: Smart Row Updating (Prevents Duplicates)
+ * 3. Forms: Global Form Server & Email Dispatcher
+ * 4. Reporting: Automatic PDF Generation & Monthly Analytics
+ * 5. Safety: Server-Side Watchdog & SMS Alerts
+ * 6. Maintenance: Auto-Archiving
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,29 +14,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const CONFIG = {
   SECRET_KEY: "%%SECRET_KEY%%",
+  
+  // FOLDER IDs (Required for Photos/PDFs)
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
   PDF_FOLDER_ID: "",        
   REPORT_TEMPLATE_ID: "",   
+  
+  // API KEYS
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%",
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
-  ORG_NAME: "%%ORGANISATION_NAME%%", // Placeholder restored
+  
+  // SETTINGS
+  ORG_NAME: "%%ORGANISATION_NAME%%",
   TIMEZONE: Session.getScriptTimeZone(),
   ARCHIVE_DAYS: 30,
-  ESCALATION_MINUTES: %%ESCALATION_MINUTES%% // Placeholder restored
+  ESCALATION_MINUTES: %%ESCALATION_MINUTES%%
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. DATA INGESTION (doPost)
+// 2. CORE: DATA INGESTION (doPost)
 // ─────────────────────────────────────────────────────────────────────────────
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(30000); 
+  lock.tryLock(30000); // Prevent write collisions
   
   try {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Data"}));
     const p = e.parameter;
     
+    // Security Check
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) {
        return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Invalid Key"}));
     }
@@ -47,7 +51,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
-    // [SCHEMA] Ensure 22 Columns (Added Signature)
+    // Schema Setup (25 Columns to support 4 Photos + Signature)
     if(sheet.getLastColumn() === 0) {
       const headers = [
         "Timestamp", "Date", "Worker Name", "Worker Phone Number", 
@@ -55,26 +59,31 @@ function doPost(e) {
         "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email",
         "Alarm Status", "Notes", "Location Name", "Location Address", 
         "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", 
-        "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature"
+        "Distance (km)", "Visit Report Data", "Anticipated Departure Time", 
+        "Signature", "Photo 2", "Photo 3", "Photo 4"
       ];
       sheet.appendRow(headers);
       sheet.getRange(1,1,1,headers.length).setFontWeight("bold").setBackground("#e2e8f0");
       sheet.setFrozenRows(1);
     }
     
-    // 1. Process Photo
-    let photoUrl = "";
-    if(p['Photo 1'] && p['Photo 1'].includes('base64')) {
-      photoUrl = saveImageToDrive(p['Photo 1'], p['Worker Name'] + '_Photo_' + Date.now() + '.jpg');
-    }
+    // --- ASSET PROCESSING ---
+    const savedAssets = {};
+    
+    // 1. Process Photos (1-4)
+    ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4'].forEach(key => {
+        if(p[key] && p[key].includes('base64')) {
+             savedAssets[key] = saveImageToDrive(p[key], `${p['Worker Name']}_${key}_${Date.now()}.jpg`);
+        }
+    });
 
-    // 2. Process Signature (NEW)
+    // 2. Process Signature
     let sigUrl = "";
     if(p['Signature'] && p['Signature'].includes('base64')) {
-      sigUrl = saveImageToDrive(p['Signature'], p['Worker Name'] + '_Sig_' + Date.now() + '.png');
+      sigUrl = saveImageToDrive(p['Signature'], `${p['Worker Name']}_Sig_${Date.now()}.png`);
     }
 
-    // [SMART ROW UPDATE]
+    // --- SMART UPDATE LOGIC ---
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
@@ -83,34 +92,42 @@ function doPost(e) {
     if (lastRow > 1) {
       const searchDepth = Math.min(lastRow - 1, 50); 
       const startRow = lastRow - searchDepth + 1;
-      const data = sheet.getRange(startRow, 1, searchDepth, 22).getValues(); 
+      const data = sheet.getRange(startRow, 1, searchDepth, 25).getValues(); 
       
       for (let i = data.length - 1; i >= 0; i--) {
-        const rowWorker = data[i][2]; 
-        const rowStatus = data[i][10]; 
+        const rowWorker = data[i][2]; // Col C
+        const rowStatus = data[i][10]; // Col K
         
+        // Logic: Update if Active OR if this is a Resolve command
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED')) {
              const realRowIndex = startRow + i;
              
+             // Basic Updates
              sheet.getRange(realRowIndex, 11).setValue(newStatus); 
              if (p['Last Known GPS']) sheet.getRange(realRowIndex, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(realRowIndex, 17).setValue(p['Battery Level']);
              if (p['Anticipated Departure Time']) sheet.getRange(realRowIndex, 21).setValue(p['Anticipated Departure Time']);
 
+             // Append Notes
              if (p['Notes'] && !p['Notes'].includes("Locating")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) sheet.getRange(realRowIndex, 12).setValue(oldNotes + " | " + p['Notes']);
              }
              
-             if (photoUrl) sheet.getRange(realRowIndex, 18).setValue(photoUrl);
+             // Update Stats
              if (p['Distance']) sheet.getRange(realRowIndex, 19).setValue(p['Distance']);
              if (p['Visit Report Data']) sheet.getRange(realRowIndex, 20).setValue(p['Visit Report Data']);
              
-             // Update Signature (Col 22)
+             // Update Images
+             if (savedAssets['Photo 1']) sheet.getRange(realRowIndex, 18).setValue(savedAssets['Photo 1']);
+             if (savedAssets['Photo 2']) sheet.getRange(realRowIndex, 23).setValue(savedAssets['Photo 2']);
+             if (savedAssets['Photo 3']) sheet.getRange(realRowIndex, 24).setValue(savedAssets['Photo 3']);
+             if (savedAssets['Photo 4']) sheet.getRange(realRowIndex, 25).setValue(savedAssets['Photo 4']);
              if (sigUrl) sheet.getRange(realRowIndex, 22).setValue(sigUrl);
 
              rowUpdated = true;
              
+             // Trigger PDF if finished
              if ((newStatus === 'DEPARTED' || newStatus === 'COMPLETED') && CONFIG.REPORT_TEMPLATE_ID) {
                  generateVisitPdf(realRowIndex);
              }
@@ -119,23 +136,37 @@ function doPost(e) {
       }
     }
 
-    // [NEW ROW FALLBACK]
+    // --- NEW ROW FALLBACK ---
     if (!rowUpdated) {
         const row = [
-          new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
+          new Date(),
+          Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
           p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), 
           p['Emergency Contact Name'] || '', "'" + (p['Emergency Contact Number'] || ""), p['Emergency Contact Email'] || '',
           p['Escalation Contact Name'] || '', "'" + (p['Escalation Contact Number'] || ""), p['Escalation Contact Email'] || '',
-          newStatus, p['Notes'], p['Location Name'] || '', p['Location Address'] || '',
+          newStatus,
+          p['Notes'],
+          p['Location Name'] || '', p['Location Address'] || '',
           p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(),
-          p['Battery Level'] || '', photoUrl, 
-          p['Distance'] || '', p['Visit Report Data'] || '',
-          p['Anticipated Departure Time'] || '', sigUrl // Col 22
+          p['Battery Level'] || '', 
+          savedAssets['Photo 1'] || '', // Col 18
+          p['Distance'] || '', 
+          p['Visit Report Data'] || '',
+          p['Anticipated Departure Time'] || '', 
+          sigUrl || '', // Col 22
+          savedAssets['Photo 2'] || '',
+          savedAssets['Photo 3'] || '',
+          savedAssets['Photo 4'] || ''
         ];
         sheet.appendRow(row);
     }
     
-    if (p['Template Name'] && p['Visit Report Data']) processFormEmail(p);
+    // [EMAIL DISPATCHER]
+    if (p['Template Name'] && p['Visit Report Data']) {
+        processFormEmail(p);
+    }
+
+    // [ALERTS]
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -144,27 +175,33 @@ function doPost(e) {
   finally { lock.releaseLock(); }
 }
 
-// Helper to save images
+// Helper: Save Image to Drive
 function saveImageToDrive(base64String, filename) {
     try {
         const data = Utilities.base64Decode(base64String.split(',')[1]);
-        const blob = Utilities.newBlob(data, 'image/jpeg', filename); // PNGs save as JPEG/PNG blob fine
-        let folder = (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) 
-          ? DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID) : DriveApp.getRootFolder();
+        const blob = Utilities.newBlob(data, 'image/jpeg', filename);
+        let folder;
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
+             try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } 
+             catch(err) { folder = DriveApp.getRootFolder(); }
+        } else { folder = DriveApp.getRootFolder(); }
+        
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         return file.getUrl();
-    } catch(e) { return "Error Saving Image"; }
+    } catch(e) { return ""; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. DATA RETRIEVAL (doGet)
+// 3. CORE: DATA RETRIEVAL (doGet)
 // ─────────────────────────────────────────────────────────────────────────────
 function doGet(e) {
+  // 1. Connection Test
   if(e.parameter.test) {
      return (e.parameter.key === CONFIG.SECRET_KEY) ? ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON) : ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
   }
   
+  // 2. Monitor App Polling (JSONP)
   if(e.parameter.callback){
     const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
     const data=sh.getDataRange().getValues();
@@ -173,6 +210,7 @@ function doGet(e) {
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(rows)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
+  // 3. Global Forms (For "Select Report" Menu)
   if(e.parameter.action === 'getGlobalForms') {
      const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
      if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
@@ -186,18 +224,21 @@ function doGet(e) {
      return ContentService.createTextOutput(JSON.stringify(globalForms)).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 4. Specific Forms (Legacy/Location specific)
   if(e.parameter.action === 'getForms') {
      const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
      if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
      const data = sh.getDataRange().getValues();
-     let foundRow = data.find(r => r[1] === e.parameter.companyName); 
-     if(!foundRow) foundRow = data.find(r => r[0] === e.parameter.companyName);
+     const param = e.parameter.companyName; 
+     let foundRow = data.find(r => r[1] === param); 
+     if(!foundRow) foundRow = data.find(r => r[0] === param);
      if(!foundRow) foundRow = data.find(r => r[1] === 'Travel Report');
      if(!foundRow) foundRow = data.find(r => r[1] === '(Standard)');
      if(!foundRow) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
      return ContentService.createTextOutput(JSON.stringify(parseQuestions(foundRow))).setMimeType(ContentService.MimeType.JSON);
   }
   
+  // 5. Manual Triggers
   if(e.parameter.run === 'reports') { runAllLongitudinalReports(); return ContentService.createTextOutput("Reports Generated"); }
   if(e.parameter.run === 'archive') { archiveOldData(); return ContentService.createTextOutput("Archive Complete"); }
   if(e.parameter.run === 'watchdog') { checkOverdueVisits(); return ContentService.createTextOutput("Watchdog Run Complete"); }
@@ -207,6 +248,7 @@ function doGet(e) {
 
 function parseQuestions(row) {
      const questions = [];
+     // Skip first 3 cols (Company, Template, Email)
      for(let i=3; i<row.length; i++) {
          const val = row[i];
          if(val && val !== "") {
@@ -227,16 +269,14 @@ function parseQuestions(row) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. ALERTS & MESSAGING
+// 4. EMAIL ENGINE (ROBUST)
 // ─────────────────────────────────────────────────────────────────────────────
-
 function processFormEmail(p) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
         const data = sh.getDataRange().getValues();
         const row = data.find(r => r[1] === p['Template Name']); 
         if (!row) return;
-        
         const recipient = row[2]; 
         if (!recipient || !recipient.includes('@')) return;
         
@@ -254,17 +294,32 @@ function processFormEmail(p) {
         }
         html += `</table>`;
         
+        // IMAGES & SIGNATURES
         const inlineImages = {};
+        
+        // Photo 1
         if (p['Photo 1'] && p['Photo 1'].includes('base64')) {
-             const b = Utilities.newBlob(Utilities.base64Decode(p['Photo 1'].split(',')[1]), 'image/jpeg', 'photo.jpg');
-             inlineImages['photo0'] = b;
-             html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo0" style="max-width:300px;"></p>`;
+             const b = Utilities.newBlob(Utilities.base64Decode(p['Photo 1'].split(',')[1]), 'image/jpeg', 'photo1.jpg');
+             inlineImages['photo1'] = b;
+             html += `<p><strong>Attached Photo:</strong><br><img src="cid:photo1" style="max-width:300px; border-radius:8px;"></p>`;
         }
-        if (reportData['Signature_Image']) {
-             const b = Utilities.newBlob(Utilities.base64Decode(reportData['Signature_Image'].split(',')[1]), 'image/png', 'sig.png');
+        // Photos 2-4
+        ['Photo 2', 'Photo 3', 'Photo 4'].forEach((k, i) => {
+             if (p[k] && p[k].includes('base64')) {
+                 const b = Utilities.newBlob(Utilities.base64Decode(p[k].split(',')[1]), 'image/jpeg', `photo${i+2}.jpg`);
+                 inlineImages[`photo${i+2}`] = b;
+                 html += `<p><strong>${k}:</strong><br><img src="cid:photo${i+2}" style="max-width:300px; border-radius:8px;"></p>`;
+             }
+        });
+        
+        // Signature
+        let sigData = p['Signature'] || reportData['Signature_Image'];
+        if (sigData && sigData.includes('base64')) {
+             const b = Utilities.newBlob(Utilities.base64Decode(sigData.split(',')[1]), 'image/png', 'sig.png');
              inlineImages['sig0'] = b;
              html += `<p><strong>Signature:</strong><br><img src="cid:sig0" style="max-width:200px; border:1px solid #ccc;"></p>`;
         }
+        
         html += `</div>`;
         
         MailApp.sendEmail({
@@ -290,14 +345,7 @@ function sendAlert(data) {
   
   recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
   const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
-  const body = `
-    <h1 style="color:red;">${data['Alarm Status']}</h1>
-    <p><strong>Worker:</strong> ${data['Worker Name']}</p>
-    <p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p>
-    <p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p>
-    <p><strong>Map:</strong> <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>
-    <hr><p><i>OTG Safety System</i></p>
-  `;
+  const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p>Worker: ${data['Worker Name']}</p><p>Location: ${data['Location Name']}</p><p>Battery: ${data['Battery Level']}</p><p>Map: <a href="https://maps.google.com/?q=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
   if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
 
   smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
@@ -335,7 +383,6 @@ function archiveOldData() {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
     sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
-    console.log(`Archived ${rowsToArchive.length} rows.`);
   }
 }
 
@@ -390,112 +437,59 @@ function runAllLongitudinalReports() {
 
 function generateVisitPdf(rowIndex) {
     if (!CONFIG.REPORT_TEMPLATE_ID || !CONFIG.PDF_FOLDER_ID) return;
-    
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const rowValues = sheet.getRange(rowIndex, 1, 1, 21).getValues()[0];
     const headers = sheet.getRange(1, 1, 1, 21).getValues()[0];
-    
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
       const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
-      
       headers.forEach((header, i) => {
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
           body.replaceText(`{{${tag}}}`, String(rowValues[i]));
           body.replaceText(`{{${header}}}`, String(rowValues[i]));
       });
-      
       if (rowValues[17]) { 
-         try {
-             const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob();
-             body.appendImage(imgBlob).setWidth(300);
-         } catch(e) {}
+         try { const imgBlob = UrlFetchApp.fetch(rowValues[17]).getBlob(); body.appendImage(imgBlob).setWidth(300); } catch(e) {}
       }
-      
       doc.saveAndClose();
-      const pdf = copy.getAs(MimeType.PDF);
-      folder.createFile(pdf);
-      
-      const recipient = Session.getEffectiveUser().getEmail();
-      MailApp.sendEmail({
-        to: recipient,
-        subject: `Visit Report: ${rowValues[2]}`,
-        body: "Please find the visit report attached.",
-        attachments: [pdf]
-      });
-
-      copy.setTrashed(true); // Cleanup
-      
+      const pdf = copy.getAs(MimeType.PDF); folder.createFile(pdf);
+      MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Visit Report: ${rowValues[2]}`, body: "Report Attached", attachments: [pdf] });
+      copy.setTrashed(true);
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. SERVER-SIDE WATCHDOG (THE SAFETY NET)
+// 6. SERVER-SIDE WATCHDOG
 // ─────────────────────────────────────────────────────────────────────────────
-
 function checkOverdueVisits() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
   if(!sheet) return;
-  
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
-
   const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
   const now = new Date().getTime();
-  
   const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
 
   for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    const rowIndex = i + 2;
-    const status = row[10];
-    const dueTimeStr = row[20];
-    
-    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) {
-      continue;
-    }
-
+    const row = data[i]; const rowIndex = i + 2; const status = row[10]; const dueTimeStr = row[20];
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
-
     const timeOverdue = now - dueTime;
 
-    // CHECK 1: CRITICAL ESCALATION (Red)
     if (timeOverdue > escalationMs) {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
           sheet.getRange(rowIndex, 11).setValue(newStatus);
-          
-          const alertData = {
-             'Worker Name': row[2], 
-             'Worker Phone Number': row[3],
-             'Alarm Status': newStatus, 
-             'Location Name': row[12], 
-             'Last Known GPS': row[14], 
-             'Notes': "Worker failed to check in. Phone may be offline.",
-             'Emergency Contact Email': row[6], 
-             'Emergency Contact Number': row[5],
-             'Escalation Contact Email': row[9], 
-             'Escalation Contact Number': row[8]
-          };
-          sendAlert(alertData);
-          console.log(`Critical Alert triggered for ${row[2]}`);
+          sendAlert({ 'Worker Name': row[2], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5] });
        }
-    }
-    // CHECK 2: INITIAL OVERDUE (Amber)
-    else if (timeOverdue > 0) {
-       if (status === 'ON SITE') {
-          sheet.getRange(rowIndex, 11).setValue("OVERDUE");
-          console.log(`Marked ${row[2]} as Overdue`);
-       }
+    } else if (timeOverdue > 0) {
+       if (status === 'ON SITE') sheet.getRange(rowIndex, 11).setValue("OVERDUE");
     }
   }
 }
-
-
-
