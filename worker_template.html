@@ -1065,7 +1065,7 @@ function buildReportForm(tplName, container) {
             else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`;
             else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`;
             else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`;
-            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this)">`;
+            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${text}')">`;
             else if(type==='gps') html = `<button onclick="captureGPS(this, '${text}')" class="mt-2 text-xs bg-blue-900 text-blue-200 px-3 py-2 rounded">📍 Capture Location</button><input type="hidden" data-key="${text}">`;
             else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
             
@@ -1183,15 +1183,27 @@ function depart(reportData = {}) {
         "Visit Report Data": JSON.stringify(reportData.jsonPayload || {})
     });
     
-    if(tempPhoto) data["Photo 1"] = tempPhoto;
-    
+    // NEW MULTI-PHOTO LOGIC
+    if (state.reportPhotos) {
+        const keys = Object.keys(state.reportPhotos);
+        // Map first 4 photos to specific slots
+        if(keys[0]) data["Photo 1"] = state.reportPhotos[keys[0]];
+        if(keys[1]) data["Photo 2"] = state.reportPhotos[keys[1]];
+        if(keys[2]) data["Photo 3"] = state.reportPhotos[keys[2]];
+        if(keys[3]) data["Photo 4"] = state.reportPhotos[keys[3]];
+    } else if (tempPhoto) {
+        // Fallback for legacy single photo
+        data["Photo 1"] = tempPhoto;
+    }
     // v65 FIX: Send Sig explicitly
     if(reportData.sig) {
         data["Signature"] = reportData.sig;
         // Logic: If Photo 1 is empty, backfill it for spreadsheet visibility
         if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
     }
-    
+    // CLEANUP
+    state.reportPhotos = {}; // Clear buffer
+    tempPhoto = null;
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
     processUploadQueue(data);
@@ -1239,14 +1251,16 @@ function withPinVerification(isDuressAction, callback) {
     document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
 }
 
-function handlePhoto(input) {
+function handlePhoto(input, key) { // Added 'key' param
     if(input.files[0]) {
-        document.getElementById('btnSubmitRep').innerText = "Compressing...";
-        document.getElementById('btnSubmitRep').disabled = true;
+        const btn = input.previousElementSibling; // The label/button
+        if(btn) btn.innerText = "Compressing...";
+        
         compressImg(input.files[0]).then(b64 => {
-            tempPhoto = b64;
-            document.getElementById('btnSubmitRep').innerText = "Submit";
-            document.getElementById('btnSubmitRep').disabled = false;
+            if(!state.reportPhotos) state.reportPhotos = {};
+            // Store by the question text (e.g. "Damage", "Tires")
+            state.reportPhotos[key] = b64;
+            if(btn) btn.innerText = "Photo Saved ✅";
         });
     }
 }
@@ -1402,3 +1416,4 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
+
