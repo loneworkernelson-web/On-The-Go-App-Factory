@@ -365,6 +365,27 @@
       }
     }
 
+    // FIX v16.1: Robust Copy Function
+    async function copyScript() {
+        const text = document.getElementById('codeDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(text);
+            alert("Code copied to clipboard!");
+        } catch (err) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert("Code copied to clipboard!");
+            } catch (err2) {
+                alert("Could not copy automatically. Please select the text and press Ctrl+C.");
+            }
+            document.body.removeChild(textArea);
+        }
+    }
+
     function copyVisitsHeaders() {
       const isAdv = document.getElementById('chkAdvanced').checked;
       const contacts = "Emergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email";
@@ -408,14 +429,13 @@
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
         .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
         .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
-        .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value) 
-        .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value) 
+        .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
+        .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
         .replace('%%PHOTOS_FOLDER_ID%%', ""); 
       document.getElementById('codeDisplay').textContent = code.trim();
       gotoStep(3);
     }
 
-    function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Code copied!"); }
     function resetTest() { document.getElementById('btnNextDownload').disabled = true; document.getElementById('testResult').classList.add('hidden'); }
     
     function testConnection() {
@@ -471,7 +491,7 @@
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
-      wFolder.file("sw.js", "const C='v16.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v16.1';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
