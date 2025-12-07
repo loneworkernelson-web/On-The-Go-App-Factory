@@ -330,7 +330,6 @@ window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     
-    // Ensure stores exist
     if(!state.photoStore) state.photoStore = {};
     if(!state.globalForms) state.globalForms = [];
 
@@ -378,7 +377,7 @@ window.addEventListener('load', () => {
     }
 });
 
-// --- HELPER FUNCTIONS MOVED UP ---
+// --- HELPER FUNCTIONS ---
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
@@ -417,6 +416,7 @@ function navigate(page) {
 // --- INIT LOCATIONS ---
 function initLocations() {
     if(!state.locations) state.locations = [];
+    
     if(CONFIG.mileage) {
         if(!state.locations.find(l => l.id === 'travel')) {
             state.locations.unshift({ 
@@ -776,7 +776,7 @@ function enterLockedScreen() {
     timerInt = setInterval(tick, 1000);
 }
 
-// --- SILENT NUDGE LOGIC ---
+// --- SILENT NUDGE LOGIC (v60) ---
 function tick() {
     if(!state.activeVisit) { clearInterval(timerInt); return; }
     const now = new Date();
@@ -796,14 +796,12 @@ function tick() {
         const minsOver = Math.floor(Math.abs(rem) / 60000);
         
         if (minsOver < CONFIG.escalationMinutes) {
-             // Only sound ONCE when it first goes overdue
              if (!state.activeVisit.overdueSent) {
                  state.activeVisit.overdueSent = true;
                  saveState();
                  triggerAutoAlert('OVERDUE');
                  playSoundAndVibrate('warning'); // Sound once
              }
-             // Vibrate nudge every minute
              if (Math.floor(Math.abs(rem)/1000) % 60 === 0) {
                  if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
              }
@@ -813,7 +811,6 @@ function tick() {
              state.activeVisit.criticalSent = true;
              saveState();
              triggerAutoAlert('EMERGENCY - OVERDUE');
-             // One confirmation vibe
              if(navigator.vibrate) navigator.vibrate(2000); 
         } 
     } else {
@@ -1021,13 +1018,11 @@ function quickStat() {
             "Visit Report Data": JSON.stringify(d.jsonPayload)
         });
         
-        // Multi Photo Mapping
-        const photoKeys = Object.keys(state.photoStore);
-        if(photoKeys.length > 0) data["Photo 1"] = state.photoStore[photoKeys[0]];
-        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; 
+        if(d.photo1) data["Photo 1"] = d.photo1;
+        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; // v56 Fix
         
         processUploadQueue(data);
-        state.activeVisit = null; state.photoStore = {}; sigPad = null;
+        state.activeVisit = null; tempPhoto = null; sigPad = null;
         closeModal('report');
     };
 }
@@ -1044,7 +1039,7 @@ function buildReportForm(tplName, container) {
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
-        tpl.forEach(f => {
+        tpl.forEach((f, index) => { // v71 FIX: Use index for unique photo keys
             // Self-Healing Parser (Handles strings vs objects)
             let type = f.type || 'check'; 
             let text = f.text || f; 
@@ -1067,8 +1062,8 @@ function buildReportForm(tplName, container) {
             else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`;
             else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`;
             else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`;
-            // v67 FIX: Pass text as key to handlePhoto
-            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${text}')">`;
+            // v71 FIX: Use unique index for photo key to prevent overwrite if labels are same
+            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${index}')">`;
             else if(type==='gps') html = `<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${text}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${text}"></div>`;
             else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
             
@@ -1143,6 +1138,9 @@ function submitReport() {
         // v67: Multi Photo Map
         const photoKeys = Object.keys(state.photoStore);
         if(photoKeys[0]) data["Photo 1"] = state.photoStore[photoKeys[0]];
+        if(photoKeys[1]) data["Photo 2"] = state.photoStore[photoKeys[1]];
+        if(photoKeys[2]) data["Photo 3"] = state.photoStore[photoKeys[2]];
+        if(photoKeys[3]) data["Photo 4"] = state.photoStore[photoKeys[3]];
         
         // v70 FIX: Send Signature Explicitly in Top Level
         if(d.sig) {
@@ -1318,7 +1316,6 @@ function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
 function syncForms() {
     if(!CONFIG.url) return;
-    // 1. Standard Sync (Local)
     const comps = [...new Set(state.locations.map(l => l.templateName).filter(Boolean))];
     comps.push("(Standard)", "Travel Report");
     comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); });
@@ -1334,7 +1331,14 @@ function syncForms() {
 function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
 
 // Listeners
-// v69 FIX: Removed redundant listeners
+document.getElementById('btnDelLoc').onclick = deleteLoc;
+document.getElementById('saveLocationBtn').onclick = saveLoc;
+document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
+document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
+document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
+document.getElementById('durationSlider').oninput = updateArrivedButtonState;
+document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
+document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
