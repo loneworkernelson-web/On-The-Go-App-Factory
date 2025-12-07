@@ -124,11 +124,11 @@
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
                 <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
-                    <li>Rename the entire workbook (top left) to <strong>"Safety System"</strong>.</li>
-                    <li>Look at the bottom of the screen. Right-click "Sheet1" and select <strong>Rename</strong>. Change it to <strong>Visits</strong> (Case sensitive).</li>
+                    <li>Rename the workbook (top left) to <strong>"Safety System"</strong>.</li>
+                    <li>Rename the bottom tab from "Sheet1" to <strong>Visits</strong> (Case sensitive).</li>
                     <li>Click the button below to copy the required headers.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
-                    <li><strong>Important:</strong> Go to the menu <strong>View > Freeze > 1 Row</strong>. This keeps the headers visible when you scroll.</li>
+                    <li>Go to <strong>View > Freeze > 1 Row</strong> (keeps headers visible).</li>
                 </ol>
                 <button onclick="copyVisitsHeaders()" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
             </div>
@@ -138,11 +138,11 @@
                 <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
                     <li>Click the <strong>+</strong> icon at the bottom left to add a new sheet.</li>
                     <li>Double-click the new tab and rename it to <strong>Checklists</strong>.</li>
-                    <li>Click the button below to copy the template structure.</li>
+                    <li>Click the button below to copy the template structure <strong>AND</strong> Legend.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
-                    <li>Go to <strong>View > Freeze > 1 Row</strong>.</li>
+                    <li>Scroll down to <strong>Row 20</strong> to see the Help Legend.</li>
                 </ol>
-                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup</button>
+                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup (+Legend)</button>
             </div>
           </div>
           
@@ -178,7 +178,7 @@
                 <li><strong>Success!</strong> Copy the <strong>Web App URL</strong> (it ends in <code>/exec</code>).</li>
              </ol>
              <div class="bg-blue-900/30 p-3 rounded border border-blue-600/50 text-xs">
-                 <strong>Closed the box too soon?</strong> Don't panic. In the Apps Script editor, click the blue <strong>Deploy</strong> button again, then select <strong>Manage Deployments</strong>. You can copy the URL from there.
+                 <strong>Lost the URL?</strong> In Apps Script, click the blue <strong>Deploy</strong> button again, then select <strong>Manage Deployments</strong>. You can copy the URL from there.
              </div>
           </div>
           
@@ -402,15 +402,36 @@
       alert("Headers copied! (Includes all 25 columns)\n\nPaste into cell A1 of 'Visits' tab.");
     }
 
+    // UPDATED FUNCTION for v18.0 Logic
     function copyChecklistSetup() {
       let h = "Company Name\tTemplate Name\tEmail Recipient";
       for(let i=1; i<=30; i++) h += "\tQuestion " + i;
+
       const rows = 
         "\n(Standard)\t\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + 
         "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
         "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
-      navigator.clipboard.writeText(h + rows);
-      alert("Full Setup Copied! (Includes 'FORMS' example)\n\nPaste into cell A1 of 'Checklists' tab.");
+      
+      const gap = "\n".repeat(16); // Gap to get to row 20
+      
+      const instruction = "To make a form available globally, set Column A to \"FORMS\" and Column B to the name (e.g. \"Accident Report\"). Add an Email Address in Column C to auto-email completed forms as soon as they are posted.";
+
+      const legend = 
+        "\nTEMPLATE CODE LEGEND" +
+        "\n" + instruction + 
+        "\n[TEXT]\tText Input Box" +
+        "\n[NUMBER]\tNumber Keypad" +
+        "\n[YESNO]\tYes / No Buttons" +
+        "\n[CHECK]\tCheckbox" +
+        "\n[PHOTO]\tCamera Button" +
+        "\n[GPS]\tGPS Location Button" +
+        "\n[SIGN]\tSignature Pad" +
+        "\n[HEADING]\tSection Title" +
+        "\n[NOTE]\tRead-only Instruction" +
+        "\n$... \tSpecial Calculation (e.g. $Distance (km))";
+
+      navigator.clipboard.writeText(h + rows + gap + legend);
+      alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
     }
 
     function copyLegend() {
@@ -498,7 +519,7 @@
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
-      wFolder.file("sw.js", "const C='v17.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
+      wFolder.file("sw.js", "const C='v18.0';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));");
 
       let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
