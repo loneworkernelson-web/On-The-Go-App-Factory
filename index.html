@@ -128,7 +128,7 @@
                     <li>Rename the bottom tab from "Sheet1" to <strong>Visits</strong> (Case sensitive).</li>
                     <li>Click the button below to copy the required headers.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
-                    <li>Go to <strong>View > Freeze > 1 Row</strong>.</li>
+                    <li><strong>Freeze Header:</strong> Go to the menu <strong>View > Freeze > 1 Row</strong>. This keeps the header visible while scrolling.</li>
                 </ol>
                 <button onclick="copyVisitsHeaders()" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
             </div>
@@ -138,14 +138,36 @@
                 <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
                     <li>Click the <strong>+</strong> icon at the bottom left to add a new sheet.</li>
                     <li>Double-click the new tab and rename it to <strong>Checklists</strong>.</li>
-                    <li>Click the button below to copy the template structure.</li>
+                    <li>Click the button below to copy the template structure <strong>AND</strong> Legend.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
                     <li>Scroll down to <strong>Row 20</strong> to see the Help Legend.</li>
                 </ol>
-                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup</button>
+                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup (+Legend)</button>
             </div>
           </div>
           
+          <div id="legendBox" class="bg-gray-900 rounded-xl p-6 border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="font-bold text-gray-200">Template Code Legend</h4>
+                <button onclick="copyLegend()" class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-1 px-3 rounded">Copy</button>
+            </div>
+            
+            <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4 text-xs text-blue-200">
+                <strong>Default Form:</strong> Edit the row named <code>(Standard)</code> to define the default form that appears for general visits.
+            </div>
+
+            <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4 text-xs text-blue-200">
+                <strong>Global Forms:</strong> Set Column A to <code>FORMS</code> and Column B to the name (e.g. "Accident Report").<br>
+                Add an <strong>Email Address</strong> in Column C to auto-email completed reports.
+            </div>
+            
+            <div class="grid grid-cols-3 gap-2 text-xs text-gray-300">
+               <div>[YESNO] Yes/No</div><div>[CHECK] Checkbox</div><div>[TEXT] Text Box</div>
+               <div>[NUMBER] Numeric</div><div>[PHOTO] Camera</div><div>[GPS] Location</div>
+               <div>[SIGN] Signature</div><div>[HEADING] Title</div><div>[NOTE] Info</div>
+            </div>
+          </div>
+
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
 
@@ -156,13 +178,12 @@
           </div>
           
           <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 text-sm text-gray-300 space-y-4">
-             <h3 class="font-bold text-green-400 text-lg">How to Deploy (Detailed Guide)</h3>
-             <p>This creates the "Brain" of your app on Google's servers.</p>
+             <h3 class="font-bold text-green-400 text-lg">How to Deploy</h3>
              <ol class="list-decimal pl-5 space-y-3">
                 <li>Go to your Google Sheet: Click <strong>Extensions</strong> in the top menu, then select <strong>Apps Script</strong>.</li>
                 <li>Delete any text currently in the editor. <strong>Paste</strong> the code you just copied.</li>
                 <li>Click the blue <strong>Deploy</strong> button (top right) and select <strong>New Deployment</strong>.</li>
-                <li>Click the "Select type" gear icon ⚙️ and choose <strong>Web App</strong>.</li>
+                <li>Click the "Select type" gear icon ⚙️ (left side of popup) and choose <strong>Web App</strong>.</li>
                 <li><strong>CRITICAL SETTINGS:</strong>
                     <ul class="list-disc pl-5 mt-1 text-gray-400">
                         <li>Description: Type <code>v1</code></li>
@@ -175,7 +196,7 @@
                     <br><span class="text-yellow-400 text-xs">Note: Google will show a "Google hasn't verified this app" warning. This is normal because YOU created it.</span>
                     <br>Click <strong>Advanced</strong> (small text) -> <strong>Go to ... (Unsafe)</strong> -> <strong>Allow</strong>.
                 </li>
-                <li><strong>Success!</strong> Copy the <strong>Web App URL</strong> (ends in <code>/exec</code>) and paste it below.</li>
+                <li><strong>Success!</strong> Copy the <strong>Web App URL</strong> (it ends in <code>/exec</code>) and paste it below.</li>
              </ol>
           </div>
           
@@ -187,20 +208,38 @@
                 </summary>
                 <div class="mt-4 text-gray-300 space-y-4 text-sm">
                    <p>Without triggers, the Watchdog (Safety Check) and Archiver will not run.</p>
-                   <ol class="list-decimal pl-5 space-y-2">
+                   <ol class="list-decimal pl-5 space-y-3">
                       <li>In the Apps Script editor, click the <strong>Alarm Clock icon</strong> (Triggers) on the left sidebar.</li>
                       <li>Click the blue <strong>+ Add Trigger</strong> button (bottom right).</li>
-                      <li class="bg-gray-800 p-2 rounded">
-                         <strong class="text-white">Trigger 1: Safety Watchdog</strong><br>
-                         Function: <code>checkOverdueVisits</code><br>
-                         Event Source: <code>Time-driven</code><br>
-                         Type: <code>Minutes timer</code> -> <code>Every 10 minutes</code>
+                      
+                      <li class="bg-gray-800 p-3 rounded border border-gray-600">
+                         <strong class="text-white block mb-1">Trigger 1: Safety Watchdog (Critical)</strong>
+                         <div class="grid grid-cols-2 gap-2 text-xs">
+                             <div>Function: <code>checkOverdueVisits</code></div>
+                             <div>Event Source: <code>Time-driven</code></div>
+                             <div>Type: <code>Minutes timer</code></div>
+                             <div>Interval: <code>Every 10 minutes</code></div>
+                         </div>
                       </li>
-                      <li class="bg-gray-800 p-2 rounded">
-                         <strong class="text-white">Trigger 2: Auto-Archiver</strong><br>
-                         Function: <code>archiveOldData</code><br>
-                         Event Source: <code>Time-driven</code><br>
-                         Type: <code>Week timer</code> -> <code>Every Sunday</code>
+
+                      <li class="bg-gray-800 p-3 rounded border border-gray-600">
+                         <strong class="text-white block mb-1">Trigger 2: Auto-Archiver (Maintenance)</strong>
+                         <div class="grid grid-cols-2 gap-2 text-xs">
+                             <div>Function: <code>archiveOldData</code></div>
+                             <div>Event Source: <code>Time-driven</code></div>
+                             <div>Type: <code>Week timer</code></div>
+                             <div>Interval: <code>Every Sunday</code></div>
+                         </div>
+                      </li>
+
+                      <li id="advancedTriggerInfo" class="hidden bg-gray-800 p-3 rounded border border-purple-500/50">
+                         <strong class="text-purple-300 block mb-1">Trigger 3: Monthly Report (Analytics)</strong>
+                         <div class="grid grid-cols-2 gap-2 text-xs">
+                             <div>Function: <code>runAllLongitudinalReports</code></div>
+                             <div>Event Source: <code>Time-driven</code></div>
+                             <div>Type: <code>Month timer</code></div>
+                             <div>Interval: <code>1st of month</code></div>
+                         </div>
                       </li>
                    </ol>
                 </div>
@@ -229,55 +268,37 @@
         <div id="step5" class="step-section space-y-10">
             
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Go Live (Recommended Hosting)</h2><p class="text-gray-400 text-sm">Host your app securely for free with Netlify.</p></div></div>
+                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Go Live (Netlify Drop)</h2><p class="text-gray-400 text-sm">Recommended for easy, secure hosting.</p></div></div>
                 
                 <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
-                    <li>Go to <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline">app.netlify.com</a> and <strong>Sign Up</strong> for a free account. <br><em class="text-xs text-yellow-400">Important: You must create an account first so your app doesn't expire in 24 hours.</em></li>
-                    <li>Once logged in, look for the "Sites" tab or "Add new site".</li>
-                    <li>Select <strong>"Deploy manually"</strong> (or drag and drop area).</li>
-                    <li>Find your <strong>unzipped folder</strong> on your computer.</li>
+                    <li>Go to <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline">app.netlify.com</a> and Sign Up. <br><em class="text-xs text-yellow-400">Create an account first to keep your app online permanently.</em></li>
+                    <li>Look for the <strong>"Add new site"</strong> button -> <strong>"Deploy manually"</strong>.</li>
+                    <li>Find your <strong>unzipped folder</strong>.</li>
                     <li>Drag the <strong>WorkerApp</strong> folder onto the Netlify page.</li>
-                    <li>Wait for it to upload (it takes seconds). It will give you a link (e.g., <code>calm-badger-123.netlify.app</code>).</li>
-                    <li><strong>This is your App!</strong> Send this link to your workers.</li>
-                    <li>Repeat the process for the <strong>MonitorApp</strong> folder to get your Office Dashboard link.</li>
+                    <li>Wait for upload. Copy the link (e.g., <code>calm-badger.netlify.app</code>).</li>
+                    <li>Repeat for the <strong>MonitorApp</strong> folder.</li>
                 </ol>
             </div>
 
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🖥️</span><div><h2 class="text-2xl font-bold text-white">2. Office Monitor Setup</h2><p class="text-gray-400 text-sm">Make the dashboard run like a real program.</p></div></div>
+                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🖥️</span><div><h2 class="text-2xl font-bold text-white">2. Office Monitor Setup</h2></div></div>
                 
                 <div class="space-y-6 text-sm text-gray-300">
                     <div class="bg-gray-800 p-4 rounded">
                         <strong class="text-white block mb-2">Step 1: Install as App (Chrome/Edge)</strong>
                         <ol class="list-decimal pl-5 space-y-1">
-                             <li>Open your Monitor App URL in the browser.</li>
-                             <li>Look at the right side of the address bar for an icon (Computer with arrow).</li>
-                             <li>Click it and select <strong>Install</strong>.</li>
+                             <li>Open your Monitor App URL.</li>
+                             <li>Click the "Install" icon (Computer with arrow) in the address bar.</li>
                         </ol>
                     </div>
                     <div class="bg-gray-800 p-4 rounded">
-                        <strong class="text-white block mb-2">Step 2: Auto-Start (Windows)</strong>
+                        <strong class="text-white block mb-2">Step 2: Add to Windows Startup</strong>
                         <ol class="list-decimal pl-5 space-y-1">
-                             <li>Press <code>Windows Key + R</code>, type <code>shell:startup</code>, and press Enter.</li>
-                             <li>Drag a <strong>copy</strong> of the Monitor App icon from your desktop into this folder.</li>
+                             <li>Press <code>Win + R</code>, type <code>shell:startup</code>, enter.</li>
+                             <li>Drag a copy of the Monitor App icon into this folder.</li>
                         </ol>
                     </div>
                 </div>
-            </div>
-            
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                 <h3 class="font-bold text-lg text-white mb-4">3. Creating Custom Forms</h3>
-                 <p class="text-sm text-gray-400 mb-2">Use the <strong>Checklists</strong> tab in your Google Sheet.</p>
-                 <table class="text-sm text-gray-300">
-                    <thead><tr><th>Tag</th><th>Effect</th></tr></thead>
-                    <tbody>
-                        <tr><td class="font-mono text-blue-400">[TEXT]</td><td>Text Box</td></tr>
-                        <tr><td class="font-mono text-blue-400">[PHOTO]</td><td>Camera</td></tr>
-                        <tr><td class="font-mono text-blue-400">[GPS]</td><td>Location Button</td></tr>
-                        <tr><td class="font-mono text-blue-400">[SIGN]</td><td>Signature Pad</td></tr>
-                        <tr><td class="font-mono text-blue-400">$...</td><td>Mileage Calc</td></tr>
-                    </tbody>
-                </table>
             </div>
 
             <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
@@ -357,7 +378,6 @@
       }
     }
 
-    // FIX v16.1: Robust Copy Function
     async function copyScript() {
         const text = document.getElementById('codeDisplay').textContent;
         try {
@@ -368,13 +388,9 @@
             textArea.value = text;
             document.body.appendChild(textArea);
             textArea.select();
-            try {
-                document.execCommand('copy');
-                alert("Code copied to clipboard!");
-            } catch (err2) {
-                alert("Could not copy automatically. Please select the text and press Ctrl+C.");
-            }
+            document.execCommand('copy');
             document.body.removeChild(textArea);
+            alert("Code copied to clipboard!");
         }
     }
 
@@ -392,28 +408,19 @@
       let h = "Company Name\tTemplate Name\tEmail Recipient";
       for(let i=1; i<=30; i++) h += "\tQuestion " + i;
 
+      // Updated Standard Template
       const rows = 
-        "\n(Standard)\t\t\tSafety Check Done?\tHazards Identified?\t[PHOTO] Site Photo\tNotes" + 
+        "\nGlobal\t(Standard)\t\t[TEXT] Notes\t[PHOTO] Photo?" + 
         "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
         "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
       
       const gap = "\n".repeat(16); 
       
-      const instruction = "To make a form available globally, set Column A to \"FORMS\" and Column B to the name (e.g. \"Accident Report\"). Add an Email Address in Column C to auto-email completed forms as soon as they are posted.";
+      const instruction = "Edit the '(Standard)' row to define your default site report.\nTo make a form available globally, set Column A to \"FORMS\" and Column B to the name. Add an Email Address in Column C to auto-email completed forms.";
 
       const legend = 
-        "\nTEMPLATE CODE LEGEND" +
-        "\n" + instruction + 
-        "\n[TEXT]\tText Input Box" +
-        "\n[NUMBER]\tNumber Keypad" +
-        "\n[YESNO]\tYes / No Buttons" +
-        "\n[CHECK]\tCheckbox" +
-        "\n[PHOTO]\tCamera Button" +
-        "\n[GPS]\tGPS Location Button" +
-        "\n[SIGN]\tSignature Pad" +
-        "\n[HEADING]\tSection Title" +
-        "\n[NOTE]\tRead-only Instruction" +
-        "\n$... \tSpecial Calculation (e.g. $Distance (km))";
+        "\nTEMPLATE CODE LEGEND\n" + instruction + "\n" +
+        "[TEXT]\tText Input Box\n[NUMBER]\tNumber Keypad\n[YESNO]\tYes / No Buttons\n[CHECK]\tCheckbox\n[PHOTO]\tCamera Button\n[GPS]\tGPS Location Button\n[SIGN]\tSignature Pad\n[HEADING]\tSection Title\n[NOTE]\tRead-only Instruction\n$... \tSpecial Calculation";
 
       navigator.clipboard.writeText(h + rows + gap + legend);
       alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
