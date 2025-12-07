@@ -1032,47 +1032,73 @@ function quickStat() {
 
 // v57: Enhanced Form Builder (Parses [CODES] and Self-Heals Strings)
 function buildReportForm(tplName, container) {
-    // 1. Check Global Forms (synced from backend)
     let tpl = (state.globalForms && state.globalForms.find(f => f.name === tplName))?.questions;
-    // 2. Check Local Cache
     if (!tpl) tpl = state.cachedForms[tplName];
-    // 3. Fallback
     if (!tpl) tpl = state.cachedForms["(Standard)"] || [];
     
     if(tpl.length === 0) {
         container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
     } else {
         tpl.forEach(f => {
-            // Self-Healing Parser (Handles strings vs objects)
-            let type = f.type || 'check'; 
-            let text = f.text || f; 
-            
-            if (typeof f === 'string') {
-                if(f.includes('[TEXT]')) { type='text'; text=f.replace('[TEXT]','').trim(); }
-                else if(f.includes('[PHOTO]')) { type='photo'; text=f.replace('[PHOTO]','').trim(); }
-                else if(f.includes('[YESNO]')) { type='yesno'; text=f.replace('[YESNO]','').trim(); }
-                else if(f.includes('[NUMBER]')) { type='number'; text=f.replace('[NUMBER]','').trim(); }
-                else if(f.includes('[GPS]')) { type='gps'; text=f.replace('[GPS]','').trim(); }
-                else if(f.includes('[HEADING]')) { type='header'; text=f.replace('[HEADING]','').trim(); }
-                else if(f.includes('[NOTE]')) { type='note'; text=f.replace('[NOTE]','').trim(); }
-                else if(f.includes('[SIGN]')) { type='signature'; text=f.replace('[SIGN]','').trim(); }
-            }
+            // Support legacy string arrays or new object arrays
+            const type = f.type || 'check'; 
+            const text = f.text || f;
             
             let html = '';
+            
+            // ... (Keep header, note, text, number logic) ...
             if(type==='header') html = `<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${text}</h3>`;
             else if(type==='note') html = `<p class="text-gray-500 text-sm italic my-2">${text}</p>`;
             else if(type==='text') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><textarea data-key="${text}" class="form-input h-24"></textarea>`;
             else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`;
             else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`;
             else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`;
-            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${text}')">`;
-            else if(type==='gps') html = `<button onclick="captureGPS(this, '${text}')" class="mt-2 text-xs bg-blue-900 text-blue-200 px-3 py-2 rounded">📍 Capture Location</button><input type="hidden" data-key="${text}">`;
-            else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
+            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this)">`;
+            
+            // [NEW] GPS BUTTON
+            else if(type==='gps') html = `
+                <div class="mt-4">
+                    <label class="block text-sm text-gray-300 mb-1">${text}</label>
+                    <button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2">
+                        <span>📍 Tap to Capture Location</span>
+                    </button>
+                    <input type="hidden" data-key="${text}">
+                </div>`;
             
             container.innerHTML += html;
         });
     }
+}
+// [NEW] GPS Handler
+function captureGPS(btn) {
+    const input = btn.nextElementSibling; // The hidden input
+    const labelSpan = btn.querySelector('span');
     
+    labelSpan.innerText = "Locating...";
+    btn.disabled = true;
+
+    if (!navigator.geolocation) {
+        labelSpan.innerText = "❌ GPS Not Supported";
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+            // Visual Update
+            labelSpan.innerText = `✅ Captured: ${coords}`;
+            btn.classList.replace('bg-blue-900', 'bg-green-900');
+            btn.classList.replace('text-blue-200', 'text-green-200');
+            // Data Update
+            input.value = coords; // This is what gets sent
+        },
+        (err) => {
+            labelSpan.innerText = "❌ GPS Failed. Try again.";
+            btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}    
     const canvas = document.getElementById('sig-canvas');
     if(canvas) initSigPad(canvas);
 }
@@ -1416,4 +1442,5 @@ document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
+
 
