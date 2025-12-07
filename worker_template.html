@@ -417,6 +417,7 @@ function navigate(page) {
 // --- INIT LOCATIONS ---
 function initLocations() {
     if(!state.locations) state.locations = [];
+    
     if(CONFIG.mileage) {
         if(!state.locations.find(l => l.id === 'travel')) {
             state.locations.unshift({ 
@@ -433,7 +434,7 @@ function initLocations() {
     }
 }
 
-// --- BATTERY SAVER ---
+// --- BATTERY SAVER (v73 FIX) ---
 function toggleBatterySaver() {
     const overlay = document.getElementById('batterySaver');
     if(overlay.classList.contains('hidden')) {
@@ -488,7 +489,7 @@ function startReminderTimer() {
         if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
             document.getElementById('startReminderBanner').classList.remove('hidden');
         }
-    }, 300000);
+    }, 300000); // 5 Mins
 }
 
 // ==================== AUDIO ENGINE ====================
@@ -801,6 +802,10 @@ function tick() {
         document.getElementById('btnDepart').classList.add('hidden');
         setupLongPress(document.getElementById('btnSafe'), iamSafe);
         
+        // Safety Wake Logic (v73 FIX)
+        document.getElementById('batterySaver').classList.add('hidden');
+
+        // 0-15 Mins: Amber "Nudge"
         const minsOver = Math.floor(Math.abs(rem) / 60000);
         
         if (minsOver < CONFIG.escalationMinutes) {
@@ -821,6 +826,7 @@ function tick() {
              state.activeVisit.criticalSent = true;
              saveState();
              triggerAutoAlert('EMERGENCY - OVERDUE');
+             // One confirmation vibe
              if(navigator.vibrate) navigator.vibrate(2000); 
         } 
     } else {
@@ -849,6 +855,9 @@ function triggerAutoAlert(status) {
 function triggerCheckin() {
     if(!document.getElementById('checkinModal').classList.contains('hidden')) return;
     showModal('checkin');
+    // Safety Wake Checkin
+    document.getElementById('batterySaver').classList.add('hidden');
+
     let rem = 120;
     const el = document.getElementById('checkinCountdown');
     
@@ -873,7 +882,7 @@ function triggerCheckin() {
     document.getElementById('checkinOkBtn').onclick = () => {
         clearInterval(checkinIntervalId);
         closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval * 60000); 
+        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
         saveState();
     };
 }
@@ -924,10 +933,12 @@ function openMidVisitMenu() {
     const list = document.getElementById('templateList');
     list.innerHTML = '';
     
+    // 1. Location Template
     const l = state.locations.find(x => x.id === state.activeVisit.locationId);
     const defaultName = l.templateName || "Standard Visit Note";
     list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName));
     
+    // 2. Global Forms
     if (state.globalForms && state.globalForms.length > 0) {
         state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name)));
     } else {
@@ -1061,6 +1072,7 @@ function buildReportForm(tplName, container) {
             else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`;
             else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`;
             else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`;
+            // v67 FIX: Pass text as key to handlePhoto
             else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${index}')">`;
             else if(type==='gps') html = `<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${text}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${text}"></div>`;
             else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
@@ -1068,6 +1080,7 @@ function buildReportForm(tplName, container) {
             container.innerHTML += html;
         });
     }
+    
     const canvas = document.getElementById('sig-canvas');
     if(canvas) initSigPad(canvas);
 }
