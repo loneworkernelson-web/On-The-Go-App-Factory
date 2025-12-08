@@ -133,7 +133,7 @@ canvas {
     <div class="space-y-3 w-full">
         <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
         <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">📝 Add Notes / Checklist</button>
-        <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">DEPART</button>
+        <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button>
         <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
     </div>
 
@@ -217,10 +217,19 @@ canvas {
             </div>
             
             <div id="advLocOptions" class="pt-2 border-t border-gray-700">
-               <label class="flex items-center justify-between p-2 bg-gray-900 rounded cursor-pointer mb-2">
-                 <span class="text-sm text-gray-300">No Report Required</span>
-                 <input type="checkbox" id="locNoRep" class="w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600">
-               </label>
+               <div class="mb-3 bg-gray-900 p-2 rounded">
+                   <label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label>
+                   <div class="flex gap-6">
+                       <label class="flex items-center gap-2 cursor-pointer">
+                           <input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500">
+                           <span class="text-sm text-white font-bold">Yes</span>
+                       </label>
+                       <label class="flex items-center gap-2 cursor-pointer">
+                           <input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500">
+                           <span class="text-sm text-gray-300">No</span>
+                       </label>
+                   </div>
+               </div>
                <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
             </div>
         </div>
@@ -275,7 +284,7 @@ canvas {
         </div>
       <div class="flex gap-3 flex-shrink-0">
         <button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
-        <button id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit</button>
+        <button id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button>
       </div>
     </div>
 
@@ -613,7 +622,11 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locAddr').value = l.address;
         document.getElementById('locBusiness').value = l.companyName || ""; 
         document.getElementById('locTemplate').value = l.templateName || "";
-        document.getElementById('locNoRep').checked = l.noReport || false;
+        
+        // FIX: Read boolean state correctly
+        const isNoRep = l.noReport === true;
+        document.getElementById('radRepNo').checked = isNoRep;
+        document.getElementById('radRepYes').checked = !isNoRep;
         
         if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
         else document.getElementById('btnDelLoc').classList.remove('hidden');
@@ -624,7 +637,11 @@ function openLocModal(id=null, e=null) {
         document.getElementById('locAddr').value = "";
         document.getElementById('locBusiness').value = ""; 
         document.getElementById('locTemplate').value = "";
-        document.getElementById('locNoRep').checked = false;
+        
+        // Default to Yes
+        document.getElementById('radRepYes').checked = true;
+        document.getElementById('radRepNo').checked = false;
+        
         document.getElementById('btnDelLoc').classList.add('hidden');
     }
 }
@@ -635,7 +652,8 @@ function saveLoc() {
     const addr = document.getElementById('locAddr').value;
     const business = document.getElementById('locBusiness').value; 
     const tpl = document.getElementById('locTemplate').value;
-    const noRep = document.getElementById('locNoRep').checked;
+    // FIX: Read radio button
+    const noRep = document.getElementById('radRepNo').checked;
     
     if(!name) return alert("Name required");
     
@@ -978,7 +996,7 @@ function loadFormAndShow(tplName) {
     buildReportForm(tplName, div);
     
     const btn = document.getElementById('btnSubmitRep');
-    btn.innerText = isMidVisitUpdate ? "Send Update" : "Submit & Depart";
+    btn.innerText = isMidVisitUpdate ? "Send Update" : "Submit & END";
     btn.onclick = submitReport;
 }
 
