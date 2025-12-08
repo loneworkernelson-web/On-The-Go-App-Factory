@@ -7,6 +7,9 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
 body{font-family:'Inter',sans-serif}
 @keyframes flash-red{0%,100%{background:#7f1d1d}50%{background:#ef4444}}
@@ -18,10 +21,16 @@ body{font-family:'Inter',sans-serif}
 .dot-online { background-color: #4ade80; animation: pulse-green 2s infinite; }
 .dot-offline { background-color: #ef4444; }
 .dot-connecting { background-color: #eab308; }
+/* Long Press Button */
+.long-press-btn { position: relative; overflow: hidden; user-select: none; }
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(0,0,0,0.2); transition: width 1.5s linear; }
+.long-press-btn.pressing::after { width: 100%; }
+
 /* Scrollbars */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #1f2937; }
 ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+#mapContainer { height: 100%; width: 100%; background: #0f172a; }
 </style>
 </head>
 <body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden">
@@ -49,7 +58,12 @@ body{font-family:'Inter',sans-serif}
       </div>
     </div>
     <div class="flex items-center gap-4">
-      <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase font-bold border border-gray-600 px-2 py-1 rounded">Enable Desktop Alerts</button>
+      <div class="flex bg-gray-700 rounded-lg p-1">
+          <button onclick="setView('grid')" id="btnViewGrid" class="px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold">Grid</button>
+          <button onclick="setView('map')" id="btnViewMap" class="px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold">Map</button>
+      </div>
+
+      <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase font-bold border border-gray-600 px-2 py-1 rounded">Enable Alerts</button>
       
       <div class="flex items-center gap-3 bg-gray-900 px-4 py-2 rounded-full border border-gray-700">
           <div id="connectionDot" class="w-3 h-3 rounded-full dot-connecting"></div>
@@ -69,7 +83,7 @@ body{font-family:'Inter',sans-serif}
   </div>
   
   <div class="bg-gray-900 border-b border-gray-800">
-    <details class="group" open>
+    <details class="group">
       <summary class="p-2 text-xs text-gray-500 cursor-pointer hover:text-gray-300 bg-gray-800/50 select-none flex justify-between px-4">
           <span>EVENT LOG</span>
           <span class="group-open:rotate-180 transition">▼</span>
@@ -78,7 +92,13 @@ body{font-family:'Inter',sans-serif}
     </details>
   </div>
 
-  <main id="workerList" class="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto pb-32"></main>
+  <div class="relative flex-1 overflow-hidden">
+      <main id="workerList" class="absolute inset-0 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto pb-32"></main>
+      
+      <div id="mapView" class="absolute inset-0 z-10 hidden">
+          <div id="mapContainer"></div>
+      </div>
+  </div>
 </div>
 
 <div id="alertOverlay" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-8 bg-red-900/95 backdrop-blur-sm text-white transition-all duration-300">
@@ -86,15 +106,19 @@ body{font-family:'Inter',sans-serif}
       <h2 class="text-9xl mb-4">🚨</h2>
       <h2 class="text-6xl font-black uppercase tracking-tighter mb-8">EMERGENCY</h2>
       <div id="alertDetails" class="text-2xl font-mono text-red-200 mb-12 space-y-2"></div>
-      <button onclick="silenceAlarm()" id="btnSilence" class="w-full bg-white text-red-900 font-black py-6 px-12 rounded-xl text-2xl shadow-2xl hover:scale-105 transition transform active:scale-95">SILENCE & ACKNOWLEDGE</button>
-      <p class="mt-4 text-red-300 text-sm">Use dashboard to resolve.</p>
+      
+      <button id="btnSilence" class="long-press-btn w-full bg-white text-red-900 font-black py-6 px-12 rounded-xl text-2xl shadow-2xl hover:scale-105 transition transform active:scale-95 cursor-pointer select-none">
+          HOLD TO ACKNOWLEDGE
+      </button>
+      
+      <p class="mt-4 text-red-300 text-sm">Acknowledging stops the siren but keeps the alarm active.</p>
   </div>
 </div>
 
 <div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
     <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-600">
         <h2 class="text-2xl font-bold text-white mb-2">Resolve Incident</h2>
-        <p class="text-gray-400 text-sm mb-6">To verify this is not an accidental dismissal, please type the worker's name exactly as shown below:</p>
+        <p class="text-gray-400 text-sm mb-6">To verify safety, type the worker's name exactly as shown:</p>
         <div id="resolveNameTarget" class="bg-gray-900 p-4 rounded border border-gray-700 text-center text-xl font-mono font-bold text-blue-400 mb-4 select-all"></div>
         <input id="resolveInput" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-center font-bold" placeholder="Type Name Here">
         <div class="flex gap-3">
@@ -112,6 +136,8 @@ let pollInt, alarm;
 let lastState = {}; 
 let acknowledgedList = new Set();
 let activeWorkerToResolve = null;
+let map, markers = {};
+let currentView = 'grid';
 
 // ==================== LOGIN LOGIC ====================
 function login() {
@@ -129,10 +155,17 @@ function startSession() {
     document.getElementById('dashboardPage').classList.add('flex'); 
     Tone.start();
     addLogEntry("Monitor Session Started");
+    
+    // Init Map
+    initMap();
+    
     fetchData(); 
     pollInt=setInterval(fetchData, 10000); 
     setInterval(updateClock, 1000);
     if(Notification.permission === "granted") document.getElementById('btnNotify').innerText = "Alerts Active ✅";
+    
+    // Setup Long Press
+    setupLongPress(document.getElementById('btnSilence'), silenceAlarm);
 }
 
 window.onload = () => {
@@ -144,6 +177,63 @@ function logout(){
     clearInterval(pollInt); 
     localStorage.removeItem('otg_monitor_key');
     location.reload(); 
+}
+
+function setView(mode) {
+    currentView = mode;
+    if(mode === 'map') {
+        document.getElementById('workerList').classList.add('hidden');
+        document.getElementById('mapView').classList.remove('hidden');
+        document.getElementById('btnViewMap').className = "px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold";
+        document.getElementById('btnViewGrid').className = "px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold";
+        if(map) map.invalidateSize();
+    } else {
+        document.getElementById('workerList').classList.remove('hidden');
+        document.getElementById('mapView').classList.add('hidden');
+        document.getElementById('btnViewGrid').className = "px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold";
+        document.getElementById('btnViewMap').className = "px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold";
+    }
+}
+
+// ==================== MAP ENGINE ====================
+function initMap() {
+    map = L.map('mapContainer').setView([-41.2, 174.0], 5); // Default NZ View
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
+}
+
+function updateMapMarker(w) {
+    if(!map) return;
+    const gps = w['Last Known GPS'];
+    if(!gps || !gps.includes(',')) return;
+    
+    const [lat, lon] = gps.split(',').map(parseFloat);
+    const status = w['Alarm Status'];
+    let color = '#4ade80'; // Green
+    if(status === 'OVERDUE') color = '#f59e0b'; // Amber
+    if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/)) color = '#ef4444'; // Red
+    if(w['Location Name'].includes('Travelling')) color = '#60a5fa'; // Blue
+    
+    // Custom Icon SVG
+    const iconHtml = `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5); animation: ${status.match(/EMERGENCY|DURESS/) ? 'pulse-red 1s infinite' : 'none'}"></div>`;
+    
+    const icon = L.divIcon({ className: 'custom-pin', html: iconHtml, iconSize: [16,16] });
+
+    if(markers[w['Worker Name']]) {
+        markers[w['Worker Name']].setLatLng([lat, lon]);
+        markers[w['Worker Name']].setIcon(icon);
+        markers[w['Worker Name']].setPopupContent(buildMapPopup(w));
+    } else {
+        const m = L.marker([lat, lon], {icon: icon}).addTo(map);
+        m.bindPopup(buildMapPopup(w));
+        markers[w['Worker Name']] = m;
+    }
+}
+
+function buildMapPopup(w) {
+    return `<strong>${w['Worker Name']}</strong><br>${w['Alarm Status']}<br>🔋 ${w['Battery Level'] || '?'}`;
 }
 
 // ==================== LOGGING SYSTEM ====================
@@ -165,44 +255,29 @@ function addLogEntry(msg, type="info") {
 function fetchData() {
   const s = document.createElement('script');
   const cb = 'cb_'+Date.now();
-  
-  // Set Dot Yellow (Connecting)
   document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-connecting";
 
   window[cb] = (data) => {
     delete window[cb]; document.body.removeChild(s);
-    
-    // Handle Auth Error
     if(data.status==='error') { 
         document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
         if(data.message === 'Invalid Key') { alert('Access Denied: Wrong Secret Key'); logout(); return; }
     }
-    
-    // Health Check
     if(data.length > 2500) document.getElementById('dbWarning').classList.remove('hidden');
-    else document.getElementById('dbWarning').classList.add('hidden');
-
-    // Success -> Green Dot
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
-    
     const lastUpd = document.getElementById('lastUpd');
     if(lastUpd) {
         lastUpd.innerText = "Updated: " + new Date().toLocaleTimeString();
         lastUpd.className = "text-[10px] text-green-500 leading-none font-mono font-bold";
     }
-
     processAndRender(data); 
   };
   
   s.src = URL + '?callback='+cb+'&key='+encodeURIComponent(SECRET);
   s.onerror = () => { 
-    // Error -> Red Dot
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
-    const lastUpd = document.getElementById('lastUpd');
-    if(lastUpd) {
-        lastUpd.innerText = "Conn Failed";
-        lastUpd.className = "text-[10px] text-red-500 leading-none font-mono font-bold";
-    }
+    document.getElementById('lastUpd').innerText = "Conn Failed";
+    document.getElementById('lastUpd').className = "text-[10px] text-red-500 font-bold";
   };
   document.body.appendChild(s);
 }
@@ -223,30 +298,27 @@ function processAndRender(data) {
   let activeAlertFound = false;
   let anyCritical = false;
   
-  // State Change Detection
+  // State Change Detection & Map Updates
   Object.values(workers).forEach(w => {
       const name = w['Worker Name'];
       const status = w['Alarm Status'];
-      const location = w['Location Name'] || 'Unknown';
+      
+      // Update Map
+      updateMapMarker(w);
       
       if(lastState[name] && lastState[name] !== status) {
           let type = "info";
           if(status.match(/EMERGENCY|DURESS|PANIC|OVERDUE/)) type = "alert";
           if(status === "DEPARTED" || status.includes("SAFE")) type = "success";
-          
           addLogEntry(`${name}: ${status}`, type);
           
-          // If moving into alert, clear silence so it rings
           if (status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/)) {
              acknowledgedList.delete(name); 
           }
       } 
-      else if(!lastState[name]) {
-          addLogEntry(`${name} connected: ${status}`, "info");
-      }
       lastState[name] = status;
       
-      // Alert Logic (Red Only triggers siren)
+      // Alert Logic
       if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
           anyCritical = true;
           if (!acknowledgedList.has(name)) {
@@ -257,8 +329,8 @@ function processAndRender(data) {
   });
   
   if(!anyCritical) {
-      stopAlarm();
-      acknowledgedList.clear();
+      stopAlarmSound();
+      acknowledgedList.clear(); // Safe to clear list if no alarms exist
   }
 
   // Render Grid
@@ -267,7 +339,6 @@ function processAndRender(data) {
       const s = w['Alarm Status'];
       return s !== 'DEPARTED' && s !== 'COMPLETED';
   }).sort((a,b) => {
-      // Sort Order: Duress > Red Alert > Amber > Normal
       const scoreA = getPriorityScore(a['Alarm Status']);
       const scoreB = getPriorityScore(b['Alarm Status']);
       return scoreB - scoreA;
@@ -280,23 +351,25 @@ function processAndRender(data) {
 
   sortedWorkers.forEach(w => {
     const status = w['Alarm Status'];
+    const name = w['Worker Name'];
     
     let cardClass = "bg-gray-800 border-l-4 border-blue-500";
     let statusClass = "text-blue-400";
     let resolveBtn = "";
     
     // Red Alert
-    if (status.includes('EMERGENCY') || status.includes('DURESS') || status.includes('ALERT') || status.includes('MISSED')) {
+    if (status.match(/EMERGENCY|DURESS|ALERT|MISSED/)) {
         const isDuress = status.includes('DURESS');
         cardClass = isDuress ? "bg-purple-900 border-l-8 border-purple-500 animate-pulse" : "bg-red-900 border-l-8 border-red-500 animate-pulse";
         statusClass = "text-white font-black bg-red-600 px-2 rounded";
+        // Button always present on tile if critical
         resolveBtn = makeResolveBtn(w);
     }
-    // Amber Alert (Visual Only)
+    // Amber Alert (Overdue) - NO BUTTON (Per user request)
     else if (status === 'OVERDUE') {
         cardClass = "bg-amber-900 border-l-8 border-amber-500";
         statusClass = "text-white font-bold bg-amber-600 px-2 rounded";
-        resolveBtn = makeResolveBtn(w);
+        resolveBtn = ""; // Explicitly empty
     }
     // Travelling
     else if(w['Location Name'] && w['Location Name'].includes('Travelling')) {
@@ -307,7 +380,7 @@ function processAndRender(data) {
     const start = new Date(w['Timestamp']);
     const mins = Math.floor((new Date() - start)/60000);
     
-    // DUE TIME / TIME REMAINING (New v14 Logic)
+    // DUE TIME
     let dueHtml = "";
     if (w['Anticipated Departure Time']) {
         const due = new Date(w['Anticipated Departure Time']);
@@ -315,12 +388,8 @@ function processAndRender(data) {
             const now = new Date();
             const diffMs = due - now;
             const diffMins = Math.floor(Math.abs(diffMs) / 60000);
-            
-            if (diffMs > 0) {
-                // Future: Green
-                dueHtml = `<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${diffMins}m remaining</div>`;
-            } else {
-                // Overdue: Amber/Red based on severity
+            if (diffMs > 0) dueHtml = `<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${diffMins}m remaining</div>`;
+            else {
                 const color = diffMins > 15 ? "bg-red-900/80 text-red-200 animate-pulse" : "bg-amber-900/80 text-amber-200";
                 dueHtml = `<div class="mt-2 text-xs ${color} px-2 py-1 rounded inline-block font-bold font-mono">⚠️ Overdue by ${diffMins}m</div>`;
             }
@@ -333,7 +402,7 @@ function processAndRender(data) {
     div.innerHTML = `
       <div>
         <div class="flex justify-between items-start mb-2">
-            <h3 class="text-2xl font-bold text-white truncate">${w['Worker Name']}</h3>
+            <h3 class="text-2xl font-bold text-white truncate">${name}</h3>
             <div class="text-right">
                 <span class="text-xs font-mono opacity-50 bg-black/30 px-2 py-1 rounded">${mins}m ago</span>
             </div>
@@ -395,7 +464,10 @@ async function playAlarm(w) {
     const isDuress = w['Alarm Status'].includes('DURESS');
     ov.className = isDuress ? 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white' : 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white';
     document.getElementById('alertDetails').innerHTML = `<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div><div class="mt-6 bg-black/40 px-6 py-2 rounded-full inline-block">${w['Alarm Status']}</div>`;
+    
+    // Add target to button for logic
     document.getElementById('btnSilence').dataset.worker = w['Worker Name'];
+
     if(Tone.context.state !== 'running') await Tone.start();
     alarm = new Tone.Oscillator(440, "square").toDestination().start();
     const lfo = new Tone.LFO("2n", 400, 800).start();
@@ -408,8 +480,11 @@ function silenceAlarm() {
     if(workerName) acknowledgedList.add(workerName);
     document.getElementById('alertOverlay').classList.add('hidden');
     stopAlarmSound();
+    // Force re-render so the Resolve button appears on grid (if it wasn't there)
+    // Actually grid re-renders on poll, but this makes UI snappy
+    const b = document.getElementById('btnSilence');
+    if(b) b.classList.remove('pressing');
 }
-function stopAlarm() { document.getElementById('alertOverlay').classList.add('hidden'); stopAlarmSound(); }
 function stopAlarmSound() { if(alarm) { alarm.stop(); alarm.dispose(); alarm = null; } }
 
 // ==================== RESOLUTION LOGIC ====================
@@ -418,6 +493,7 @@ function initiateResolve(workerName) {
     document.getElementById('resolveNameTarget').innerText = workerName;
     document.getElementById('resolveInput').value = "";
     document.getElementById('resolveModal').classList.remove('hidden');
+    document.getElementById('resolveInput').focus();
 }
 function closeResolve() { document.getElementById('resolveModal').classList.add('hidden'); activeWorkerToResolve = null; }
 
@@ -430,23 +506,37 @@ function confirmResolve() {
         params.append('Notes', 'Incident resolved by Monitor Dashboard');
         params.append('key', SECRET);
 
-        // FIX: Added mode: 'no-cors'
         fetch(URL, { method: 'POST', body: params, mode: 'no-cors' })
             .then(() => {
                 alert("Resolution Sent.");
                 closeResolve();
-                silenceAlarm();
+                stopAlarmSound();
                 lastState[activeWorkerToResolve] = 'SAFE - MONITOR CLEARED';
                 acknowledgedList.add(activeWorkerToResolve);
             })
             .catch(e => {
                  console.log("Resolve Error: " + e);
-                 // Even if error, close modal to prevent getting stuck
                  closeResolve();
             });
     } else {
         alert("Name does not match. Please type exactly: " + activeWorkerToResolve);
     }
+}
+
+// ==================== LONG PRESS UTILITY ====================
+function setupLongPress(btn, cb) {
+  let t; 
+  const start = (e) => { 
+      e.preventDefault(); 
+      btn.classList.add('pressing'); 
+      t = setTimeout(() => { cb(); end(); }, 1500); 
+  };
+  const end = () => { 
+      clearTimeout(t); 
+      btn.classList.remove('pressing'); 
+  };
+  btn.onmousedown = btn.ontouchstart = start; 
+  btn.onmouseup = btn.ontouchend = btn.onmouseleave = end;
 }
 
 function toggleNotifications() {
@@ -455,7 +545,6 @@ function toggleNotifications() {
     }
 }
 function updateClock() { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }
-document.addEventListener('DOMContentLoaded', () => { const btn = document.querySelector('#alertOverlay button'); if(btn) btn.id = "btnSilence"; });
 </script>
 </body>
 </html>
