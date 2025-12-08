@@ -325,6 +325,7 @@ let panicTapTimer;
 let deferredPrompt;
 let isMidVisitUpdate = false; 
 let currentActiveTemplate = "";
+let currentBatteryLevel = ""; // NEW: Battery Global
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
@@ -343,6 +344,15 @@ window.addEventListener('load', () => {
         state.settings.emergencyName = state.settings.emgName;
         state.settings.emergencyPhone = state.settings.emgPhone;
         state.settings.emergencyEmail = state.settings.emgEmail;
+    }
+
+    // Battery Monitor Init
+    if(navigator.getBattery) {
+        navigator.getBattery().then(b => {
+            const upd = () => { currentBatteryLevel = Math.round(b.level * 100) + "%"; };
+            upd(); 
+            b.addEventListener('levelchange', upd);
+        });
     }
 
     initLocations();
@@ -473,6 +483,7 @@ function buildPayload(data) {
         'Escalation Contact Number': state.settings.escalationPhone, 
         'Escalation Contact Email': state.settings.escalationEmail,
         'Anticipated Departure Time': dueTime,
+        'Battery Level': currentBatteryLevel, 
         'Template Name': currentActiveTemplate,
         ...data, 
         'Timestamp': new Date().toISOString()
@@ -992,13 +1003,22 @@ function preDepart(isSafeFlow) {
              if(state.activeVisit.gpsStart) {
                
                // ASYNC ORS CALL
-               fetchRoadDistance(state.activeVisit.gpsStart, end).then(km => {
+               fetchRoadDistance(state.activeVisit.gpsStart, end).then(result => {
                     const inp = document.querySelector('input[data-key="Distance (km)"]');
                     if(inp) { 
-                        inp.value = km; 
+                        inp.value = result.km; 
                         inp.disabled = false; 
                         inp.placeholder = ""; 
-                        inp.style.borderColor = "#4ade80"; // Green border to show success
+                        inp.style.borderColor = "#4ade80"; 
+                        
+                        // IF FALLBACK USED, POPULATE NOTE
+                        if(result.isFallback) {
+                            const detailBox = document.querySelector('textarea[data-key="Details"]');
+                            if(detailBox) {
+                                detailBox.value = "⚠️ As-the-crow-flies calculation only (GPS/Network unavailable for road stats).";
+                                detailBox.style.borderColor = "#facc15"; 
+                            }
+                        }
                     }
                });
              }
@@ -1026,7 +1046,7 @@ async function fetchRoadDistance(p1, p2) {
     const crow = calcDist(p1, p2); // Fallback
     
     // If no key or offline, return crow flies immediately
-    if(!CONFIG.orsKey || !navigator.onLine) return crow;
+    if(!CONFIG.orsKey || !navigator.onLine) return { km: crow, isFallback: true };
     
     try {
         // ORS format: lon,lat
@@ -1042,11 +1062,11 @@ async function fetchRoadDistance(p1, p2) {
         
         const json = await res.json();
         const meters = json.features[0].properties.segments[0].distance;
-        return (meters / 1000).toFixed(2);
+        return { km: (meters / 1000).toFixed(2), isFallback: false };
         
     } catch(e) {
         console.warn("ORS Fail, using Haversine", e);
-        return crow;
+        return { km: crow, isFallback: true };
     }
 }
 
