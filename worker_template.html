@@ -298,7 +298,8 @@ const CONFIG = {
     checkinEnabled: %%CHECKIN_ENABLED%%,   
     checkinInterval: %%CHECKIN_INTERVAL%%,
     escalationMinutes: %%ESCALATION_MINUTES%%, 
-    key: "%%SECRET_KEY%%"
+    key: "%%SECRET_KEY%%",
+    orsKey: "%%ORS_API_KEY%%"
 }; 
 const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 
@@ -979,6 +980,7 @@ function preDepart(isSafeFlow) {
 
         loadFormAndShow(l.templateName || "(Standard)");
         
+        // --- MILEAGE LOGIC ---
         if(l.id === 'travel' && CONFIG.mileage) {
            setTimeout(() => {
                const inp = document.querySelector('input[data-key="Distance (km)"]');
@@ -988,9 +990,17 @@ function preDepart(isSafeFlow) {
            navigator.geolocation.getCurrentPosition(pos => {
              const end = pos.coords.latitude+','+pos.coords.longitude;
              if(state.activeVisit.gpsStart) {
-               const km = calcDist(state.activeVisit.gpsStart, end);
-               const inp = document.querySelector('input[data-key="Distance (km)"]');
-               if(inp) { inp.value = km; inp.disabled = false; inp.placeholder = ""; inp.style.borderColor = "#4ade80"; }
+               
+               // ASYNC ORS CALL
+               fetchRoadDistance(state.activeVisit.gpsStart, end).then(km => {
+                    const inp = document.querySelector('input[data-key="Distance (km)"]');
+                    if(inp) { 
+                        inp.value = km; 
+                        inp.disabled = false; 
+                        inp.placeholder = ""; 
+                        inp.style.borderColor = "#4ade80"; // Green border to show success
+                    }
+               });
              }
            }, (err) => {
                const inp = document.querySelector('input[data-key="Distance (km)"]');
@@ -1010,6 +1020,36 @@ function preDepart(isSafeFlow) {
         withPinVerification(false, proceed);
     }
 }
+
+// --- NEW ORS FUNCTION ---
+async function fetchRoadDistance(p1, p2) {
+    const crow = calcDist(p1, p2); // Fallback
+    
+    // If no key or offline, return crow flies immediately
+    if(!CONFIG.orsKey || !navigator.onLine) return crow;
+    
+    try {
+        // ORS format: lon,lat
+        const [lat1, lon1] = p1.split(',');
+        const [lat2, lon2] = p2.split(',');
+        
+        const url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${lon1},${lat1}&end=${lon2},${lat2}`;
+        const res = await fetch(url, { 
+            headers: { 'Authorization': CONFIG.orsKey } 
+        });
+        
+        if(!res.ok) throw new Error("ORS Error");
+        
+        const json = await res.json();
+        const meters = json.features[0].properties.segments[0].distance;
+        return (meters / 1000).toFixed(2);
+        
+    } catch(e) {
+        console.warn("ORS Fail, using Haversine", e);
+        return crow;
+    }
+}
+
 
 function quickStat() {
     if(!state.selectedLocationId) return;
