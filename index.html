@@ -142,10 +142,11 @@
                 <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
                     <li>Click the <strong>+</strong> icon at the bottom left to add a new sheet.</li>
                     <li>Double-click the new tab and rename it to <strong>Checklists</strong>.</li>
-                    <li>Click the button below to copy the template structure.</li>
+                    <li>Click the button below to copy the template structure <strong>AND</strong> Legend.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
+                    <li>Scroll down to <strong>Row 20</strong> to see the Help Legend.</li>
                 </ol>
-                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup</button>
+                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup (+Legend)</button>
             </div>
           </div>
           
@@ -160,7 +161,7 @@
                 </ol>
                 <button onclick="copyReportGuide()" class="w-full btn bg-yellow-600 hover:bg-yellow-500 text-white py-2">Copy Reporting Guide</button>
           </div>
-          
+
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
 
@@ -402,16 +403,25 @@
       alert("Headers copied! (Includes all 25 columns)\n\nPaste into cell A1 of 'Visits' tab.");
     }
 
+    // UPDATED FUNCTION (v18.0)
     function copyChecklistSetup() {
       let h = "Company Name\tTemplate Name\tEmail Recipient";
       for(let i=1; i<=30; i++) h += "\tQuestion " + i;
-      const rows = "\nGlobal\t(Standard)\t\t[TEXT] Notes\t[PHOTO] Photo?" + 
+
+      // Updated Standard Template
+      const rows = 
+        "\nGlobal\t(Standard)\t\t[TEXT] Notes\t[PHOTO] Photo?" + 
         "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
         "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
+      
       const gap = "\n".repeat(16); 
+      
       const instruction = "Edit the '(Standard)' row to define your default site report.\nTo make a form available globally, set Column A to \"FORMS\" and Column B to the name. Add an Email Address in Column C to auto-email completed forms.";
-      const legend = "\nTEMPLATE CODE LEGEND\n" + instruction + "\n" +
+
+      const legend = 
+        "\nTEMPLATE CODE LEGEND\n" + instruction + "\n" +
         "[TEXT]\tText Input Box\n[NUMBER]\tNumber Keypad\n[YESNO]\tYes / No Buttons\n[CHECK]\tCheckbox\n[PHOTO]\tCamera Button\n[GPS]\tGPS Location Button\n[SIGN]\tSignature Pad\n[HEADING]\tSection Title\n[NOTE]\tRead-only Instruction\n$... \tSpecial Calculation";
+
       navigator.clipboard.writeText(h + rows + gap + legend);
       alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
     }
@@ -546,10 +556,18 @@ RECIPE 10: FORM DATA EXPORT
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([
-          fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.gs')
+          fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.js')
         ]);
         if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing templates");
-        tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
+        tplWorker = await resW.text(); 
+        tplMonitor = await resM.text(); 
+        tplBackend = await resB.text();
+        
+        // Safety Check: Did we get HTML by mistake?
+        if(tplBackend.trim().startsWith("<!DOCTYPE html>")) {
+            throw new Error("SERVER ERROR: The browser loaded index.html instead of the Backend code. Please ensure the file is named 'backend_template.js'.");
+        }
+        
         generateScript();
       } catch(e) { alert("Error: " + e.message); }
     }
