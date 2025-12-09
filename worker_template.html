@@ -131,7 +131,7 @@ canvas {
     </div>
 
     <div class="space-y-3 w-full">
-        <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend 10m</button>
+        <button id="btnExtend" class="long-press-btn w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Extend Time</button>
         <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">📝 Add Notes / Checklist</button>
         <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button>
         <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
@@ -239,6 +239,16 @@ canvas {
             <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
             <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
+    </div>
+
+    <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+        <h2 class="text-xl font-bold mb-6 text-white">Extend Visit</h2>
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button>
+            <button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button>
+            <button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button>
+        </div>
+        <button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button>
     </div>
 
     <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center">
@@ -402,15 +412,16 @@ window.addEventListener('load', () => {
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.remove('hidden');
+    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : id === 'extend' ? 'extendModal' : 'infoModal').classList.remove('hidden');
     if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); 
 }
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : 'infoModal').classList.add('hidden');
+    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : id === 'extend' ? 'extendModal' : 'infoModal').classList.add('hidden');
     document.getElementById('checkinModal').classList.add('hidden');
     document.getElementById('templateModal').classList.add('hidden'); 
+    document.getElementById('extendModal').classList.add('hidden');
 }
 function navigate(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -810,7 +821,7 @@ function enterLockedScreen() {
     tick(); 
     
     setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
-    setupLongPress(document.getElementById('btnExtend'), extendVisit);
+    setupLongPress(document.getElementById('btnExtend'), () => showModal('extend'));
     
     if(timerInt) clearInterval(timerInt);
     timerInt = setInterval(tick, 1000);
@@ -924,13 +935,26 @@ function confirmCheckin() {
     saveState();
 }
 
-function extendVisit() {
-    withPinVerification(false, () => {
-        state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + 15 * 60000);
+function confirmExtension(mins) {
+    const process = () => {
+        state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + mins * 60000);
         saveState();
         playSoundAndVibrate('extend');
-        processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended 15m" }));
-    });
+        processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended " + mins + "m" }));
+    };
+
+    const now = new Date();
+    const due = new Date(state.activeVisit.anticipatedDepartureTime);
+    const isOverdue = (due - now) < 0;
+    const isPanic = state.activeVisit.isPanic === true;
+
+    closeModal('extend');
+
+    if (isOverdue || isPanic) {
+        withPinVerification(false, process);
+    } else {
+        process();
+    }
 }
 
 function handlePanicTap() {
