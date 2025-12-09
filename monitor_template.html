@@ -330,36 +330,49 @@ function processAndRender(data) {
   // State Change Detection & Map Updates
   Object.values(workers).forEach(w => {
       const name = w['Worker Name'];
-      const status = w['Alarm Status'];
+      let status = w['Alarm Status'];
+      
+      // --- LOGIC FIX: LOCAL ESCALATION ---
+      let overdueMins = 0;
+      if (w['Anticipated Departure Time']) {
+          const due = new Date(w['Anticipated Departure Time']);
+          if(!isNaN(due)) {
+              const diffMs = new Date() - due;
+              if(diffMs > 0) overdueMins = Math.floor(diffMs / 60000);
+          }
+      }
+      
+      const isCriticalOverdue = (status === 'OVERDUE' && overdueMins > 15);
+      const isCritical = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/) || isCriticalOverdue;
       
       // Update Map
       updateMapMarker(w);
       
       if(lastState[name] && lastState[name] !== status) {
           let type = "info";
-          if(status.match(/EMERGENCY|DURESS|PANIC|OVERDUE/)) type = "alert";
+          if(isCritical || status === 'OVERDUE') type = "alert";
           if(status === "DEPARTED" || status.includes("SAFE")) type = "success";
           addLogEntry(`${name}: ${status}`, type);
           
-          if (status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT|OVERDUE/)) {
+          if (isCritical) {
              acknowledgedList.delete(name); 
           }
       } 
       lastState[name] = status;
       
       // Alert Logic
-      if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
+      if(isCritical) {
           anyCritical = true;
           if (!acknowledgedList.has(name)) {
               activeAlertFound = true;
-              playAlarm(w);
+              playAlarm(w, isCriticalOverdue);
           }
       }
   });
   
   if(!anyCritical) {
       stopAlarmSound();
-      acknowledgedList.clear(); // Safe to clear list if no alarms exist
+      acknowledgedList.clear(); 
   }
 
   // Render Grid
@@ -368,8 +381,12 @@ function processAndRender(data) {
       const s = w['Alarm Status'];
       return s !== 'DEPARTED' && s !== 'COMPLETED';
   }).sort((a,b) => {
-      const scoreA = getPriorityScore(a['Alarm Status']);
-      const scoreB = getPriorityScore(b['Alarm Status']);
+      // Custom sorting including local calc
+      let scoreA = getPriorityScore(a['Alarm Status']);
+      let scoreB = getPriorityScore(b['Alarm Status']);
+      // Boost Score if locally critical
+      if(isLocallyCritical(a)) scoreA = 3; 
+      if(isLocallyCritical(b)) scoreB = 3;
       return scoreB - scoreA;
   });
 
@@ -381,24 +398,24 @@ function processAndRender(data) {
   sortedWorkers.forEach(w => {
     const status = w['Alarm Status'];
     const name = w['Worker Name'];
+    const criticalOverdue = isLocallyCritical(w);
     
     let cardClass = "bg-gray-800 border-l-4 border-blue-500";
     let statusClass = "text-blue-400";
     let resolveBtn = "";
     
-    // Red Alert
-    if (status.match(/EMERGENCY|DURESS|ALERT|MISSED/)) {
+    // Red Alert (Server or Local)
+    if (status.match(/EMERGENCY|DURESS|ALERT|MISSED/) || criticalOverdue) {
         const isDuress = status.includes('DURESS');
         cardClass = isDuress ? "bg-purple-900 border-l-8 border-purple-500 animate-pulse" : "bg-red-900 border-l-8 border-red-500 animate-pulse";
         statusClass = "text-white font-black bg-red-600 px-2 rounded";
-        // Button always present on tile if critical
         resolveBtn = makeResolveBtn(w);
     }
-    // Amber Alert (Overdue) - NO BUTTON (Per user request)
+    // Amber Alert (Overdue)
     else if (status === 'OVERDUE') {
         cardClass = "bg-amber-900 border-l-8 border-amber-500";
         statusClass = "text-white font-bold bg-amber-600 px-2 rounded";
-        resolveBtn = ""; // Explicitly empty
+        resolveBtn = ""; 
     }
     // Travelling
     else if(w['Location Name'] && w['Location Name'].includes('Travelling')) {
@@ -419,7 +436,7 @@ function processAndRender(data) {
             const diffMins = Math.floor(Math.abs(diffMs) / 60000);
             if (diffMs > 0) dueHtml = `<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${diffMins}m remaining</div>`;
             else {
-                const color = diffMins > 15 ? "bg-red-900/80 text-red-200 animate-pulse" : "bg-amber-900/80 text-amber-200";
+                const color = diffMins > 15 ? "bg-red-900/80 text-red-200 font-black animate-pulse" : "bg-amber-900/80 text-amber-200";
                 dueHtml = `<div class="mt-2 text-xs ${color} px-2 py-1 rounded inline-block font-bold font-mono">⚠️ Overdue by ${diffMins}m</div>`;
             }
         }
@@ -440,7 +457,7 @@ function processAndRender(data) {
         <div class="text-xs text-gray-500 mb-4 truncate">${w['Location Address'] || ''}</div>
         
         <div class="flex items-center justify-between bg-black/20 p-3 rounded-lg">
-            <span class="${statusClass} uppercase text-sm font-bold tracking-wider">${status}</span>
+            <span class="${statusClass} uppercase text-sm font-bold tracking-wider">${criticalOverdue ? 'EMERGENCY (OVERDUE)' : status}</span>
             <span class="text-xs font-mono ${getBatColor(w['Battery Level'])}">🔋 ${w['Battery Level'] || '?'}</span>
         </div>
         
@@ -459,6 +476,14 @@ function processAndRender(data) {
     `;
     list.appendChild(div);
   });
+}
+
+function isLocallyCritical(w) {
+    if(!w['Anticipated Departure Time']) return false;
+    const due = new Date(w['Anticipated Departure Time']);
+    if(isNaN(due)) return false;
+    const diff = (new Date() - due) / 60000;
+    return w['Alarm Status'] === 'OVERDUE' && diff > 15;
 }
 
 function makeResolveBtn(w) {
@@ -482,7 +507,7 @@ function getBatColor(bat) {
 }
 
 // ==================== ALARM SYSTEM ====================
-async function playAlarm(w) {
+async function playAlarm(w, localOverdue = false) {
   if(Notification.permission === "granted") {
       new Notification(`🚨 ${w['Alarm Status']}: ${w['Worker Name']}`, { body: `Location: ${w['Location Name']}`, icon: '%%LOGO_URL%%' });
   }
@@ -492,12 +517,18 @@ async function playAlarm(w) {
     ov.classList.remove('hidden');
     const isDuress = w['Alarm Status'].includes('DURESS');
     ov.className = isDuress ? 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white' : 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white';
-    document.getElementById('alertDetails').innerHTML = `<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div><div class="mt-6 bg-black/40 px-6 py-2 rounded-full inline-block">${w['Alarm Status']}</div>`;
     
-    // Add target to button for logic
+    // Logic to show Correct Status even if Server lags
+    const displayStatus = localOverdue ? "EMERGENCY - OVERDUE (Local Calc)" : w['Alarm Status'];
+    
+    document.getElementById('alertDetails').innerHTML = `<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div><div class="mt-6 bg-black/40 px-6 py-2 rounded-full inline-block">${displayStatus}</div>`;
+    
     document.getElementById('btnSilence').dataset.worker = w['Worker Name'];
 
+    // FORCE AUDIO WAKE
     if(Tone.context.state !== 'running') await Tone.start();
+    if(Tone.context.state === 'suspended') await Tone.context.resume();
+    
     alarm = new Tone.Oscillator(440, "square").toDestination().start();
     const lfo = new Tone.LFO("2n", 400, 800).start();
     lfo.connect(alarm.frequency);
