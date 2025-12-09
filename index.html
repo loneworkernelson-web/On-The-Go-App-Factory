@@ -243,8 +243,14 @@
             <label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label>
             <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()">
           </div>
-          <div class="flex justify-center"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button></div>
-          <div id="testResult" class="text-center font-bold text-lg hidden"></div>
+          
+          <div class="flex justify-center gap-4">
+              <button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button>
+              <button id="btnGenTemplate" onclick="triggerTemplateSetup()" disabled class="hidden btn bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">🪄 Auto-Generate PDF Template</button>
+          </div>
+          
+          <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
+          
           <div class="flex justify-between pt-6">
             <button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button>
             <button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button>
@@ -410,7 +416,6 @@
       alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
     }
 
-    // NEW: Generate AI Guide
     function copyReportGuide() {
         const guide = `AI REPORTING GUIDE
 Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
@@ -569,6 +574,7 @@ RECIPE 10: FORM DATA EXPORT
         const result = document.getElementById('testResult');
         const btnNext = document.getElementById('btnNextDownload');
         const key = document.getElementById('secretKey').value;
+        const btnTemplate = document.getElementById('btnGenTemplate');
         
         if(!url.includes('/exec')) { alert('Invalid URL'); return; }
         
@@ -579,10 +585,37 @@ RECIPE 10: FORM DATA EXPORT
                 if(data.status === "success") {
                   result.textContent = "✅ Connection Successful!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
                   btnNext.disabled = false; btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
+                  // Enable Template Button
+                  btnTemplate.classList.remove('hidden');
+                  btnTemplate.disabled = false;
                   document.getElementById('finalAppName').innerText = document.getElementById('orgName').value + " Safety";
                 } else { throw new Error("Invalid Key"); }
             }).catch(() => {
                 result.textContent = "❌ Connection Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block";
+            });
+    }
+    
+    // TRIGGER THE SETUP WIZARD
+    function triggerTemplateSetup() {
+        const url = document.getElementById('webAppUrl').value;
+        const key = document.getElementById('secretKey').value;
+        
+        // Visual Feedback
+        const btn = document.getElementById('btnGenTemplate');
+        const originalText = btn.innerText;
+        btn.innerText = "⏳ Generating...";
+        btn.disabled = true;
+        
+        fetch(url + '?run=setupTemplate&key=' + encodeURIComponent(key))
+            .then(res => res.text())
+            .then(txt => {
+                alert(txt);
+                btn.innerText = "✅ Done";
+            })
+            .catch(err => {
+                alert("Setup Failed: " + err);
+                btn.innerText = originalText;
+                btn.disabled = false;
             });
     }
 
