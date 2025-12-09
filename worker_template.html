@@ -272,11 +272,11 @@ canvas {
             <h3 class="font-bold text-white">1. Starting a Visit</h3>
             <p>Select a location. Press START (1.5s).</p>
             <h3 class="font-bold text-white">2. During Visit</h3>
-            <p>Use <strong>Extend</strong> or <strong>Depart</strong>.</p>
+            <p>Use <strong>Extend</strong> or <strong>HOLD TO END</strong>.</p>
             <h3 class="font-bold text-white">3. Duress</h3>
             <p>Enter <strong>Duress PIN</strong> to silently alarm.</p>
-            <h3 class="font-bold text-white">4. Offline</h3>
-            <p>Works offline. Uploads automatically.</p>
+            <h3 class="font-bold text-white">4. Travelling</h3>
+            <p>Updates location every 5 mins. Keep app open.</p>
         </div>
         <div class="mt-6 flex justify-end"><button onclick="closeModal('info')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Close</button></div>
     </div>
@@ -336,7 +336,7 @@ let state = {
 };
 
 // Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt;
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
 let tempPhoto = null;
 let sigPad = null;
 let panicTapCount = 0;
@@ -357,6 +357,11 @@ window.addEventListener('load', () => {
 
     state.settings.googleSheetUrl = CONFIG.url; 
     
+    // RESTORE TRAVELLING PULSE IF ACTIVE
+    if(state.activeVisit && state.activeVisit.locationId === 'travel') {
+        startTravellingPulse();
+    }
+
     if(state.settings.name && !state.settings.workerName) {
         state.settings.workerName = state.settings.name;
         state.settings.workerPhone = state.settings.phone;
@@ -764,6 +769,13 @@ function updateArrivedButtonState() {
 
 function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
+    
+    // --- TRAVELLING PULSE LOGIC ---
+    if(sel.id === 'travel') {
+        startTravellingPulse();
+    }
+    // ------------------------------
+
     const now = new Date();
     
     if(state.settings.name && !state.settings.workerName) {
@@ -789,9 +801,10 @@ function startVisit() {
     requestWakeLock();
 
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
+    const initialStatus = sel.id === 'travel' ? 'TRAVELLING' : 'ON SITE';
     
     processUploadQueue(buildPayload({ 
-        "Alarm Status": 'ON SITE', 
+        "Alarm Status": initialStatus, 
         "Notes": "Visit Started (Locating...)",
         "Location Name": locName,
         "Location Address": sel.address 
@@ -801,17 +814,44 @@ function startVisit() {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
             processUploadQueue(buildPayload({ 
-                "Alarm Status": 'ON SITE', 
+                "Alarm Status": initialStatus, 
                 "Notes": "Location Confirmed",
                 "Location Name": locName,
                 "Last Known GPS": state.activeVisit.gpsStart
             }));
             saveState();
         }, () => {
-            processUploadQueue(buildPayload({ "Alarm Status": 'ON SITE', "Notes": "Visit Started (GPS Slow)" }));
+            processUploadQueue(buildPayload({ "Alarm Status": initialStatus, "Notes": "Visit Started (GPS Slow)" }));
         }, { timeout: 5000, maximumAge: 60000 });
     }
 }
+
+// --- NEW PULSE FUNCTIONS ---
+function startTravellingPulse() {
+    // 1. Force Dark Mode
+    toggleBatterySaver(); 
+    // 2. Start Interval (5 Mins)
+    if(travellingInterval) clearInterval(travellingInterval);
+    travellingInterval = setInterval(sendTravellingPulse, 300000); 
+}
+
+function sendTravellingPulse() {
+    if(!navigator.onLine) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+         const gps = pos.coords.latitude + "," + pos.coords.longitude;
+         // Send Silent Update
+         const payload = buildPayload({
+             "Alarm Status": "TRAVELLING",
+             "Last Known GPS": gps,
+             "Notes": "Auto-Location Update"
+         });
+         // Don't flood the pending queue, just fire and forget for background pulses
+         const fd = new FormData();
+         for(let k in payload) fd.append(k, payload[k]);
+         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(()=>{});
+    }, err => console.log(err));
+}
+// ---------------------------
 
 function enterLockedScreen() {
     const l = state.locations.find(l => l.id === state.activeVisit.locationId) || {name: 'Unknown'};
@@ -1271,6 +1311,10 @@ function submitReport() {
 
 function depart(reportData = {}) {
     playSoundAndVibrate('depart');
+    
+    // STOP PULSE
+    if(travellingInterval) clearInterval(travellingInterval);
+    document.getElementById('batterySaver').classList.add('hidden');
     
     let noteStr = reportData.notes || "";
     if(reportData.custom) {
