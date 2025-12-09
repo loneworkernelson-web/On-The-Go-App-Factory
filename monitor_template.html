@@ -235,15 +235,26 @@ function initMap() {
 
 function updateMapMarker(w) {
     if(!map) return;
+    const name = w['Worker Name'];
+    const status = w['Alarm Status'];
+
+    // 1. GARBAGE COLLECTION: Remove pin if departed
+    if (status === 'DEPARTED' || status === 'COMPLETED' || status.includes('SAFE - MONITOR')) {
+        if (markers[name]) {
+            map.removeLayer(markers[name]);
+            delete markers[name];
+        }
+        return;
+    }
+
     const gps = w['Last Known GPS'];
     if(!gps || !gps.includes(',')) return;
     
     const [lat, lon] = gps.split(',').map(parseFloat);
-    const status = w['Alarm Status'];
     let color = '#4ade80'; // Green
     if(status === 'OVERDUE') color = '#f59e0b'; // Amber
     if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/)) color = '#ef4444'; // Red
-    if(w['Location Name'].includes('Travelling')) color = '#60a5fa'; // Blue
+    if(w['Location Name'].includes('Travelling') || status === 'TRAVELLING') color = '#60a5fa'; // Blue
     
     // Custom Icon SVG
     const iconHtml = `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5); animation: ${status.match(/EMERGENCY|DURESS/) ? 'pulse-red 1s infinite' : 'none'}"></div>`;
@@ -518,14 +529,12 @@ async function playAlarm(w, localOverdue = false) {
     const isDuress = w['Alarm Status'].includes('DURESS');
     ov.className = isDuress ? 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white' : 'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white';
     
-    // Logic to show Correct Status even if Server lags
     const displayStatus = localOverdue ? "EMERGENCY - OVERDUE (Local Calc)" : w['Alarm Status'];
     
     document.getElementById('alertDetails').innerHTML = `<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div><div class="mt-6 bg-black/40 px-6 py-2 rounded-full inline-block">${displayStatus}</div>`;
     
     document.getElementById('btnSilence').dataset.worker = w['Worker Name'];
 
-    // FORCE AUDIO WAKE
     if(Tone.context.state !== 'running') await Tone.start();
     if(Tone.context.state === 'suspended') await Tone.context.resume();
     
