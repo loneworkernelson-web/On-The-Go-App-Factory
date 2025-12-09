@@ -33,7 +33,7 @@ body{font-family:'Inter',sans-serif}
 #mapContainer { height: 100%; width: 100%; background: #0f172a; }
 </style>
 </head>
-<body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden">
+<body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden" onclick="unlockAudio()">
 
 <div id="setupPage" class="h-full flex items-center justify-center p-4 z-50 bg-gray-900 absolute inset-0">
   <div class="text-center space-y-6 max-w-md w-full bg-gray-800 p-10 rounded-2xl shadow-2xl border border-gray-700">
@@ -49,6 +49,10 @@ body{font-family:'Inter',sans-serif}
 
 <div id="dashboardPage" class="hidden h-full flex flex-col">
   
+  <div id="audioWarning" class="hidden bg-red-600 text-white font-bold text-center py-2 uppercase tracking-widest cursor-pointer hover:bg-red-500 animate-pulse z-50">
+      🔇 Audio Suspended - Click Here to Enable Alarm Sound 🔇
+  </div>
+
   <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
     <div class="flex items-center gap-3">
       <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain" onerror="this.style.display='none'">
@@ -138,6 +142,7 @@ let acknowledgedList = new Set();
 let activeWorkerToResolve = null;
 let map, markers = {};
 let currentView = 'grid';
+let audioHeartbeat;
 
 // ==================== LOGIN LOGIC ====================
 function login() {
@@ -149,11 +154,14 @@ function login() {
   }
 }
 
-function startSession() {
+async function startSession() {
     document.getElementById('setupPage').classList.add('hidden'); 
     document.getElementById('dashboardPage').classList.remove('hidden'); 
     document.getElementById('dashboardPage').classList.add('flex'); 
-    Tone.start();
+    
+    // Audio Context Start
+    await Tone.start();
+    
     addLogEntry("Monitor Session Started");
     
     // Init Map
@@ -162,6 +170,10 @@ function startSession() {
     fetchData(); 
     pollInt=setInterval(fetchData, 10000); 
     setInterval(updateClock, 1000);
+    
+    // START AUDIO HEARTBEAT
+    audioHeartbeat = setInterval(checkAudioStatus, 2000); // Check every 2s
+    
     if(Notification.permission === "granted") document.getElementById('btnNotify').innerText = "Alerts Active ✅";
     
     // Setup Long Press
@@ -175,6 +187,7 @@ window.onload = () => {
 
 function logout(){ 
     clearInterval(pollInt); 
+    clearInterval(audioHeartbeat);
     localStorage.removeItem('otg_monitor_key');
     location.reload(); 
 }
@@ -192,6 +205,22 @@ function setView(mode) {
         document.getElementById('mapView').classList.add('hidden');
         document.getElementById('btnViewGrid').className = "px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold";
         document.getElementById('btnViewMap').className = "px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold";
+    }
+}
+
+// ==================== AUDIO HEARTBEAT ====================
+function checkAudioStatus() {
+    if (Tone.context.state === 'suspended') {
+        document.getElementById('audioWarning').classList.remove('hidden');
+    } else {
+        document.getElementById('audioWarning').classList.add('hidden');
+    }
+}
+
+async function unlockAudio() {
+    if (Tone.context.state !== 'running') {
+        await Tone.start();
+        checkAudioStatus();
     }
 }
 
@@ -480,8 +509,6 @@ function silenceAlarm() {
     if(workerName) acknowledgedList.add(workerName);
     document.getElementById('alertOverlay').classList.add('hidden');
     stopAlarmSound();
-    // Force re-render so the Resolve button appears on grid (if it wasn't there)
-    // Actually grid re-renders on poll, but this makes UI snappy
     const b = document.getElementById('btnSilence');
     if(b) b.classList.remove('pressing');
 }
