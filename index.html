@@ -20,15 +20,11 @@
     .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
     .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
-    a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
-    a.link:hover { color: #93c5fd; }
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     details > summary { list-style: none; outline: none; cursor: pointer; }
     details > summary::-webkit-details-marker { display: none; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #4b5563; padding: 8px; text-align: left; font-size: 0.9rem; }
-    th { background-color: #374151; color: #fff; }
+    a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4">
@@ -36,7 +32,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Lone Worker System Generator (v35.4 Clean)</p>
+      <p class="text-gray-400">Lone Worker System Generator (v36.0 Fixed)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -134,7 +130,7 @@
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
                     <li><strong>Freeze Header:</strong> Go to the menu <strong>View > Freeze > 1 Row</strong>. This keeps the header visible while scrolling.</li>
                 </ol>
-                <button onclick="copyVisitsHeaders()" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
+                <button id="btnCopyHeaders" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
             </div>
 
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
@@ -145,7 +141,7 @@
                     <li>Click the button below to copy the template structure.</li>
                     <li>Right-click cell <strong>A1</strong> and select <strong>Paste</strong>.</li>
                 </ol>
-                <button onclick="copyChecklistSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup</button>
+                <button id="btnCopyChecklist" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Checklists' Setup</button>
             </div>
           </div>
           
@@ -158,7 +154,7 @@
                     <li>Click the button below to copy the <strong>Prompt Recipes & Data Map</strong>.</li>
                     <li>Paste into cell <strong>A1</strong>.</li>
                 </ol>
-                <button onclick="copyReportGuide()" class="w-full btn bg-yellow-600 hover:bg-yellow-500 text-white py-2">Copy Reporting Guide</button>
+                <button id="btnCopyReportGuide" class="w-full btn bg-yellow-600 hover:bg-yellow-500 text-white py-2">Copy Reporting Guide</button>
           </div>
 
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
@@ -377,6 +373,172 @@
       }
     }
 
+    async function copyScript() {
+        const text = document.getElementById('codeDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(text);
+            alert("Code copied to clipboard!");
+        } catch (err) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert("Code copied to clipboard!");
+        }
+    }
+
+    // --- ATTACH EVENT LISTENERS SAFELY ---
+    document.getElementById('btnCopyHeaders').onclick = copyVisitsHeaders;
+    document.getElementById('btnCopyChecklist').onclick = copyChecklistSetup;
+    document.getElementById('btnCopyReportGuide').onclick = copyReportGuide;
+
+    function copyVisitsHeaders() {
+      const isAdv = document.getElementById('chkAdvanced').checked;
+      const contacts = "Emergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email";
+      const basic = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
+      const adv = "\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4";
+      navigator.clipboard.writeText(basic + (isAdv ? adv : ""));
+      alert("Headers copied! (Includes all 25 columns)\n\nPaste into cell A1 of 'Visits' tab.");
+    }
+
+    function copyChecklistSetup() {
+      let h = "Company Name\tTemplate Name\tEmail Recipient";
+      for(let i=1; i<=30; i++) h += "\tQuestion " + i;
+      const rows = 
+        "\nGlobal\t(Standard)\t\t[TEXT] Notes\t[PHOTO] Photo?" + 
+        "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
+        "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
+      const gap = "\n".repeat(16); 
+      const instruction = "Edit the '(Standard)' row to define your default site report.\nTo make a form available globally, set Column A to \"FORMS\" and Column B to the name. Add an Email Address in Column C to auto-email completed forms.";
+      const legend = "\nTEMPLATE CODE LEGEND\n" + instruction + "\n" +
+        "[TEXT]\tText Input Box\n[NUMBER]\tNumber Keypad\n[YESNO]\tYes / No Buttons\n[CHECK]\tCheckbox\n[PHOTO]\tCamera Button\n[GPS]\tGPS Location Button\n[SIGN]\tSignature Pad\n[HEADING]\tSection Title\n[NOTE]\tRead-only Instruction\n$... \tSpecial Calculation";
+      navigator.clipboard.writeText(h + rows + gap + legend);
+      alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
+    }
+
+    function copyReportGuide() {
+        const guide = `AI REPORTING GUIDE
+Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
+
+---------------------------------------------------
+SECTION 1: DEPLOYMENT RULE (READ FIRST)
+---------------------------------------------------
+If you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):
+1. You DO NOT need to update the Web App Deployment.
+2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).
+3. The script runs "locally" inside the sheet.
+
+Only update the Web App Deployment if you change "doPost" or "doGet" (the core backend).
+
+---------------------------------------------------
+SECTION 2: DATA MAP (For the AI)
+---------------------------------------------------
+Paste this into your AI prompt so it knows your data structure:
+
+"I have a Google Sheet named 'Visits'.
+The columns are mapped as follows:
+- Col A: Timestamp (Start of Visit)
+- Col C: Worker Name
+- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')
+- Col M: Location Name
+- Col P: Device Timestamp (End of Visit / Last Check-in)
+- Col Q: Battery Level (e.g. '85%')
+- Col S: Distance (km)
+- Col T: Visit Report Data (JSON string containing form answers)
+- Col U: Anticipated Departure Time"
+
+---------------------------------------------------
+SECTION 2B: LONG-TERM HISTORY (THE ARCHIVE)
+---------------------------------------------------
+PRO TIP: If you need a report covering more than 30 days (e.g., Annual Mileage), you must tell the AI to look at the Archive.
+
+Add this to your prompt:
+"Please note: Older data is moved to a sheet named 'Archive'. Please modify the script to read data from BOTH the 'Visits' sheet and the 'Archive' sheet, combine them into one array, and then generate the report."
+
+---------------------------------------------------
+SECTION 3: PROMPT RECIPES (Copy & Paste these)
+---------------------------------------------------
+
+RECIPE 1: MILEAGE REPORT
+"Write a Google Apps Script function called 'generateMileageReport'.
+1. Read all data from 'Visits'.
+2. Create/Overwrite a sheet called 'Mileage Report'.
+3. Group data by Worker Name (Col C) and Location (Col M).
+4. Sum the Distance (Col S) for each group.
+5. Create a clean table: Worker | Location | Total KM.
+6. Add a Grand Total at the bottom."
+
+RECIPE 2: TIMESHEET (PAYROLL)
+"Write a script called 'generateTimesheet'.
+1. Read 'Visits'.
+2. Calculate duration in minutes: (Col P - Col A).
+3. Ignore rows where Status is not 'DEPARTED'.
+4. Create a sheet 'Weekly Timesheet'.
+5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).
+6. Sum Total Hours per Worker."
+
+RECIPE 3: SAFETY AUDIT (COMPLIANCE)
+"Write a script called 'auditSafety'.
+1. Read 'Visits'.
+2. Identify rows where Battery Level (Col Q) is < 20%.
+3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.
+4. Create a sheet 'Safety Audit'.
+5. List these high-risk visits.
+6. Highlight 'EMERGENCY' rows in Red."
+
+RECIPE 4: SITE HISTORY (JSON EXTRACTION)
+"Write a script called 'collateSiteComments'.
+1. Read 'Visits'.
+2. Filter for Location Name = 'Main Office' (make this a variable).
+3. Parse the JSON in Col T ('Visit Report Data').
+4. Extract the field labeled 'Notes' or 'Comments' from that JSON.
+5. Create a sheet 'Site Log - Main Office'.
+6. List: Date | Worker | Extracted Notes."
+
+RECIPE 5: AFTER-HOURS WORK
+"Write a script to find after-hours work.
+1. Read 'Visits'.
+2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.
+3. Output to a new sheet 'After Hours Log'."
+
+RECIPE 6: WORKER ACTIVITY SUMMARY
+"Write a script for an Executive Summary.
+1. Count total unique visits per Worker.
+2. Calculate average duration per visit per Worker.
+3. Count total 'EMERGENCY' statuses per Worker.
+4. Output a summary table."
+
+RECIPE 7: MISSING REPORTS
+"Write a script to find missing reports.
+1. Filter rows where Status is 'DEPARTED'.
+2. Check if Col T (Report Data) is empty or '{}'.
+3. List workers who departed without filing a report."
+
+RECIPE 8: TRAVEL VS ON-SITE
+"Write a script to compare Travel vs Work.
+1. Sum duration for rows where Location Name contains 'Travel'.
+2. Sum duration for all other rows.
+3. Calculate the ratio per worker."
+
+RECIPE 9: MONTHLY ARCHIVE
+"Write a script to move last month's data.
+1. Identify rows from the previous month.
+2. Move them to a sheet named 'Archive - [Month-Year]'.
+3. Delete them from 'Visits' to keep it fast."
+
+RECIPE 10: FORM DATA EXPORT
+"Write a script to flatten the JSON form data.
+1. Read Col T.
+2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').
+3. Create a new sheet with these keys as Column Headers.
+4. Populate the rows with the values from the JSON."
+`;
+        navigator.clipboard.writeText(guide);
+        alert("AI Guide Copied!\n\n1. Go to your Spreadsheet\n2. Add a new tab named 'AI Reporting'\n3. Paste (Ctrl+V) into Cell A1.");
+    }
+
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([
@@ -387,7 +549,7 @@
         tplMonitor = await resM.text(); 
         tplBackend = await resB.text();
         
-        // Safety Check: Did we get HTML by mistake?
+        // Safety Check
         if(tplBackend.trim().startsWith("<!DOCTYPE html>")) {
             throw new Error("SERVER ERROR: The browser loaded index.html instead of the Backend code. Please ensure the file is named 'backend_template.js'.");
         }
