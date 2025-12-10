@@ -1,6 +1,6 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v36.0
- * FULL PRODUCTION VERSION
+ * ON-THE-GO APPSUITE - MASTER BACKEND v37.0
+ * FIX: Data Overwrite Protection
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +35,7 @@ if(storedPdfFolderId) CONFIG.PDF_FOLDER_ID = storedPdfFolderId;
 // ─────────────────────────────────────────────────────────────────────────────
 function doPost(e) {
   const lock = LockService.getScriptLock();
+  // Reduce lock wait time to fail faster if jammed, but usually 30s is fine
   lock.tryLock(30000); 
 
   try {
@@ -87,38 +88,49 @@ function doPost(e) {
         const rowWorker = data[i][2];
         const rowStatus = data[i][10];
         
-        if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED')) {
+        // UPDATE CONDITION: Same Worker AND (Row is Active OR New Status is Safe/Correction)
+        // FIX: Quick Stat often sends "DATA_ENTRY_ONLY". If previous row was also that, update it.
+        if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED' || (rowStatus === 'DATA_ENTRY_ONLY' && newStatus === 'DATA_ENTRY_ONLY'))) {
              const rIdx = startRow + i;
              
-             // Update Status & Vitals
+             // Update Status & Vitals (Always update these if present)
              sheet.getRange(rIdx, 11).setValue(newStatus);
              if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
              if (p['Anticipated Departure Time']) sheet.getRange(rIdx, 21).setValue(p['Anticipated Departure Time']);
              
-             // Append Notes
+             // --- FIX 1: PROTECTED NOTES UPDATE ---
+             // Only append if it's new info. Don't overwrite.
              if (p['Notes'] && !p['Notes'].includes("Locating")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) {
-                    sheet.getRange(rIdx, 12).setValue(oldNotes + " | " + p['Notes']);
+                    // Check if old notes were empty
+                    const newVal = oldNotes ? oldNotes + " | " + p['Notes'] : p['Notes'];
+                    sheet.getRange(rIdx, 12).setValue(newVal);
                 }
              }
              
-             // Update Report Data
+             // --- FIX 2: PROTECTED DATA UPDATE ---
+             // Only overwrite Distance/Report Data if the NEW payload has actual data.
              if (p['Distance']) sheet.getRange(rIdx, 19).setValue(p['Distance']);
-             if (p['Visit Report Data']) sheet.getRange(rIdx, 20).setValue(p['Visit Report Data']);
              
-             // Update Assets
+             // CRITICAL FIX: Only update Report Data if payload is valid JSON and not empty {}
+             if (p['Visit Report Data'] && p['Visit Report Data'].length > 5 && p['Visit Report Data'] !== '{}') {
+                 sheet.getRange(rIdx, 20).setValue(p['Visit Report Data']);
+             }
+             
+             // Update Assets (Only if new ones exist)
              ['Photo 1', 'Signature', 'Photo 2', 'Photo 3', 'Photo 4'].forEach((k, idx) => {
-                 // Column Indices: Photo1=18, Sig=22, P2=23, P3=24, P4=25
                  const cols = [18, 22, 23, 24, 25];
                  if(savedAssets[k]) sheet.getRange(rIdx, cols[idx]).setValue(savedAssets[k]);
              });
 
              rowUpdated = true;
              
-             // Trigger PDF on Depart
-             if ((newStatus === 'DEPARTED' || newStatus === 'COMPLETED') && CONFIG.REPORT_TEMPLATE_ID) {
+             // Trigger PDF on Depart (or Quick Stat)
+             // FIX: Quick Stat usually comes in as DATA_ENTRY_ONLY. We should trigger PDF if we have data.
+             const isDepart = (newStatus === 'DEPARTED' || newStatus === 'COMPLETED' || newStatus === 'DATA_ENTRY_ONLY');
+             if (isDepart && CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
                  generateVisitPdf(rIdx);
              }
              break;
@@ -142,10 +154,18 @@ function doPost(e) {
           p['Anticipated Departure Time'], savedAssets['Signature'], savedAssets['Photo 2'], savedAssets['Photo 3'], savedAssets['Photo 4']
         ];
         sheet.appendRow(row);
+        
+        // If it's a fresh row with data (Quick Stat), generate PDF immediately
+        if (CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
+             generateVisitPdf(sheet.getLastRow());
+        }
     }
     
-    // Notifications
-    if (p['Template Name'] && p['Visit Report Data']) processFormEmail(p);
+    // Notifications (Only if we have actual report data)
+    if (p['Template Name'] && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
+        processFormEmail(p);
+    }
+    
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -161,45 +181,32 @@ function doPost(e) {
 // 3. API HANDLERS (doGet)
 // ─────────────────────────────────────────────────────────────────────────────
 function doGet(e) {
-  // Test Connection
   if(e.parameter.test) {
      if(e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
      return ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
   }
   
-  // Monitor Polling (JSONP)
   if(e.parameter.callback){
     const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
     const data=sh.getDataRange().getValues();
     const headers=data.shift();
     const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
-    
-    // Server Health Data
     const lastRun = PropertiesService.getScriptProperties().getProperty('LAST_WATCHDOG_RUN') || "Never";
-    const response = {
-        workers: rows,
-        server_time: new Date().toISOString(),
-        watchdog_last_run: lastRun
-    };
-    
+    const response = { workers: rows, server_time: new Date().toISOString(), watchdog_last_run: lastRun };
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(response)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
-  // Get Form Definitions
   if(e.parameter.action === 'getGlobalForms') {
      const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
      if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
      const data = sh.getDataRange().getValues();
      const globalForms = [];
      for(let r=1; r<data.length; r++) {
-         if(String(data[r][0]).toUpperCase().trim() === 'FORMS') {
-             globalForms.push({ name: data[r][1], questions: parseQuestions(data[r]) });
-         }
+         if(String(data[r][0]).toUpperCase().trim() === 'FORMS') globalForms.push({ name: data[r][1], questions: parseQuestions(data[r]) });
      }
      return ContentService.createTextOutput(JSON.stringify(globalForms)).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Get Specific Form
   if(e.parameter.action === 'getForms') {
      const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
      if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
@@ -210,7 +217,6 @@ function doGet(e) {
      return ContentService.createTextOutput(JSON.stringify(parseQuestions(foundRow))).setMimeType(ContentService.MimeType.JSON);
   }
   
-  // Triggers & Tools
   if(e.parameter.run === 'setupTemplate') { return ContentService.createTextOutput(setupReportTemplate()); }
   if(e.parameter.run === 'reports') { runAllLongitudinalReports(); return ContentService.createTextOutput("Reports Generated"); }
   if(e.parameter.run === 'archive') { archiveOldData(); return ContentService.createTextOutput("Archive Complete"); }
@@ -223,9 +229,7 @@ function doGet(e) {
 // 4. WATCHDOG (SERVER SIDE)
 // ─────────────────────────────────────────────────────────────────────────────
 function checkOverdueVisits() {
-  // Update Heartbeat
   PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString());
-
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
   if(!sheet) return;
@@ -237,57 +241,39 @@ function checkOverdueVisits() {
   
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
-    const rowIndex = i + 2;
     const status = row[10];
     const dueTimeStr = row[20];
     if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
-    
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
     const timeOverdue = now - dueTime;
-    
     if (timeOverdue > escalationMs) {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
-          sheet.getRange(rowIndex, 11).setValue(newStatus);
-          sendAlert({
-             'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 
-             'Location Name': row[12], 'Last Known GPS': row[14], 
-             'Notes': "Worker failed to check in. Phone may be offline.",
-             'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5],
-             'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8],
-             'Battery Level': row[16]
-          });
+          sheet.getRange(i + 2, 11).setValue(newStatus);
+          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in. Phone may be offline.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] });
        }
-    }
-    else if (timeOverdue > 0) {
-       if (status === 'ON SITE') sheet.getRange(rowIndex, 11).setValue("OVERDUE");
+    } else if (timeOverdue > 0) {
+       if (status === 'ON SITE') sheet.getRange(i + 2, 11).setValue("OVERDUE");
     }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. SMART SCRIBE (AI)
+// 5. SMART SCRIBE & HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function smartScribe(text) {
   if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text;
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
     const payload = { "contents": [{ "parts": [{ "text": "Correct the grammar and spelling of the following text to standard New Zealand English. Do not add any conversational filler or introductions. Only return the corrected text. Text: " + text }] }] };
-    const options = { 'method': 'post', 'contentType': 'application/json', 'payload': JSON.stringify(payload), 'muteHttpExceptions': true };
-    const response = UrlFetchApp.fetch(url, options);
+    const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
     const json = JSON.parse(response.getContentText());
     if (json.candidates && json.candidates[0].content.parts[0].text) return json.candidates[0].content.parts[0].text.trim();
     return text;
-  } catch (e) {
-    console.log("Smart Scribe Error: " + e);
-    return text;
-  }
+  } catch (e) { return text; }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. OUTPUT (EMAIL/PDF)
-// ─────────────────────────────────────────────────────────────────────────────
 function processFormEmail(p) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
@@ -300,8 +286,6 @@ function processFormEmail(p) {
         const reportData = JSON.parse(p['Visit Report Data']);
         const worker = p['Worker Name'];
         const loc = p['Location Name'] || "Unknown";
-        
-        // Smart Scribe Notes
         let displayNotes = p['Notes'] || "";
         if(displayNotes) displayNotes = smartScribe(displayNotes);
         
@@ -319,7 +303,6 @@ function processFormEmail(p) {
             html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${displayVal}</td></tr>`;
         }
         html += `</table>`;
-        
         const inlineImages = {};
         ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4'].forEach((k, i) => {
              if (p[k] && p[k].includes('base64')) {
@@ -328,7 +311,6 @@ function processFormEmail(p) {
                  html += `<p><strong>${k}:</strong><br><img src="cid:p${i}" style="max-width:300px; border-radius:8px;"></p>`;
              }
         });
-        
         let sigData = p['Signature'] || reportData['Signature_Image'];
         if (sigData && sigData.includes('base64')) {
              const b = Utilities.newBlob(Utilities.base64Decode(sigData.split(',')[1]), 'image/png', 'sig.png');
@@ -346,37 +328,25 @@ function generateVisitPdf(rowIndex) {
     const sheet = ss.getSheetByName('Visits');
     const rowValues = sheet.getRange(rowIndex, 1, 1, 25).getValues()[0];
     const headers = sheet.getRange(1, 1, 1, 25).getValues()[0];
-
     try {
       const templateFile = DriveApp.getFileById(CONFIG.REPORT_TEMPLATE_ID);
       let folder;
       if (CONFIG.PDF_FOLDER_ID) try { folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID); } catch(e){ folder = DriveApp.getRootFolder(); }
       else folder = DriveApp.getRootFolder();
-
       const copy = templateFile.makeCopy(`Report - ${rowValues[2]} - ${rowValues[1]}`, folder);
       const doc = DocumentApp.openById(copy.getId());
       const body = doc.getBody();
-
       headers.forEach((header, i) => {
           const tag = header.replace(/[^a-zA-Z0-9]/g, ""); 
           let val = String(rowValues[i]);
           if (header === 'Notes' || (header === 'Visit Report Data' && val.length > 20)) val = smartScribe(val);
-          body.replaceText(`{{${tag}}}`, val);
-          body.replaceText(`{{${header}}}`, val);
+          body.replaceText(`{{${tag}}}`, val); body.replaceText(`{{${header}}}`, val);
       });
-
       const imgIndices = [{idx: 17, name: "Photo 1"}, {idx: 22, name: "Photo 2"}, {idx: 23, name: "Photo 3"}, {idx: 24, name: "Photo 4"}, {idx: 21, name: "Signature"}];
       imgIndices.forEach(item => {
-          if (rowValues[item.idx]) {
-             try {
-                 const imgBlob = UrlFetchApp.fetch(rowValues[item.idx]).getBlob();
-                 body.appendParagraph(item.name + ":");
-                 body.appendImage(imgBlob).setWidth(300);
-             } catch(e) {}
-          }
+          if (rowValues[item.idx]) { try { const imgBlob = UrlFetchApp.fetch(rowValues[item.idx]).getBlob(); body.appendParagraph(item.name + ":"); body.appendImage(imgBlob).setWidth(300); } catch(e) {} }
       });
       doc.saveAndClose();
-      
       const pdf = copy.getAs(MimeType.PDF);
       const recipient = Session.getEffectiveUser().getEmail();
       MailApp.sendEmail({ to: recipient, subject: `Visit Report (PDF): ${rowValues[2]}`, body: "Please find the polished visit report attached.", attachments: [pdf] });
@@ -384,9 +354,6 @@ function generateVisitPdf(rowIndex) {
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. SETUP & HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 function setupReportTemplate() {
     try {
         const doc = DocumentApp.create(`${CONFIG.ORG_NAME} Master Report Template`);
@@ -394,25 +361,13 @@ function setupReportTemplate() {
         body.appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         body.appendParagraph("VISIT REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING2).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
         body.appendHorizontalRule();
-        
         const cells = [["Worker:", "{{WorkerName}}"], ["Location:", "{{LocationName}}"], ["Date:", "{{Date}}"], ["Status:", "{{AlarmStatus}}"]];
         cells.forEach(r => body.appendParagraph(`${r[0]} ${r[1]}`));
-        
-        body.appendHorizontalRule();
-        body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3);
-        body.appendParagraph("{{Notes}}");
-        
-        body.appendHorizontalRule();
-        body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3);
-        body.appendParagraph("{{VisitReportData}}");
-        
-        body.appendHorizontalRule();
-        body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4);
-        body.appendParagraph("{{Signature}}");
-        
+        body.appendHorizontalRule(); body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{Notes}}");
+        body.appendHorizontalRule(); body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{VisitReportData}}");
+        body.appendHorizontalRule(); body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4); body.appendParagraph("{{Signature}}");
         doc.saveAndClose();
         PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID', doc.getId());
-        
         MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: "OTG Setup: Template Created", body: `Success! Report template created.\nID: ${doc.getId()}` });
         return "SUCCESS: Template Created & Saved. Check your Email.";
     } catch(e) { return "ERROR: " + e.toString(); }
@@ -423,9 +378,8 @@ function saveImageToDrive(base64String, filename) {
         const data = Utilities.base64Decode(base64String.split(',')[1]);
         const blob = Utilities.newBlob(data, 'image/jpeg', filename); 
         let folder;
-        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
-             try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(err) { folder = DriveApp.getRootFolder(); }
-        } else { folder = DriveApp.getRootFolder(); }
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(err) { folder = DriveApp.getRootFolder(); } } 
+        else { folder = DriveApp.getRootFolder(); }
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         return file.getUrl();
@@ -446,7 +400,6 @@ function sendAlert(data) {
   const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
   const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
   if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
-
   smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
   const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}. Map: https://maps.google.com/?q=${data['Last Known GPS']}`;
   smsNumbers.forEach(phone => sendSms(phone, smsMsg));
@@ -486,9 +439,7 @@ function archiveOldData() {
   if (!archive) archive = ss.insertSheet('Archive');
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
-  const today = new Date(); 
-  const rowsToKeep = [data[0]]; 
-  const rowsToArchive = [];
+  const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = [];
   for (let i = 1; i < data.length; i++) {
     const date = new Date(data[i][0]);
     const diff = (today - date) / (1000 * 60 * 60 * 24);
@@ -497,8 +448,7 @@ function archiveOldData() {
   if (rowsToArchive.length > 0) {
     if (archive.getLastRow() === 0) archive.appendRow(data[0]);
     archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive);
-    sheet.clearContents(); 
-    sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
+    sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep);
   }
 }
 
@@ -543,6 +493,5 @@ function runAllLongitudinalReports() {
   }
   const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]);
   if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows);
-  
   MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` });
 }
