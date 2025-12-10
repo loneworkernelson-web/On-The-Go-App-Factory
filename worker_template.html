@@ -106,9 +106,9 @@ canvas {
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 flex-shrink-0">
         <div class="flex justify-between mb-2">
             <span class="text-gray-400 text-sm uppercase font-bold">Duration</span>
-            <span id="durationDisplay" class="font-bold text-blue-400">0 min</span>
+            <span id="durationDisplay" class="font-bold text-blue-400">0 mins</span>
         </div>
-        <input id="durationSlider" type="range" min="0" max="14" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+        <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
     </div>
 
     <div class="flex gap-2 flex-shrink-0">
@@ -320,7 +320,13 @@ const CONFIG = {
     key: "%%SECRET_KEY%%",
     orsKey: "%%ORS_API_KEY%%"
 }; 
-const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
+// 12-HOUR SHIFT MAPPING (0-120 in 10s/15s, then 30s, then 60s)
+const DURATION_MAP = [
+    0, 10, 20, 30, 45, 60, 
+    75, 90, 105, 120, // up to 2h
+    150, 180, 210, 240, 270, 300, // up to 5h
+    360, 420, 480, 540, 600, 660, 720 // up to 12h
+];
 
 // ==================== STATE MANAGEMENT ====================
 let state = { 
@@ -728,8 +734,17 @@ function getGpsAddress() {
 
 // ==================== VISIT LOGIC ====================
 function updateArrivedButtonState() {
-    const val = DURATION_STEPS[document.getElementById('durationSlider').value];
-    document.getElementById('durationDisplay').innerText = val + ' min';
+    const step = document.getElementById('durationSlider').value;
+    const val = DURATION_MAP[step] || 0; // Use Map
+    
+    // Formatting Logic
+    let display = val + ' mins';
+    if(val >= 60) {
+        const h = Math.floor(val/60);
+        const m = val % 60;
+        display = `${h} hr${h>1?'s':''} ${m>0 ? m+' mins' : ''}`;
+    }
+    document.getElementById('durationDisplay').innerText = display;
     state.visitDurationMinutes = val;
     
     const btn = document.getElementById('btnStart');
@@ -1189,6 +1204,8 @@ function quickStat() {
         processUploadQueue(data);
         state.activeVisit = null; state.photoStore = {}; sigPad = null;
         closeModal('report');
+        if(navigator.onLine) alert("✅ Update Sent!");
+        else alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
     };
 }
 
@@ -1310,7 +1327,6 @@ function submitReport() {
              if(!data["Photo 1"]) data["Photo 1"] = d.sig;
         }
         
-        // OFFLINE CHECK
         processUploadQueue(data);
         if(navigator.onLine) alert("✅ Update Sent!");
         else alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
@@ -1357,13 +1373,8 @@ function depart(reportData = {}) {
     
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
-    // OFFLINE CHECK
     processUploadQueue(data);
-    if(navigator.onLine) {
-        // No alert needed for departure if online, just visual change
-    } else {
-        alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
-    }
+    if(!navigator.onLine) alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
     
     state.activeVisit = null; 
     state.photoStore = {}; 
