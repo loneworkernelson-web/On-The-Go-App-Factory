@@ -36,7 +36,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Lone Worker System Generator (v35.3)</p>
+      <p class="text-gray-400">Lone Worker System Generator (v35.4 Clean)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -404,131 +404,11 @@ self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll([
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>c!==C?caches.delete(c):null)))));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
 
-      // 1. UPDATE Worker Template with Pulse Logic
-      let workerCode = tplWorker
-        // A. Inject Pulse Logic into startVisit
-        .replace(
-            `if(state.settings.name && !state.settings.workerName) {`,
-            `
-            // PULSE LOGIC START
-            if(state.selectedLocationId) {
-                const sel = state.locations.find(l => l.id === state.selectedLocationId);
-                if(sel && sel.id === 'travel') {
-                    document.getElementById('batterySaver').classList.remove('hidden');
-                    if(travellingInterval) clearInterval(travellingInterval);
-                    travellingInterval = setInterval(sendTravellingPulse, 300000); // 5 Mins
-                }
-            }
-            // PULSE LOGIC END
-            if(state.settings.name && !state.settings.workerName) {`
-        )
-        // B. Inject Pulse Function
-        .replace(
-            `// --- DATA BUILDER ---`,
-            `
-function sendTravellingPulse() {
-    if(!navigator.onLine) return;
-    navigator.geolocation.getCurrentPosition(pos => {
-         const gps = pos.coords.latitude + "," + pos.coords.longitude;
-         const payload = buildPayload({
-             "Alarm Status": "TRAVELLING",
-             "Last Known GPS": gps,
-             "Notes": "Auto-Location Update"
-         });
-         processUploadQueue(payload);
-    }, err => console.log(err));
-}
-// --- DATA BUILDER ---`
-        )
-        // C. Clean up in Depart
-        .replace(
-            `function depart(reportData = {}) {`,
-            `function depart(reportData = {}) {
-    if(travellingInterval) clearInterval(travellingInterval);
-    document.getElementById('batterySaver').classList.add('hidden');`
-        )
-        // D. Fix Initial Status for Travelling
-        .replace(
-            `"Alarm Status": 'ON SITE',`,
-            `"Alarm Status": (state.selectedLocationId === 'travel' ? 'TRAVELLING' : 'ON SITE'),`
-        );
+      // 1. Worker Code: NO INJECTION (Trusting worker_template.html)
+      let workerCode = tplWorker;
 
-      // 2. UPDATE Monitor Template with Map Marker Removal & Alert Logic
-      let monitorCode = tplMonitor
-        // A. Fix Map Marker Logic (Garbage Collection)
-        .replace(
-            `function updateMapMarker(w) {
-    if(!map) return;
-    const gps = w['Last Known GPS'];
-    if(!gps || !gps.includes(',')) return;`, 
-            `function updateMapMarker(w) {
-    if(!map) return;
-    const name = w['Worker Name'];
-    const status = w['Alarm Status'];
-
-    // 1. REMOVE Logic
-    if (status === 'DEPARTED' || status === 'COMPLETED' || status.includes('SAFE - MONITOR')) {
-        if (markers[name]) {
-            map.removeLayer(markers[name]);
-            delete markers[name];
-        }
-        return;
-    }
-
-    // 2. GPS Logic (Only proceeds if active)
-    const gps = w['Last Known GPS'];
-    if(!gps || !gps.includes(',')) return;`
-        )
-        // B. Fix Alarm Escalation Logic (Local Calculation)
-        .replace(
-            `Object.values(workers).forEach(w => {
-      const name = w['Worker Name'];
-      const status = w['Alarm Status'];`,
-            `Object.values(workers).forEach(w => {
-      const name = w['Worker Name'];
-      let status = w['Alarm Status'];
-      
-      // --- LOGIC FIX: LOCAL ESCALATION ---
-      let overdueMins = 0;
-      if (w['Anticipated Departure Time']) {
-          const due = new Date(w['Anticipated Departure Time']);
-          if(!isNaN(due)) {
-              const diffMs = new Date() - due;
-              if(diffMs > 0) overdueMins = Math.floor(diffMs / 60000);
-          }
-      }
-      
-      const isCriticalOverdue = (status === 'OVERDUE' && overdueMins > 15);
-      const isCritical = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/) || isCriticalOverdue;`
-        )
-        // C. Update Alarm Check
-        .replace(
-            `if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
-          anyCritical = true;
-          if (!acknowledgedList.has(name)) {
-              activeAlertFound = true;
-              playAlarm(w);
-          }
-      }`,
-            `if(isCritical) {
-          anyCritical = true;
-          if (!acknowledgedList.has(name)) {
-              activeAlertFound = true;
-              playAlarm(w, isCriticalOverdue);
-          }
-      }`
-        )
-        // D. Update playAlarm signature
-        .replace(
-            `async function playAlarm(w) {`,
-            `async function playAlarm(w, localOverdue = false) {`
-        )
-        // E. Force Audio Wake in playAlarm
-        .replace(
-            `if(Tone.context.state !== 'running') await Tone.start();`,
-            `if(Tone.context.state !== 'running') await Tone.start();
-    if(Tone.context.state === 'suspended') await Tone.context.resume();`
-        );
+      // 2. Monitor Code: NO INJECTION (Trusting monitor_template.html)
+      let monitorCode = tplMonitor;
 
       const code = tplBackend
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
@@ -577,6 +457,7 @@ function sendTravellingPulse() {
             });
     }
     
+    // TRIGGER THE SETUP WIZARD
     function triggerTemplateSetup() {
         const url = document.getElementById('webAppUrl').value;
         const key = document.getElementById('secretKey').value;
@@ -632,6 +513,7 @@ function sendTravellingPulse() {
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
+      // USE THE DYNAMIC SW CODE
       wFolder.file("sw.js", window.generatedSW);
 
       // Use the dynamically modified monitor code
