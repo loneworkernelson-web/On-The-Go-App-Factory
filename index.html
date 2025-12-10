@@ -36,7 +36,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Lone Worker System Generator (v35.1)</p>
+      <p class="text-gray-400">Lone Worker System Generator (v35.3)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -377,181 +377,6 @@
       }
     }
 
-    async function copyScript() {
-        const text = document.getElementById('codeDisplay').textContent;
-        try {
-            await navigator.clipboard.writeText(text);
-            alert("Code copied to clipboard!");
-        } catch (err) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            alert("Code copied to clipboard!");
-        }
-    }
-
-    function copyVisitsHeaders() {
-      const isAdv = document.getElementById('chkAdvanced').checked;
-      const contacts = "Emergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email";
-      const basic = "Timestamp\tDate\tWorker Name\tWorker Phone\t" + contacts + "\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level";
-      const adv = "\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4";
-      navigator.clipboard.writeText(basic + (isAdv ? adv : ""));
-      alert("Headers copied! (Includes all 25 columns)\n\nPaste into cell A1 of 'Visits' tab.");
-    }
-
-    // UPDATED FUNCTION (v18.0)
-    function copyChecklistSetup() {
-      let h = "Company Name\tTemplate Name\tEmail Recipient";
-      for(let i=1; i<=30; i++) h += "\tQuestion " + i;
-
-      // Updated Standard Template
-      const rows = 
-        "\nGlobal\t(Standard)\t\t[TEXT] Notes\t[PHOTO] Photo?" + 
-        "\nInternal\tTravel Report\t\t$Distance (km)\t[TEXT] Details" +
-        "\nFORMS\tAccident Report\tsafety@example.com\t[HEADING] Incident Details\t[TEXT] What Happened?\t[PHOTO] Damage\t[SIGN] Signature";
-      
-      const gap = "\n".repeat(16); 
-      
-      const instruction = "Edit the '(Standard)' row to define your default site report.\nTo make a form available globally, set Column A to \"FORMS\" and Column B to the name. Add an Email Address in Column C to auto-email completed forms.";
-
-      const legend = 
-        "\nTEMPLATE CODE LEGEND\n" + instruction + "\n" +
-        "[TEXT]\tText Input Box\n[NUMBER]\tNumber Keypad\n[YESNO]\tYes / No Buttons\n[CHECK]\tCheckbox\n[PHOTO]\tCamera Button\n[GPS]\tGPS Location Button\n[SIGN]\tSignature Pad\n[HEADING]\tSection Title\n[NOTE]\tRead-only Instruction\n$... \tSpecial Calculation";
-
-      navigator.clipboard.writeText(h + rows + gap + legend);
-      alert("Full Setup Copied! (Paste into Cell A1. Legend will appear at Row 20)");
-    }
-
-    function copyReportGuide() {
-        const guide = `AI REPORTING GUIDE
-Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
-
----------------------------------------------------
-SECTION 1: DEPLOYMENT RULE (READ FIRST)
----------------------------------------------------
-If you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):
-1. You DO NOT need to update the Web App Deployment.
-2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).
-3. The script runs "locally" inside the sheet.
-
-Only update the Web App Deployment if you change "doPost" or "doGet" (the core backend).
-
----------------------------------------------------
-SECTION 2: DATA MAP (For the AI)
----------------------------------------------------
-Paste this into your AI prompt so it knows your data structure:
-
-"I have a Google Sheet named 'Visits'.
-The columns are mapped as follows:
-- Col A: Timestamp (Start of Visit)
-- Col C: Worker Name
-- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')
-- Col M: Location Name
-- Col P: Device Timestamp (End of Visit / Last Check-in)
-- Col Q: Battery Level (e.g. '85%')
-- Col S: Distance (km)
-- Col T: Visit Report Data (JSON string containing form answers)
-- Col U: Anticipated Departure Time"
-
----------------------------------------------------
-SECTION 2B: LONG-TERM HISTORY (THE ARCHIVE)
----------------------------------------------------
-PRO TIP: If you need a report covering more than 30 days (e.g., Annual Mileage), you must tell the AI to look at the Archive.
-
-Add this to your prompt:
-"Please note: Older data is moved to a sheet named 'Archive'. Please modify the script to read data from BOTH the 'Visits' sheet and the 'Archive' sheet, combine them into one array, and then generate the report."
-
----------------------------------------------------
-SECTION 3: PROMPT RECIPES (Copy & Paste these)
----------------------------------------------------
-
-RECIPE 1: MILEAGE REPORT
-"Write a Google Apps Script function called 'generateMileageReport'.
-1. Read all data from 'Visits'.
-2. Create/Overwrite a sheet called 'Mileage Report'.
-3. Group data by Worker Name (Col C) and Location (Col M).
-4. Sum the Distance (Col S) for each group.
-5. Create a clean table: Worker | Location | Total KM.
-6. Add a Grand Total at the bottom."
-
-RECIPE 2: TIMESHEET (PAYROLL)
-"Write a script called 'generateTimesheet'.
-1. Read 'Visits'.
-2. Calculate duration in minutes: (Col P - Col A).
-3. Ignore rows where Status is not 'DEPARTED'.
-4. Create a sheet 'Weekly Timesheet'.
-5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).
-6. Sum Total Hours per Worker."
-
-RECIPE 3: SAFETY AUDIT (COMPLIANCE)
-"Write a script called 'auditSafety'.
-1. Read 'Visits'.
-2. Identify rows where Battery Level (Col Q) is < 20%.
-3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.
-4. Create a sheet 'Safety Audit'.
-5. List these high-risk visits.
-6. Highlight 'EMERGENCY' rows in Red."
-
-RECIPE 4: SITE HISTORY (JSON EXTRACTION)
-"Write a script called 'collateSiteComments'.
-1. Read 'Visits'.
-2. Filter for Location Name = 'Main Office' (make this a variable).
-3. Parse the JSON in Col T ('Visit Report Data').
-4. Extract the field labeled 'Notes' or 'Comments' from that JSON.
-5. Create a sheet 'Site Log - Main Office'.
-6. List: Date | Worker | Extracted Notes."
-
-RECIPE 5: AFTER-HOURS WORK
-"Write a script to find after-hours work.
-1. Read 'Visits'.
-2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.
-3. Output to a new sheet 'After Hours Log'."
-
-RECIPE 6: WORKER ACTIVITY SUMMARY
-"Write a script for an Executive Summary.
-1. Count total unique visits per Worker.
-2. Calculate average duration per visit per Worker.
-3. Count total 'EMERGENCY' statuses per Worker.
-4. Output a summary table."
-
-RECIPE 7: MISSING REPORTS
-"Write a script to find missing reports.
-1. Filter rows where Status is 'DEPARTED'.
-2. Check if Col T (Report Data) is empty or '{}'.
-3. List workers who departed without filing a report."
-
-RECIPE 8: TRAVEL VS ON-SITE
-"Write a script to compare Travel vs Work.
-1. Sum duration for rows where Location Name contains 'Travel'.
-2. Sum duration for all other rows.
-3. Calculate the ratio per worker."
-
-RECIPE 9: MONTHLY ARCHIVE
-"Write a script to move last month's data.
-1. Identify rows from the previous month.
-2. Move them to a sheet named 'Archive - [Month-Year]'.
-3. Delete them from 'Visits' to keep it fast."
-
-RECIPE 10: FORM DATA EXPORT
-"Write a script to flatten the JSON form data.
-1. Read Col T.
-2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').
-3. Create a new sheet with these keys as Column Headers.
-4. Populate the rows with the values from the JSON."
-`;
-        navigator.clipboard.writeText(guide);
-        alert("AI Guide Copied!\n\n1. Go to your Spreadsheet\n2. Add a new tab named 'AI Reporting'\n3. Paste (Ctrl+V) into Cell A1.");
-    }
-
-    function copyLegend() {
-      const legend = `Template Code Legend:\n[YESNO] - Yes/No Radio\n[CHECK] - Checkbox\n[TEXT] - Text Area\n[NUMBER] - Numeric\n[PHOTO] - Camera\n[GPS] - Location\n[HEADING] - Header\n[NOTE] - Instruction\n[SIGN] - Signature\n$ - Numeric Column`;
-      navigator.clipboard.writeText(legend);
-      alert("Legend copied!");
-    }
-
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([
@@ -579,6 +404,132 @@ self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll([
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>c!==C?caches.delete(c):null)))));
 self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
 
+      // 1. UPDATE Worker Template with Pulse Logic
+      let workerCode = tplWorker
+        // A. Inject Pulse Logic into startVisit
+        .replace(
+            `if(state.settings.name && !state.settings.workerName) {`,
+            `
+            // PULSE LOGIC START
+            if(state.selectedLocationId) {
+                const sel = state.locations.find(l => l.id === state.selectedLocationId);
+                if(sel && sel.id === 'travel') {
+                    document.getElementById('batterySaver').classList.remove('hidden');
+                    if(travellingInterval) clearInterval(travellingInterval);
+                    travellingInterval = setInterval(sendTravellingPulse, 300000); // 5 Mins
+                }
+            }
+            // PULSE LOGIC END
+            if(state.settings.name && !state.settings.workerName) {`
+        )
+        // B. Inject Pulse Function
+        .replace(
+            `// --- DATA BUILDER ---`,
+            `
+function sendTravellingPulse() {
+    if(!navigator.onLine) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+         const gps = pos.coords.latitude + "," + pos.coords.longitude;
+         const payload = buildPayload({
+             "Alarm Status": "TRAVELLING",
+             "Last Known GPS": gps,
+             "Notes": "Auto-Location Update"
+         });
+         processUploadQueue(payload);
+    }, err => console.log(err));
+}
+// --- DATA BUILDER ---`
+        )
+        // C. Clean up in Depart
+        .replace(
+            `function depart(reportData = {}) {`,
+            `function depart(reportData = {}) {
+    if(travellingInterval) clearInterval(travellingInterval);
+    document.getElementById('batterySaver').classList.add('hidden');`
+        )
+        // D. Fix Initial Status for Travelling
+        .replace(
+            `"Alarm Status": 'ON SITE',`,
+            `"Alarm Status": (state.selectedLocationId === 'travel' ? 'TRAVELLING' : 'ON SITE'),`
+        );
+
+      // 2. UPDATE Monitor Template with Map Marker Removal & Alert Logic
+      let monitorCode = tplMonitor
+        // A. Fix Map Marker Logic (Garbage Collection)
+        .replace(
+            `function updateMapMarker(w) {
+    if(!map) return;
+    const gps = w['Last Known GPS'];
+    if(!gps || !gps.includes(',')) return;`, 
+            `function updateMapMarker(w) {
+    if(!map) return;
+    const name = w['Worker Name'];
+    const status = w['Alarm Status'];
+
+    // 1. REMOVE Logic
+    if (status === 'DEPARTED' || status === 'COMPLETED' || status.includes('SAFE - MONITOR')) {
+        if (markers[name]) {
+            map.removeLayer(markers[name]);
+            delete markers[name];
+        }
+        return;
+    }
+
+    // 2. GPS Logic (Only proceeds if active)
+    const gps = w['Last Known GPS'];
+    if(!gps || !gps.includes(',')) return;`
+        )
+        // B. Fix Alarm Escalation Logic (Local Calculation)
+        .replace(
+            `Object.values(workers).forEach(w => {
+      const name = w['Worker Name'];
+      const status = w['Alarm Status'];`,
+            `Object.values(workers).forEach(w => {
+      const name = w['Worker Name'];
+      let status = w['Alarm Status'];
+      
+      // --- LOGIC FIX: LOCAL ESCALATION ---
+      let overdueMins = 0;
+      if (w['Anticipated Departure Time']) {
+          const due = new Date(w['Anticipated Departure Time']);
+          if(!isNaN(due)) {
+              const diffMs = new Date() - due;
+              if(diffMs > 0) overdueMins = Math.floor(diffMs / 60000);
+          }
+      }
+      
+      const isCriticalOverdue = (status === 'OVERDUE' && overdueMins > 15);
+      const isCritical = status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/) || isCriticalOverdue;`
+        )
+        // C. Update Alarm Check
+        .replace(
+            `if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)) {
+          anyCritical = true;
+          if (!acknowledgedList.has(name)) {
+              activeAlertFound = true;
+              playAlarm(w);
+          }
+      }`,
+            `if(isCritical) {
+          anyCritical = true;
+          if (!acknowledgedList.has(name)) {
+              activeAlertFound = true;
+              playAlarm(w, isCriticalOverdue);
+          }
+      }`
+        )
+        // D. Update playAlarm signature
+        .replace(
+            `async function playAlarm(w) {`,
+            `async function playAlarm(w, localOverdue = false) {`
+        )
+        // E. Force Audio Wake in playAlarm
+        .replace(
+            `if(Tone.context.state !== 'running') await Tone.start();`,
+            `if(Tone.context.state !== 'running') await Tone.start();
+    if(Tone.context.state === 'suspended') await Tone.context.resume();`
+        );
+
       const code = tplBackend
         .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
         .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
@@ -590,7 +541,9 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r
       
       document.getElementById('codeDisplay').textContent = code.trim();
       
-      // We store SW code in a global to use during download
+      // Store modified codes for Zip generation
+      window.finalWorkerCode = workerCode;
+      window.finalMonitorCode = monitorCode;
       window.generatedSW = swCode;
       
       gotoStep(3);
@@ -624,12 +577,9 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r
             });
     }
     
-    // TRIGGER THE SETUP WIZARD
     function triggerTemplateSetup() {
         const url = document.getElementById('webAppUrl').value;
         const key = document.getElementById('secretKey').value;
-        
-        // Visual Feedback
         const btn = document.getElementById('btnGenTemplate');
         const originalText = btn.innerText;
         btn.innerText = "⏳ Generating...";
@@ -659,7 +609,9 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r
       const escMins = document.getElementById('escalationMins').value;
       const secret = document.getElementById('secretKey').value;
 
-      let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org).replace(/%%ORGANISATION_NAME%%/g, org)
+      // Use the dynamically modified worker code
+      let wHtml = window.finalWorkerCode
+        .replace(/%%ORG_NAME%%/g, org).replace(/%%ORGANISATION_NAME%%/g, org)
         .replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData)
         .replace('%%IS_ADVANCED%%', isAdv).replace('%%ENABLE_MILEAGE%%', (isAdv && mile))
         .replace('%%CHECKIN_ENABLED%%', chkEnabled).replace('%%CHECKIN_INTERVAL%%', chkMins)
@@ -680,10 +632,12 @@ self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r
               { src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable" }
           ] 
       }, null, 2));
-      // USE THE DYNAMIC SW CODE
       wFolder.file("sw.js", window.generatedSW);
 
-      let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
+      // Use the dynamically modified monitor code
+      let mHtml = window.finalMonitorCode
+        .replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
+      
       const mFolder = zip.folder("MonitorApp"); mFolder.file("index.html", mHtml);
       
       zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
