@@ -136,6 +136,9 @@ body{font-family:'Inter',sans-serif}
         <p class="text-gray-400 text-sm mb-6">To verify safety, type the worker's name exactly as shown:</p>
         <div id="resolveNameTarget" class="bg-gray-900 p-4 rounded border border-gray-700 text-center text-xl font-mono font-bold text-blue-400 mb-4 select-all"></div>
         <input id="resolveInput" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-center font-bold" placeholder="Type Name Here">
+        
+        <input id="resolveReason" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-sm" placeholder="Reason / Action Taken (Optional)">
+
         <div class="flex gap-3">
             <button onclick="closeResolve()" class="flex-1 py-3 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold">Cancel</button>
             <button onclick="confirmResolve()" class="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded text-white font-bold shadow-lg">DECLARE SAFE</button>
@@ -499,7 +502,7 @@ function processAndRender(data) {
     
     const div = document.createElement('div');
     div.className = `rounded-xl shadow-lg p-5 flex flex-col justify-between ${cardClass} transition-all hover:scale-[1.02] relative cursor-pointer`;
-    div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') focusWorker(w); };
+    div.onclick = (e) => { if(e.target.tagName !== 'BUTTON' && e.target.id !== 'resolveInput' && e.target.id !== 'resolveReason') focusWorker(w); };
     
     div.innerHTML = `
       <div>
@@ -612,6 +615,7 @@ function initiateResolve(workerName) {
     activeWorkerToResolve = workerName;
     document.getElementById('resolveNameTarget').innerText = workerName;
     document.getElementById('resolveInput').value = "";
+    document.getElementById('resolveReason').value = ""; // Reset Reason
     document.getElementById('resolveModal').classList.remove('hidden');
     document.getElementById('resolveInput').focus();
 }
@@ -620,10 +624,14 @@ function closeResolve() { document.getElementById('resolveModal').classList.add(
 function confirmResolve() {
     const input = document.getElementById('resolveInput').value.trim();
     if (input === activeWorkerToResolve) {
+        // CAPTURE REASON
+        const reason = document.getElementById('resolveReason').value || "Cleared by Monitor (No reason provided)";
+        
         const params = new URLSearchParams();
         params.append('Worker Name', activeWorkerToResolve);
         params.append('Alarm Status', 'SAFE - MONITOR CLEARED');
-        params.append('Notes', 'Incident resolved by Monitor Dashboard');
+        // APPEND REASON TO NOTES
+        params.append('Notes', `[RESOLUTION: ${reason}]`);
         params.append('key', SECRET);
 
         fetch(URL, { method: 'POST', body: params, mode: 'no-cors' })
