@@ -16,51 +16,20 @@
 
 <style>
 /* --- CORE STYLES --- */
-body { 
-    font-family: 'Inter', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
-    user-select: none; 
-    overscroll-behavior-y: contain; 
-    background-color: #111827; 
-    color: white;
-}
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; }
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { 
-    content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
-    background: rgba(255, 255, 255, 0.3); 
-    transition: width 1.5s linear; 
-}
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 1.5s linear; }
 .long-press-btn.pressing::after { width: 100%; }
 
-.slider-thumb::-webkit-slider-thumb { 
-    -webkit-appearance: none; appearance: none; 
-    width: 28px; height: 28px; 
-    background: #3b82f6; 
-    cursor: pointer; 
-    border-radius: 50%; 
-    border: 2px solid white; 
-    box-shadow: 0 0 10px rgba(0,0,0,0.3); 
-}
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
 
-.spinner { 
-    border: 3px solid rgba(255, 255, 255, 0.3); 
-    border-radius: 50%; 
-    border-top-color: #fff; 
-    width: 20px; height: 20px; 
-    animation: spin 1s linear infinite; 
-}
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-canvas { 
-    touch-action: none; 
-    background: #fff; 
-    border-radius: 0.5rem; 
-    cursor: crosshair; 
-}
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
 /* --- SETTINGS CARDS --- */
 .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
@@ -68,8 +37,6 @@ canvas {
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
-
-/* --- COLORS --- */
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -118,7 +85,11 @@ canvas {
 </div>
 
 <div id="lockedPage" class="page p-6 text-center justify-between bg-gray-900 relative">
-    <div class="flex justify-between items-start">
+    <div id="fiveMinBanner" class="hidden absolute top-0 left-0 w-full bg-yellow-600 text-white font-bold py-3 animate-pulse z-50 shadow-xl border-b-4 border-yellow-400">
+        ⚠️ 5 MINUTES REMAINING - EXTEND NOW
+    </div>
+
+    <div class="flex justify-between items-start mt-8">
         <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700">🌙</button>
         <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
     </div>
@@ -320,1212 +291,187 @@ const CONFIG = {
     key: "%%SECRET_KEY%%",
     orsKey: "%%ORS_API_KEY%%"
 }; 
-// 12-HOUR SHIFT MAPPING (0-120 in 10s/15s, then 30s, then 60s)
-const DURATION_MAP = [
-    0, 10, 20, 30, 45, 60, 
-    75, 90, 105, 120, // up to 2h
-    150, 180, 210, 240, 270, 300, // up to 5h
-    360, 420, 480, 540, 600, 660, 720 // up to 12h
-];
+const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
 // ==================== STATE MANAGEMENT ====================
 let state = { 
-    settings: {}, 
-    locations: [], 
-    selectedLocationId: null, 
-    visitDurationMinutes: 0, 
-    activeVisit: null, 
-    cachedForms: {}, 
-    pendingUploads: [],
-    globalForms: [],
-    photoStore: {}
+    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
+    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false 
 };
 
 // Globals
 let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
-let tempPhoto = null;
-let sigPad = null;
-let panicTapCount = 0;
-let panicTapTimer;
-let deferredPrompt;
-let isMidVisitUpdate = false; 
-let currentActiveTemplate = "";
-let currentBatteryLevel = ""; // NEW: Battery Global
+let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
+let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
-    
-    // Ensure stores exist
     if(!state.photoStore) state.photoStore = {};
     if(!state.globalForms) state.globalForms = [];
-
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // RESTORE TRAVELLING PULSE IF ACTIVE
-    if(state.activeVisit && state.activeVisit.locationId === 'travel') {
-        startTravellingPulse();
-    }
+    if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
     if(state.settings.name && !state.settings.workerName) {
-        state.settings.workerName = state.settings.name;
-        state.settings.workerPhone = state.settings.phone;
-        state.settings.emergencyName = state.settings.emgName;
-        state.settings.emergencyPhone = state.settings.emgPhone;
-        state.settings.emergencyEmail = state.settings.emgEmail;
+        state.settings.workerName = state.settings.name; state.settings.workerPhone = state.settings.phone;
+        state.settings.emergencyName = state.settings.emgName; state.settings.emergencyPhone = state.settings.emgPhone; state.settings.emergencyEmail = state.settings.emgEmail;
     }
 
-    // Battery Monitor Init
+    // Dying Breath Logic
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
-            const upd = () => { currentBatteryLevel = Math.round(b.level * 100) + "%"; };
-            upd(); 
-            b.addEventListener('levelchange', upd);
+            const upd = () => { 
+                currentBatteryLevel = Math.round(b.level * 100) + "%"; 
+                if (b.level < 0.10 && !state.lowBatSent && state.activeVisit) {
+                     state.lowBatSent = true; saveState();
+                     processUploadQueue(buildPayload({ "Alarm Status": "BATTERY CRITICAL (10%)", "Notes": "Automated Low Battery Alert" }));
+                }
+            };
+            upd(); b.addEventListener('levelchange', upd);
         });
     }
 
     initLocations();
+    if(CONFIG.isAdv) { document.getElementById('btnQuick').classList.remove('hidden'); document.getElementById('advLocOptions').classList.remove('hidden'); syncForms(); } 
+    else { document.getElementById('advLocOptions').classList.add('hidden'); }
 
-    if(CONFIG.isAdv) {
-        document.getElementById('btnQuick').classList.remove('hidden');
-        document.getElementById('advLocOptions').classList.remove('hidden');
-        syncForms();
-    } else {
-        document.getElementById('advLocOptions').classList.add('hidden');
-    }
-
-    if(!state.settings.pinCode || !state.settings.workerName) {
-        navigate('settings');
-        document.getElementById('btnCloseSettings').style.display = 'none';
-    } else if(state.activeVisit) {
-        enterLockedScreen();
-    } else {
-        navigate('main');
-        renderLocations();
-    }
+    if(!state.settings.pinCode || !state.settings.workerName) { navigate('settings'); document.getElementById('btnCloseSettings').style.display = 'none'; } 
+    else if(state.activeVisit) { enterLockedScreen(); } 
+    else { navigate('main'); renderLocations(); }
     
-    updateArrivedButtonState();
-    processUploadQueue();
-    document.body.addEventListener('click', initAudio, { once: true });
-    startReminderTimer();
-    
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock();
-    });
-    
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
-    }
+    updateArrivedButtonState(); processUploadQueue(); document.body.addEventListener('click', initAudio, { once: true }); startReminderTimer();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock(); });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
 });
 
-// --- HELPER FUNCTIONS ---
-function showModal(id) {
-    document.getElementById('modalBackdrop').classList.remove('hidden');
-    document.getElementById('modalBackdrop').classList.add('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : id === 'extend' ? 'extendModal' : 'infoModal').classList.remove('hidden');
-    if(id === 'template') document.getElementById('templateModal').classList.remove('hidden'); 
-}
-function closeModal(id) {
-    document.getElementById('modalBackdrop').classList.add('hidden');
-    document.getElementById('modalBackdrop').classList.remove('flex');
-    document.getElementById(id === 'location' ? 'locationModal' : id === 'pin' ? 'pinModal' : id === 'report' ? 'modal-report' : id === 'checkin' ? 'checkinModal' : id === 'extend' ? 'extendModal' : 'infoModal').classList.add('hidden');
-    document.getElementById('checkinModal').classList.add('hidden');
-    document.getElementById('templateModal').classList.add('hidden'); 
-    document.getElementById('extendModal').classList.add('hidden');
-}
-function navigate(page) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById(page + 'Page').classList.add('active');
-    
-    if(page === 'main') startReminderTimer();
-    else clearTimeout(mainScreenReminderTimer);
+// ... (UI Helper Functions omitted for brevity, logic identical) ...
+function showModal(id) { document.getElementById('modalBackdrop').classList.remove('hidden'); document.getElementById('modalBackdrop').classList.add('flex'); document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden'); if(id==='template')document.getElementById('templateModal').classList.remove('hidden'); }
+function closeModal(id) { document.getElementById('modalBackdrop').classList.add('hidden'); document.getElementById('modalBackdrop').classList.remove('flex'); document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.add('hidden'); document.getElementById('checkinModal').classList.add('hidden'); document.getElementById('templateModal').classList.add('hidden'); document.getElementById('extendModal').classList.add('hidden'); }
+function navigate(page) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(page + 'Page').classList.add('active'); if(page==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(page==='settings'){ document.getElementById('set_name').value=state.settings.workerName||""; document.getElementById('set_phone').value=state.settings.workerPhone||""; document.getElementById('set_emg_name').value=state.settings.emergencyName||""; document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('set_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('set_esc_name').value=state.settings.escalationName||""; document.getElementById('set_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('set_esc_email').value=state.settings.escalationEmail||""; document.getElementById('set_pin').value=state.settings.pinCode||""; document.getElementById('set_duress').value=state.settings.duressPin||""; document.getElementById('set_url').value=state.settings.googleSheetUrl; }}
+function initLocations() { if(!state.locations)state.locations=[]; if(CONFIG.mileage){ if(!state.locations.find(l=>l.id==='travel'))state.locations.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:false,companyName:'Internal',templateName:'Travel Report'}); } else { state.locations=state.locations.filter(l=>l.id!=='travel'); }}
+function toggleBatterySaver() { const o=document.getElementById('batterySaver'); if(o.classList.contains('hidden')){o.classList.remove('hidden'); setInterval(()=>{if(document.getElementById('saverClock'))document.getElementById('saverClock').innerText=new Date().toLocaleTimeString();},1000);}else{o.classList.add('hidden');} }
+function buildPayload(data) { let dueTime=""; if(state.activeVisit && state.activeVisit.anticipatedDepartureTime) dueTime=new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); if(!data["Location Name"]&&state.activeVisit&&state.activeVisit.locationId){ const l=state.locations.find(x=>x.id===state.activeVisit.locationId); if(l){ data["Location Name"]=l.companyName?`${l.companyName} - ${l.name}`:l.name; data["Location Address"]=l.address; }} return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Anticipated Departure Time': dueTime, 'Battery Level': currentBatteryLevel, 'Template Name': currentActiveTemplate, ...data, 'Timestamp': new Date().toISOString() }; }
+function saveState() { localStorage.setItem('loneWorkerState', JSON.stringify(state)); }
+function startReminderTimer() { clearTimeout(mainScreenReminderTimer); document.getElementById('startReminderBanner').classList.add('hidden'); mainScreenReminderTimer=setTimeout(()=>{ if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) document.getElementById('startReminderBanner').classList.remove('hidden'); },300000); }
+async function initAudio() { if(synth)return; try{await Tone.start(); synth=new Tone.Synth().toDestination();}catch(e){} }
+function playSoundAndVibrate(action) { initAudio().then(()=>{ const now=Tone.now(); switch(action){ case 'arrive':synth.triggerAttackRelease("C4","8n",now);synth.triggerAttackRelease("G4","8n",now+0.2);if(navigator.vibrate)navigator.vibrate(50);break; case 'depart':synth.triggerAttackRelease("G4","8n",now);synth.triggerAttackRelease("C4","8n",now+0.2);if(navigator.vibrate)navigator.vibrate(50);break; case 'extend':synth.triggerAttackRelease("A4","16n",now);if(navigator.vibrate)navigator.vibrate(50);break; case 'safe':synth.triggerAttackRelease("C5","8n",now);if(navigator.vibrate)navigator.vibrate([50,50,50]);break; case 'warning':synth.triggerAttackRelease("E5","16n",now);synth.triggerAttackRelease("G5","16n",now+0.2);if(navigator.vibrate)navigator.vibrate([800,200]);break; case 'panic':synth.triggerAttackRelease("G5","16n",now);synth.triggerAttackRelease("G5","16n",now+0.1);synth.triggerAttackRelease("G5","16n",now+0.2);if(navigator.vibrate)navigator.vibrate([200,100,200]);break; case 'checkin':synth.triggerAttackRelease("A4","16n",now);if(navigator.vibrate)navigator.vibrate(200);break; case 'pre_alert': synth.triggerAttackRelease("C6","16n",now); synth.triggerAttackRelease("C6","16n",now+0.15); if(navigator.vibrate)navigator.vibrate([1000, 500, 1000, 500, 2000]); break; }}); }
 
-    if(page === 'settings') {
-        document.getElementById('set_name').value = state.settings.workerName || "";
-        document.getElementById('set_phone').value = state.settings.workerPhone || "";
-        document.getElementById('set_emg_name').value = state.settings.emergencyName || "";
-        document.getElementById('set_emg_phone').value = state.settings.emergencyPhone || "";
-        document.getElementById('set_emg_email').value = state.settings.emergencyEmail || "";
-        document.getElementById('set_esc_name').value = state.settings.escalationName || "";
-        document.getElementById('set_esc_phone').value = state.settings.escalationPhone || "";
-        document.getElementById('set_esc_email').value = state.settings.escalationEmail || "";
-        document.getElementById('set_pin').value = state.settings.pinCode || "";
-        document.getElementById('set_duress').value = state.settings.duressPin || "";
-        document.getElementById('set_url').value = state.settings.googleSheetUrl;
-    }
-}
+function renderLocations() { const list=document.getElementById('locationList'); list.innerHTML=''; if(!state.locations)state.locations=[]; state.locations.forEach(l=>{ const el=document.createElement('div'); let bg='bg-gray-900',bc='border-transparent',tc='text-white'; if(state.selectedLocationId===l.id){bg='bg-blue-900';bc='border-blue-500';} if(l.id==='travel')tc='text-purple-400'; el.className=`p-4 rounded-lg border-2 ${bg} ${bc} cursor-pointer flex justify-between items-center group transition-all mb-2`; let biz=l.companyName&&l.companyName!=='Internal'?`<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>`:''; el.innerHTML=`<div>${biz}<div class="font-bold text-lg ${tc}">${l.name}</div><div class="text-sm text-gray-400">${l.address}</div></div><div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}',event)">⚙️</button></div>`; el.onclick=(e)=>{if(e.target.tagName!=='BUTTON'){state.selectedLocationId=l.id;renderLocations();updateArrivedButtonState();}}; list.appendChild(el); }); }
+function openLocModal(id=null, e=null) { if(e)e.stopPropagation(); showModal('location'); if(id){ const l=state.locations.find(x=>x.id===id); document.getElementById('locModalTitle').innerText="Edit Location"; document.getElementById('locId').value=id; document.getElementById('locName').value=l.name; document.getElementById('locAddr').value=l.address; document.getElementById('locBusiness').value=l.companyName||""; document.getElementById('locTemplate').value=l.templateName||""; const isNo=l.noReport===true; document.getElementById('radRepNo').checked=isNo; document.getElementById('radRepYes').checked=!isNo; if(id==='travel')document.getElementById('btnDelLoc').classList.add('hidden'); else document.getElementById('btnDelLoc').classList.remove('hidden'); } else { document.getElementById('locModalTitle').innerText="Add Location"; document.getElementById('locId').value=""; document.getElementById('locName').value=""; document.getElementById('locAddr').value=""; document.getElementById('locBusiness').value=""; document.getElementById('locTemplate').value=""; document.getElementById('radRepYes').checked=true; document.getElementById('radRepNo').checked=false; document.getElementById('btnDelLoc').classList.add('hidden'); } }
+function saveLoc() { const id=document.getElementById('locId').value, name=document.getElementById('locName').value, addr=document.getElementById('locAddr').value, business=document.getElementById('locBusiness').value, tpl=document.getElementById('locTemplate').value, noRep=document.getElementById('radRepNo').checked; if(!name)return alert("Name required"); if(id){ const idx=state.locations.findIndex(l=>l.id===id); if(idx>-1)state.locations[idx]={...state.locations[idx],name,address:addr,companyName:business,templateName:tpl,noReport:noRep}; } else { state.locations.push({id:Date.now().toString(),name,address:addr,companyName:business,templateName:tpl,noReport:noRep}); } saveState(); renderLocations(); closeModal('location'); syncForms(); }
+function deleteLoc() { const id=document.getElementById('locId').value; if(id==='travel')return alert("Cannot delete Travelling tile."); if(confirm('Delete location?')){ state.locations=state.locations.filter(l=>l.id!==id); if(state.selectedLocationId===id)state.selectedLocationId=null; saveState(); renderLocations(); closeModal('location'); } }
+function getGpsAddress() { const btn=document.getElementById('btnGpsAddr'); if(!navigator.geolocation)return alert("GPS not supported"); btn.innerText="..."; btn.disabled=true; navigator.geolocation.getCurrentPosition(pos=>{ const lat=pos.coords.latitude, lon=pos.coords.longitude; fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`).then(r=>r.json()).then(data=>{ document.getElementById('locAddr').value=data.display_name||`${lat}, ${lon}`; btn.innerText="📍 GPS"; btn.disabled=false; }).catch(()=>{ document.getElementById('locAddr').value=`${lat}, ${lon}`; btn.innerText="📍 GPS"; btn.disabled=false; }); }, ()=>{ alert("GPS Error"); btn.innerText="📍 GPS"; btn.disabled=false; }, {timeout:10000}); }
 
-// --- INIT LOCATIONS ---
-function initLocations() {
-    if(!state.locations) state.locations = [];
-    
-    if(CONFIG.mileage) {
-        if(!state.locations.find(l => l.id === 'travel')) {
-            state.locations.unshift({ 
-                id: 'travel', 
-                name: 'Travelling', 
-                address: 'Calculates Mileage via GPS', 
-                noReport: false, 
-                companyName: 'Internal', 
-                templateName: 'Travel Report' 
-            });
-        }
-    } else {
-        state.locations = state.locations.filter(l => l.id !== 'travel');
-    }
-}
-
-// --- BATTERY SAVER (v73 FIX) ---
-function toggleBatterySaver() {
-    const overlay = document.getElementById('batterySaver');
-    if(overlay.classList.contains('hidden')) {
-        overlay.classList.remove('hidden');
-        setInterval(() => { if(document.getElementById('saverClock')) document.getElementById('saverClock').innerText = new Date().toLocaleTimeString(); }, 1000);
-    } else {
-        overlay.classList.add('hidden');
-    }
-}
-
-// --- DATA BUILDER ---
-function buildPayload(data) {
-    let dueTime = "";
-    if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
-        dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
-    }
-    
-    // v72 FIX: Ensure location is attached for emails
-    if (!data["Location Name"] && state.activeVisit && state.activeVisit.locationId) {
-         const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-         if (l) {
-             data["Location Name"] = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
-             data["Location Address"] = l.address;
-         }
-    }
-    
-    return {
-        'key': CONFIG.key,
-        'Worker Name': state.settings.workerName, 
-        'Worker Phone Number': state.settings.workerPhone,
-        'Emergency Contact Name': state.settings.emergencyName, 
-        'Emergency Contact Number': state.settings.emergencyPhone, 
-        'Emergency Contact Email': state.settings.emergencyEmail,
-        'Escalation Contact Name': state.settings.escalationName, 
-        'Escalation Contact Number': state.settings.escalationPhone, 
-        'Escalation Contact Email': state.settings.escalationEmail,
-        'Anticipated Departure Time': dueTime,
-        'Battery Level': currentBatteryLevel, 
-        'Template Name': currentActiveTemplate,
-        ...data, 
-        'Timestamp': new Date().toISOString()
-    };
-}
-
-function saveState() { 
-    localStorage.setItem('loneWorkerState', JSON.stringify(state)); 
-}
-
-function startReminderTimer() {
-    clearTimeout(mainScreenReminderTimer);
-    document.getElementById('startReminderBanner').classList.add('hidden');
-    mainScreenReminderTimer = setTimeout(() => {
-        if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
-            document.getElementById('startReminderBanner').classList.remove('hidden');
-        }
-    }, 300000); // 5 Mins
-}
-
-// ==================== AUDIO ENGINE ====================
-async function initAudio() {
-    if(synth) return;
-    try {
-        await Tone.start();
-        synth = new Tone.Synth().toDestination();
-    } catch(e) { console.warn("Audio Init Fail", e); }
-}
-
-function playSoundAndVibrate(action) {
-    initAudio().then(() => {
-        const now = Tone.now();
-        switch(action) {
-            case 'arrive': 
-                synth.triggerAttackRelease("C4", "8n", now); 
-                synth.triggerAttackRelease("G4", "8n", now+0.2); 
-                if(navigator.vibrate) navigator.vibrate(50); 
-                break;
-            case 'depart': 
-                synth.triggerAttackRelease("G4", "8n", now); 
-                synth.triggerAttackRelease("C4", "8n", now+0.2); 
-                if(navigator.vibrate) navigator.vibrate(50); 
-                break;
-            case 'extend': 
-                synth.triggerAttackRelease("A4", "16n", now); 
-                if(navigator.vibrate) navigator.vibrate(50); 
-                break;
-            case 'safe': 
-                synth.triggerAttackRelease("C5", "8n", now); 
-                if(navigator.vibrate) navigator.vibrate([50,50,50]); 
-                break;
-            case 'warning': 
-                synth.triggerAttackRelease("E5", "16n", now); 
-                synth.triggerAttackRelease("G5", "16n", now+0.2); 
-                if(navigator.vibrate) navigator.vibrate([800,200]); 
-                break;
-            case 'panic': 
-                synth.triggerAttackRelease("G5", "16n", now); 
-                synth.triggerAttackRelease("G5", "16n", now+0.1); 
-                synth.triggerAttackRelease("G5", "16n", now+0.2); 
-                if(navigator.vibrate) navigator.vibrate([200,100,200]); 
-                break;
-            case 'checkin': 
-                synth.triggerAttackRelease("A4", "16n", now); 
-                if(navigator.vibrate) navigator.vibrate(200); 
-                break;
-        }
-    });
-}
-
-// ==================== LOCATION LOGIC ====================
-function renderLocations() {
-    const list = document.getElementById('locationList');
-    list.innerHTML = '';
-    if(!state.locations) state.locations = [];
-    
-    state.locations.forEach(l => {
-        const el = document.createElement('div');
-        
-        // TILE STYLE LOGIC
-        let bgColor = 'bg-gray-900';
-        let borderColor = 'border-transparent';
-        let textColor = 'text-white';
-        
-        if(state.selectedLocationId === l.id) {
-            bgColor = 'bg-blue-900';
-            borderColor = 'border-blue-500';
-        }
-        
-        if(l.id === 'travel') textColor = 'text-purple-400';
-        
-        el.className = `p-4 rounded-lg border-2 ${bgColor} ${borderColor} cursor-pointer flex justify-between items-center group transition-all mb-2`;
-        
-        let businessHtml = l.companyName && l.companyName !== 'Internal' 
-            ? `<div class="text-xs text-gray-500 uppercase font-bold mb-1">${l.companyName}</div>` 
-            : '';
-
-        let html = `
-            <div>
-                ${businessHtml}
-                <div class="font-bold text-lg ${textColor}">${l.name}</div>
-                <div class="text-sm text-gray-400">${l.address}</div>
-            </div>`;
-        
-        html += `<div class="flex gap-2"><button class="text-gray-500 hover:text-white p-2 text-xl z-10" onclick="openLocModal('${l.id}', event)">⚙️</button></div>`;
-        
-        el.innerHTML = html;
-        el.onclick = (e) => {
-            if(e.target.tagName !== 'BUTTON') { 
-                state.selectedLocationId = l.id; 
-                renderLocations(); 
-                updateArrivedButtonState(); 
-            }
-        };
-        list.appendChild(el);
-    });
-}
-
-function openLocModal(id=null, e=null) {
-    if(e) e.stopPropagation();
-    showModal('location');
-    if(id) {
-        const l = state.locations.find(x => x.id === id);
-        document.getElementById('locModalTitle').innerText = "Edit Location";
-        document.getElementById('locId').value = id;
-        document.getElementById('locName').value = l.name;
-        document.getElementById('locAddr').value = l.address;
-        document.getElementById('locBusiness').value = l.companyName || ""; 
-        document.getElementById('locTemplate').value = l.templateName || "";
-        
-        // FIX: Read boolean state correctly
-        const isNoRep = l.noReport === true;
-        document.getElementById('radRepNo').checked = isNoRep;
-        document.getElementById('radRepYes').checked = !isNoRep;
-        
-        if(id === 'travel') document.getElementById('btnDelLoc').classList.add('hidden');
-        else document.getElementById('btnDelLoc').classList.remove('hidden');
-    } else {
-        document.getElementById('locModalTitle').innerText = "Add Location";
-        document.getElementById('locId').value = "";
-        document.getElementById('locName').value = "";
-        document.getElementById('locAddr').value = "";
-        document.getElementById('locBusiness').value = ""; 
-        document.getElementById('locTemplate').value = "";
-        
-        // Default to Yes
-        document.getElementById('radRepYes').checked = true;
-        document.getElementById('radRepNo').checked = false;
-        
-        document.getElementById('btnDelLoc').classList.add('hidden');
-    }
-}
-
-function saveLoc() {
-    const id = document.getElementById('locId').value;
-    const name = document.getElementById('locName').value;
-    const addr = document.getElementById('locAddr').value;
-    const business = document.getElementById('locBusiness').value; 
-    const tpl = document.getElementById('locTemplate').value;
-    // FIX: Read radio button
-    const noRep = document.getElementById('radRepNo').checked;
-    
-    if(!name) return alert("Name required");
-    
-    if(id) {
-        const idx = state.locations.findIndex(l => l.id === id);
-        if(idx > -1) {
-            state.locations[idx] = { ...state.locations[idx], name, address: addr, companyName: business, templateName: tpl, noReport: noRep };
-        }
-    } else {
-        state.locations.push({ 
-            id: Date.now().toString(), 
-            name, address: addr, companyName: business, templateName: tpl, noReport: noRep 
-        });
-    }
-    saveState(); renderLocations(); closeModal('location'); syncForms();
-}
-
-function deleteLoc() {
-    const id = document.getElementById('locId').value;
-    if(id === 'travel') return alert("Cannot delete Travelling tile.");
-    if(confirm('Delete location?')) {
-        state.locations = state.locations.filter(l => l.id !== id);
-        if(state.selectedLocationId === id) state.selectedLocationId = null;
-        saveState(); renderLocations(); closeModal('location');
-    }
-}
-
-function getGpsAddress() {
-    const btn = document.getElementById('btnGpsAddr');
-    if(!navigator.geolocation) return alert("GPS not supported");
-    
-    btn.innerText = "...";
-    btn.disabled = true;
-    
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('locAddr').value = data.display_name || `${lat}, ${lon}`;
-                btn.innerText = "📍 GPS";
-                btn.disabled = false;
-            })
-            .catch(() => {
-                document.getElementById('locAddr').value = `${lat}, ${lon}`;
-                btn.innerText = "📍 GPS";
-                btn.disabled = false;
-            });
-    }, () => {
-        alert("GPS Error");
-        btn.innerText = "📍 GPS";
-        btn.disabled = false;
-    }, { timeout: 10000 });
-}
-
-// ==================== VISIT LOGIC ====================
 function updateArrivedButtonState() {
     const step = document.getElementById('durationSlider').value;
-    const val = DURATION_MAP[step] || 0; // Use Map
-    
-    // Formatting Logic
+    const val = DURATION_MAP[step] || 0;
     let display = val + ' mins';
-    if(val >= 60) {
-        const h = Math.floor(val/60);
-        const m = val % 60;
-        display = `${h} hr${h>1?'s':''} ${m>0 ? m+' mins' : ''}`;
-    }
+    if(val >= 60) { const h = Math.floor(val/60); const m = val % 60; display = `${h} hr${h>1?'s':''} ${m>0 ? m+' mins' : ''}`; }
     document.getElementById('durationDisplay').innerText = display;
     state.visitDurationMinutes = val;
-    
-    const btn = document.getElementById('btnStart');
-    const btnQ = document.getElementById('btnQuick');
-    
+    const btn = document.getElementById('btnStart'), btnQ = document.getElementById('btnQuick');
     if(state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
-        
-        // Quick Stat Logic
-        if(CONFIG.isAdv && !l.noReport) {
-            btnQ.disabled = false; 
-            btnQ.classList.replace('opacity-50','hover:bg-teal-500');
-            btnQ.classList.replace('bg-teal-900','bg-teal-600');
-            btnQ.classList.replace('text-teal-500','text-white');
-        } else {
-            btnQ.disabled = true;
-            btnQ.classList.replace('hover:bg-teal-500','opacity-50');
-            btnQ.classList.replace('bg-teal-600','bg-teal-900');
-            btnQ.classList.replace('text-white','text-teal-500');
-        }
-        
-        if(val > 0) {
-            btn.disabled = false; 
-            btn.innerText = 'HOLD TO START';
-            btn.className = 'long-press-btn flex-[2] py-5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xl shadow-lg transition-all';
-            setupLongPress(btn, startVisit);
-        } else {
-            btn.disabled = true;
-            btn.innerText = 'Set Duration';
-            btn.className = 'long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all';
-        }
-    } else {
-        btn.disabled = true;
-        btn.innerText = 'Select Location';
-    }
+        if(CONFIG.isAdv && !l.noReport) { btnQ.disabled = false; btnQ.classList.replace('opacity-50','hover:bg-teal-500'); btnQ.classList.replace('bg-teal-900','bg-teal-600'); btnQ.classList.replace('text-teal-500','text-white'); } 
+        else { btnQ.disabled = true; btnQ.classList.replace('hover:bg-teal-500','opacity-50'); btnQ.classList.replace('bg-teal-600','bg-teal-900'); btnQ.classList.replace('text-white','text-teal-500'); }
+        if(val > 0) { btn.disabled = false; btn.innerText = 'HOLD TO START'; btn.className = 'long-press-btn flex-[2] py-5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-xl shadow-lg transition-all'; setupLongPress(btn, startVisit); } 
+        else { btn.disabled = true; btn.innerText = 'Set Duration'; btn.className = 'long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all'; }
+    } else { btn.disabled = true; btn.innerText = 'Select Location'; }
 }
 
 function startVisit() {
     const sel = state.locations.find(l => l.id === state.selectedLocationId);
-    
-    // --- TRAVELLING PULSE LOGIC ---
-    if(sel.id === 'travel') {
-        startTravellingPulse();
-    }
-    // ------------------------------
-
+    if(sel.id === 'travel') startTravellingPulse();
     const now = new Date();
-    
-    if(state.settings.name && !state.settings.workerName) {
-        state.settings.workerName = state.settings.name;
-        state.settings.workerPhone = state.settings.phone;
-    }
-
+    if(state.settings.name && !state.settings.workerName) { state.settings.workerName = state.settings.name; state.settings.workerPhone = state.settings.phone; }
     state.activeVisit = {
-        locationId: sel.id,
-        startTime: now,
+        locationId: sel.id, startTime: now,
         anticipatedDepartureTime: new Date(now.getTime() + state.visitDurationMinutes * 60000),
-        arrivalTimeForSheet: now.toISOString(),
-        gpsStart: null,
-        isPanic: false,
+        arrivalTimeForSheet: now.toISOString(), gpsStart: null, isPanic: false,
         nextCheckin: CONFIG.checkinEnabled ? new Date(now.getTime() + CONFIG.checkinInterval * 60000) : null,
-        overdueSent: false,
-        criticalSent: false
+        overdueSent: false, criticalSent: false, fiveMinWarned: false // Reset Warning Flag
     };
-    
-    playSoundAndVibrate('arrive');
-    saveState();
-    enterLockedScreen();
-    requestWakeLock();
-
+    state.lowBatSent = false; // Reset Dying Breath Flag
+    playSoundAndVibrate('arrive'); saveState(); enterLockedScreen(); requestWakeLock();
     const locName = sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name;
     const initialStatus = sel.id === 'travel' ? 'TRAVELLING' : 'ON SITE';
-    
-    processUploadQueue(buildPayload({ 
-        "Alarm Status": initialStatus, 
-        "Notes": "Visit Started (Locating...)",
-        "Location Name": locName,
-        "Location Address": sel.address 
-    }));
-    
+    processUploadQueue(buildPayload({ "Alarm Status": initialStatus, "Notes": "Visit Started (Locating...)", "Location Name": locName, "Location Address": sel.address }));
     if(navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             state.activeVisit.gpsStart = pos.coords.latitude + ',' + pos.coords.longitude;
-            processUploadQueue(buildPayload({ 
-                "Alarm Status": initialStatus, 
-                "Notes": "Location Confirmed",
-                "Location Name": locName,
-                "Last Known GPS": state.activeVisit.gpsStart
-            }));
+            processUploadQueue(buildPayload({ "Alarm Status": initialStatus, "Notes": "Location Confirmed", "Location Name": locName, "Last Known GPS": state.activeVisit.gpsStart }));
             saveState();
-        }, () => {
-            processUploadQueue(buildPayload({ "Alarm Status": initialStatus, "Notes": "Visit Started (GPS Slow)" }));
-        }, { timeout: 5000, maximumAge: 60000 });
+        }, () => { processUploadQueue(buildPayload({ "Alarm Status": initialStatus, "Notes": "Visit Started (GPS Slow)" })); }, { timeout: 5000, maximumAge: 60000 });
     }
 }
+function startTravellingPulse() { toggleBatterySaver(); if(travellingInterval) clearInterval(travellingInterval); travellingInterval = setInterval(sendTravellingPulse, 300000); }
+function sendTravellingPulse() { if(!navigator.onLine) return; navigator.geolocation.getCurrentPosition(pos => { const gps = pos.coords.latitude + "," + pos.coords.longitude; const payload = buildPayload({ "Alarm Status": "TRAVELLING", "Last Known GPS": gps, "Notes": "Auto-Location Update" }); const fd = new FormData(); for(let k in payload) fd.append(k, payload[k]); fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(()=>{}); }, err => console.log(err)); }
 
-// --- NEW PULSE FUNCTIONS ---
-function startTravellingPulse() {
-    // 1. Force Dark Mode
-    toggleBatterySaver(); 
-    // 2. Start Interval (5 Mins)
-    if(travellingInterval) clearInterval(travellingInterval);
-    travellingInterval = setInterval(sendTravellingPulse, 300000); 
-}
+function enterLockedScreen() { const l = state.locations.find(l => l.id === state.activeVisit.locationId) || {name: 'Unknown'}; document.getElementById('lockedLocationName').innerText = l.name; navigate('locked'); tick(); setupLongPress(document.getElementById('btnDepart'), () => preDepart(false)); setupLongPress(document.getElementById('btnExtend'), () => showModal('extend')); if(timerInt) clearInterval(timerInt); timerInt = setInterval(tick, 1000); }
 
-function sendTravellingPulse() {
-    if(!navigator.onLine) return;
-    navigator.geolocation.getCurrentPosition(pos => {
-         const gps = pos.coords.latitude + "," + pos.coords.longitude;
-         // Send Silent Update
-         const payload = buildPayload({
-             "Alarm Status": "TRAVELLING",
-             "Last Known GPS": gps,
-             "Notes": "Auto-Location Update"
-         });
-         // Don't flood the pending queue, just fire and forget for background pulses
-         const fd = new FormData();
-         for(let k in payload) fd.append(k, payload[k]);
-         fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).catch(()=>{});
-    }, err => console.log(err));
-}
-// ---------------------------
-
-function enterLockedScreen() {
-    const l = state.locations.find(l => l.id === state.activeVisit.locationId) || {name: 'Unknown'};
-    document.getElementById('lockedLocationName').innerText = l.name;
-    navigate('locked');
-    
-    tick(); 
-    
-    setupLongPress(document.getElementById('btnDepart'), () => preDepart(false));
-    setupLongPress(document.getElementById('btnExtend'), () => showModal('extend'));
-    
-    if(timerInt) clearInterval(timerInt);
-    timerInt = setInterval(tick, 1000);
-}
-
-// --- SILENT NUDGE LOGIC ---
 function tick() {
     if(!state.activeVisit) { clearInterval(timerInt); return; }
-    const now = new Date();
-    const due = new Date(state.activeVisit.anticipatedDepartureTime);
+    const now = new Date(), due = new Date(state.activeVisit.anticipatedDepartureTime);
     const rem = due - now;
-    
     document.getElementById('lockedAnticipatedTime').innerText = due.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    
+    // 5 MINUTE WARNING LOGIC
+    const minsRemaining = Math.floor(rem / 60000);
+    if (minsRemaining === 5 && !state.activeVisit.fiveMinWarned && !state.activeVisit.isPanic) {
+        state.activeVisit.fiveMinWarned = true; saveState();
+        playSoundAndVibrate('pre_alert');
+        document.getElementById('fiveMinBanner').classList.remove('hidden');
+        setTimeout(() => document.getElementById('fiveMinBanner').classList.add('hidden'), 10000); // Hide after 10s
+    }
 
     if(rem < 0) {
-        document.getElementById('countdownTimer').innerText = 'OVERDUE';
-        document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500');
-        document.getElementById('btnSafe').classList.remove('hidden');
-        document.getElementById('btnDepart').classList.add('hidden');
-        setupLongPress(document.getElementById('btnSafe'), iamSafe);
-        
-        // Safety Wake Logic (v73 FIX)
-        document.getElementById('batterySaver').classList.add('hidden');
-
-        // 0-15 Mins: Amber "Nudge"
+        document.getElementById('countdownTimer').innerText = 'OVERDUE'; document.getElementById('countdownTimer').classList.replace('text-white', 'text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); document.getElementById('batterySaver').classList.add('hidden');
         const minsOver = Math.floor(Math.abs(rem) / 60000);
-        
         if (minsOver < CONFIG.escalationMinutes) {
-             // Only sound ONCE when it first goes overdue
-             if (!state.activeVisit.overdueSent) {
-                 state.activeVisit.overdueSent = true;
-                 saveState();
-                 triggerAutoAlert('OVERDUE');
-                 playSoundAndVibrate('warning'); // Sound once
-             }
-             // Vibrate nudge every minute
-             if (Math.floor(Math.abs(rem)/1000) % 60 === 0) {
-                 if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
-             }
-        } 
-        // 15+ Mins: Critical (Silent on Phone, Loud on Monitor)
-        else if (!state.activeVisit.criticalSent) { 
-             state.activeVisit.criticalSent = true;
-             saveState();
-             triggerAutoAlert('EMERGENCY - OVERDUE');
-             // One confirmation vibe
-             if(navigator.vibrate) navigator.vibrate(2000); 
-        } 
+             if (!state.activeVisit.overdueSent) { state.activeVisit.overdueSent = true; saveState(); triggerAutoAlert('OVERDUE'); playSoundAndVibrate('warning'); }
+             if (Math.floor(Math.abs(rem)/1000) % 60 === 0) if(navigator.vibrate) navigator.vibrate([1000,500,1000]);
+        } else if (!state.activeVisit.criticalSent) { state.activeVisit.criticalSent = true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); if(navigator.vibrate) navigator.vibrate(2000); } 
     } else {
-        const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
-        document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`;
-        document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white');
-        document.getElementById('btnSafe').classList.add('hidden');
-        document.getElementById('btnDepart').classList.remove('hidden');
+        const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000); document.getElementById('countdownTimer').innerText = `${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.replace('text-red-500', 'text-white'); document.getElementById('btnSafe').classList.add('hidden'); document.getElementById('btnDepart').classList.remove('hidden');
     }
-    
-    if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) {
-        triggerCheckin();
-    }
+    if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && now > new Date(state.activeVisit.nextCheckin)) triggerCheckin();
 }
 
-function triggerAutoAlert(status) {
-    const sel = state.locations.find(l => l.id === state.activeVisit.locationId);
-    const locName = sel ? (sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name) : "Unknown";
-    navigator.geolocation.getCurrentPosition(pos => {
-        processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert", "Location Name": locName, "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}` }));
-    }, () => {
-        processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert (GPS Fail)", "Location Name": locName }));
-    });
-}
-
-function triggerCheckin() {
-    if(!document.getElementById('checkinModal').classList.contains('hidden')) return;
-    showModal('checkin');
-    // Safety Wake Checkin
-    document.getElementById('batterySaver').classList.add('hidden');
-
-    let rem = 120;
-    const el = document.getElementById('checkinCountdown');
-    
-    if(checkinIntervalId) clearInterval(checkinIntervalId);
-    playSoundAndVibrate('checkin');
-    
-    // UPDATED: Swap button to clean listeners and attach Long Press
-    const btn = document.getElementById('btnCheckinConfirm');
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    setupLongPress(newBtn, confirmCheckin);
-
-    checkinIntervalId = setInterval(() => {
-        rem--;
-        const m = Math.floor(rem/60); const s = rem%60;
-        el.innerText = `${m}:${s<10?'0':''}${s}`;
-        
-        if(rem === 60 || rem === 30 || rem === 10) playSoundAndVibrate('checkin');
-        
-        if(rem <= 0) {
-            clearInterval(checkinIntervalId);
-            closeModal('checkin');
-            sendToGoogleSheet(buildPayload({ "Alarm Status": 'MISSED_CHECKIN', "Notes": "Worker failed to respond to check-in" }));
-            alert('MISSED CHECK-IN ALERT SENT');
-        }
-    }, 1000);
-}
-
-function confirmCheckin() {
-    clearInterval(checkinIntervalId); 
-    closeModal('checkin'); 
-    state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
-    saveState();
-}
-
-function confirmExtension(mins) {
-    const process = () => {
-        state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + mins * 60000);
-        saveState();
-        playSoundAndVibrate('extend');
-        processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended " + mins + "m" }));
-    };
-
-    const now = new Date();
-    const due = new Date(state.activeVisit.anticipatedDepartureTime);
-    const isOverdue = (due - now) < 0;
-    const isPanic = state.activeVisit.isPanic === true;
-
-    closeModal('extend');
-
-    if (isOverdue || isPanic) {
-        withPinVerification(false, process);
-    } else {
-        process();
-    }
-}
-
-function handlePanicTap() {
-    const now = Date.now();
-    if (now - panicTapTimer > 2000) panicTapCount = 0;
-    panicTapCount++; panicTapTimer = now;
-    if (panicTapCount >= 3) { triggerPanic(); panicTapCount = 0; }
-}
-
-function triggerPanic() {
-    state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState();
-    playSoundAndVibrate('panic');
-    processUploadQueue(buildPayload({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" }));
-    alert('PANIC ALERT SENT');
-}
-
-function iamSafe() {
-    withPinVerification(false, () => {
-        playSoundAndVibrate('safe');
-        processUploadQueue(buildPayload({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" }));
-        state.activeVisit.isPanic = false;
-        preDepart(true);
-    });
-}
-
-// ==================== REPORTING ENGINE ====================
-function openMidVisitMenu() {
-    isMidVisitUpdate = true;
-    showModal('template');
-    const list = document.getElementById('templateList');
-    list.innerHTML = '';
-    
-    // 1. Location Template
-    const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-    const defaultName = l.templateName || "Standard Visit Note";
-    list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName));
-    
-    // 2. Global Forms
-    if (state.globalForms && state.globalForms.length > 0) {
-        state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name)));
-    } else {
-        list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>';
-    }
-}
-
-function createTemplateBtn(label, value) {
-    const btn = document.createElement('button');
-    btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4";
-    btn.innerText = label;
-    btn.onclick = () => {
-        closeModal('template');
-        loadFormAndShow(value);
-    };
-    return btn;
-}
-
-function loadFormAndShow(tplName) {
-    currentActiveTemplate = tplName;
-    showModal('report');
-    const div = document.getElementById('reportFields');
-    div.innerHTML = '';
-    document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tplName : "Visit Report";
-    buildReportForm(tplName, div);
-    
-    const btn = document.getElementById('btnSubmitRep');
-    // CLONE to strip listeners
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    
-    if (isMidVisitUpdate) {
-        newBtn.innerText = "Send Update";
-        newBtn.classList.remove('long-press-btn');
-        newBtn.onclick = submitReport;
-    } else {
-        newBtn.innerText = "HOLD TO SUBMIT & END";
-        newBtn.classList.add('long-press-btn');
-        setupLongPress(newBtn, submitReport);
-    }
-}
-
-function preDepart(isSafeFlow) {
-    isMidVisitUpdate = false;
-    const proceed = () => {
-        if(!CONFIG.isAdv) { depart(); return; }
-        const l = state.locations.find(l => l.id === state.activeVisit.locationId);
-        if(l && l.noReport) { depart(); return; }
-
-        loadFormAndShow(l.templateName || "(Standard)");
-        
-        // --- MILEAGE LOGIC ---
-        if(l.id === 'travel' && CONFIG.mileage) {
-           setTimeout(() => {
-               const inp = document.querySelector('input[data-key="Distance (km)"]');
-               if(inp) { inp.value = ""; inp.placeholder = "Calculating..."; inp.disabled = true; }
-           }, 100);
-
-           navigator.geolocation.getCurrentPosition(pos => {
-             const end = pos.coords.latitude+','+pos.coords.longitude;
-             if(state.activeVisit.gpsStart) {
-               
-               // ASYNC ORS CALL
-               fetchRoadDistance(state.activeVisit.gpsStart, end).then(result => {
-                    const inp = document.querySelector('input[data-key="Distance (km)"]');
-                    if(inp) { 
-                        inp.value = result.km; 
-                        inp.disabled = false; 
-                        inp.placeholder = ""; 
-                        inp.style.borderColor = "#4ade80"; 
-                        
-                        // IF FALLBACK USED, POPULATE NOTE
-                        if(result.isFallback) {
-                            const detailBox = document.querySelector('textarea[data-key="Details"]');
-                            if(detailBox) {
-                                detailBox.value = "⚠️ As-the-crow-flies calculation only (GPS/Network unavailable for road stats).";
-                                detailBox.style.borderColor = "#facc15"; 
-                            }
-                        }
-                    }
-               });
-             }
-           }, (err) => {
-               const inp = document.querySelector('input[data-key="Distance (km)"]');
-               if(inp) { inp.placeholder = "GPS Error - Enter Manually"; inp.disabled = false; }
-           }, { enableHighAccuracy: true, timeout: 10000 });
-        }
-    };
-
-    const now = new Date();
-    const due = new Date(state.activeVisit.anticipatedDepartureTime);
-    const isOverdue = (due - now) < 0;
-    const isPanic = state.activeVisit.isPanic === true;
-    
-    if(isSafeFlow || (!isOverdue && !isPanic)) {
-        proceed();
-    } else {
-        withPinVerification(false, proceed);
-    }
-}
-
-// --- NEW ORS FUNCTION ---
-async function fetchRoadDistance(p1, p2) {
-    const crow = calcDist(p1, p2); // Fallback
-    
-    // If no key or offline, return crow flies immediately
-    if(!CONFIG.orsKey || !navigator.onLine) return { km: crow, isFallback: true };
-    
-    try {
-        // ORS format: lon,lat
-        const [lat1, lon1] = p1.split(',');
-        const [lat2, lon2] = p2.split(',');
-        
-        const url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${lon1},${lat1}&end=${lon2},${lat2}`;
-        const res = await fetch(url, { 
-            headers: { 'Authorization': CONFIG.orsKey } 
-        });
-        
-        if(!res.ok) throw new Error("ORS Error");
-        
-        const json = await res.json();
-        const meters = json.features[0].properties.segments[0].distance;
-        return { km: (meters / 1000).toFixed(2), isFallback: false };
-        
-    } catch(e) {
-        console.warn("ORS Fail, using Haversine", e);
-        return { km: crow, isFallback: true };
-    }
-}
-
-
-function quickStat() {
-    if(!state.selectedLocationId) return;
-    const l = state.locations.find(x => x.id === state.selectedLocationId);
-    state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() };
-    
-    loadFormAndShow(l.templateName || "(Standard)");
-    
-    document.getElementById('btnSubmitRep').onclick = () => {
-        const d = gatherFormData();
-        const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
-        
-        const data = buildPayload({
-            "Location Name": locName,
-            "Location Address": l.address,
-            "Alarm Status": "DATA_ENTRY_ONLY",
-            "Notes": d.notes,
-            "Visit Report Data": JSON.stringify(d.jsonPayload)
-        });
-        
-        const photoKeys = Object.keys(state.photoStore);
-        if(photoKeys.length > 0) data["Photo 1"] = state.photoStore[photoKeys[0]];
-        if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; 
-        
-        processUploadQueue(data);
-        state.activeVisit = null; state.photoStore = {}; sigPad = null;
-        closeModal('report');
-        if(navigator.onLine) alert("✅ Update Sent!");
-        else alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
-    };
-}
-
-// v57: Enhanced Form Builder
-function buildReportForm(tplName, container) {
-    state.photoStore = {}; // Reset photos
-    let tpl = (state.globalForms && state.globalForms.find(f => f.name === tplName))?.questions;
-    if (!tpl) tpl = state.cachedForms[tplName];
-    if (!tpl) tpl = state.cachedForms["(Standard)"] || [];
-    
-    if(tpl.length === 0) {
-        container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
-    } else {
-        tpl.forEach((f, index) => { // v71 FIX: Use index
-            let type = f.type || 'check'; 
-            let text = f.text || f; 
-            
-            if (typeof f === 'string') {
-                if(f.includes('[TEXT]')) { type='text'; text=f.replace('[TEXT]','').trim(); }
-                else if(f.includes('[PHOTO]')) { type='photo'; text=f.replace('[PHOTO]','').trim(); }
-                else if(f.includes('[YESNO]')) { type='yesno'; text=f.replace('[YESNO]','').trim(); }
-                else if(f.includes('[NUMBER]')) { type='number'; text=f.replace('[NUMBER]','').trim(); }
-                else if(f.includes('[GPS]')) { type='gps'; text=f.replace('[GPS]','').trim(); }
-                else if(f.includes('[HEADING]')) { type='header'; text=f.replace('[HEADING]','').trim(); }
-                else if(f.includes('[NOTE]')) { type='note'; text=f.replace('[NOTE]','').trim(); }
-                else if(f.includes('[SIGN]')) { type='signature'; text=f.replace('[SIGN]','').trim(); }
-            }
-            
-            let html = '';
-            if(type==='header') html = `<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${text}</h3>`;
-            else if(type==='note') html = `<p class="text-gray-500 text-sm italic my-2">${text}</p>`;
-            else if(type==='text') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><textarea data-key="${text}" class="form-input h-24"></textarea>`;
-            else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`;
-            else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`;
-            else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`;
-            // v67 FIX: Pass text as key to handlePhoto
-            else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${index}')">`;
-            else if(type==='gps') html = `<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${text}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${text}"></div>`;
-            else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
-            
-            container.innerHTML += html;
-        });
-    }
-    
-    const canvas = document.getElementById('sig-canvas');
-    if(canvas) initSigPad(canvas);
-}
-
-function initSigPad(canvas) {
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2; ctx.strokeStyle = "#000";
-    let drawing = false;
-    const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : e;
-        return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-    };
-    const start = (e) => { drawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
-    const move = (e) => { if(!drawing) return; e.preventDefault(); const {x,y} = getPos(e); ctx.lineTo(x,y); ctx.stroke(); };
-    const end = () => { drawing = false; };
-    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); canvas.addEventListener('mouseup', end);
-    canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move); canvas.addEventListener('touchend', end);
-}
+function triggerAutoAlert(status) { const sel = state.locations.find(l => l.id === state.activeVisit.locationId); const locName = sel ? (sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name) : "Unknown"; navigator.geolocation.getCurrentPosition(pos => { processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert", "Location Name": locName, "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}` })); }, () => { processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert (GPS Fail)", "Location Name": locName })); }); }
+function triggerCheckin() { if(!document.getElementById('checkinModal').classList.contains('hidden')) return; showModal('checkin'); document.getElementById('batterySaver').classList.add('hidden'); let rem = 120; const el = document.getElementById('checkinCountdown'); if(checkinIntervalId) clearInterval(checkinIntervalId); playSoundAndVibrate('checkin'); const btn = document.getElementById('btnCheckinConfirm'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); setupLongPress(newBtn, confirmCheckin); checkinIntervalId = setInterval(() => { rem--; const m = Math.floor(rem/60); const s = rem%60; el.innerText = `${m}:${s<10?'0':''}${s}`; if(rem === 60 || rem === 30 || rem === 10) playSoundAndVibrate('checkin'); if(rem <= 0) { clearInterval(checkinIntervalId); closeModal('checkin'); sendToGoogleSheet(buildPayload({ "Alarm Status": 'MISSED_CHECKIN', "Notes": "Worker failed to respond to check-in" })); alert('MISSED CHECK-IN ALERT SENT'); } }, 1000); }
+function confirmCheckin() { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }
+function confirmExtension(mins) { const process = () => { state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + mins * 60000); saveState(); playSoundAndVibrate('extend'); processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended " + mins + "m" })); }; const now = new Date(), due = new Date(state.activeVisit.anticipatedDepartureTime); closeModal('extend'); if ((due-now)<0 || state.activeVisit.isPanic) withPinVerification(false, process); else process(); }
+function handlePanicTap() { const now = Date.now(); if (now - panicTapTimer > 2000) panicTapCount = 0; panicTapCount++; panicTapTimer = now; if (panicTapCount >= 3) { triggerPanic(); panicTapCount = 0; } }
+function triggerPanic() { state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState(); playSoundAndVibrate('panic'); processUploadQueue(buildPayload({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" })); alert('PANIC ALERT SENT'); }
+function iamSafe() { withPinVerification(false, () => { playSoundAndVibrate('safe'); processUploadQueue(buildPayload({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" })); state.activeVisit.isPanic = false; preDepart(true); }); }
+function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); const list = document.getElementById('templateList'); list.innerHTML = ''; const l = state.locations.find(x => x.id === state.activeVisit.locationId); const defaultName = l.templateName || "Standard Visit Note"; list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName)); if (state.globalForms && state.globalForms.length > 0) state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name))); else list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>'; }
+function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
+function loadFormAndShow(tplName) { currentActiveTemplate = tplName; showModal('report'); const div = document.getElementById('reportFields'); div.innerHTML = ''; document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tplName : "Visit Report"; buildReportForm(tplName, div); const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); if (isMidVisitUpdate) { newBtn.innerText = "Send Update"; newBtn.classList.remove('long-press-btn'); newBtn.onclick = submitReport; } else { newBtn.innerText = "HOLD TO SUBMIT & END"; newBtn.classList.add('long-press-btn'); setupLongPress(newBtn, submitReport); } }
+function preDepart(isSafeFlow) { isMidVisitUpdate = false; const proceed = () => { if(!CONFIG.isAdv) { depart(); return; } const l = state.locations.find(l => l.id === state.activeVisit.locationId); if(l && l.noReport) { depart(); return; } loadFormAndShow(l.templateName || "(Standard)"); if(l.id === 'travel' && CONFIG.mileage) { setTimeout(() => { const inp = document.querySelector('input[data-key="Distance (km)"]'); if(inp) { inp.value = ""; inp.placeholder = "Calculating..."; inp.disabled = true; } }, 100); navigator.geolocation.getCurrentPosition(pos => { const end = pos.coords.latitude+','+pos.coords.longitude; if(state.activeVisit.gpsStart) { fetchRoadDistance(state.activeVisit.gpsStart, end).then(result => { const inp = document.querySelector('input[data-key="Distance (km)"]'); if(inp) { inp.value = result.km; inp.disabled = false; inp.placeholder = ""; inp.style.borderColor = "#4ade80"; if(result.isFallback) { const detailBox = document.querySelector('textarea[data-key="Details"]'); if(detailBox) { detailBox.value = "⚠️ As-the-crow-flies calculation only (GPS/Network unavailable for road stats)."; detailBox.style.borderColor = "#facc15"; } } } }); } }, (err) => { const inp = document.querySelector('input[data-key="Distance (km)"]'); if(inp) { inp.placeholder = "GPS Error - Enter Manually"; inp.disabled = false; } }, { enableHighAccuracy: true, timeout: 10000 }); } }; const now = new Date(), due = new Date(state.activeVisit.anticipatedDepartureTime); if(isSafeFlow || (!((due - now) < 0) && !state.activeVisit.isPanic)) proceed(); else withPinVerification(false, proceed); }
+async function fetchRoadDistance(p1, p2) { const crow = calcDist(p1, p2); if(!CONFIG.orsKey || !navigator.onLine) return { km: crow, isFallback: true }; try { const [lat1, lon1] = p1.split(','), [lat2, lon2] = p2.split(','); const res = await fetch(`https://api.openrouteservice.org/v2/directions/driving-car?start=${lon1},${lat1}&end=${lon2},${lat2}`, { headers: { 'Authorization': CONFIG.orsKey } }); if(!res.ok) throw new Error("ORS Error"); const json = await res.json(); const meters = json.features[0].properties.segments[0].distance; return { km: (meters / 1000).toFixed(2), isFallback: false }; } catch(e) { return { km: crow, isFallback: true }; } }
+function quickStat() { if(!state.selectedLocationId) return; const l = state.locations.find(x => x.id === state.selectedLocationId); state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() }; loadFormAndShow(l.templateName || "(Standard)"); document.getElementById('btnSubmitRep').onclick = () => { const d = gatherFormData(); const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; const data = buildPayload({ "Location Name": locName, "Location Address": l.address, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Visit Report Data": JSON.stringify(d.jsonPayload) }); const photoKeys = Object.keys(state.photoStore); if(photoKeys.length > 0) data["Photo 1"] = state.photoStore[photoKeys[0]]; if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; processUploadQueue(data); if(navigator.onLine) alert("✅ Uploaded!"); else alert("💾 SAVED TO OUTBOX."); state.activeVisit = null; state.photoStore = {}; sigPad = null; closeModal('report'); }; }
+function buildReportForm(tplName, container) { state.photoStore = {}; let tpl = (state.globalForms && state.globalForms.find(f => f.name === tplName))?.questions; if (!tpl) tpl = state.cachedForms[tplName]; if (!tpl) tpl = state.cachedForms["(Standard)"] || []; if(tpl.length === 0) { container.innerHTML = '<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>'; } else { tpl.forEach((f, index) => { let type = f.type || 'check', text = f.text || f; if (typeof f === 'string') { if(f.includes('[TEXT]')) { type='text'; text=f.replace('[TEXT]','').trim(); } else if(f.includes('[PHOTO]')) { type='photo'; text=f.replace('[PHOTO]','').trim(); } else if(f.includes('[YESNO]')) { type='yesno'; text=f.replace('[YESNO]','').trim(); } else if(f.includes('[NUMBER]')) { type='number'; text=f.replace('[NUMBER]','').trim(); } else if(f.includes('[GPS]')) { type='gps'; text=f.replace('[GPS]','').trim(); } else if(f.includes('[HEADING]')) { type='header'; text=f.replace('[HEADING]','').trim(); } else if(f.includes('[NOTE]')) { type='note'; text=f.replace('[NOTE]','').trim(); } else if(f.includes('[SIGN]')) { type='signature'; text=f.replace('[SIGN]','').trim(); } } let html = ''; if(type==='header') html = `<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${text}</h3>`; else if(type==='note') html = `<p class="text-gray-500 text-sm italic my-2">${text}</p>`; else if(type==='text') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><textarea data-key="${text}" class="form-input h-24"></textarea>`; else if(type==='number') html = `<label class="block text-sm text-gray-300 mt-2">${text}</label><input type="number" step="any" data-key="${text}" class="form-input">`; else if(type==='check') html = `<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${text}" class="w-5 h-5"><span class="text-gray-300">${text}</span></label>`; else if(type==='yesno') html = `<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${text}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${text}" value="Yes" data-key="${text}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${text}" value="No" data-key="${text}"> No</label></div></div>`; else if(type==='photo') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this, '${index}')">`; else if(type==='gps') html = `<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${text}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${text}"></div>`; else if(type==='signature') html = `<label class="block text-sm text-gray-300 mt-4">${text}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`; container.innerHTML += html; }); } const canvas = document.getElementById('sig-canvas'); if(canvas) initSigPad(canvas); }
+function initSigPad(canvas) { const ctx = canvas.getContext('2d'); ctx.lineWidth = 2; ctx.strokeStyle = "#000"; let drawing = false; const getPos = (e) => { const rect = canvas.getBoundingClientRect(); const touch = e.touches ? e.touches[0] : e; return { x: touch.clientX - rect.left, y: touch.clientY - rect.top }; }; const start = (e) => { drawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); }; const move = (e) => { if(!drawing) return; e.preventDefault(); const {x,y} = getPos(e); ctx.lineTo(x,y); ctx.stroke(); }; const end = () => { drawing = false; }; canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); canvas.addEventListener('mouseup', end); canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move); canvas.addEventListener('touchend', end); }
 function clearSig() { const c = document.getElementById('sig-canvas'); if(c) { const ctx = c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); } }
-
-function gatherFormData() {
-    const data = { custom: {}, notes: '', sig: null, jsonPayload: {} };
-    const stdNotes = document.getElementById('rep_notes');
-    if(stdNotes) data.notes = stdNotes.value;
-
-    document.querySelectorAll('[data-key]').forEach(el => {
-        const key = el.getAttribute('data-key');
-        let val = el.value;
-        if(el.type === 'checkbox') val = el.checked ? 'Yes' : 'No';
-        else if(el.type === 'radio') { if(!el.checked) return; val = el.value; }
-        
-        data.custom[key] = val;
-        data.jsonPayload[key] = val;
-    });
-    
-    // v60 FIX: Capture directly
-    const canvas = document.getElementById('sig-canvas'); if(canvas) data.sig = canvas.toDataURL('image/png');
-    return data;
-}
-
-// v67 FIX: Robust Photo Handler
-function handlePhoto(input, key) {
-    if(input.files[0]) {
-        const btn = input.previousElementSibling; // Label
-        btn.innerText = "Compressing...";
-        compressImg(input.files[0]).then(b64 => {
-            state.photoStore[key] = b64;
-            btn.innerText = "Photo Saved ✅";
-        });
-    }
-}
-
-function submitReport() {
-    const d = gatherFormData();
-    
-    if (isMidVisitUpdate) {
-        const noteStr = d.notes || "Mid-visit update";
-        const data = buildPayload({ 
-            "Alarm Status": "ON SITE", 
-            "Notes": noteStr, 
-            "Visit Report Data": JSON.stringify(d.jsonPayload || {}) 
-        });
-        
-        // v67: Multi Photo Map
-        const photoKeys = Object.keys(state.photoStore);
-        if(photoKeys[0]) data["Photo 1"] = state.photoStore[photoKeys[0]];
-        if(photoKeys[1]) data["Photo 2"] = state.photoStore[photoKeys[1]];
-        if(photoKeys[2]) data["Photo 3"] = state.photoStore[photoKeys[2]];
-        if(photoKeys[3]) data["Photo 4"] = state.photoStore[photoKeys[3]];
-        
-        // v70 FIX: Send Signature Explicitly in Top Level
-        if(d.sig) {
-             data["Signature"] = d.sig;
-             if(!data["Photo 1"]) data["Photo 1"] = d.sig;
-        }
-        
-        processUploadQueue(data);
-        if(navigator.onLine) alert("✅ Update Sent!");
-        else alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
-        
-        closeModal('report');
-        return;
-    }
-    
-    depart(d);
-}
-
-function depart(reportData = {}) {
-    playSoundAndVibrate('depart');
-    
-    // STOP PULSE
-    if(travellingInterval) clearInterval(travellingInterval);
-    document.getElementById('batterySaver').classList.add('hidden');
-    
-    let noteStr = reportData.notes || "";
-    if(reportData.custom) {
-        Object.keys(reportData.custom).forEach(k => {
-            if(reportData.custom[k]) noteStr += `\n[${k}: ${reportData.custom[k]}]`;
-        });
-    }
-
-    const data = buildPayload({
-        "Alarm Status": 'DEPARTED',
-        "Notes": noteStr,
-        "Visit Report Data": JSON.stringify(reportData.jsonPayload || {})
-    });
-    
-    // v67: Robust Asset Mapping
-    const photoKeys = Object.keys(state.photoStore);
-    if(photoKeys[0]) data["Photo 1"] = state.photoStore[photoKeys[0]];
-    if(photoKeys[1]) data["Photo 2"] = state.photoStore[photoKeys[1]];
-    if(photoKeys[2]) data["Photo 3"] = state.photoStore[photoKeys[2]];
-    if(photoKeys[3]) data["Photo 4"] = state.photoStore[photoKeys[3]];
-    
-    // v70 FIX: Signature Explicit
-    if(reportData.sig) {
-        data["Signature"] = reportData.sig;
-        if(!data["Photo 1"]) data["Photo 1"] = reportData.sig;
-    }
-    
-    if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
-
-    processUploadQueue(data);
-    if(!navigator.onLine) alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
-    
-    state.activeVisit = null; 
-    state.photoStore = {}; 
-    sigPad = null;
-    saveState();
-    closeModal('report');
-    navigate('main');
-    updateArrivedButtonState();
-}
-
-function withPinVerification(isDuressAction, callback) {
-    showModal('pin');
-    const input = document.getElementById('pinInput');
-    input.value = ''; input.focus();
-    
-    const confirm = () => {
-        const val = input.value;
-        closeModal('pin');
-        if(val === state.settings.pinCode) callback();
-        else if(val === state.settings.duressPin) {
-            processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" }));
-            if(isDuressAction) callback();
-            else alert("PIN Accepted");
-        } else {
-            alert("Incorrect PIN");
-        }
-        document.getElementById('confirmPinBtn').removeEventListener('click', confirm);
-    };
-    document.getElementById('confirmPinBtn').addEventListener('click', confirm);
-    document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-}
-
-function captureGPS(btn, key) {
-    btn.innerText = "Locating...";
-    navigator.geolocation.getCurrentPosition(p => {
-        const coords = p.coords.latitude + "," + p.coords.longitude;
-        btn.innerText = "✅ " + coords;
-        btn.nextElementSibling.value = coords;
-    });
-}
-
-// --- NETWORK ---
-function processUploadQueue(newData = null) {
-    if(newData) {
-        state.pendingUploads.push(newData);
-        saveState();
-    }
-
-    if(!navigator.onLine) {
-        document.getElementById('queueCount').innerText = state.pendingUploads.length;
-        document.getElementById('uploadBanner').classList.remove('hidden');
-        return;
-    }
-
-    if(state.pendingUploads.length > 0) {
-        document.getElementById('uploadBanner').classList.remove('hidden');
-        document.getElementById('queueCount').innerText = state.pendingUploads.length;
-        
-        const item = state.pendingUploads[0];
-        const fd = new FormData();
-        for(let k in item) fd.append(k, item[k]);
-        
-        // v62 FIX: Restore no-cors for robust connection
-        fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd })
-            .then(() => {
-                state.pendingUploads.shift(); 
-                saveState();
-                processUploadQueue(); 
-            })
-            .catch(() => {
-                document.getElementById('uploadBanner').classList.remove('hidden');
-            });
-    } else {
-        document.getElementById('uploadBanner').classList.add('hidden');
-    }
-}
-
-// If Battery
-if(navigator.getBattery) {
-    navigator.getBattery().then(b => {
-        // We can attach this to the state or check it on send
-    });
-} 
-
+function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const stdNotes = document.getElementById('rep_notes'); if(stdNotes) data.notes = stdNotes.value; document.querySelectorAll('[data-key]').forEach(el => { const key = el.getAttribute('data-key'); let val = el.value; if(el.type === 'checkbox') val = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; val = el.value; } data.custom[key] = val; data.jsonPayload[key] = val; }); const canvas = document.getElementById('sig-canvas'); if(canvas) data.sig = canvas.toDataURL('image/png'); return data; }
+function handlePhoto(input, key) { if(input.files[0]) { const btn = input.previousElementSibling; btn.innerText = "Compressing..."; compressImg(input.files[0]).then(b64 => { state.photoStore[key] = b64; btn.innerText = "Photo Saved ✅"; }); } }
+function submitReport() { const d = gatherFormData(); if (isMidVisitUpdate) { const noteStr = d.notes || "Mid-visit update"; const data = buildPayload({ "Alarm Status": "ON SITE", "Notes": noteStr, "Visit Report Data": JSON.stringify(d.jsonPayload || {}) }); const photoKeys = Object.keys(state.photoStore); if(photoKeys[0]) data["Photo 1"] = state.photoStore[photoKeys[0]]; if(photoKeys[1]) data["Photo 2"] = state.photoStore[photoKeys[1]]; if(photoKeys[2]) data["Photo 3"] = state.photoStore[photoKeys[2]]; if(photoKeys[3]) data["Photo 4"] = state.photoStore[photoKeys[3]]; if(d.sig) { data["Signature"] = d.sig; if(!data["Photo 1"]) data["Photo 1"] = d.sig; } processUploadQueue(data); if(navigator.onLine) alert("✅ Update Sent!"); else alert("💾 SAVED TO OUTBOX."); closeModal('report'); return; } depart(d); }
+function depart(reportData = {}) { playSoundAndVibrate('depart'); if(travellingInterval) clearInterval(travellingInterval); document.getElementById('batterySaver').classList.add('hidden'); let noteStr = reportData.notes || ""; if(reportData.custom) Object.keys(reportData.custom).forEach(k => { if(reportData.custom[k]) noteStr += `\n[${k}: ${reportData.custom[k]}]`; }); const data = buildPayload({ "Alarm Status": 'DEPARTED', "Notes": noteStr, "Visit Report Data": JSON.stringify(reportData.jsonPayload || {}) }); const photoKeys = Object.keys(state.photoStore); if(photoKeys[0]) data["Photo 1"] = state.photoStore[photoKeys[0]]; if(photoKeys[1]) data["Photo 2"] = state.photoStore[photoKeys[1]]; if(photoKeys[2]) data["Photo 3"] = state.photoStore[photoKeys[2]]; if(photoKeys[3]) data["Photo 4"] = state.photoStore[photoKeys[3]]; if(reportData.sig) { data["Signature"] = reportData.sig; if(!data["Photo 1"]) data["Photo 1"] = reportData.sig; } if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"]; processUploadQueue(data); if(!navigator.onLine) alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns."); state.activeVisit = null; state.photoStore = {}; sigPad = null; saveState(); closeModal('report'); navigate('main'); updateArrivedButtonState(); }
+function withPinVerification(isDuressAction, callback) { showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) callback(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(isDuressAction) callback(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
+function captureGPS(btn, key) { btn.innerText = "Locating..."; navigator.geolocation.getCurrentPosition(p => { const coords = p.coords.latitude + "," + p.coords.longitude; btn.innerText = "✅ " + coords; btn.nextElementSibling.value = coords; }); }
+function processUploadQueue(newData = null) { if(newData) { state.pendingUploads.push(newData); saveState(); } if(!navigator.onLine) { document.getElementById('queueCount').innerText = state.pendingUploads.length; document.getElementById('uploadBanner').classList.remove('hidden'); return; } if(state.pendingUploads.length > 0) { document.getElementById('uploadBanner').classList.remove('hidden'); document.getElementById('queueCount').innerText = state.pendingUploads.length; const item = state.pendingUploads[0]; const fd = new FormData(); for(let k in item) fd.append(k, item[k]); fetch(state.settings.googleSheetUrl, { method: 'POST', mode: 'no-cors', body: fd }).then(() => { state.pendingUploads.shift(); saveState(); processUploadQueue(); }).catch(() => { document.getElementById('uploadBanner').classList.remove('hidden'); }); } else { document.getElementById('uploadBanner').classList.add('hidden'); } }
 function saveState() { localStorage.setItem('loneWorkerState', JSON.stringify(state)); }
-function saveSettings() {
-  const name = document.getElementById('set_name').value.trim();
-  const phone = document.getElementById('set_phone').value.trim();
-  const emgName = document.getElementById('set_emg_name').value.trim();
-  const emgPhone = document.getElementById('set_emg_phone').value.trim();
-  const emgEmail = document.getElementById('set_emg_email').value.trim();
-  const escName = document.getElementById('set_esc_name').value.trim();
-  const escPhone = document.getElementById('set_esc_phone').value.trim();
-  const escEmail = document.getElementById('set_esc_email').value.trim();
-  const pin = document.getElementById('set_pin').value.trim();
-  const duressPin = document.getElementById('set_duress').value.trim();
-
-  if(!name || !phone) return alert("Please enter your Name and Phone.");
-  if(!emgName || !emgPhone) return alert("Emergency Contact details are required.");
-  if(!pin || pin.length !== 4) return alert("Normal PIN must be 4 digits.");
-  if(!duressPin || duressPin.length !== 4) return alert("Duress PIN must be 4 digits.");
-  if(pin === duressPin) return alert("Normal PIN and Duress PIN cannot be the same.");
-
-  state.settings = {
-    workerName: name, workerPhone: phone,
-    emergencyName: emgName, emergencyPhone: emgPhone, emergencyEmail: emgEmail,
-    escalationName: escName, escalationPhone: escPhone, escalationEmail: escEmail,
-    pinCode: pin, duressPin: duressPin,
-    googleSheetUrl: CONFIG.url
-  };
-  saveState(); navigate('main'); 
-  document.getElementById('btnCloseSettings').style.display = 'block';
-  renderLocations(); updateArrivedButtonState();
-}
-function clearData() {
-    if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); }
-}
-function setupLongPress(btn, cb) {
-  let t; const start = (e) => { e.preventDefault(); btn.classList.add('pressing'); t = setTimeout(() => { cb(); end(); }, 1500); };
-  const end = () => { clearTimeout(t); btn.classList.remove('pressing'); };
-  btn.onmousedown = btn.ontouchstart = start; btn.onmouseup = btn.ontouchend = btn.onmouseleave = end;
-}
+function saveSettings() { const name = document.getElementById('set_name').value.trim(); const phone = document.getElementById('set_phone').value.trim(); const emgName = document.getElementById('set_emg_name').value.trim(); const emgPhone = document.getElementById('set_emg_phone').value.trim(); const emgEmail = document.getElementById('set_emg_email').value.trim(); const escName = document.getElementById('set_esc_name').value.trim(); const escPhone = document.getElementById('set_esc_phone').value.trim(); const escEmail = document.getElementById('set_esc_email').value.trim(); const pin = document.getElementById('set_pin').value.trim(); const duressPin = document.getElementById('set_duress').value.trim(); if(!name || !phone) return alert("Please enter your Name and Phone."); if(!emgName || !emgPhone) return alert("Emergency Contact details are required."); if(!pin || pin.length !== 4) return alert("Normal PIN must be 4 digits."); if(!duressPin || duressPin.length !== 4) return alert("Duress PIN must be 4 digits."); if(pin === duressPin) return alert("Normal PIN and Duress PIN cannot be the same."); state.settings = { workerName: name, workerPhone: phone, emergencyName: emgName, emergencyPhone: emgPhone, emergencyEmail: emgEmail, escalationName: escName, escalationPhone: escPhone, escalationEmail: escEmail, pinCode: pin, duressPin: duressPin, googleSheetUrl: CONFIG.url }; saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display = 'block'; renderLocations(); updateArrivedButtonState(); }
+function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
+function setupLongPress(btn, cb) { let t; const start = (e) => { e.preventDefault(); btn.classList.add('pressing'); t = setTimeout(() => { cb(); end(); }, 1500); }; const end = () => { clearTimeout(t); btn.classList.remove('pressing'); }; btn.onmousedown = btn.ontouchstart = start; btn.onmouseup = btn.ontouchend = btn.onmouseleave = end; }
 function compressImg(f) { return new Promise(r => { const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
 function calcDist(p1,p2) { if(!p1||!p2)return 0; const[y1,x1]=p1.split(',').map(Number),[y2,x2]=p2.split(',').map(Number),R=6371,dLat=(y2-y1)*Math.PI/180,dLon=(x2-x1)*Math.PI/180,a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(y1*Math.PI/180)*Math.cos(y2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2); }
 async function requestWakeLock() { if('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
-function syncForms() {
-    if(!CONFIG.url) return;
-    // 1. Standard Sync (Local)
-    const comps = [...new Set(state.locations.map(l => l.templateName).filter(Boolean))];
-    comps.push("(Standard)", "Travel Report");
-    comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); });
-    
-    // 2. Global Sync (v53)
-    fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => {
-        if(Array.isArray(j)) {
-            state.globalForms = j;
-            saveState();
-        }
-    });
-}
+function syncForms() { if(!CONFIG.url) return; const comps = [...new Set(state.locations.map(l => l.templateName).filter(Boolean))]; comps.push("(Standard)", "Travel Report"); comps.forEach(c => { fetch(`${CONFIG.url}?action=getForms&companyName=${encodeURIComponent(c)}`).then(r => r.json()).then(j => { state.cachedForms[c] = j; saveState(); }); }); fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
 function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
-
-// Listeners
-document.getElementById('btnDelLoc').onclick = deleteLoc;
-document.getElementById('saveLocationBtn').onclick = saveLoc;
-document.getElementById('cancelLocationBtn').onclick = () => closeModal('location');
-document.getElementById('cancelReportBtn').onclick = () => closeModal('report');
-document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); };
-document.getElementById('durationSlider').oninput = updateArrivedButtonState;
-document.getElementById('cancelPinBtn').onclick = () => closeModal('pin');
-document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
+document.getElementById('btnDelLoc').onclick = deleteLoc; document.getElementById('saveLocationBtn').onclick = saveLoc; document.getElementById('cancelLocationBtn').onclick = () => closeModal('location'); document.getElementById('cancelReportBtn').onclick = () => closeModal('report'); document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }; document.getElementById('durationSlider').oninput = updateArrivedButtonState; document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
