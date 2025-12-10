@@ -55,6 +55,11 @@ body{font-family:'Inter',sans-serif}
       🔇 Audio Suspended - Click Here to Enable Alarm Sound 🔇
   </div>
 
+  <div id="disconnectBanner" class="hidden bg-purple-900 text-purple-200 font-bold text-center py-2 border-b border-purple-500 z-50 flex justify-center items-center gap-2">
+      <span class="animate-pulse">⚠️ CONNECTION LOST</span>
+      <span class="text-xs font-normal opacity-75">(Check Internet)</span>
+  </div>
+
   <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
     <div class="flex items-center gap-3">
       <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain" onerror="this.style.display='none'">
@@ -145,6 +150,7 @@ let activeWorkerToResolve = null;
 let map, markers = {};
 let currentView = 'grid';
 let audioHeartbeat;
+let failedPollCount = 0; // NEW: Fault Counter
 
 // ==================== LOGIN LOGIC ====================
 function login() {
@@ -302,9 +308,12 @@ function fetchData() {
   window[cb] = (data) => {
     delete window[cb]; document.body.removeChild(s);
     if(data.status==='error') { 
-        document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
-        if(data.message === 'Invalid Key') { alert('Access Denied: Wrong Secret Key'); logout(); return; }
+        handleFetchError(data.message);
+        return;
     }
+    // SUCCESS
+    failedPollCount = 0;
+    document.getElementById('disconnectBanner').classList.add('hidden');
     if(data.length > 2500) document.getElementById('dbWarning').classList.remove('hidden');
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
     const lastUpd = document.getElementById('lastUpd');
@@ -317,11 +326,30 @@ function fetchData() {
   
   s.src = URL + '?callback='+cb+'&key='+encodeURIComponent(SECRET);
   s.onerror = () => { 
+    handleFetchError("Network Error");
+  };
+  document.body.appendChild(s);
+}
+
+function handleFetchError(msg) {
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-offline";
     document.getElementById('lastUpd').innerText = "Conn Failed";
     document.getElementById('lastUpd').className = "text-[10px] text-red-500 font-bold";
-  };
-  document.body.appendChild(s);
+    
+    // NEW: Fault Counter Logic
+    failedPollCount++;
+    if(failedPollCount >= 3) {
+        document.getElementById('disconnectBanner').classList.remove('hidden');
+        // Play Fault Sound (Low Beep)
+        try {
+            if(Tone.context.state === 'running') {
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("C2", "8n");
+            }
+        } catch(e){}
+    }
+    
+    if(msg === 'Invalid Key') { alert('Access Denied: Wrong Secret Key'); logout(); }
 }
 
 // ==================== RENDERING LOGIC ====================
