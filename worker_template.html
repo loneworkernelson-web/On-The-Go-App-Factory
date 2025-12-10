@@ -285,7 +285,7 @@ canvas {
         <h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2>
         <p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p>
         <div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div>
-        <button onclick="confirmCheckin()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">I am OK</button>
+        <button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM OK</button>
     </div>
 
     <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl">
@@ -945,6 +945,12 @@ function triggerCheckin() {
     if(checkinIntervalId) clearInterval(checkinIntervalId);
     playSoundAndVibrate('checkin');
     
+    // UPDATED: Swap button to clean listeners and attach Long Press
+    const btn = document.getElementById('btnCheckinConfirm');
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    setupLongPress(newBtn, confirmCheckin);
+
     checkinIntervalId = setInterval(() => {
         rem--;
         const m = Math.floor(rem/60); const s = rem%60;
@@ -959,13 +965,6 @@ function triggerCheckin() {
             alert('MISSED CHECK-IN ALERT SENT');
         }
     }, 1000);
-    
-    document.getElementById('checkinOkBtn').onclick = () => {
-        clearInterval(checkinIntervalId);
-        closeModal('checkin');
-        state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); 
-        saveState();
-    };
 }
 
 function confirmCheckin() {
@@ -1311,8 +1310,11 @@ function submitReport() {
              if(!data["Photo 1"]) data["Photo 1"] = d.sig;
         }
         
+        // OFFLINE CHECK
         processUploadQueue(data);
-        alert("Update Sent!");
+        if(navigator.onLine) alert("✅ Update Sent!");
+        else alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
+        
         closeModal('report');
         return;
     }
@@ -1355,7 +1357,13 @@ function depart(reportData = {}) {
     
     if(reportData.custom && reportData.custom["Distance (km)"]) data["Distance"] = reportData.custom["Distance (km)"];
 
+    // OFFLINE CHECK
     processUploadQueue(data);
+    if(navigator.onLine) {
+        // No alert needed for departure if online, just visual change
+    } else {
+        alert("💾 SAVED TO OUTBOX.\n\nNo internet connection. Data will sync automatically when signal returns.");
+    }
     
     state.activeVisit = null; 
     state.photoStore = {}; 
