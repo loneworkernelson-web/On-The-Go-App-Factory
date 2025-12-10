@@ -294,7 +294,7 @@ canvas {
         </div>
       <div class="flex gap-3 flex-shrink-0">
         <button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
-        <button id="btnSubmitRep" class="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button>
+        <button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button>
       </div>
     </div>
 
@@ -1060,8 +1060,19 @@ function loadFormAndShow(tplName) {
     buildReportForm(tplName, div);
     
     const btn = document.getElementById('btnSubmitRep');
-    btn.innerText = isMidVisitUpdate ? "Send Update" : "Submit & END";
-    btn.onclick = submitReport;
+    // CLONE to strip listeners
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    if (isMidVisitUpdate) {
+        newBtn.innerText = "Send Update";
+        newBtn.classList.remove('long-press-btn');
+        newBtn.onclick = submitReport;
+    } else {
+        newBtn.innerText = "HOLD TO SUBMIT & END";
+        newBtn.classList.add('long-press-btn');
+        setupLongPress(newBtn, submitReport);
+    }
 }
 
 function preDepart(isSafeFlow) {
