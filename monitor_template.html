@@ -60,6 +60,10 @@ body{font-family:'Inter',sans-serif}
       <span class="text-xs font-normal opacity-75">(Check Internet)</span>
   </div>
 
+  <div id="serverFaultBanner" class="hidden bg-orange-600 text-white font-bold text-center py-2 border-b border-orange-400 z-50 animate-pulse">
+      ⚠️ SERVER FAULT: Watchdog Trigger Stopped. Check Backend.
+  </div>
+
   <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
     <div class="flex items-center gap-3">
       <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain" onerror="this.style.display='none'">
@@ -150,7 +154,7 @@ let activeWorkerToResolve = null;
 let map, markers = {};
 let currentView = 'grid';
 let audioHeartbeat;
-let failedPollCount = 0; // NEW: Fault Counter
+let failedPollCount = 0; 
 
 // ==================== LOGIN LOGIC ====================
 function login() {
@@ -305,23 +309,33 @@ function fetchData() {
   const cb = 'cb_'+Date.now();
   document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-connecting";
 
-  window[cb] = (data) => {
+  window[cb] = (resp) => {
     delete window[cb]; document.body.removeChild(s);
-    if(data.status==='error') { 
-        handleFetchError(data.message);
+    if(resp.status==='error') { 
+        handleFetchError(resp.message);
         return;
     }
     // SUCCESS
     failedPollCount = 0;
     document.getElementById('disconnectBanner').classList.add('hidden');
-    if(data.length > 2500) document.getElementById('dbWarning').classList.remove('hidden');
+    // Check Watchdog Health (15 min tolerance)
+    if(resp.watchdog_last_run) {
+        const last = new Date(resp.watchdog_last_run);
+        const diff = (new Date() - last) / 60000;
+        document.getElementById('serverFaultBanner').classList.toggle('hidden', diff < 15);
+    }
+    
+    // Check DB Size
+    const workers = resp.workers || []; // Handle new structure
+    if(workers.length > 2500) document.getElementById('dbWarning').classList.remove('hidden');
+    
     document.getElementById('connectionDot').className = "w-3 h-3 rounded-full dot-online";
     const lastUpd = document.getElementById('lastUpd');
     if(lastUpd) {
         lastUpd.innerText = "Updated: " + new Date().toLocaleTimeString();
         lastUpd.className = "text-[10px] text-green-500 leading-none font-mono font-bold";
     }
-    processAndRender(data); 
+    processAndRender(workers); 
   };
   
   s.src = URL + '?callback='+cb+'&key='+encodeURIComponent(SECRET);
@@ -336,7 +350,7 @@ function handleFetchError(msg) {
     document.getElementById('lastUpd').innerText = "Conn Failed";
     document.getElementById('lastUpd').className = "text-[10px] text-red-500 font-bold";
     
-    // NEW: Fault Counter Logic
+    // Fault Counter Logic
     failedPollCount++;
     if(failedPollCount >= 3) {
         document.getElementById('disconnectBanner').classList.remove('hidden');
@@ -484,7 +498,8 @@ function processAndRender(data) {
     }
     
     const div = document.createElement('div');
-    div.className = `rounded-xl shadow-lg p-5 flex flex-col justify-between ${cardClass} transition-all hover:scale-[1.02] relative`;
+    div.className = `rounded-xl shadow-lg p-5 flex flex-col justify-between ${cardClass} transition-all hover:scale-[1.02] relative cursor-pointer`;
+    div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') focusWorker(w); };
     
     div.innerHTML = `
       <div>
@@ -517,6 +532,14 @@ function processAndRender(data) {
     `;
     list.appendChild(div);
   });
+}
+
+function focusWorker(w) {
+    if(!w['Last Known GPS']) { alert("No GPS location available for " + w['Worker Name']); return; }
+    setView('map');
+    const [lat,lon] = w['Last Known GPS'].split(',').map(parseFloat);
+    map.setView([lat,lon], 16);
+    if(markers[w['Worker Name']]) markers[w['Worker Name']].openPopup();
 }
 
 function isLocallyCritical(w) {
