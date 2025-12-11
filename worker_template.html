@@ -60,6 +60,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="content-area">
         <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
+        
         <div id="locationList" class="space-y-3 pb-4"></div>
         <button onclick="openLocModal()" class="w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold mb-2">+ Add Manual Location</button>
         <button onclick="forceSync()" class="w-full py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600">↻ Sync Assigned Sites</button>
@@ -203,64 +204,36 @@ const CONFIG = {
 const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
 // ==================== STATE MANAGEMENT ====================
-let state = { 
-    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
-    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
-    photoStore: {}, lowBatSent: false 
-};
+let state = { settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false };
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer, deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
-// Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
-let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
-let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
-
-// ==================== CORE FUNCTIONS (Define First) ====================
-function forceSync(){
-    if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
-    document.getElementById('uploadBanner').classList.remove('hidden');
-    
-    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}`)
-    .then(r=>r.json()).then(data=>{
-        const managedSites = data.sites.map(s=>({
-            id: 'site_' + s.siteName.replace(/\s/g,''),
-            name: s.siteName,
-            address: s.address,
-            companyName: s.company,
-            templateName: s.template,
-            noReport: false,
-            contactName: s.contactName,
-            contactPhone: s.contactPhone,
-            contactEmail: s.contactEmail,
-            notes: s.notes
-        }));
-        
-        if(CONFIG.mileage) {
-            managedSites.unshift({id:'travel', name:'Travelling', address:'Calculates Mileage via GPS', noReport:false, companyName:'Internal', templateName:'Travel Report'});
-        }
-        
-        state.locations = managedSites;
-        state.globalForms = data.forms || [];
-        state.cachedForms = data.cachedTemplates || {};
-        
-        saveState(); renderLocations();
-        document.getElementById('uploadBanner').classList.add('hidden'); 
-        alert("Sync Complete! Loaded " + managedSites.length + " sites.");
-    }).catch(e=>{ 
-        document.getElementById('uploadBanner').classList.add('hidden'); 
-        alert("Sync Failed: " + e); 
-    });
-}
-
-function initLocations() { 
-    if(!state.locations) state.locations = []; 
-    // FORCE CACHE TRAVEL REPORT
-    if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
-        state.cachedForms['Travel Report'] = [
-            {type:'number', text:'Distance (km)'}, 
-            {type:'text', text:'Details'},
-            {type:'photo', text:'Odometer'}
-        ];
+// ==================== CRITICAL FUNCTIONS (Define First) ====================
+function buildReportForm(n,c){
+    state.photoStore={};
+    let t=(state.globalForms&&state.globalForms.find(f=>f.name===n))?.questions;
+    if(!t)t=state.cachedForms[n];
+    if(!t)t=state.cachedForms["(Standard)"]||[];
+    c.innerHTML='';
+    if(t.length===0){
+        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+    }else{
+        t.forEach((f,i)=>{
+            let y=f.type||'check',x=f.text||f;
+            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}}
+            let h='';
+            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
+            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
+            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
+            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
+            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
+            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
+            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
+            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
+            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
+            c.innerHTML+=h;
+        });
     }
+    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
 }
 
 // ==================== INITIALIZATION ====================
@@ -269,11 +242,12 @@ window.addEventListener('load', () => {
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
     if(!state.photoStore) state.photoStore = {};
     if(!state.globalForms) state.globalForms = [];
-    if(!state.cachedForms) state.cachedForms = {};
     state.settings.googleSheetUrl = CONFIG.url; 
     
+    // Resume Pulse
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
+    // Battery Monitor
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -309,7 +283,36 @@ window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
 });
 
-// ==================== NAVIGATION & STATE ====================
+// ==================== SYNC & LOGIC ====================
+function forceSync(){
+    if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
+    document.getElementById('uploadBanner').classList.remove('hidden');
+    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}`)
+    .then(r=>r.json()).then(data=>{
+        const managedSites = data.sites.map(s=>({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
+        if(CONFIG.mileage) managedSites.unshift({id:'travel', name:'Travelling', address:'Calculates Mileage via GPS', noReport:false, companyName:'Internal', templateName:'Travel Report'});
+        state.locations = managedSites;
+        state.globalForms = data.forms || [];
+        state.cachedForms = data.cachedTemplates || {};
+        saveState(); renderLocations();
+        document.getElementById('uploadBanner').classList.add('hidden'); 
+        alert("Sync Complete! Loaded " + managedSites.length + " sites.");
+    }).catch(e=>{ document.getElementById('uploadBanner').classList.add('hidden'); alert("Sync Failed: " + e); });
+}
+
+function initLocations() { 
+    if(!state.locations) state.locations = []; 
+    // FORCE CACHE TRAVEL REPORT (v41.0 FIX)
+    if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
+        state.cachedForms['Travel Report'] = [
+            {type:'number', text:'Distance (km)'}, 
+            {type:'text', text:'Details'},
+            {type:'photo', text:'Odometer'}
+        ];
+    }
+}
+
+// NAVIGATION
 function navigate(p){
     document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
     document.getElementById(p+'Page').classList.add('active'); 
@@ -333,22 +336,19 @@ function navigate(p){
 function saveSettings(){ 
     state.settings.workerName=document.getElementById('set_name').value; 
     state.settings.workerPhone=document.getElementById('set_phone').value; 
-    state.settings.emergencyName = document.getElementById('set_emg_name').value;
-    state.settings.emergencyPhone = document.getElementById('set_emg_phone').value;
-    state.settings.emergencyEmail = document.getElementById('set_emg_email').value;
-    state.settings.escalationName = document.getElementById('set_esc_name').value;
-    state.settings.escalationPhone = document.getElementById('set_esc_phone').value;
-    state.settings.escalationEmail = document.getElementById('set_esc_email').value;
+    state.settings.emergencyName=document.getElementById('set_emg_name').value;
+    state.settings.emergencyPhone=document.getElementById('set_emg_phone').value;
+    state.settings.emergencyEmail=document.getElementById('set_emg_email').value;
+    state.settings.escalationName=document.getElementById('set_esc_name').value;
+    state.settings.escalationPhone=document.getElementById('set_esc_phone').value;
+    state.settings.escalationEmail=document.getElementById('set_esc_email').value;
     state.settings.pinCode=document.getElementById('set_pin').value; 
     state.settings.duressPin=document.getElementById('set_duress').value; 
-    saveState(); 
-    navigate('main'); 
-    document.getElementById('btnCloseSettings').style.display='block'; 
-    forceSync(); 
+    saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); 
 }
 function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
-// ==================== LOCATIONS UI ====================
+// LOCATION UI
 function renderLocations(){
     const l=document.getElementById('locationList'); l.innerHTML='';
     state.locations.forEach(loc=>{
@@ -365,7 +365,7 @@ function renderLocations(){
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
     
-    // CUSTOM TRAVEL INFO
+    // CUSTOM TRAVEL INFO (v41.0 FIX)
     if(id === 'travel') {
         showModal('info');
         document.getElementById('infoTitle').innerText = "Travelling Mode";
@@ -390,44 +390,25 @@ function showSiteInfo(id, e) {
         return;
     }
 
-    const l = state.locations.find(x => x.id === id);
-    if(!l) return;
-    showModal('info'); 
-    document.getElementById('infoTitle').innerText = l.name;
-    let html = "";
-    if(l.address) html += `<p><strong>Address:</strong><br>${l.address}</p>`;
-    if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
-    if(l.notes) html += `<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;
+    const l = state.locations.find(x => x.id === id); if(!l) return;
+    showModal('info'); document.getElementById('infoTitle').innerText = l.name;
+    let html = ""; if(l.address) html += `<p><strong>Address:</strong><br>${l.address}</p>`; if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`; if(l.notes) html += `<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;
     document.getElementById('siteInfoContent').innerHTML = html;
-    const btnCall = document.getElementById('btnSiteCall');
-    const btnEmail = document.getElementById('btnSiteEmail');
+    const btnCall=document.getElementById('btnSiteCall'), btnEmail=document.getElementById('btnSiteEmail');
     if(l.contactPhone) { btnCall.href = `tel:${l.contactPhone}`; btnCall.classList.remove('hidden'); } else btnCall.classList.add('hidden');
     if(l.contactEmail) { btnEmail.href = `mailto:${l.contactEmail}`; btnEmail.classList.remove('hidden'); } else btnEmail.classList.add('hidden');
 }
 function deleteLoc() { 
     const id = document.getElementById('locId').value;
     if(id === 'travel') return alert("Cannot delete Travelling tile.");
-    if(id.startsWith('site_')) return alert("This location is managed by the administrator and cannot be deleted.");
-    if(confirm('Delete location?')) {
-        state.locations = state.locations.filter(l => l.id !== id);
-        if(state.selectedLocationId === id) state.selectedLocationId = null;
-        saveState(); renderLocations(); closeModal('location');
-    }
+    if(id.startsWith('site_')) return alert("Managed sites cannot be deleted.");
+    if(confirm('Delete location?')) { state.locations = state.locations.filter(l => l.id !== id); if(state.selectedLocationId === id) state.selectedLocationId = null; saveState(); renderLocations(); closeModal('location'); }
 }
 function saveLoc() {
-    const id = document.getElementById('locId').value;
-    const name = document.getElementById('locName').value;
-    const addr = document.getElementById('locAddr').value;
-    const business = document.getElementById('locBusiness').value; 
-    const tpl = document.getElementById('locTemplate').value;
-    const noRep = document.getElementById('radRepNo').checked;
+    const id=document.getElementById('locId').value, name=document.getElementById('locName').value, addr=document.getElementById('locAddr').value, business=document.getElementById('locBusiness').value, tpl=document.getElementById('locTemplate').value, noRep=document.getElementById('radRepNo').checked;
     if(!name) return alert("Name required");
-    if(id) {
-        const idx = state.locations.findIndex(l => l.id === id);
-        if(idx > -1) { state.locations[idx] = { ...state.locations[idx], name, address: addr, companyName: business, templateName: tpl, noReport: noRep }; }
-    } else {
-        state.locations.push({ id: Date.now().toString(), name, address: addr, companyName: business, templateName: tpl, noReport: noRep });
-    }
+    if(id) { const idx=state.locations.findIndex(l=>l.id===id); if(idx>-1) state.locations[idx]={...state.locations[idx], name, address:addr, companyName:business, templateName:tpl, noReport:noRep}; } 
+    else { state.locations.push({id:Date.now().toString(), name, address:addr, companyName:business, templateName:tpl, noReport:noRep}); }
     saveState(); renderLocations(); closeModal('location'); syncForms();
 }
 function getGpsAddress() {
@@ -436,38 +417,17 @@ function getGpsAddress() {
     btn.innerText = "..."; btn.disabled = true;
     navigator.geolocation.getCurrentPosition(pos => {
         const lat = pos.coords.latitude; const lon = pos.coords.longitude;
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => {
-            document.getElementById('locAddr').value = data.display_name || `${lat}, ${lon}`;
-            btn.innerText = "📍 GPS"; btn.disabled = false;
-        }).catch(() => { document.getElementById('locAddr').value = `${lat}, ${lon}`; btn.innerText = "📍 GPS"; btn.disabled = false; });
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`).then(r => r.json()).then(data => { document.getElementById('locAddr').value = data.display_name || `${lat}, ${lon}`; btn.innerText = "📍 GPS"; btn.disabled = false; }).catch(() => { document.getElementById('locAddr').value = `${lat}, ${lon}`; btn.innerText = "📍 GPS"; btn.disabled = false; });
     }, (err) => { alert("GPS Error: " + err.message); btn.innerText = "📍 GPS"; btn.disabled = false; }, { timeout: 10000, enableHighAccuracy: true });
 }
 function openLocModal(id=null, e=null) { 
-    if(e)e.stopPropagation(); 
-    showModal('location'); 
-    const btnDel = document.getElementById('btnDelLoc');
+    if(e)e.stopPropagation(); showModal('location'); const btnDel = document.getElementById('btnDelLoc');
     if(id){ 
         if(id==='travel' || id.startsWith('site_')) btnDel.classList.add('hidden'); else btnDel.classList.remove('hidden');
         const l=state.locations.find(x=>x.id===id); 
-        document.getElementById('locModalTitle').innerText="Edit Location"; 
-        document.getElementById('locId').value=id; 
-        document.getElementById('locName').value=l.name; 
-        document.getElementById('locAddr').value=l.address; 
-        document.getElementById('locBusiness').value=l.companyName||""; 
-        document.getElementById('locTemplate').value=l.templateName||""; 
-        const isNo=l.noReport===true; 
-        document.getElementById('radRepNo').checked=isNo; 
-        document.getElementById('radRepYes').checked=!isNo; 
+        document.getElementById('locModalTitle').innerText="Edit Location"; document.getElementById('locId').value=id; document.getElementById('locName').value=l.name; document.getElementById('locAddr').value=l.address; document.getElementById('locBusiness').value=l.companyName||""; document.getElementById('locTemplate').value=l.templateName||""; const isNo=l.noReport===true; document.getElementById('radRepNo').checked=isNo; document.getElementById('radRepYes').checked=!isNo; 
     } else { 
-        document.getElementById('locModalTitle').innerText="Add Location"; 
-        document.getElementById('locId').value=""; 
-        document.getElementById('locName').value=""; 
-        document.getElementById('locAddr').value=""; 
-        document.getElementById('locBusiness').value=""; 
-        document.getElementById('locTemplate').value=""; 
-        document.getElementById('radRepYes').checked=true; 
-        document.getElementById('radRepNo').checked=false; 
-        btnDel.classList.add('hidden'); 
+        document.getElementById('locModalTitle').innerText="Add Location"; document.getElementById('locId').value=""; document.getElementById('locName').value=""; document.getElementById('locAddr').value=""; document.getElementById('locBusiness').value=""; document.getElementById('locTemplate').value=""; document.getElementById('radRepYes').checked=true; document.getElementById('radRepNo').checked=false; btnDel.classList.add('hidden'); 
     } 
 }
 
@@ -564,6 +524,7 @@ function createTemplateBtn(label, value) { const btn = document.createElement('b
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
 function buildPayload(d){ 
+    // v41.0 FIX: Ensure anticipated time is sent
     let dueTime = "";
     if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
         dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
@@ -579,34 +540,6 @@ function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGl
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-
-function buildReportForm(n,c){
-    state.photoStore={};
-    let t=(state.globalForms&&state.globalForms.find(f=>f.name===n))?.questions;
-    if(!t)t=state.cachedForms[n];
-    if(!t)t=state.cachedForms["(Standard)"]||[];
-    c.innerHTML='';
-    if(t.length===0){
-        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
-    }else{
-        t.forEach((f,i)=>{
-            let y=f.type||'check',x=f.text||f;
-            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}}
-            let h='';
-            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
-            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
-            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
-            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
-            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
-            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
-            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
-            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
-            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
-            c.innerHTML+=h;
-        });
-    }
-    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
-}
 
 // LISTENERS
 document.getElementById('btnDelLoc').onclick = deleteLoc; document.getElementById('saveLocationBtn').onclick = saveLoc; document.getElementById('cancelLocationBtn').onclick = () => closeModal('location'); document.getElementById('cancelReportBtn').onclick = () => closeModal('report'); document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }; document.getElementById('durationSlider').oninput = updateArrivedButtonState; document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
