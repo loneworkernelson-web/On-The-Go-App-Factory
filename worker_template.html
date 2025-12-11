@@ -60,7 +60,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="content-area">
         <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
-        
         <div id="locationList" class="space-y-3 pb-4"></div>
         <button onclick="openLocModal()" class="w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold mb-2">+ Add Manual Location</button>
         <button onclick="forceSync()" class="w-full py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600">↻ Sync Assigned Sites</button>
@@ -205,8 +204,9 @@ const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 24
 
 // ==================== STATE MANAGEMENT ====================
 let state = { 
-    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, 
-    pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false 
+    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
+    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
+    photoStore: {}, lowBatSent: false 
 };
 
 // Globals
@@ -241,6 +241,7 @@ function forceSync(){
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
+        
         saveState(); renderLocations();
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete! Loaded " + managedSites.length + " sites.");
@@ -252,12 +253,12 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
-    // Ensure Travel Report always exists in definition if we have mileage enabled
+    // FORCE CACHE TRAVEL REPORT
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
         state.cachedForms['Travel Report'] = [
             {type:'number', text:'Distance (km)'}, 
             {type:'text', text:'Details'},
-            {type:'photo', text:'Odometer?'}
+            {type:'photo', text:'Odometer'}
         ];
     }
 }
@@ -271,10 +272,8 @@ window.addEventListener('load', () => {
     if(!state.cachedForms) state.cachedForms = {};
     state.settings.googleSheetUrl = CONFIG.url; 
     
-    // Resume Travelling Pulse if active
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
-    // Init Battery Monitoring
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -357,7 +356,7 @@ function renderLocations(){
         let cls = state.selectedLocationId===loc.id ? 'border-blue-500 bg-blue-900' : 'border-transparent bg-gray-900';
         if(loc.id==='travel') cls = state.selectedLocationId===loc.id ? 'border-purple-500 bg-purple-900' : 'border-purple-900/30 bg-gray-900';
         div.className = `p-4 rounded-lg border-2 ${cls} cursor-pointer flex justify-between items-center mb-2`;
-        let infoBtn = loc.notes || loc.contactName ? `<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : '';
+        let infoBtn = loc.notes || loc.contactName || loc.id==='travel' ? `<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : '';
         div.innerHTML=`<div><div class="text-xs text-gray-500 font-bold uppercase">${loc.companyName||''}</div><div class="font-bold text-lg text-white">${loc.name}</div></div><div class="flex gap-2">${infoBtn}</div>`;
         div.onclick=(e)=>{if(e.target.tagName!=='BUTTON'){state.selectedLocationId=loc.id; renderLocations(); updateArrivedButtonState();}};
         l.appendChild(div);
@@ -365,6 +364,32 @@ function renderLocations(){
 }
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
+    
+    // CUSTOM TRAVEL INFO
+    if(id === 'travel') {
+        showModal('info');
+        document.getElementById('infoTitle').innerText = "Travelling Mode";
+        document.getElementById('siteInfoContent').innerHTML = `
+            <div class="space-y-3">
+                <div class="bg-blue-900/50 p-3 rounded border border-blue-500">
+                    <strong>📡 GPS Tracking Active</strong><br>
+                    Your location is sent every 5 minutes.
+                </div>
+                <div class="bg-yellow-900/50 p-3 rounded border border-yellow-500">
+                    <strong>⚠️ DO NOT LOCK SCREEN</strong><br>
+                    Pressing the power button stops GPS.
+                </div>
+                <div class="bg-gray-700 p-3 rounded">
+                    <strong>🔋 Save Battery:</strong><br>
+                    Use the Moon Icon (🌙) to darken the screen without locking.
+                </div>
+            </div>
+        `;
+        document.getElementById('btnSiteCall').classList.add('hidden');
+        document.getElementById('btnSiteEmail').classList.add('hidden');
+        return;
+    }
+
     const l = state.locations.find(x => x.id === id);
     if(!l) return;
     showModal('info'); 
@@ -467,7 +492,7 @@ function tick(){
 }
 
 function preDepart(){ 
-    isMidVisitUpdate = false; // RESET FLAG
+    isMidVisitUpdate = false; 
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     loadFormAndShow(l.templateName||"(Standard)"); 
 }
@@ -497,16 +522,14 @@ function submitReport(){
     if(isMidVisitUpdate) { 
         processUploadQueue(buildPayload({...data, "Alarm Status":"ON SITE"})); 
         alert("Update Sent"); 
-        isMidVisitUpdate = false; // RESET FLAG
+        isMidVisitUpdate = false; 
         closeModal('report'); 
         return; 
     } 
     
-    // Departure Logic
     processUploadQueue(buildPayload({...data, "Alarm Status":"DEPARTED"})); 
     if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
     
-    // RESET ALL STATES
     state.activeVisit=null; 
     state.photoStore={};
     state.visitDurationMinutes = 0;
@@ -530,24 +553,31 @@ function triggerCheckin() { if(!document.getElementById('checkinModal').classLis
 function confirmCheckin() { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }
 function confirmExtension(mins) { const process = () => { state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + mins * 60000); saveState(); playSound('extend'); processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended " + mins + "m" })); }; const now = new Date(), due = new Date(state.activeVisit.anticipatedDepartureTime); closeModal('extend'); if ((due-now)<0 || state.activeVisit.isPanic) withPinVerification(false, process); else process(); }
 function handlePanicTap() { const now = Date.now(); if (now - panicTapTimer > 2000) panicTapCount = 0; panicTapCount++; panicTapTimer = now; if (panicTapCount >= 3) { triggerPanic(); panicTapCount = 0; } }
-function triggerPanic() { state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState(); playSound('panic'); processUploadQueue(buildPayload({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" })); alert('PANIC ALERT SENT'); }
+function triggerPanic() { 
+    state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState(); playSound('panic'); 
+    processUploadQueue(buildPayload({ "Alarm Status": 'EMERGENCY - PANIC BUTTON', "Notes": "Panic Button Pressed" })); 
+    alert('🚨 SOS SENT 🚨\n\nEmergency contacts have been notified.\nLocation broadcast active.');
+}
 function iamSafe() { withPinVerification(false, () => { playSound('safe'); processUploadQueue(buildPayload({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" })); state.activeVisit.isPanic = false; preDepart(true); }); }
 function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); const list = document.getElementById('templateList'); list.innerHTML = ''; const l = state.locations.find(x => x.id === state.activeVisit.locationId); const defaultName = l.templateName || "Standard Visit Note"; list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName)); if (state.globalForms && state.globalForms.length > 0) state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name))); else list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>'; }
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
-function buildPayload(d){ return {'key':CONFIG.key, 'Worker Name':state.settings.workerName, 'Timestamp':new Date().toISOString(), ...d}; }
-function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
+function buildPayload(d){ 
+    let dueTime = "";
+    if (state.activeVisit && state.activeVisit.anticipatedDepartureTime) {
+        dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
+    }
+    return {'key':CONFIG.key, 'Worker Name':state.settings.workerName, 'Anticipated Departure Time': dueTime, 'Timestamp':new Date().toISOString(), ...d}; 
+}
+function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue()}); } saveState(); }
 function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
-function showModal(id){ document.getElementById('modalBackdrop').classList.remove('hidden'); document.getElementById(id==='report'?'modal-report':id==='location'?'locationModal':id==='pin'?'pinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden'); if(id==='template')document.getElementById('templateModal').classList.remove('hidden'); }
-function closeModal(id){ document.getElementById('modalBackdrop').classList.add('hidden'); document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden')); }
+function withPinVerification(d,c){ showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) c(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(d) c(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
+function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
+function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
+function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
-function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
-function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
-function quickStat() { if(!state.selectedLocationId) return; const l = state.locations.find(x => x.id === state.selectedLocationId); state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() }; loadFormAndShow(l.templateName || "(Standard)"); document.getElementById('btnSubmitRep').onclick = () => { const d = gatherFormData(); const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; const data = buildPayload({ "Location Name": locName, "Location Address": l.address, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Visit Report Data": JSON.stringify(d.jsonPayload) }); const photoKeys = Object.keys(state.photoStore); if(photoKeys.length > 0) data["Photo 1"] = state.photoStore[photoKeys[0]]; if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; processUploadQueue(data); if(navigator.onLine) alert("✅ Uploaded!"); else alert("💾 SAVED TO OUTBOX."); state.activeVisit = null; state.photoStore = {}; sigPad = null; closeModal('report'); }; }
-function withPinVerification(isDuressAction, callback) { showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) callback(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(isDuressAction) callback(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
-function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 
 function buildReportForm(n,c){
@@ -577,6 +607,9 @@ function buildReportForm(n,c){
     }
     const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
 }
+
+// LISTENERS
+document.getElementById('btnDelLoc').onclick = deleteLoc; document.getElementById('saveLocationBtn').onclick = saveLoc; document.getElementById('cancelLocationBtn').onclick = () => closeModal('location'); document.getElementById('cancelReportBtn').onclick = () => closeModal('report'); document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }; document.getElementById('durationSlider').oninput = updateArrivedButtonState; document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
