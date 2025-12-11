@@ -32,7 +32,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Lone Worker System Generator (v38.3 Template Loader)</p>
+      <p class="text-gray-400">Lone Worker System Generator (v38.4 Final Fix)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -115,7 +115,7 @@
                 <p class="text-xs text-gray-400">This is where all safety data is stored.</p>
                 <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
                     <li>Rename the workbook (top left) to <strong>"Safety System"</strong>.</li>
-                    <li>Rename the bottom tab to <strong>Visits</strong>.</li>
+                    <li>Double-click "Sheet1" (bottom) and rename to <strong>Visits</strong>.</li>
                     <li>Click the button below to copy headers. Paste into cell <strong>A1</strong>.</li>
                     <li><strong>View > Freeze > 1 Row</strong>.</li>
                 </ol>
@@ -126,7 +126,7 @@
                 <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
                 <p class="text-xs text-gray-400">Defines your forms and reports.</p>
                 <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create a new tab named <strong>Templates</strong>.</li>
+                    <li>Click <strong>+</strong> to add a new tab. Rename to <strong>Templates</strong>.</li>
                     <li>Click button below. Paste into cell <strong>A1</strong>.</li>
                     <li><em class="text-yellow-400">Read the legend in the pasted rows!</em></li>
                 </ol>
@@ -137,7 +137,7 @@
                 <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
                 <p class="text-xs text-gray-400">Assigns locations to workers.</p>
                 <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create a new tab named <strong>Sites</strong>.</li>
+                    <li>Click <strong>+</strong> to add a new tab. Rename to <strong>Sites</strong>.</li>
                     <li>Click button below. Paste into cell <strong>A1</strong>.</li>
                     <li><em class="text-yellow-400">Check the 'Assigned To' column instructions.</em></li>
                 </ol>
@@ -271,8 +271,7 @@
       } catch(e) { console.log("No local icon.png found."); }
     };
 
-    // --- COPY BUTTONS WITH RICH INSTRUCTIONS ---
-    
+    // --- COPY BUTTONS ---
     function copyVisitsHeaders() {
       const h = "Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4";
       navigator.clipboard.writeText(h); alert("Copied 'Visits' Headers! Paste into Cell A1.");
@@ -560,6 +559,7 @@ RECIPE 10: FORM DATA EXPORT
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
         
+        // FIXED: Hardcoded 'true' for Advanced features (Managed Fleet Edition)
         let wHtml = tplWorker
             .replace(/%%ORG_NAME%%/g, org)
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
@@ -568,8 +568,8 @@ RECIPE 10: FORM DATA EXPORT
             .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
             .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-            .replace(/%%IS_ADVANCED%%/g, document.getElementById('chkAdvanced').checked)
-            .replace(/%%ENABLE_MILEAGE%%/g, document.getElementById('chkMileage').checked)
+            .replace(/%%IS_ADVANCED%%/g, "true") // Managed Fleet = Advanced
+            .replace(/%%ENABLE_MILEAGE%%/g, "true") // Managed Fleet = Mileage Ready
             .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value);
 
         let mHtml = tplMonitor
