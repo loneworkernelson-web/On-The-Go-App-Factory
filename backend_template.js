@@ -1,6 +1,10 @@
 /**
- * ON-THE-GO APPSUITE - MASTER BACKEND v37.0
- * FIX: Data Overwrite Protection
+ * ON-THE-GO APPSUITE - MASTER BACKEND v38.7 (Managed Fleet & Safety Edition)
+ * * CORE FEATURES:
+ * 1. Smart Sync: Filters sites/forms based on Worker Name.
+ * 2. Overwrite Protection: Prevents blank data from erasing records.
+ * 3. Server Watchdog: timestamp tracking for Monitor health check.
+ * 4. AI Smart Scribe: Grammar correction for reports.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,19 +27,18 @@ const CONFIG = {
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%
 };
 
-// LOAD DYNAMIC CONFIG
-const scriptProps = PropertiesService.getScriptProperties();
-const storedTemplateId = scriptProps.getProperty('REPORT_TEMPLATE_ID');
-const storedPdfFolderId = scriptProps.getProperty('PDF_FOLDER_ID');
-if(storedTemplateId) CONFIG.REPORT_TEMPLATE_ID = storedTemplateId;
-if(storedPdfFolderId) CONFIG.PDF_FOLDER_ID = storedPdfFolderId;
+// LOAD DYNAMIC PROPERTIES
+const sp = PropertiesService.getScriptProperties();
+const tid = sp.getProperty('REPORT_TEMPLATE_ID');
+const pid = sp.getProperty('PDF_FOLDER_ID');
+if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
+if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. DATA INGESTION (doPost)
 // ─────────────────────────────────────────────────────────────────────────────
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  // Reduce lock wait time to fail faster if jammed, but usually 30s is fine
   lock.tryLock(30000); 
 
   try {
@@ -51,29 +54,21 @@ function doPost(e) {
     
     // Schema Check
     if(sheet.getLastColumn() === 0) {
-      const headers = [
-        "Timestamp", "Date", "Worker Name", "Worker Phone Number", 
-        "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email",
-        "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email",
-        "Alarm Status", "Notes", "Location Name", "Location Address", 
-        "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", 
-        "Distance (km)", "Visit Report Data", "Anticipated Departure Time", 
-        "Signature", "Photo 2", "Photo 3", "Photo 4"
-      ];
+      const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
       sheet.appendRow(headers);
       sheet.setFrozenRows(1);
     }
     
     // Asset Saving
-    const savedAssets = {};
+    const assets = {};
     ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(key => {
         if(p[key] && p[key].includes('base64')) {
              const ext = key === 'Signature' ? 'png' : 'jpg';
-             savedAssets[key] = saveImageToDrive(p[key], `${p['Worker Name']}_${key}_${Date.now()}.${ext}`);
+             assets[key] = saveImageToDrive(p[key], `${p['Worker Name']}_${key}_${Date.now()}.${ext}`);
         }
     });
 
-    // Smart Row De-duplication
+    // Smart Row De-duplication & Update
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
@@ -88,47 +83,42 @@ function doPost(e) {
         const rowWorker = data[i][2];
         const rowStatus = data[i][10];
         
-        // UPDATE CONDITION: Same Worker AND (Row is Active OR New Status is Safe/Correction)
-        // FIX: Quick Stat often sends "DATA_ENTRY_ONLY". If previous row was also that, update it.
+        // UPDATE LOGIC: Match Worker + (Active Status OR Safe Clearance OR Data Entry Update)
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus) || newStatus === 'SAFE - MONITOR CLEARED' || (rowStatus === 'DATA_ENTRY_ONLY' && newStatus === 'DATA_ENTRY_ONLY'))) {
              const rIdx = startRow + i;
              
-             // Update Status & Vitals (Always update these if present)
+             // Always update Vital Signs
              sheet.getRange(rIdx, 11).setValue(newStatus);
              if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
              if (p['Anticipated Departure Time']) sheet.getRange(rIdx, 21).setValue(p['Anticipated Departure Time']);
              
-             // --- FIX 1: PROTECTED NOTES UPDATE ---
-             // Only append if it's new info. Don't overwrite.
+             // Protected Note Append
              if (p['Notes'] && !p['Notes'].includes("Locating")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) {
-                    // Check if old notes were empty
                     const newVal = oldNotes ? oldNotes + " | " + p['Notes'] : p['Notes'];
                     sheet.getRange(rIdx, 12).setValue(newVal);
                 }
              }
              
-             // --- FIX 2: PROTECTED DATA UPDATE ---
-             // Only overwrite Distance/Report Data if the NEW payload has actual data.
+             // Protected Data Update (Crucial Fix for Quick Stat)
              if (p['Distance']) sheet.getRange(rIdx, 19).setValue(p['Distance']);
              
-             // CRITICAL FIX: Only update Report Data if payload is valid JSON and not empty {}
+             // ONLY update Report Data if payload is valid and not empty
              if (p['Visit Report Data'] && p['Visit Report Data'].length > 5 && p['Visit Report Data'] !== '{}') {
                  sheet.getRange(rIdx, 20).setValue(p['Visit Report Data']);
              }
              
-             // Update Assets (Only if new ones exist)
+             // Update Assets
              ['Photo 1', 'Signature', 'Photo 2', 'Photo 3', 'Photo 4'].forEach((k, idx) => {
                  const cols = [18, 22, 23, 24, 25];
-                 if(savedAssets[k]) sheet.getRange(rIdx, cols[idx]).setValue(savedAssets[k]);
+                 if(assets[k]) sheet.getRange(rIdx, cols[idx]).setValue(assets[k]);
              });
 
              rowUpdated = true;
              
-             // Trigger PDF on Depart (or Quick Stat)
-             // FIX: Quick Stat usually comes in as DATA_ENTRY_ONLY. We should trigger PDF if we have data.
+             // Trigger PDF on Depart
              const isDepart = (newStatus === 'DEPARTED' || newStatus === 'COMPLETED' || newStatus === 'DATA_ENTRY_ONLY');
              if (isDepart && CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
                  generateVisitPdf(rIdx);
@@ -143,49 +133,85 @@ function doPost(e) {
         const row = [
           new Date(),
           Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"),
-          p['Worker Name'], 
-          "'" + (p['Worker Phone Number'] || ""), 
+          p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), 
           p['Emergency Contact Name'], "'" + (p['Emergency Contact Number'] || ""), p['Emergency Contact Email'],
           p['Escalation Contact Name'], "'" + (p['Escalation Contact Number'] || ""), p['Escalation Contact Email'],
-          newStatus,
-          p['Notes'], 
-          p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(),
-          p['Battery Level'], savedAssets['Photo 1'], p['Distance'], p['Visit Report Data'],
-          p['Anticipated Departure Time'], savedAssets['Signature'], savedAssets['Photo 2'], savedAssets['Photo 3'], savedAssets['Photo 4']
+          newStatus, p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(),
+          p['Battery Level'], assets['Photo 1'], p['Distance'], p['Visit Report Data'],
+          p['Anticipated Departure Time'], assets['Signature'], assets['Photo 2'], assets['Photo 3'], assets['Photo 4']
         ];
         sheet.appendRow(row);
         
-        // If it's a fresh row with data (Quick Stat), generate PDF immediately
+        // Immediate PDF for Quick Stat
         if (CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
              generateVisitPdf(sheet.getLastRow());
         }
     }
     
-    // Notifications (Only if we have actual report data)
-    if (p['Template Name'] && p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
-        processFormEmail(p);
-    }
-    
+    // Notifications
+    if (p['Template Name'] && p['Visit Report Data'] && p['Visit Report Data'].length > 5) processFormEmail(p);
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
 
-  } catch(e) { 
-      return ContentService.createTextOutput("Error: " + e.toString());
-  } finally { 
-      lock.releaseLock();
-  }
+  } catch(e) { return ContentService.createTextOutput("Error: " + e.toString()); } 
+  finally { lock.releaseLock(); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. API HANDLERS (doGet)
+// 3. API HANDLERS (doGet) - SMART SYNC ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 function doGet(e) {
+  // Connection Test
   if(e.parameter.test) {
      if(e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
      return ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
   }
   
+  // 1. SMART SYNC (The Managed Fleet Logic)
+  if(e.parameter.action === 'sync') {
+      const worker = e.parameter.worker;
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      
+      // A. Get Relevant Forms
+      const tSheet = ss.getSheetByName('Templates');
+      const tData = tSheet ? tSheet.getDataRange().getValues() : [];
+      const forms = [];
+      const cachedTemplates = {};
+      
+      // Parse Templates
+      for(let i=1; i<tData.length; i++) {
+          const row = tData[i];
+          const type = row[0]; // FORM or REPORT
+          const name = row[1];
+          const assign = row[2]; // Worker, ALL, or empty
+          
+          if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) {
+              forms.push({ name: name, questions: parseQuestions(row) });
+          }
+          cachedTemplates[name] = parseQuestions(row);
+      }
+      
+      // B. Get Relevant Sites
+      const sSheet = ss.getSheetByName('Sites');
+      const sData = sSheet ? sSheet.getDataRange().getValues() : [];
+      const sites = [];
+      
+      for(let i=1; i<sData.length; i++) {
+          const row = sData[i];
+          const assign = row[0]; // Worker Name
+          if(assign.includes(worker) || assign === 'ALL') {
+              sites.push({
+                  template: row[1], company: row[2], siteName: row[3], address: row[4],
+                  contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8]
+              });
+          }
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ sites: sites, forms: forms, cachedTemplates: cachedTemplates })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // 2. MONITOR POLLING
   if(e.parameter.callback){
     const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits');
     const data=sh.getDataRange().getValues();
@@ -196,28 +222,8 @@ function doGet(e) {
     return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify(response)+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
-  if(e.parameter.action === 'getGlobalForms') {
-     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
-     if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
-     const data = sh.getDataRange().getValues();
-     const globalForms = [];
-     for(let r=1; r<data.length; r++) {
-         if(String(data[r][0]).toUpperCase().trim() === 'FORMS') globalForms.push({ name: data[r][1], questions: parseQuestions(data[r]) });
-     }
-     return ContentService.createTextOutput(JSON.stringify(globalForms)).setMimeType(ContentService.MimeType.JSON);
-  }
-
-  if(e.parameter.action === 'getForms') {
-     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
-     if(!sh) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
-     const data = sh.getDataRange().getValues();
-     const param = e.parameter.companyName; 
-     let foundRow = data.find(r => r[1] === param) || data.find(r => r[0] === param) || data.find(r => r[1] === 'Travel Report') || data.find(r => r[1] === '(Standard)');
-     if(!foundRow) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
-     return ContentService.createTextOutput(JSON.stringify(parseQuestions(foundRow))).setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  if(e.parameter.run === 'setupTemplate') { return ContentService.createTextOutput(setupReportTemplate()); }
+  // 3. UTILITIES
+  if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
   if(e.parameter.run === 'reports') { runAllLongitudinalReports(); return ContentService.createTextOutput("Reports Generated"); }
   if(e.parameter.run === 'archive') { archiveOldData(); return ContentService.createTextOutput("Archive Complete"); }
   if(e.parameter.run === 'watchdog') { checkOverdueVisits(); return ContentService.createTextOutput("Watchdog Run Complete"); }
@@ -230,6 +236,7 @@ function doGet(e) {
 // ─────────────────────────────────────────────────────────────────────────────
 function checkOverdueVisits() {
   PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString());
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
   if(!sheet) return;
@@ -244,14 +251,23 @@ function checkOverdueVisits() {
     const status = row[10];
     const dueTimeStr = row[20];
     if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
+    
     const dueTime = new Date(dueTimeStr).getTime();
     if (isNaN(dueTime)) continue;
     const timeOverdue = now - dueTime;
+    
     if (timeOverdue > escalationMs) {
        if (!status.includes('EMERGENCY')) {
           const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)";
           sheet.getRange(i + 2, 11).setValue(newStatus);
-          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in. Phone may be offline.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] });
+          sendAlert({
+             'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 
+             'Location Name': row[12], 'Last Known GPS': row[14], 
+             'Notes': "Worker failed to check in. Phone may be offline.",
+             'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5],
+             'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8],
+             'Battery Level': row[16]
+          });
        }
     } else if (timeOverdue > 0) {
        if (status === 'ON SITE') sheet.getRange(i + 2, 11).setValue("OVERDUE");
@@ -260,27 +276,107 @@ function checkOverdueVisits() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. SMART SCRIBE & HELPERS
+// 5. HELPER FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
+function parseQuestions(row) {
+     const questions = [];
+     // Questions start at Index 4 (Col E) in the new Template layout
+     for(let i=4; i<row.length; i++) {
+         const val = row[i];
+         if(val && val !== "") {
+             let type='check', text=val;
+             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); }
+             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
+             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
+             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
+             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } 
+             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
+             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
+             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
+             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
+             questions.push({type, text});
+         }
+     }
+     return questions;
+}
+
 function smartScribe(text) {
   if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text;
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
-    const payload = { "contents": [{ "parts": [{ "text": "Correct the grammar and spelling of the following text to standard New Zealand English. Do not add any conversational filler or introductions. Only return the corrected text. Text: " + text }] }] };
-    const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+    const payload = { "contents": [{ "parts": [{ "text": "Correct grammar/spelling to standard NZ English: " + text }] }] };
+    const options = { 'method': 'post', 'contentType': 'application/json', 'payload': JSON.stringify(payload), 'muteHttpExceptions': true };
+    const response = UrlFetchApp.fetch(url, options);
     const json = JSON.parse(response.getContentText());
     if (json.candidates && json.candidates[0].content.parts[0].text) return json.candidates[0].content.parts[0].text.trim();
     return text;
   } catch (e) { return text; }
 }
 
+function setupReportTemplate() {
+    try {
+        const doc = DocumentApp.create(`${CONFIG.ORG_NAME} Master Report Template`);
+        const body = doc.getBody();
+        body.appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        body.appendParagraph("VISIT REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING2).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+        body.appendHorizontalRule();
+        const cells = [["Worker:", "{{WorkerName}}"], ["Location:", "{{LocationName}}"], ["Date:", "{{Date}}"], ["Status:", "{{AlarmStatus}}"]];
+        cells.forEach(r => body.appendParagraph(`${r[0]} ${r[1]}`));
+        body.appendHorizontalRule(); body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{Notes}}");
+        body.appendHorizontalRule(); body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{VisitReportData}}");
+        body.appendHorizontalRule(); body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4); body.appendParagraph("{{Signature}}");
+        doc.saveAndClose();
+        PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID', doc.getId());
+        MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: "OTG Setup: Template Created", body: `Success! Report template created.\nID: ${doc.getId()}` });
+        return "SUCCESS: Template Created & Saved. Check your Email.";
+    } catch(e) { return "ERROR: " + e.toString(); }
+}
+
+function saveImageToDrive(base64String, filename) {
+    try {
+        const data = Utilities.base64Decode(base64String.split(',')[1]);
+        const blob = Utilities.newBlob(data, 'image/jpeg', filename); 
+        let folder;
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(err) { folder = DriveApp.getRootFolder(); } } 
+        else { folder = DriveApp.getRootFolder(); }
+        const file = folder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return file.getUrl();
+    } catch(e) { return ""; }
+}
+
+function sendAlert(data) {
+  let recipients = [Session.getEffectiveUser().getEmail()];
+  let smsNumbers = [];
+  if (data['Alarm Status'] === 'ESCALATION_SENT') {
+     if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
+     if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']);
+  } else {
+     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
+     if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
+  }
+  recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
+  const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
+  const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
+  if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
+  smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
+  const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}. Map: https://maps.google.com/?q=${data['Last Known GPS']}`;
+  smsNumbers.forEach(phone => sendSms(phone, smsMsg));
+}
+
+function sendSms(phone, msg) {
+  const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
+  const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt';
+  try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
+}
+
 function processFormEmail(p) {
     try {
-        const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checklists');
+        const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
         const data = sh.getDataRange().getValues();
         const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
         if (!row) return;
-        const recipient = row[2];
+        const recipient = row[3]; 
         if (!recipient || !String(recipient).includes('@')) return;
         
         const reportData = JSON.parse(p['Visit Report Data']);
@@ -354,84 +450,6 @@ function generateVisitPdf(rowIndex) {
     } catch(e) { console.log("PDF Error: " + e.toString()); }
 }
 
-function setupReportTemplate() {
-    try {
-        const doc = DocumentApp.create(`${CONFIG.ORG_NAME} Master Report Template`);
-        const body = doc.getBody();
-        body.appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-        body.appendParagraph("VISIT REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING2).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-        body.appendHorizontalRule();
-        const cells = [["Worker:", "{{WorkerName}}"], ["Location:", "{{LocationName}}"], ["Date:", "{{Date}}"], ["Status:", "{{AlarmStatus}}"]];
-        cells.forEach(r => body.appendParagraph(`${r[0]} ${r[1]}`));
-        body.appendHorizontalRule(); body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{Notes}}");
-        body.appendHorizontalRule(); body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{VisitReportData}}");
-        body.appendHorizontalRule(); body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4); body.appendParagraph("{{Signature}}");
-        doc.saveAndClose();
-        PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID', doc.getId());
-        MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: "OTG Setup: Template Created", body: `Success! Report template created.\nID: ${doc.getId()}` });
-        return "SUCCESS: Template Created & Saved. Check your Email.";
-    } catch(e) { return "ERROR: " + e.toString(); }
-}
-
-function saveImageToDrive(base64String, filename) {
-    try {
-        const data = Utilities.base64Decode(base64String.split(',')[1]);
-        const blob = Utilities.newBlob(data, 'image/jpeg', filename); 
-        let folder;
-        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(err) { folder = DriveApp.getRootFolder(); } } 
-        else { folder = DriveApp.getRootFolder(); }
-        const file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        return file.getUrl();
-    } catch(e) { return ""; }
-}
-
-function sendAlert(data) {
-  let recipients = [Session.getEffectiveUser().getEmail()];
-  let smsNumbers = [];
-  if (data['Alarm Status'] === 'ESCALATION_SENT') {
-     if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
-     if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']);
-  } else {
-     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']);
-     if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
-  }
-  recipients = [...new Set(recipients)].filter(e => e && e.includes('@'));
-  const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status'];
-  const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`;
-  if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body});
-  smsNumbers = [...new Set(smsNumbers)].filter(n => n && n.length > 5);
-  const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}. Map: https://maps.google.com/?q=${data['Last Known GPS']}`;
-  smsNumbers.forEach(phone => sendSms(phone, smsMsg));
-}
-
-function sendSms(phone, msg) {
-  const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
-  const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt';
-  try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: msg, key: key }), muteHttpExceptions: true }); } catch(e) {}
-}
-
-function parseQuestions(row) {
-     const questions = [];
-     for(let i=3; i<row.length; i++) {
-         const val = row[i];
-         if(val && val !== "") {
-             let type='check', text=val;
-             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); }
-             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
-             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
-             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
-             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } 
-             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
-             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
-             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
-             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
-             questions.push({type, text});
-         }
-     }
-     return questions;
-}
-
 function archiveOldData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -479,7 +497,6 @@ function runAllLongitudinalReports() {
   }
   const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]);
   if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 4).setValues(actRows);
-  
   let sheetTrav = reportSS.getSheetByName('Travel Stats');
   if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats');
   sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]);
