@@ -526,33 +526,7 @@ function tick(){
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin();
 }
 function preDepart(){ const l=state.locations.find(x=>x.id===state.activeVisit.locationId); loadFormAndShow(l.templateName||"(Standard)"); }
-
-// FIX: Updated logic to correctly set title and button text
-function loadFormAndShow(tpl){ 
-    showModal('report'); 
-    
-    // 1. Set Title
-    document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
-    
-    // 2. Build Form
-    buildReportForm(tpl, document.getElementById('reportFields')); 
-    
-    // 3. Swap Button
-    const btn = document.getElementById('btnSubmitRep');
-    const newBtn = btn.cloneNode(true); 
-    btn.parentNode.replaceChild(newBtn, btn);
-    
-    if(isMidVisitUpdate) { 
-        newBtn.innerText="Send Update"; 
-        newBtn.classList.remove('long-press-btn'); 
-        newBtn.onclick=submitReport; 
-    } else { 
-        newBtn.innerText="HOLD TO SUBMIT & END"; 
-        newBtn.classList.add('long-press-btn'); 
-        setupLongPress(newBtn, submitReport); 
-    }
-}
-
+function loadFormAndShow(tpl){ showModal('report'); buildReportForm(tpl, document.getElementById('reportFields')); const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); if(isMidVisitUpdate) { newBtn.innerText="Send Update"; newBtn.classList.remove('long-press-btn'); newBtn.onclick=submitReport; } else { newBtn.innerText="HOLD TO SUBMIT & END"; newBtn.classList.add('long-press-btn'); setupLongPress(newBtn, submitReport); } }
 function submitReport(){ const data = gatherFormData(); if(isMidVisitUpdate) { processUploadQueue(buildPayload({...data, "Alarm Status":"ON SITE"})); alert("Update Sent"); closeModal('report'); return; } processUploadQueue(buildPayload({...data, "Alarm Status":"DEPARTED"})); if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); state.activeVisit=null; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); }
 function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const sn = document.getElementById('rep_notes'); if(sn) data.notes = sn.value; document.querySelectorAll('[data-key]').forEach(el => { const k = el.getAttribute('data-key'); let v = el.value; if(el.type === 'checkbox') v = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; v = el.value; } data.custom[k] = v; data.jsonPayload[k] = v; }); const c = document.getElementById('sig-canvas'); if(c) data.sig = c.toDataURL('image/png'); return data; }
 function handlePhoto(input, key){ if(input.files[0]){ const btn=input.previousElementSibling; btn.innerText="Compressing..."; compressImg(input.files[0]).then(b64=>{ state.photoStore[key]=b64; btn.innerText="Photo Saved ✅"; }); } }
@@ -584,9 +558,6 @@ function quickStat() { if(!state.selectedLocationId) return; const l = state.loc
 function withPinVerification(isDuressAction, callback) { showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) callback(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(isDuressAction) callback(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
 function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-
-// LISTENERS
-document.getElementById('btnDelLoc').onclick = deleteLoc; document.getElementById('saveLocationBtn').onclick = saveLoc; document.getElementById('cancelLocationBtn').onclick = () => closeModal('location'); document.getElementById('cancelReportBtn').onclick = () => closeModal('report'); document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }; document.getElementById('durationSlider').oninput = updateArrivedButtonState; document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
 </script>
 </body>
 </html>
