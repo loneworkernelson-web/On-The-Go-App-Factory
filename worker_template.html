@@ -36,6 +36,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -130,8 +131,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
         <div class="setting-card">
             <label class="setting-label lbl-blue">Your Details</label>
-            <input id="set_name" class="form-input" placeholder="Full Name (Exact Match)">
-            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
+            <input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)">
+            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+        </div>
+
+        <div class="setting-card">
+            <label class="setting-label lbl-green">Emergency Contact (Required)</label>
+            <input id="set_emg_name" class="form-input-card" placeholder="Contact Name">
+            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email (Optional)">
+        </div>
+
+        <div class="setting-card">
+            <label class="setting-label lbl-purple">Escalation Contact (Optional)</label>
+            <input id="set_esc_name" class="form-input-card" placeholder="Manager Name">
+            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email (Optional)">
         </div>
 
         <div class="setting-card">
@@ -159,12 +174,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2>
         <div id="siteInfoContent" class="text-gray-300 text-sm space-y-2 mb-4"></div>
-        
         <div class="flex gap-2 mb-4">
             <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a>
             <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a>
         </div>
-
         <button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button>
     </div>
 
@@ -222,8 +235,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <script>
 // ==================== CONFIGURATION ====================
 const CONFIG = { 
-    isAdv: true, // HARDCODED for Managed Fleet
-    mileage: true, 
+    isAdv: %%IS_ADVANCED%%, 
+    mileage: %%ENABLE_MILEAGE%%, 
     url: "%%GOOGLE_SHEET_URL%%", 
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
@@ -265,12 +278,12 @@ window.addEventListener('load', () => {
     // Resume Travelling Pulse if active
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
-    // Init Battery Monitoring (Dying Breath)
+    // Init Battery Monitoring
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
                 currentBatteryLevel = Math.round(b.level * 100) + "%"; 
-                // Alert if < 10%
+                // Dying Breath Logic: < 10%
                 if (b.level < 0.10 && !state.lowBatSent && state.activeVisit) {
                      state.lowBatSent = true; saveState();
                      processUploadQueue(buildPayload({ "Alarm Status": "BATTERY CRITICAL (10%)", "Notes": "Automated Low Battery Alert" }));
@@ -345,8 +358,34 @@ function forceSync(){
 }
 
 // ==================== NAVIGATION & STATE ====================
-function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){document.getElementById('set_name').value=state.settings.workerName||"";document.getElementById('set_phone').value=state.settings.workerPhone||"";document.getElementById('set_pin').value=state.settings.pinCode||"";document.getElementById('set_duress').value=state.settings.duressPin||"";}}
-function saveSettings(){ state.settings.workerName=document.getElementById('set_name').value; state.settings.workerPhone=document.getElementById('set_phone').value; state.settings.pinCode=document.getElementById('set_pin').value; state.settings.duressPin=document.getElementById('set_duress').value; saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); }
+function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){
+    document.getElementById('set_name').value=state.settings.workerName||"";
+    document.getElementById('set_phone').value=state.settings.workerPhone||"";
+    document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
+    document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
+    document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
+    document.getElementById('set_esc_name').value=state.settings.escalationName||"";
+    document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";
+    document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";
+    document.getElementById('set_pin').value=state.settings.pinCode||"";
+    document.getElementById('set_duress').value=state.settings.duressPin||"";
+    document.getElementById('set_url').value=state.settings.googleSheetUrl;
+}}
+
+function saveSettings(){ 
+    state.settings.workerName=document.getElementById('set_name').value;
+    state.settings.workerPhone=document.getElementById('set_phone').value;
+    state.settings.emergencyName=document.getElementById('set_emg_name').value;
+    state.settings.emergencyPhone=document.getElementById('set_emg_phone').value;
+    state.settings.emergencyEmail=document.getElementById('set_emg_email').value;
+    state.settings.escalationName=document.getElementById('set_esc_name').value;
+    state.settings.escalationPhone=document.getElementById('set_esc_phone').value;
+    state.settings.escalationEmail=document.getElementById('set_esc_email').value;
+    state.settings.pinCode=document.getElementById('set_pin').value;
+    state.settings.duressPin=document.getElementById('set_duress').value;
+    saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); 
+}
+
 function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
 // ==================== LOCATIONS UI ====================
@@ -415,12 +454,7 @@ function tick(){
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
     
     // 5 MIN WARNING
-    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ 
-        state.activeVisit.fiveMinWarned=true; 
-        playSound('pre_alert'); 
-        document.getElementById('fiveMinBanner').classList.remove('hidden'); 
-        setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); 
-    }
+    if(Math.floor(rem/60000)===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
     
     if(rem<0) { 
         document.getElementById('countdownTimer').classList.add('text-red-500'); 
@@ -509,7 +543,7 @@ function buildReportForm(tplName, container) {
     const canvas = document.getElementById('sig-canvas'); if(canvas) initSigPad(canvas);
 }
 
-// ... (Helper Functions)
+// ... (Helper Functions: captureGPS, handlePhoto, compressImg, initSigPad, clearSig, etc.)
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 function handlePhoto(input, key){if(input.files[0]){const btn=input.previousElementSibling;btn.innerText="Compressing...";compressImg(input.files[0]).then(b64=>{state.photoStore[key]=b64;btn.innerText="Photo Saved ✅";});}}
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1024/i.width,1024/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.6));};i.src=e.target.result;};rd.readAsDataURL(f);});}
