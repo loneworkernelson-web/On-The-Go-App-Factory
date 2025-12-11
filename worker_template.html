@@ -16,60 +16,26 @@
 
 <style>
 /* --- CORE STYLES --- */
-body { 
-    font-family: 'Inter', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
-    user-select: none; 
-    overscroll-behavior-y: contain; 
-    background-color: #111827; 
-    color: white;
-}
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; }
 .page { display: none; height: 100%; flex-direction: column; }
 .page.active { display: flex; }
 
 /* --- INTERACTIVE ELEMENTS --- */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { 
-    content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; 
-    background: rgba(255, 255, 255, 0.3); 
-    transition: width 1.5s linear; 
-}
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 1.5s linear; }
 .long-press-btn.pressing::after { width: 100%; }
 
-.slider-thumb::-webkit-slider-thumb { 
-    -webkit-appearance: none; appearance: none; 
-    width: 28px; height: 28px; 
-    background: #3b82f6; 
-    cursor: pointer; 
-    border-radius: 50%; 
-    border: 2px solid white; 
-    box-shadow: 0 0 10px rgba(0,0,0,0.3); 
-}
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
 
-.spinner { 
-    border: 3px solid rgba(255, 255, 255, 0.3); 
-    border-radius: 50%; 
-    border-top-color: #fff; 
-    width: 20px; height: 20px; 
-    animation: spin 1s linear infinite; 
-}
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-canvas { 
-    touch-action: none; 
-    background: #fff; 
-    border-radius: 0.5rem; 
-    cursor: crosshair; 
-}
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
 /* --- SETTINGS CARDS --- */
 .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
 .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
 .form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
 .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
-
-/* --- COLORS --- */
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 </style>
 </head>
@@ -164,8 +130,8 @@ canvas {
 
         <div class="setting-card">
             <label class="setting-label lbl-blue">Your Details</label>
-            <input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)">
-            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_name" class="form-input" placeholder="Full Name (Exact Match)">
+            <input id="set_phone" type="tel" class="form-input" placeholder="Phone (+64...)">
         </div>
 
         <div class="setting-card">
@@ -256,8 +222,8 @@ canvas {
 <script>
 // ==================== CONFIGURATION ====================
 const CONFIG = { 
-    isAdv: %%IS_ADVANCED%%, 
-    mileage: %%ENABLE_MILEAGE%%, 
+    isAdv: true, // HARDCODED for Managed Fleet
+    mileage: true, 
     url: "%%GOOGLE_SHEET_URL%%", 
     org: "%%ORGANISATION_NAME%%", 
     checkinEnabled: %%CHECKIN_ENABLED%%,   
@@ -299,12 +265,12 @@ window.addEventListener('load', () => {
     // Resume Travelling Pulse if active
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
-    // Init Battery Monitoring
+    // Init Battery Monitoring (Dying Breath)
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
                 currentBatteryLevel = Math.round(b.level * 100) + "%"; 
-                // Dying Breath Logic: < 10%
+                // Alert if < 10%
                 if (b.level < 0.10 && !state.lowBatSent && state.activeVisit) {
                      state.lowBatSent = true; saveState();
                      processUploadQueue(buildPayload({ "Alarm Status": "BATTERY CRITICAL (10%)", "Notes": "Automated Low Battery Alert" }));
@@ -449,7 +415,12 @@ function tick(){
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
     
     // 5 MIN WARNING
-    if(Math.floor(rem/60000)===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
+    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ 
+        state.activeVisit.fiveMinWarned=true; 
+        playSound('pre_alert'); 
+        document.getElementById('fiveMinBanner').classList.remove('hidden'); 
+        setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); 
+    }
     
     if(rem<0) { 
         document.getElementById('countdownTimer').classList.add('text-red-500'); 
@@ -538,7 +509,7 @@ function buildReportForm(tplName, container) {
     const canvas = document.getElementById('sig-canvas'); if(canvas) initSigPad(canvas);
 }
 
-// ... (Helper Functions: captureGPS, handlePhoto, compressImg, initSigPad, clearSig, etc.)
+// ... (Helper Functions)
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 function handlePhoto(input, key){if(input.files[0]){const btn=input.previousElementSibling;btn.innerText="Compressing...";compressImg(input.files[0]).then(b64=>{state.photoStore[key]=b64;btn.innerText="Photo Saved ✅";});}}
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1024/i.width,1024/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.6));};i.src=e.target.result;};rd.readAsDataURL(f);});}
@@ -562,7 +533,7 @@ function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e
 function showModal(id){ document.getElementById('modalBackdrop').classList.remove('hidden'); document.getElementById(id==='report'?'modal-report':id==='location'?'locationModal':id==='pin'?'pinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden'); if(id==='template')document.getElementById('templateModal').classList.remove('hidden'); }
 function closeModal(){ document.getElementById('modalBackdrop').classList.add('hidden'); document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden')); }
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
-function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate(1000);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
+function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
 function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
 function quickStat() { if(!state.selectedLocationId) return; const l = state.locations.find(x => x.id === state.selectedLocationId); state.activeVisit = { locationId: l.id, startTime: new Date().toISOString() }; loadFormAndShow(l.templateName || "(Standard)"); document.getElementById('btnSubmitRep').onclick = () => { const d = gatherFormData(); const locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; const data = buildPayload({ "Location Name": locName, "Location Address": l.address, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Visit Report Data": JSON.stringify(d.jsonPayload) }); const photoKeys = Object.keys(state.photoStore); if(photoKeys.length > 0) data["Photo 1"] = state.photoStore[photoKeys[0]]; if(d.custom["Distance (km)"]) data["Distance"] = d.custom["Distance (km)"]; processUploadQueue(data); if(navigator.onLine) alert("✅ Uploaded!"); else alert("💾 SAVED TO OUTBOX."); state.activeVisit = null; state.photoStore = {}; sigPad = null; closeModal('report'); }; }
@@ -571,258 +542,6 @@ function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); lo
 
 // LISTENERS
 document.getElementById('btnDelLoc').onclick = deleteLoc; document.getElementById('saveLocationBtn').onclick = saveLoc; document.getElementById('cancelLocationBtn').onclick = () => closeModal('location'); document.getElementById('cancelReportBtn').onclick = () => closeModal('report'); document.getElementById('checkinOkBtn').onclick = () => { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }; document.getElementById('durationSlider').oninput = updateArrivedButtonState; document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); document.getElementById('alertModalOkBtn').onclick = () => closeModal('alert');
-</script></body></html>
 </script>
-
-<script id="tpl-monitor" type="text/template">
-<!DOCTYPE html>
-<html lang="en" class="h-full">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>%%ORG_NAME%% Monitor</title>
-<link rel="icon" href="%%LOGO_URL%%"> 
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-body{font-family:'Inter',sans-serif}
-@keyframes flash-red{0%,100%{background:#7f1d1d}50%{background:#ef4444}}
-@keyframes flash-purple{0%,100%{background:#581c87}50%{background:#a855f7}}
-.flashing-alert{animation:flash-red 1s infinite}
-.flashing-duress{animation:flash-purple 1s infinite}
-.dot-online { background-color: #4ade80; animation: pulse-green 2s infinite; }
-.dot-offline { background-color: #ef4444; }
-.dot-connecting { background-color: #eab308; }
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(0,0,0,0.2); transition: width 1.5s linear; }
-.long-press-btn.pressing::after { width: 100%; }
-#mapContainer { height: 100%; width: 100%; background: #0f172a; }
-</style>
-</head>
-<body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden" onclick="unlockAudio()">
-
-<div id="setupPage" class="h-full flex items-center justify-center p-4 z-50 bg-gray-900 absolute inset-0">
-  <div class="text-center space-y-6 max-w-md w-full bg-gray-800 p-10 rounded-2xl shadow-2xl border border-gray-700">
-    <div><img src="%%LOGO_URL%%" class="h-20 mx-auto mb-4 object-contain"><h1 class="text-3xl font-extrabold text-blue-400">Security Login</h1></div>
-    <input type="password" id="secretKeyInput" class="w-full bg-gray-900 p-4 rounded-xl text-white border border-gray-600 text-center tracking-widest text-xl" placeholder="Enter Key">
-    <button onclick="login()" class="w-full bg-blue-600 p-4 rounded-xl font-bold">Connect</button>
-  </div>
-</div>
-
-<div id="dashboardPage" class="hidden h-full flex flex-col">
-  <div id="audioWarning" class="hidden bg-red-600 text-white font-bold text-center py-2 uppercase cursor-pointer hover:bg-red-500 animate-pulse z-50">🔇 Audio Suspended - Click Here to Enable 🔇</div>
-  <div id="disconnectBanner" class="hidden bg-purple-900 text-purple-200 font-bold text-center py-2 border-b border-purple-500 z-50 animate-pulse">⚠️ CONNECTION LOST (Check Internet)</div>
-  <div id="serverFaultBanner" class="hidden bg-orange-600 text-white font-bold text-center py-2 border-b border-orange-400 z-50 animate-pulse">⚠️ SERVER FAULT: Watchdog Trigger Stopped</div>
-
-  <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
-    <div class="flex items-center gap-3"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain"><div><h1 class="text-xl font-bold text-white">%%ORG_NAME%%</h1><span class="text-xs text-blue-400 font-mono">LIVE MONITOR</span></div></div>
-    <div class="flex items-center gap-4">
-      <div class="flex bg-gray-700 rounded-lg p-1"><button onclick="setView('grid')" id="btnViewGrid" class="px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold">Grid</button><button onclick="setView('map')" id="btnViewMap" class="px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold">Map</button></div>
-      <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase border border-gray-600 px-2 py-1 rounded">Enable Alerts</button>
-      <div class="flex items-center gap-3 bg-gray-900 px-4 py-2 rounded-full border border-gray-700"><div id="connectionDot" class="w-3 h-3 rounded-full dot-connecting"></div><div class="text-right flex flex-col justify-center"><div id="clock" class="text-xs font-bold font-mono text-gray-300">00:00:00</div><div id="lastUpd" class="text-[10px] text-gray-500 leading-none font-mono">Init...</div></div></div>
-      <button onclick="logout()" class="text-gray-400 hover:text-white text-sm font-bold uppercase">Logout</button>
-    </div>
-  </header>
-  
-  <div id="dbWarning" class="hidden bg-yellow-600 text-white px-4 py-2 text-center text-sm font-bold cursor-pointer hover:bg-yellow-500" onclick="alert('Sheet > 2500 rows. Run Archive.')">⚠️ Database Large</div>
-  
-  <div class="bg-gray-900 border-b border-gray-800"><details class="group"><summary class="p-2 text-xs text-gray-500 cursor-pointer hover:text-gray-300 bg-gray-800/50 select-none flex justify-between px-4"><span>EVENT LOG</span><span>▼</span></summary><div id="logPanel" class="h-32 overflow-y-auto p-2 font-mono text-xs space-y-1 bg-black/20"></div></details></div>
-
-  <div class="relative flex-1 overflow-hidden">
-      <main id="workerList" class="absolute inset-0 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto pb-32"></main>
-      <div id="mapView" class="absolute inset-0 z-10 hidden"><div id="mapContainer"></div></div>
-  </div>
-</div>
-
-<div id="alertOverlay" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-8 bg-red-900/95 text-white">
-  <div class="bg-red-950 p-12 rounded-3xl shadow-2xl text-center max-w-2xl w-full border-4 border-red-500 animate-pulse">
-      <h2 class="text-9xl mb-4">🚨</h2><h2 class="text-6xl font-black uppercase tracking-tighter mb-8">EMERGENCY</h2>
-      <div id="alertDetails" class="text-2xl font-mono text-red-200 mb-12 space-y-2"></div>
-      <button id="btnSilence" class="long-press-btn w-full bg-white text-red-900 font-black py-6 px-12 rounded-xl text-2xl shadow-2xl">HOLD TO ACKNOWLEDGE</button>
-  </div>
-</div>
-
-<div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-600">
-        <h2 class="text-2xl font-bold text-white mb-2">Resolve Incident</h2>
-        <p class="text-gray-400 text-sm mb-6">Type name exactly to verify safety:</p>
-        <div id="resolveNameTarget" class="bg-gray-900 p-4 rounded border border-gray-700 text-center text-xl font-mono font-bold text-blue-400 mb-4 select-all"></div>
-        <input id="resolveInput" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-center font-bold" placeholder="Type Name Here">
-        <input id="resolveReason" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-sm" placeholder="Reason / Action Taken">
-        <div class="flex gap-3"><button onclick="closeResolve()" class="flex-1 py-3 bg-gray-600 rounded font-bold">Cancel</button><button onclick="confirmResolve()" class="flex-1 py-3 bg-green-600 rounded font-bold">DECLARE SAFE</button></div>
-    </div>
-</div>
-
-<script>
-const URL="%%SHEET_URL%%"; let SECRET="", pollInt, alarm, lastState={}, acknowledgedList=new Set(), activeWorkerToResolve=null, map, markers={}, currentView='grid', audioHeartbeat, failedPollCount=0;
-
-function login(){ const k=document.getElementById('secretKeyInput').value; if(k){ SECRET=k; localStorage.setItem('otg_monitor_key', k); startSession(); }}
-async function startSession(){ document.getElementById('setupPage').classList.add('hidden'); document.getElementById('dashboardPage').classList.remove('hidden'); document.getElementById('dashboardPage').classList.add('flex'); try{await Tone.start();}catch(e){} initMap(); fetchData(); pollInt=setInterval(fetchData,10000); setInterval(updateClock,1000); audioHeartbeat=setInterval(checkAudioStatus,2000); setupLongPress(document.getElementById('btnSilence'), silenceAlarm); }
-window.onload=()=>{const s=localStorage.getItem('otg_monitor_key');if(s)document.getElementById('secretKeyInput').value=s;};
-function logout(){ clearInterval(pollInt); clearInterval(audioHeartbeat); localStorage.removeItem('otg_monitor_key'); location.reload(); }
-
-function setView(mode){ currentView=mode; document.getElementById('workerList').classList.toggle('hidden', mode==='map'); document.getElementById('mapView').classList.toggle('hidden', mode!=='map'); document.getElementById('btnViewGrid').className = mode==='grid'?"px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold":"px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold"; document.getElementById('btnViewMap').className = mode==='map'?"px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold":"px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold"; if(mode==='map'&&map)map.invalidateSize(); }
-function checkAudioStatus(){ document.getElementById('audioWarning').classList.toggle('hidden', Tone.context.state !== 'suspended'); }
-async function unlockAudio(){ if(Tone.context.state!=='running'){ await Tone.start(); checkAudioStatus(); }}
-
-function initMap(){ map=L.map('mapContainer').setView([-41.2,174.0],5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map); }
-function updateMapMarker(w){
-    if(!map)return; const name=w['Worker Name'], status=w['Alarm Status'];
-    if(status==='DEPARTED'||status==='COMPLETED'||status.includes('SAFE - MONITOR')){ if(markers[name]){map.removeLayer(markers[name]);delete markers[name];} return; }
-    if(!w['Last Known GPS']||!w['Last Known GPS'].includes(','))return;
-    const [lat,lon]=w['Last Known GPS'].split(',').map(parseFloat);
-    let color='#4ade80'; if(status==='OVERDUE')color='#f59e0b'; if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/))color='#ef4444'; if(status==='TRAVELLING')color='#60a5fa';
-    const icon=L.divIcon({className:'custom-pin',html:`<div style="background-color:${color};width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.5);animation:${status.match(/EMERGENCY|DURESS/)?'pulse-red 1s infinite':'none'}"></div>`,iconSize:[16,16]});
-    if(markers[name]){markers[name].setLatLng([lat,lon]);markers[name].setIcon(icon);markers[name].setPopupContent(buildMapPopup(w));} else {const m=L.marker([lat,lon],{icon:icon}).addTo(map);m.bindPopup(buildMapPopup(w));markers[name]=m;}
-}
-function buildMapPopup(w){ return `<strong>${w['Worker Name']}</strong><br>${w['Alarm Status']}<br>🔋 ${w['Battery Level']||'?'}`; }
-
-function fetchData(){
-  const s=document.createElement('script'), cb='cb_'+Date.now(); document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-connecting";
-  window[cb]=(resp)=>{ delete window[cb]; document.body.removeChild(s); if(resp.status==='error'){ handleFetchError(resp.message); return; } failedPollCount=0; document.getElementById('disconnectBanner').classList.add('hidden'); if(resp.watchdog_last_run){ const last=new Date(resp.watchdog_last_run); const diff=(new Date()-last)/60000; document.getElementById('serverFaultBanner').classList.toggle('hidden', diff<15); } if((resp.workers||[]).length>2500) document.getElementById('dbWarning').classList.remove('hidden'); document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-online"; document.getElementById('lastUpd').innerText="Upd: "+new Date().toLocaleTimeString(); processAndRender(resp.workers||[]); };
-  s.src=URL+'?callback='+cb+'&key='+encodeURIComponent(SECRET); s.onerror=()=>handleFetchError("Network"); document.body.appendChild(s);
-}
-function handleFetchError(msg){ document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-offline"; document.getElementById('lastUpd').innerText="Conn Failed"; failedPollCount++; if(failedPollCount>=3){document.getElementById('disconnectBanner').classList.remove('hidden'); try{if(Tone.context.state==='running'){const s=new Tone.Synth().toDestination();s.triggerAttackRelease("C2","8n");}}catch(e){}} if(msg==='Invalid Key'){alert('Invalid Key');logout();} }
-
-function processAndRender(workersArray){
-  const list=document.getElementById('workerList'), workers={};
-  workersArray.forEach(row=>{ if(row['Worker Name']) workers[row['Worker Name']]=row; }); 
-  let anyCritical=false;
-  Object.values(workers).forEach(w=>{
-      const name=w['Worker Name'], status=w['Alarm Status'];
-      let overdueMins=0; if(w['Anticipated Departure Time']){const d=new Date(w['Anticipated Departure Time']);if(!isNaN(d))overdueMins=Math.floor((new Date()-d)/60000);}
-      const localCrit=(status==='OVERDUE'&&overdueMins>15), isCrit=status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)||localCrit;
-      updateMapMarker(w);
-      if(lastState[name]!==status){ if(isCrit)acknowledgedList.delete(name); addLogEntry(`${name}: ${status}`, isCrit?"alert":"info"); } lastState[name]=status;
-      if(isCrit){ anyCritical=true; if(!acknowledgedList.has(name)) playAlarm(w,localCrit); }
-  });
-  if(!anyCritical){ stopAlarmSound(); acknowledgedList.clear(); }
-  list.innerHTML='';
-  const sorted=Object.values(workers).filter(w=>!['DEPARTED','COMPLETED'].includes(w['Alarm Status'])).sort((a,b)=>getPriorityScore(b['Alarm Status'])-getPriorityScore(a['Alarm Status']));
-  if(sorted.length===0){ list.innerHTML=`<div class="col-span-full flex flex-col items-center justify-center h-64 text-gray-600"><div class="text-6xl mb-4">☕</div><div class="text-xl">No Active Visits</div></div>`; return; }
-  sorted.forEach(w=>{
-    const status=w['Alarm Status'], name=w['Worker Name'];
-    let overdueMins=0; if(w['Anticipated Departure Time']){const d=new Date(w['Anticipated Departure Time']);if(!isNaN(d))overdueMins=Math.floor((new Date()-d)/60000);}
-    const localCrit=(status==='OVERDUE'&&overdueMins>15);
-    let cls="bg-gray-800 border-l-4 border-blue-500", stCls="text-blue-400", btn="";
-    if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/)||localCrit){ cls=status.includes('DURESS')?"bg-purple-900 border-l-8 border-purple-500 animate-pulse":"bg-red-900 border-l-8 border-red-500 animate-pulse"; stCls="text-white font-black bg-red-600 px-2 rounded"; btn=`<button onclick="initiateResolve('${name.replace(/'/g,"\\'")}')" class="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg relative z-10 pointer-events-auto">✅ RESOLVE INCIDENT</button>`; }
-    else if(status==='OVERDUE'){ cls="bg-amber-900 border-l-8 border-amber-500"; stCls="text-white font-bold bg-amber-600 px-2 rounded"; }
-    else if(status==='TRAVELLING'){ cls="bg-indigo-900/40 border-l-4 border-indigo-500"; stCls="text-indigo-300"; }
-    let dueHtml=overdueMins>0?`<div class="mt-2 text-xs ${overdueMins>15?"bg-red-900/80 text-red-200 animate-pulse":"bg-amber-900/80 text-amber-200"} px-2 py-1 rounded inline-block font-bold font-mono">⚠️ Overdue ${overdueMins}m</div>`:`<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${Math.abs(overdueMins)}m remaining</div>`;
-    const div=document.createElement('div'); div.className=`rounded-xl shadow-lg p-5 flex flex-col justify-between ${cls} transition-all hover:scale-[1.02] relative cursor-pointer`; div.onclick=(e)=>{if(e.target.tagName!=='BUTTON'&&e.target.id!=='resolveInput')focusWorker(w);};
-    div.innerHTML=`<div><div class="flex justify-between items-start mb-2"><h3 class="text-2xl font-bold text-white truncate">${name}</h3></div><div class="text-gray-300 text-sm mb-1 truncate">📍 ${w['Location Name']||'Unknown'}</div><div class="flex items-center justify-between bg-black/20 p-3 rounded-lg"><span class="${stCls} uppercase text-sm font-bold tracking-wider">${localCrit?'EMERGENCY (OVERDUE)':status}</span><span class="text-xs font-mono">🔋 ${w['Battery Level']||'?'}</span></div>${dueHtml}</div><div class="mt-2 pointer-events-auto">${btn}</div>`;
-    list.appendChild(div);
-  });
-}
-
-function focusWorker(w){ if(!w['Last Known GPS'])return; setView('map'); const[lat,lon]=w['Last Known GPS'].split(',').map(parseFloat); map.setView([lat,lon],16); if(markers[w['Worker Name']])markers[w['Worker Name']].openPopup(); }
-function getPriorityScore(s){if(s.includes('DURESS'))return 4;if(s.includes('EMERGENCY')||s.includes('ALERT'))return 3;if(s==='OVERDUE')return 2;return 1;}
-async function playAlarm(w, locOvd){ const ov=document.getElementById('alertOverlay'); ov.classList.remove('hidden'); ov.className=w['Alarm Status'].includes('DURESS')?'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white':'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white'; document.getElementById('alertDetails').innerHTML=`<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div>`; document.getElementById('btnSilence').dataset.worker=w['Worker Name']; if(Tone.context.state!=='running')await Tone.start(); if(Tone.context.state==='suspended')await Tone.context.resume(); alarm=new Tone.Oscillator(440,"square").toDestination().start(); new Tone.LFO("2n",400,800).start().connect(alarm.frequency); }
-function silenceAlarm(){ const n=document.getElementById('btnSilence').dataset.worker; acknowledgedList.add(n); document.getElementById('alertOverlay').classList.add('hidden'); stopAlarmSound(); }
-function stopAlarmSound(){ if(alarm){alarm.stop();alarm.dispose();alarm=null;} }
-function initiateResolve(n){ activeWorkerToResolve=n; document.getElementById('resolveNameTarget').innerText=n; document.getElementById('resolveInput').value=""; document.getElementById('resolveReason').value=""; document.getElementById('resolveModal').classList.remove('hidden'); }
-function closeResolve(){ document.getElementById('resolveModal').classList.add('hidden'); activeWorkerToResolve=null; }
-function confirmResolve(){ const v=document.getElementById('resolveInput').value.trim(); if(v!==activeWorkerToResolve){alert("Name mismatch");return;} const r=document.getElementById('resolveReason').value||"Cleared by Monitor"; const p=new URLSearchParams(); p.append('Worker Name',activeWorkerToResolve); p.append('Alarm Status','SAFE - MONITOR CLEARED'); p.append('Notes',`[RESOLUTION: ${r}]`); p.append('key',SECRET); fetch(URL,{method:'POST',body:p,mode:'no-cors'}).then(()=>{alert("Resolved"); closeResolve(); stopAlarmSound(); lastState[activeWorkerToResolve]='SAFE'; acknowledgedList.add(activeWorkerToResolve);}); }
-function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=btn.onmouseleave=()=>{clearTimeout(t);btn.classList.remove('pressing')}; }
-function toggleNotifications(){ Notification.requestPermission().then(p=>{if(p==='granted')document.getElementById('btnNotify').innerText="Alerts Active ✅"}); }
-function updateClock(){ document.getElementById('clock').innerText=new Date().toLocaleTimeString(); }
-function addLogEntry(m,t="info"){ const p=document.createElement('div'); p.className=`border-b border-gray-800 pb-1 ${t==='alert'?'text-red-400 font-bold':t==='success'?'text-green-400':'text-gray-400'}`; p.innerText=`[${new Date().toLocaleTimeString()}] ${m}`; document.getElementById('logPanel').prepend(p); }
-</script></body></html>
-</script>
-
-<script id="tpl-backend" type="text/template">
-const CONFIG={SECRET_KEY:"%%SECRET_KEY%%", ORS_API_KEY:"%%ORS_API_KEY%%", GEMINI_API_KEY:"%%GEMINI_API_KEY%%", ORG_NAME:"%%ORGANISATION_NAME%%", ESCALATION_MINUTES:%%ESCALATION_MINUTES%%, REPORT_TEMPLATE_ID:"", PDF_FOLDER_ID:""};
-// LOAD DYNAMIC PROPERTIES
-const sp=PropertiesService.getScriptProperties(); const tid=sp.getProperty('REPORT_TEMPLATE_ID'); const pid=sp.getProperty('PDF_FOLDER_ID'); if(tid)CONFIG.REPORT_TEMPLATE_ID=tid; if(pid)CONFIG.PDF_FOLDER_ID=pid;
-
-function doGet(e){
-    // SYNC ENDPOINT (NEW)
-    if(e.parameter.action==='sync'){
-        const worker=e.parameter.worker; const ss=SpreadsheetApp.getActiveSpreadsheet();
-        // 1. FORMS
-        const tSheet=ss.getSheetByName('Templates'); const tData=tSheet?tSheet.getDataRange().getValues():[]; const forms=[]; const cachedTemplates={};
-        for(let i=1;i<tData.length;i++){ const r=tData[i]; if(r[0]==='FORM'&&(r[2].includes(worker)||r[2]==='ALL'))forms.push({name:r[1],questions:parseQuestions(r)}); cachedTemplates[r[1]]=parseQuestions(r); }
-        // 2. SITES
-        const sSheet=ss.getSheetByName('Sites'); const sData=sSheet?sSheet.getDataRange().getValues():[]; const sites=[];
-        for(let i=1;i<sData.length;i++){ const r=sData[i]; if(r[0].includes(worker)||r[0]==='ALL') sites.push({template:r[1],company:r[2],siteName:r[3],address:r[4],contactName:r[5],contactPhone:r[6],contactEmail:r[7],notes:r[8]}); }
-        return ContentService.createTextOutput(JSON.stringify({sites,forms,cachedTemplates})).setMimeType(ContentService.MimeType.JSON);
-    }
-    // MONITOR ENDPOINT
-    if(e.parameter.callback){
-        const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visits'); const rows=sh.getDataRange().getValues(); const h=rows.shift(); const data=rows.map(r=>{let o={};h.forEach((k,i)=>o[k]=r[i]);return o;});
-        const lastRun=PropertiesService.getScriptProperties().getProperty('LAST_WATCHDOG_RUN')||"Never";
-        return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({workers:data,server_time:new Date().toISOString(),watchdog_last_run:lastRun})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-    }
-    if(e.parameter.run==='setupTemplate') return ContentService.createTextOutput(setupReportTemplate());
-    if(e.parameter.run==='watchdog') { checkOverdueVisits(); return ContentService.createTextOutput("Watchdog Run"); }
-    return ContentService.createTextOutput("OTG Online");
-}
-
-function doPost(e){
-    const lock=LockService.getScriptLock(); lock.tryLock(30000);
-    try{
-        const p=e.parameter; if(p.key!==CONFIG.SECRET_KEY) return ContentService.createTextOutput("Invalid Key");
-        const ss=SpreadsheetApp.getActiveSpreadsheet(); const sheet=ss.getSheetByName('Visits')||ss.insertSheet('Visits');
-        if(sheet.getLastColumn()===0){ sheet.appendRow(["Timestamp","Date","Worker Name","Worker Phone Number","Emergency Contact Name","Emergency Contact Number","Emergency Contact Email","Escalation Contact Name","Escalation Contact Number","Escalation Contact Email","Alarm Status","Notes","Location Name","Location Address","Last Known GPS","GPS Timestamp","Battery Level","Photo 1","Distance (km)","Visit Report Data","Anticipated Departure Time","Signature","Photo 2","Photo 3","Photo 4"]); sheet.setFrozenRows(1); }
-        
-        // ASSETS
-        const assets={}; ['Photo 1','Photo 2','Photo 3','Photo 4','Signature'].forEach(k=>{ if(p[k]&&p[k].includes('base64')) assets[k]=saveImageToDrive(p[k],`${p['Worker Name']}_${k}_${Date.now()}.${k==='Signature'?'png':'jpg'}`); });
-        
-        const worker=p['Worker Name'], status=p['Alarm Status']; let updated=false; const lr=sheet.getLastRow();
-        if(lr>1){
-            const search=Math.min(lr-1,50); const start=lr-search+1; const data=sheet.getRange(start,1,search,25).getValues();
-            for(let i=data.length-1;i>=0;i--){
-                const r=data[i], rStat=r[10];
-                if(r[2]===worker && (!['DEPARTED','COMPLETED'].includes(rStat) || status==='SAFE - MONITOR CLEARED' || (rStat==='DATA_ENTRY_ONLY' && status==='DATA_ENTRY_ONLY'))){
-                    const ri=start+i;
-                    sheet.getRange(ri,11).setValue(status);
-                    if(p['Last Known GPS']) sheet.getRange(ri,15).setValue(p['Last Known GPS']);
-                    if(p['Battery Level']) sheet.getRange(ri,17).setValue(p['Battery Level']);
-                    if(p['Anticipated Departure Time']) sheet.getRange(ri,21).setValue(p['Anticipated Departure Time']);
-                    if(p['Notes'] && !p['Notes'].includes("Locating")) { const old=data[i][11]; if(!old.includes(p['Notes'])) sheet.getRange(ri,12).setValue(old?old+" | "+p['Notes']:p['Notes']); }
-                    // OVERWRITE PROTECTION
-                    if(p['Visit Report Data'] && p['Visit Report Data'].length>5 && p['Visit Report Data']!=='{}') sheet.getRange(ri,20).setValue(p['Visit Report Data']);
-                    ['Photo 1','Signature','Photo 2','Photo 3','Photo 4'].forEach((k,idx)=>{ if(assets[k]) sheet.getRange(ri,[18,22,23,24,25][idx]).setValue(assets[k]); });
-                    updated=true;
-                    if((status==='DEPARTED'||status==='DATA_ENTRY_ONLY') && CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length>5) generateVisitPdf(ri);
-                    break;
-                }
-            }
-        }
-        if(!updated){
-            sheet.appendRow([new Date(),Utilities.formatDate(new Date(),Session.getScriptTimeZone(),"yyyy-MM-dd"),p['Worker Name'],"'"+(p['Worker Phone Number']||""),p['Emergency Contact Name'],"'"+(p['Emergency Contact Number']||""),p['Emergency Contact Email'],p['Escalation Contact Name'],"'"+(p['Escalation Contact Number']||""),p['Escalation Contact Email'],status,p['Notes'],p['Location Name'],p['Location Address'],p['Last Known GPS'],p['Timestamp']||new Date().toISOString(),p['Battery Level'],assets['Photo 1'],p['Distance'],p['Visit Report Data'],p['Anticipated Departure Time'],assets['Signature'],assets['Photo 2'],assets['Photo 3'],assets['Photo 4']]);
-            if(CONFIG.REPORT_TEMPLATE_ID && p['Visit Report Data'] && p['Visit Report Data'].length>5) generateVisitPdf(sheet.getLastRow());
-        }
-        
-        if(p['Template Name'] && p['Visit Report Data'] && p['Visit Report Data'].length>5) processFormEmail(p);
-        if(status.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
-        
-        return ContentService.createTextOutput("OK");
-    } catch(e){ return ContentService.createTextOutput("Error: "+e); } finally { lock.releaseLock(); }
-}
-
-function checkOverdueVisits(){
-    PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN',new Date().toISOString());
-    const ss=SpreadsheetApp.getActiveSpreadsheet(), sh=ss.getSheetByName('Visits'); if(!sh)return;
-    const data=sh.getDataRange().getValues(), now=new Date().getTime(), esc=CONFIG.ESCALATION_MINUTES*60000;
-    for(let i=1;i<data.length;i++){
-        const r=data[i], s=r[10], due=r[20];
-        if(['DEPARTED','COMPLETED','SAFE - MONITOR CLEARED'].includes(s)||!due) continue;
-        const diff=now-new Date(due).getTime();
-        if(diff>esc && !s.includes('EMERGENCY')){
-            const ns="EMERGENCY - OVERDUE (Server Watchdog)"; sh.getRange(i+1,11).setValue(ns);
-            sendAlert({'Worker Name':r[2],'Worker Phone Number':r[3],'Alarm Status':ns,'Location Name':r[12],'Last Known GPS':r[14],'Battery Level':r[16],'Emergency Contact Email':r[6],'Emergency Contact Number':r[5]});
-        }
-    }
-}
-
-function setupReportTemplate(){ try{ const d=DocumentApp.create(CONFIG.ORG_NAME+" Report Template"); d.getBody().appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1); d.saveAndClose(); PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID',d.getId()); return "Done. ID: "+d.getId(); }catch(e){return "Error: "+e;} }
-function saveImageToDrive(b64,n){ try{ const b=Utilities.newBlob(Utilities.base64Decode(b64.split(',')[1]),'image/jpeg',n); const f=CONFIG.PHOTOS_FOLDER_ID?DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID).createFile(b):DriveApp.getRootFolder().createFile(b); f.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW); return f.getUrl(); }catch(e){return "";} }
-function generateVisitPdf(ri){ /* ... (Standard PDF Gen Logic) ... */ }
-function processFormEmail(p){ /* ... (Standard Email Logic) ... */ }
-function sendAlert(d){ /* ... (Standard Alert Logic) ... */ }
-function parseQuestions(r){ const q=[]; for(let i=3;i<r.length;i++){if(r[i]){let t='check',x=r[i]; if(x.includes('[TEXT]')){t='text';x=x.replace('[TEXT]','').trim();} else if(x.includes('[PHOTO]')){t='photo';x=x.replace('[PHOTO]','').trim();} else if(x.includes('[SIGN]')){t='signature';x=x.replace('[SIGN]','').trim();} q.push({type:t,text:x});}} return q; }
-</script>
+</body>
+</html>
