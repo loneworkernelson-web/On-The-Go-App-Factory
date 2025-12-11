@@ -137,6 +137,20 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card">
+            <label class="setting-label lbl-green">Emergency Contact (Required)</label>
+            <input id="set_emg_name" class="form-input-card" placeholder="Name">
+            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email">
+        </div>
+
+        <div class="setting-card">
+            <label class="setting-label lbl-purple">Escalation Contact (Optional)</label>
+            <input id="set_esc_name" class="form-input-card" placeholder="Name">
+            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email">
+        </div>
+
+        <div class="setting-card">
             <label class="setting-label lbl-red">Security (4 Digits)</label>
             <div class="flex gap-2">
                 <input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN">
@@ -157,46 +171,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
-    
-    <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
-        <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
-        <input type="hidden" id="locId">
-        <div class="space-y-4">
-            <div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div>
-            <div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div>
-            
-            <div>
-                <label class="text-xs text-gray-400 uppercase font-bold">Address</label>
-                <div class="flex gap-2">
-                    <input type="text" id="locAddr" class="form-input mb-0 flex-1">
-                    <button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button>
-                </div>
-            </div>
-            
-            <div id="advLocOptions" class="pt-2 border-t border-gray-700">
-               <div class="mb-3 bg-gray-900 p-2 rounded">
-                   <label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label>
-                   <div class="flex gap-6">
-                       <label class="flex items-center gap-2 cursor-pointer">
-                           <input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500">
-                           <span class="text-sm text-white font-bold">Yes</span>
-                       </label>
-                       <label class="flex items-center gap-2 cursor-pointer">
-                           <input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500">
-                           <span class="text-sm text-gray-300">No</span>
-                       </label>
-                   </div>
-               </div>
-               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
-            </div>
-        </div>
-        <div class="mt-6 flex justify-end space-x-3">
-            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
-            <div class="flex-1"></div>
-            <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-            <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
-        </div>
-    </div>
     
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2>
@@ -312,7 +286,7 @@ window.addEventListener('load', () => {
         navigator.getBattery().then(b => {
             const upd = () => { 
                 currentBatteryLevel = Math.round(b.level * 100) + "%"; 
-                // Dying Breath Logic: < 10%
+                // Alert if < 10%
                 if (b.level < 0.10 && !state.lowBatSent && state.activeVisit) {
                      state.lowBatSent = true; saveState();
                      processUploadQueue(buildPayload({ "Alarm Status": "BATTERY CRITICAL (10%)", "Notes": "Automated Low Battery Alert" }));
@@ -387,8 +361,47 @@ function forceSync(){
 }
 
 // ==================== NAVIGATION & STATE ====================
-function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){document.getElementById('set_name').value=state.settings.workerName||"";document.getElementById('set_phone').value=state.settings.workerPhone||"";document.getElementById('set_pin').value=state.settings.pinCode||"";document.getElementById('set_duress').value=state.settings.duressPin||"";}}
-function saveSettings(){ state.settings.workerName=document.getElementById('set_name').value; state.settings.workerPhone=document.getElementById('set_phone').value; state.settings.pinCode=document.getElementById('set_pin').value; state.settings.duressPin=document.getElementById('set_duress').value; saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); }
+function navigate(p){
+    document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+    document.getElementById(p+'Page').classList.add('active'); 
+    if(p==='main') startReminderTimer(); 
+    else clearTimeout(mainScreenReminderTimer); 
+    
+    if(p==='settings'){
+        // RE-POPULATE FIELDS
+        document.getElementById('set_name').value=state.settings.workerName||"";
+        document.getElementById('set_phone').value=state.settings.workerPhone||"";
+        document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
+        document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
+        document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
+        document.getElementById('set_esc_name').value=state.settings.escalationName||"";
+        document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";
+        document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";
+        document.getElementById('set_pin').value=state.settings.pinCode||"";
+        document.getElementById('set_duress').value=state.settings.duressPin||"";
+    }
+}
+
+function saveSettings(){ 
+    state.settings.workerName=document.getElementById('set_name').value; 
+    state.settings.workerPhone=document.getElementById('set_phone').value; 
+    
+    // NEW: Save Emergency Data
+    state.settings.emergencyName = document.getElementById('set_emg_name').value;
+    state.settings.emergencyPhone = document.getElementById('set_emg_phone').value;
+    state.settings.emergencyEmail = document.getElementById('set_emg_email').value;
+    state.settings.escalationName = document.getElementById('set_esc_name').value;
+    state.settings.escalationPhone = document.getElementById('set_esc_phone').value;
+    state.settings.escalationEmail = document.getElementById('set_esc_email').value;
+
+    state.settings.pinCode=document.getElementById('set_pin').value; 
+    state.settings.duressPin=document.getElementById('set_duress').value; 
+    saveState(); 
+    navigate('main'); 
+    document.getElementById('btnCloseSettings').style.display='block'; 
+    forceSync(); 
+}
+
 function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
 // ==================== LOCATIONS UI ====================
@@ -415,7 +428,7 @@ function showSiteInfo(id, e) {
     const l = state.locations.find(x => x.id === id);
     if(!l) return;
     
-    showModal('info'); // Show the generic info modal
+    showModal('info'); 
     document.getElementById('infoTitle').innerText = l.name;
     
     let html = "";
@@ -433,7 +446,6 @@ function showSiteInfo(id, e) {
     if(l.contactEmail) { btnEmail.href = `mailto:${l.contactEmail}`; btnEmail.classList.remove('hidden'); } else btnEmail.classList.add('hidden');
 }
 
-// RESTORED: deleteLoc (Required for the Location Modal logic)
 function deleteLoc() { 
     const id = document.getElementById('locId').value;
     if(id === 'travel') return alert("Cannot delete Travelling tile.");
