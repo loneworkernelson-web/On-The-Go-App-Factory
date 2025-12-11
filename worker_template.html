@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -67,7 +67,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
     <div class="flex-1 overflow-y-auto mb-4 rounded-lg min-h-0">
         <div id="locationList" class="space-y-3"></div>
-        <button onclick="forceSync()" class="mt-4 w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold">↻ Sync Sites</button>
+        <button onclick="openLocModal()" class="mt-4 w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold">+ Add Location</button>
+        <button onclick="forceSync()" class="mt-2 w-full py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600">↻ Sync Assigned Sites</button>
     </div>
 
     <div class="mb-4 bg-gray-900 rounded-lg p-4 border border-gray-700 flex-shrink-0">
@@ -136,20 +137,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card">
-            <label class="setting-label lbl-green">Emergency Contact (Required)</label>
-            <input id="set_emg_name" class="form-input-card" placeholder="Contact Name">
-            <input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
-            <input id="set_emg_email" type="email" class="form-input-card" placeholder="Email (Optional)">
-        </div>
-
-        <div class="setting-card">
-            <label class="setting-label lbl-purple">Escalation Contact (Optional)</label>
-            <input id="set_esc_name" class="form-input-card" placeholder="Manager Name">
-            <input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
-            <input id="set_esc_email" type="email" class="form-input-card" placeholder="Email (Optional)">
-        </div>
-
-        <div class="setting-card">
             <label class="setting-label lbl-red">Security (4 Digits)</label>
             <div class="flex gap-2">
                 <input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN">
@@ -171,13 +158,55 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
     
+    <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6">
+        <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
+        <input type="hidden" id="locId">
+        <div class="space-y-4">
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div>
+            
+            <div>
+                <label class="text-xs text-gray-400 uppercase font-bold">Address</label>
+                <div class="flex gap-2">
+                    <input type="text" id="locAddr" class="form-input mb-0 flex-1">
+                    <button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button>
+                </div>
+            </div>
+            
+            <div id="advLocOptions" class="pt-2 border-t border-gray-700">
+               <div class="mb-3 bg-gray-900 p-2 rounded">
+                   <label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label>
+                   <div class="flex gap-6">
+                       <label class="flex items-center gap-2 cursor-pointer">
+                           <input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500">
+                           <span class="text-sm text-white font-bold">Yes</span>
+                       </label>
+                       <label class="flex items-center gap-2 cursor-pointer">
+                           <input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500">
+                           <span class="text-sm text-gray-300">No</span>
+                       </label>
+                   </div>
+               </div>
+               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Checklists' sheet.</p></div>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
+            <div class="flex-1"></div>
+            <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
+        </div>
+    </div>
+    
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2>
         <div id="siteInfoContent" class="text-gray-300 text-sm space-y-2 mb-4"></div>
+        
         <div class="flex gap-2 mb-4">
             <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a>
             <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a>
         </div>
+
         <button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button>
     </div>
 
@@ -278,7 +307,7 @@ window.addEventListener('load', () => {
     // Resume Travelling Pulse if active
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
 
-    // Init Battery Monitoring
+    // Init Battery Monitoring (Dying Breath)
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -358,34 +387,8 @@ function forceSync(){
 }
 
 // ==================== NAVIGATION & STATE ====================
-function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){
-    document.getElementById('set_name').value=state.settings.workerName||"";
-    document.getElementById('set_phone').value=state.settings.workerPhone||"";
-    document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
-    document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
-    document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
-    document.getElementById('set_esc_name').value=state.settings.escalationName||"";
-    document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";
-    document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";
-    document.getElementById('set_pin').value=state.settings.pinCode||"";
-    document.getElementById('set_duress').value=state.settings.duressPin||"";
-    document.getElementById('set_url').value=state.settings.googleSheetUrl;
-}}
-
-function saveSettings(){ 
-    state.settings.workerName=document.getElementById('set_name').value;
-    state.settings.workerPhone=document.getElementById('set_phone').value;
-    state.settings.emergencyName=document.getElementById('set_emg_name').value;
-    state.settings.emergencyPhone=document.getElementById('set_emg_phone').value;
-    state.settings.emergencyEmail=document.getElementById('set_emg_email').value;
-    state.settings.escalationName=document.getElementById('set_esc_name').value;
-    state.settings.escalationPhone=document.getElementById('set_esc_phone').value;
-    state.settings.escalationEmail=document.getElementById('set_esc_email').value;
-    state.settings.pinCode=document.getElementById('set_pin').value;
-    state.settings.duressPin=document.getElementById('set_duress').value;
-    saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); 
-}
-
+function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){document.getElementById('set_name').value=state.settings.workerName||"";document.getElementById('set_phone').value=state.settings.workerPhone||"";document.getElementById('set_pin').value=state.settings.pinCode||"";document.getElementById('set_duress').value=state.settings.duressPin||"";}}
+function saveSettings(){ state.settings.workerName=document.getElementById('set_name').value; state.settings.workerPhone=document.getElementById('set_phone').value; state.settings.pinCode=document.getElementById('set_pin').value; state.settings.duressPin=document.getElementById('set_duress').value; saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); }
 function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
 // ==================== LOCATIONS UI ====================
@@ -430,6 +433,40 @@ function showSiteInfo(id, e) {
     if(l.contactEmail) { btnEmail.href = `mailto:${l.contactEmail}`; btnEmail.classList.remove('hidden'); } else btnEmail.classList.add('hidden');
 }
 
+// RESTORED: deleteLoc (Required for the Location Modal logic)
+function deleteLoc() { 
+    const id = document.getElementById('locId').value;
+    if(id === 'travel') return alert("Cannot delete Travelling tile.");
+    if(confirm('Delete location?')) {
+        state.locations = state.locations.filter(l => l.id !== id);
+        if(state.selectedLocationId === id) state.selectedLocationId = null;
+        saveState(); renderLocations(); closeModal('location');
+    }
+}
+function saveLoc() {
+    const id = document.getElementById('locId').value;
+    const name = document.getElementById('locName').value;
+    const addr = document.getElementById('locAddr').value;
+    const business = document.getElementById('locBusiness').value; 
+    const tpl = document.getElementById('locTemplate').value;
+    const noRep = document.getElementById('radRepNo').checked;
+    
+    if(!name) return alert("Name required");
+    
+    if(id) {
+        const idx = state.locations.findIndex(l => l.id === id);
+        if(idx > -1) {
+            state.locations[idx] = { ...state.locations[idx], name, address: addr, companyName: business, templateName: tpl, noReport: noRep };
+        }
+    } else {
+        state.locations.push({ 
+            id: Date.now().toString(), 
+            name, address: addr, companyName: business, templateName: tpl, noReport: noRep 
+        });
+    }
+    saveState(); renderLocations(); closeModal('location'); syncForms();
+}
+
 // ==================== VISIT LOGIC ====================
 function updateArrivedButtonState(){ const val=DURATION_MAP[document.getElementById('durationSlider').value]; document.getElementById('durationDisplay').innerText=val>=60?(Math.floor(val/60)+' hr '+(val%60)+' min'):val+' min'; state.visitDurationMinutes=val; const btn=document.getElementById('btnStart'); if(state.selectedLocationId && val>0){ btn.disabled=false; btn.innerText="HOLD TO START"; btn.className="long-press-btn flex-[2] py-5 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all"; setupLongPress(btn,startVisit); } else { btn.disabled=true; btn.innerText=state.selectedLocationId?"Set Time":"Select Location"; btn.className="long-press-btn flex-[2] py-5 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all"; }}
 
@@ -454,7 +491,12 @@ function tick(){
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
     
     // 5 MIN WARNING
-    if(Math.floor(rem/60000)===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
+    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ 
+        state.activeVisit.fiveMinWarned=true; 
+        playSound('pre_alert'); 
+        document.getElementById('fiveMinBanner').classList.remove('hidden'); 
+        setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); 
+    }
     
     if(rem<0) { 
         document.getElementById('countdownTimer').classList.add('text-red-500'); 
@@ -552,6 +594,17 @@ function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getCont
 
 // ==================== CORE UTILS ====================
 function triggerAutoAlert(status) { const sel = state.locations.find(l => l.id === state.activeVisit.locationId); const locName = sel ? (sel.companyName ? `${sel.companyName} - ${sel.name}` : sel.name) : "Unknown"; navigator.geolocation.getCurrentPosition(pos => { processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert", "Location Name": locName, "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}` })); }, () => { processUploadQueue(buildPayload({ "Alarm Status": status, "Notes": "Automated System Alert (GPS Fail)", "Location Name": locName })); }); }
+// RESTORED: startReminderTimer (Critical for startup crash fix)
+function startReminderTimer() {
+    clearTimeout(mainScreenReminderTimer);
+    document.getElementById('startReminderBanner').classList.add('hidden');
+    mainScreenReminderTimer = setTimeout(() => {
+        if(!state.activeVisit && document.getElementById('mainPage').classList.contains('active')) {
+            document.getElementById('startReminderBanner').classList.remove('hidden');
+        }
+    }, 300000); 
+}
+
 function triggerCheckin() { if(!document.getElementById('checkinModal').classList.contains('hidden')) return; showModal('checkin'); document.getElementById('batterySaver').classList.add('hidden'); let rem = 120; const el = document.getElementById('checkinCountdown'); if(checkinIntervalId) clearInterval(checkinIntervalId); playSound('checkin'); const btn = document.getElementById('btnCheckinConfirm'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn); setupLongPress(newBtn, confirmCheckin); checkinIntervalId = setInterval(() => { rem--; const m = Math.floor(rem/60); const s = rem%60; el.innerText = `${m}:${s<10?'0':''}${s}`; if(rem === 60 || rem === 30 || rem === 10) playSound('checkin'); if(rem <= 0) { clearInterval(checkinIntervalId); closeModal('checkin'); sendToGoogleSheet(buildPayload({ "Alarm Status": 'MISSED_CHECKIN', "Notes": "Worker failed to respond to check-in" })); alert('MISSED CHECK-IN ALERT SENT'); } }, 1000); }
 function confirmCheckin() { clearInterval(checkinIntervalId); closeModal('checkin'); state.activeVisit.nextCheckin = new Date(Date.now() + CONFIG.checkinInterval*60000); saveState(); }
 function confirmExtension(mins) { const process = () => { state.activeVisit.anticipatedDepartureTime = new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime() + mins * 60000); saveState(); playSound('extend'); processUploadQueue(buildPayload({ "Alarm Status": 'EXTENDED', "Notes": "Extended " + mins + "m" })); }; const now = new Date(), due = new Date(state.activeVisit.anticipatedDepartureTime); closeModal('extend'); if ((due-now)<0 || state.activeVisit.isPanic) withPinVerification(false, process); else process(); }
