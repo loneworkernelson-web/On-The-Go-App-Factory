@@ -58,8 +58,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
         <div id="locationList" class="space-y-3 pb-4"></div>
-        <button onclick="openLocModal()" class="w-full py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold mb-2">+ Add Manual Location</button>
-        <button onclick="forceSync()" class="w-full py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600">↻ Sync Assigned Sites</button>
+        
+        <div class="flex gap-3 mt-4">
+             <button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button>
+             <button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button>
+        </div>
     </div>
     <div class="footer-bar">
         <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
@@ -449,7 +452,7 @@ function preDepart(){
 function loadFormAndShow(tpl){ 
     showModal('report'); 
     document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
-    currentActiveTemplate = tpl; // SAVE THIS FOR EMAIL LOGIC
+    currentActiveTemplate = tpl; // SAVE FOR EMAIL
     buildReportForm(tpl, document.getElementById('reportFields')); 
     const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
     if(isMidVisitUpdate) { newBtn.innerText="Send Update"; newBtn.classList.remove('long-press-btn'); newBtn.onclick=submitReport; } else { newBtn.innerText="HOLD TO SUBMIT & END"; newBtn.classList.add('long-press-btn'); setupLongPress(newBtn, submitReport); }
@@ -463,7 +466,7 @@ function submitReport(){
         ...d.custom,
         // BACKEND REQUIRES "Visit Report Data" as a string
         "Visit Report Data": JSON.stringify(d.jsonPayload),
-        "Template Name": currentActiveTemplate // v48.0 FIX: For Emailing
+        "Template Name": currentActiveTemplate // v48.0 FIX: Required for Email
     };
 
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
