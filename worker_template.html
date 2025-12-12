@@ -157,8 +157,16 @@ const CONFIG = {
 const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
 // ==================== STATE MANAGEMENT ====================
-let state = { settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false };
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer, deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
+let state = { 
+    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
+    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
+    photoStore: {}, lowBatSent: false 
+};
+
+// Globals
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
+let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
+let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
 // ==================== CORE UI FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
@@ -223,6 +231,12 @@ function forceSync(){
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
+        
+        // v44.0 FIX: FORCE RE-INJECT TRAVEL REPORT AFTER SYNC
+        if(CONFIG.mileage) {
+            state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
+        }
+
         saveState(); renderLocations();
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete! Loaded " + managedSites.length + " sites.");
@@ -234,6 +248,7 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
+    // Initial Load Logic
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
         state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
     }
@@ -255,7 +270,6 @@ function renderLocations(){
 
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
-    
     if(id === 'travel') {
         showModal('info');
         document.getElementById('infoTitle').innerText = "Travelling Mode";
@@ -348,7 +362,6 @@ function openLocModal(id=null, e=null) {
 
 // ==================== VISIT LOGIC ====================
 function updateArrivedButtonState(){ const val=DURATION_MAP[document.getElementById('durationSlider').value]; document.getElementById('durationDisplay').innerText=val>=60?(Math.floor(val/60)+' hr '+(val%60)+' min'):val+' min'; state.visitDurationMinutes=val; const btn=document.getElementById('btnStart'); if(state.selectedLocationId && val>0){ btn.disabled=false; btn.innerText="HOLD TO START"; btn.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all"; setupLongPress(btn,startVisit); } else { btn.disabled=true; btn.innerText=state.selectedLocationId?"Set Time":"Select Location"; btn.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all"; }}
-
 function startVisit(){ 
     const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
     if(sel.id==='travel') startTravellingPulse(); 
@@ -360,21 +373,17 @@ function startVisit(){
     playSound('arrive'); 
     processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
 }
-
 function enterLockedScreen(){ 
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     document.getElementById('lockedLocationName').innerText=l.name; 
     navigate('locked'); 
-    
-    // v43.0 FIX: FORCE BUTTON RESET
+    // v43.0 FIX: Reset Buttons
     document.getElementById('btnDepart').classList.remove('hidden');
     document.getElementById('btnSafe').classList.add('hidden');
-    
     timerInt=setInterval(tick,1000); 
     setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false)); 
     setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); 
 }
-
 function tick(){
     const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
     const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
@@ -411,20 +420,30 @@ function loadFormAndShow(tpl){
 }
 
 function submitReport(){ 
-    const data = gatherFormData();
+    const d = gatherFormData();
     
-    // v43.0 FIX: Form Data & KM Extraction
-    if(data.custom && data.custom["Distance (km)"]) data["Distance"] = data.custom["Distance (km)"];
+    // v44.0 FIX: Data Mapping for Backend Compatibility
+    const finalData = {
+        ...d.custom,
+        // BACKEND REQUIRES "Visit Report Data" as a string
+        "Visit Report Data": JSON.stringify(d.jsonPayload) 
+    };
+
+    if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
     
     if(isMidVisitUpdate) { 
-        processUploadQueue(buildPayload({...data, "Alarm Status":"ON SITE"})); 
+        // v44.0 FIX: Use "TRAVELLING" status if mid-visit in travel mode
+        let status = "ON SITE";
+        if(state.activeVisit.locationId === 'travel') status = "TRAVELLING";
+
+        processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes})); 
         alert("Update Sent"); 
         isMidVisitUpdate = false; 
         closeModal('report'); 
         return; 
     } 
     
-    processUploadQueue(buildPayload({...data, "Alarm Status":"DEPARTED"})); 
+    processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes})); 
     if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
     
     state.activeVisit=null; 
@@ -460,8 +479,6 @@ function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); co
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
-
-// v43.0 FIX: THE UNIVERSAL PAYLOAD BUILDER
 function buildPayload(d){ 
     let dueTime = "";
     let locName = "Unknown";
@@ -481,27 +498,20 @@ function buildPayload(d){
         'key': CONFIG.key,
         'Worker Name': state.settings.workerName,
         'Worker Phone Number': state.settings.workerPhone,
-        
-        // CONTACTS
         'Emergency Contact Name': state.settings.emergencyName,
         'Emergency Contact Number': state.settings.emergencyPhone,
         'Emergency Contact Email': state.settings.emergencyEmail,
         'Escalation Contact Name': state.settings.escalationName,
         'Escalation Contact Number': state.settings.escalationPhone,
         'Escalation Contact Email': state.settings.escalationEmail,
-        
-        // VITALS
         'Battery Level': currentBatteryLevel,
         'Location Name': locName,
         'Location Address': locAddr,
         'Anticipated Departure Time': dueTime,
         'Timestamp': new Date().toISOString(),
-        
-        // DATA
         ...d
     }; 
 }
-
 function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
 function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
 function withPinVerification(d,c){ showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) c(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(d) c(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
@@ -511,7 +521,6 @@ function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGl
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-
 function buildReportForm(n,c){
     state.photoStore={};
     let t=(state.globalForms&&state.globalForms.find(f=>f.name===n))?.questions;
