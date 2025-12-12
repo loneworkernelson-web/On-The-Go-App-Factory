@@ -31,7 +31,9 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 1.5s linear; }
 .long-press-btn.pressing::after { width: 100%; }
+
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
@@ -160,34 +162,49 @@ const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 24
 let state = { settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false };
 let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer, deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
-// ==================== CORE FUNCTIONS (Define First) ====================
-function buildReportForm(n,c){
-    state.photoStore={};
-    let t=(state.globalForms&&state.globalForms.find(f=>f.name===n))?.questions;
-    if(!t)t=state.cachedForms[n];
-    if(!t)t=state.cachedForms["(Standard)"]||[];
-    c.innerHTML='';
-    if(t.length===0){
-        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
-    }else{
-        t.forEach((f,i)=>{
-            let y=f.type||'check',x=f.text||f;
-            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}}
-            let h='';
-            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
-            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
-            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
-            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
-            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
-            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
-            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
-            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
-            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
-            c.innerHTML+=h;
-        });
+// ==================== CORE FUNCTIONS (Define First to avoid Hoisting errors) ====================
+function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
+function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));document.getElementById('locationModal').classList.add('hidden');}
+
+function navigate(p){
+    document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+    document.getElementById(p+'Page').classList.add('active'); 
+    if(p==='main') startReminderTimer(); 
+    else clearTimeout(mainScreenReminderTimer); 
+    
+    if(p==='settings'){
+        document.getElementById('set_name').value=state.settings.workerName||"";
+        document.getElementById('set_phone').value=state.settings.workerPhone||"";
+        document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
+        document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
+        document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
+        document.getElementById('set_esc_name').value=state.settings.escalationName||"";
+        document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";
+        document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";
+        document.getElementById('set_pin').value=state.settings.pinCode||"";
+        document.getElementById('set_duress').value=state.settings.duressPin||"";
+        document.getElementById('set_url').value=state.settings.googleSheetUrl||"";
     }
-    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
 }
+
+function saveSettings(){ 
+    state.settings.workerName=document.getElementById('set_name').value; 
+    state.settings.workerPhone=document.getElementById('set_phone').value; 
+    state.settings.emergencyName = document.getElementById('set_emg_name').value;
+    state.settings.emergencyPhone = document.getElementById('set_emg_phone').value;
+    state.settings.emergencyEmail = document.getElementById('set_emg_email').value;
+    state.settings.escalationName = document.getElementById('set_esc_name').value;
+    state.settings.escalationPhone = document.getElementById('set_esc_phone').value;
+    state.settings.escalationEmail = document.getElementById('set_esc_email').value;
+    state.settings.pinCode=document.getElementById('set_pin').value; 
+    state.settings.duressPin=document.getElementById('set_duress').value; 
+    saveState(); 
+    navigate('main'); 
+    document.getElementById('btnCloseSettings').style.display='block'; 
+    forceSync(); 
+}
+
+function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
 // ==================== INITIALIZATION ====================
 window.addEventListener('load', () => {
@@ -235,13 +252,13 @@ window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
 });
 
-// ==================== SYNC & LOGIC ====================
+// ==================== SYNC LOGIC ====================
 function forceSync(){
     if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
     
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}`)
-    .then(r=>r.text()) // Get text first to check for error
+    .then(r=>r.text()) // Get text first to safely parse error
     .then(txt=>{
         if(txt.includes("OTG Online") || !txt.startsWith("{")) {
             throw new Error("SERVER UPDATE REQUIRED: The Google Script needs to be re-deployed as 'New Version'.");
@@ -249,11 +266,27 @@ function forceSync(){
         return JSON.parse(txt);
     })
     .then(data=>{
-        const managedSites = data.sites.map(s=>({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
-        if(CONFIG.mileage) managedSites.unshift({id:'travel', name:'Travelling', address:'Calculates Mileage via GPS', noReport:false, companyName:'Internal', templateName:'Travel Report'});
+        const managedSites = data.sites.map(s=>({
+            id: 'site_' + s.siteName.replace(/\s/g,''),
+            name: s.siteName,
+            address: s.address,
+            companyName: s.company,
+            templateName: s.template,
+            noReport: false,
+            contactName: s.contactName,
+            contactPhone: s.contactPhone,
+            contactEmail: s.contactEmail,
+            notes: s.notes
+        }));
+        
+        if(CONFIG.mileage) {
+            managedSites.unshift({id:'travel', name:'Travelling', address:'Calculates Mileage via GPS', noReport:false, companyName:'Internal', templateName:'Travel Report'});
+        }
+        
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
+        
         saveState(); renderLocations();
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete! Loaded " + managedSites.length + " sites.");
@@ -265,7 +298,6 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
-    // FORCE CACHE TRAVEL REPORT
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
         state.cachedForms['Travel Report'] = [
             {type:'number', text:'Distance (km)'}, 
@@ -275,43 +307,7 @@ function initLocations() {
     }
 }
 
-// NAVIGATION
-function navigate(p){
-    document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
-    document.getElementById(p+'Page').classList.add('active'); 
-    if(p==='main') startReminderTimer(); 
-    else clearTimeout(mainScreenReminderTimer); 
-    
-    if(p==='settings'){
-        document.getElementById('set_name').value=state.settings.workerName||"";
-        document.getElementById('set_phone').value=state.settings.workerPhone||"";
-        document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
-        document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
-        document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
-        document.getElementById('set_esc_name').value=state.settings.escalationName||"";
-        document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";
-        document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";
-        document.getElementById('set_pin').value=state.settings.pinCode||"";
-        document.getElementById('set_duress').value=state.settings.duressPin||"";
-        document.getElementById('set_url').value=state.settings.googleSheetUrl||"";
-    }
-}
-function saveSettings(){ 
-    state.settings.workerName=document.getElementById('set_name').value; 
-    state.settings.workerPhone=document.getElementById('set_phone').value; 
-    state.settings.emergencyName=document.getElementById('set_emg_name').value;
-    state.settings.emergencyPhone=document.getElementById('set_emg_phone').value;
-    state.settings.emergencyEmail=document.getElementById('set_emg_email').value;
-    state.settings.escalationName=document.getElementById('set_esc_name').value;
-    state.settings.escalationPhone=document.getElementById('set_esc_phone').value;
-    state.settings.escalationEmail=document.getElementById('set_esc_email').value;
-    state.settings.pinCode=document.getElementById('set_pin').value; 
-    state.settings.duressPin=document.getElementById('set_duress').value; 
-    saveState(); navigate('main'); document.getElementById('btnCloseSettings').style.display='block'; forceSync(); 
-}
-function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
-
-// LOCATION UI
+// ==================== LOCATIONS UI ====================
 function renderLocations(){
     const l=document.getElementById('locationList'); l.innerHTML='';
     state.locations.forEach(loc=>{
@@ -325,48 +321,53 @@ function renderLocations(){
         l.appendChild(div);
     });
 }
+
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
     
-    // CUSTOM TRAVEL INFO
     if(id === 'travel') {
         showModal('info');
         document.getElementById('infoTitle').innerText = "Travelling Mode";
         document.getElementById('siteInfoContent').innerHTML = `
             <div class="space-y-3">
-                <div class="bg-blue-900/50 p-3 rounded border border-blue-500">
-                    <strong>📡 GPS Tracking Active</strong><br>
-                    Your location is sent every 5 minutes.
-                </div>
-                <div class="bg-yellow-900/50 p-3 rounded border border-yellow-500">
-                    <strong>⚠️ DO NOT LOCK SCREEN</strong><br>
-                    Pressing the power button stops GPS.
-                </div>
-                <div class="bg-gray-700 p-3 rounded">
-                    <strong>🔋 Save Battery:</strong><br>
-                    Use the Moon Icon (🌙) to darken the screen without locking.
-                </div>
-            </div>
-        `;
+                <div class="bg-blue-900/50 p-3 rounded border border-blue-500"><strong>📡 GPS Tracking Active</strong><br>Your location is sent every 5 minutes.</div>
+                <div class="bg-yellow-900/50 p-3 rounded border border-yellow-500"><strong>⚠️ DO NOT LOCK SCREEN</strong><br>Pressing the power button stops GPS.</div>
+                <div class="bg-gray-700 p-3 rounded"><strong>🔋 Save Battery:</strong><br>Use the Moon Icon (🌙) to darken the screen without locking.</div>
+            </div>`;
         document.getElementById('btnSiteCall').classList.add('hidden');
         document.getElementById('btnSiteEmail').classList.add('hidden');
         return;
     }
 
-    const l = state.locations.find(x => x.id === id); if(!l) return;
-    showModal('info'); document.getElementById('infoTitle').innerText = l.name;
-    let html = ""; if(l.address) html += `<p><strong>Address:</strong><br>${l.address}</p>`; if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`; if(l.notes) html += `<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;
+    const l = state.locations.find(x => x.id === id);
+    if(!l) return;
+    
+    showModal('info'); 
+    document.getElementById('infoTitle').innerText = l.name;
+    
+    let html = "";
+    if(l.address) html += `<p><strong>Address:</strong><br>${l.address}</p>`;
+    if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
+    if(l.notes) html += `<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;
+    
     document.getElementById('siteInfoContent').innerHTML = html;
+    
     const btnCall = document.getElementById('btnSiteCall');
     const btnEmail = document.getElementById('btnSiteEmail');
+    
     if(l.contactPhone) { btnCall.href = `tel:${l.contactPhone}`; btnCall.classList.remove('hidden'); } else btnCall.classList.add('hidden');
     if(l.contactEmail) { btnEmail.href = `mailto:${l.contactEmail}`; btnEmail.classList.remove('hidden'); } else btnEmail.classList.add('hidden');
 }
+
 function deleteLoc() { 
     const id = document.getElementById('locId').value;
     if(id === 'travel') return alert("Cannot delete Travelling tile.");
-    if(id.startsWith('site_')) return alert("Managed sites cannot be deleted.");
-    if(confirm('Delete location?')) { state.locations = state.locations.filter(l => l.id !== id); if(state.selectedLocationId === id) state.selectedLocationId = null; saveState(); renderLocations(); closeModal('location'); }
+    if(id.startsWith('site_')) return alert("This location is managed by the administrator and cannot be deleted.");
+    if(confirm('Delete location?')) {
+        state.locations = state.locations.filter(l => l.id !== id);
+        if(state.selectedLocationId === id) state.selectedLocationId = null;
+        saveState(); renderLocations(); closeModal('location');
+    }
 }
 function saveLoc() {
     const id = document.getElementById('locId').value;
@@ -397,7 +398,9 @@ function getGpsAddress() {
     }, (err) => { alert("GPS Error: " + err.message); btn.innerText = "📍 GPS"; btn.disabled = false; }, { timeout: 10000, enableHighAccuracy: true });
 }
 function openLocModal(id=null, e=null) { 
-    if(e)e.stopPropagation(); showModal('location'); const btnDel = document.getElementById('btnDelLoc');
+    if(e)e.stopPropagation(); 
+    showModal('location'); 
+    const btnDel = document.getElementById('btnDelLoc');
     if(id){ 
         if(id==='travel' || id.startsWith('site_')) btnDel.classList.add('hidden'); else btnDel.classList.remove('hidden');
         const l=state.locations.find(x=>x.id===id); 
@@ -432,7 +435,6 @@ function tick(){
     const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
     
-    // v41.2 FIX: Restore "Due:" Time display
     if(state.activeVisit.anticipatedDepartureTime) {
         document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
@@ -448,58 +450,19 @@ function tick(){
     }
     if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin();
 }
-
 function preDepart(){ 
     isMidVisitUpdate = false; 
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     loadFormAndShow(l.templateName||"(Standard)"); 
 }
-
 function loadFormAndShow(tpl){ 
     showModal('report'); 
     document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
     buildReportForm(tpl, document.getElementById('reportFields')); 
-    
-    const btn = document.getElementById('btnSubmitRep'); 
-    const newBtn = btn.cloneNode(true); 
-    btn.parentNode.replaceChild(newBtn, btn);
-    
-    if(isMidVisitUpdate) { 
-        newBtn.innerText="Send Update"; 
-        newBtn.classList.remove('long-press-btn'); 
-        newBtn.onclick=submitReport; 
-    } else { 
-        newBtn.innerText="HOLD TO SUBMIT & END"; 
-        newBtn.classList.add('long-press-btn'); 
-        setupLongPress(newBtn, submitReport); 
-    }
+    const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
+    if(isMidVisitUpdate) { newBtn.innerText="Send Update"; newBtn.classList.remove('long-press-btn'); newBtn.onclick=submitReport; } else { newBtn.innerText="HOLD TO SUBMIT & END"; newBtn.classList.add('long-press-btn'); setupLongPress(newBtn, submitReport); }
 }
-
-function submitReport(){ 
-    const data = gatherFormData();
-    if(isMidVisitUpdate) { 
-        processUploadQueue(buildPayload({...data, "Alarm Status":"ON SITE"})); 
-        alert("Update Sent"); 
-        isMidVisitUpdate = false; 
-        closeModal('report'); 
-        return; 
-    } 
-    
-    processUploadQueue(buildPayload({...data, "Alarm Status":"DEPARTED"})); 
-    if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
-    
-    state.activeVisit=null; 
-    state.photoStore={};
-    state.visitDurationMinutes = 0;
-    isMidVisitUpdate = false;
-    
-    saveState(); 
-    closeModal('report'); 
-    navigate('main'); 
-    playSound('depart'); 
-    if(travellingInterval) clearInterval(travellingInterval); 
-}
-
+function submitReport(){ const data = gatherFormData(); if(isMidVisitUpdate) { processUploadQueue(buildPayload({...data, "Alarm Status":"ON SITE"})); alert("Update Sent"); closeModal('report'); return; } processUploadQueue(buildPayload({...data, "Alarm Status":"DEPARTED"})); if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); state.activeVisit=null; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); }
 function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const sn = document.getElementById('rep_notes'); if(sn) data.notes = sn.value; document.querySelectorAll('[data-key]').forEach(el => { const k = el.getAttribute('data-key'); let v = el.value; if(el.type === 'checkbox') v = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; v = el.value; } data.custom[k] = v; data.jsonPayload[k] = v; }); const c = document.getElementById('sig-canvas'); if(c) data.sig = c.toDataURL('image/png'); return data; }
 function handlePhoto(input, key){ if(input.files[0]){ const btn=input.previousElementSibling; btn.innerText="Compressing..."; compressImg(input.files[0]).then(b64=>{ state.photoStore[key]=b64; btn.innerText="Photo Saved ✅"; }); } }
 function compressImg(f){ return new Promise(r=>{ const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'), s=Math.min(1024/i.width,1024/i.height,1); c.width=i.width*s; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.6)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
