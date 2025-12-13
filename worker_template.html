@@ -49,7 +49,21 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="app-container" class="relative h-full w-full">
 
-<div id="mainPage" class="page active">
+<div id="settingsPage" class="page active z-50 bg-gray-800">
+    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2 hidden">×</button></div>
+    <div class="content-area pb-24">
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div>
+        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
+        <div class="setting-card"><label class="setting-label lbl-blue">Your Details</label><input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)"><input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"></div>
+        <div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div>
+        <div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div>
+        <div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div>
+        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
+    </div>
+    <div class="footer-bar"><button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Save & Sync</button></div>
+</div>
+
+<div id="mainPage" class="page">
     <div class="header-bar">
         <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
         <div class="flex gap-2"><button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button><button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button></div>
@@ -101,20 +115,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
     <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
-</div>
-
-<div id="settingsPage" class="page z-50 bg-gray-800">
-    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
-    <div class="content-area pb-24">
-        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div>
-        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
-        <div class="setting-card"><label class="setting-label lbl-blue">Your Details</label><input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)"><input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"></div>
-        <div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div>
-        <div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div>
-        <div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div>
-        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
-    </div>
-    <div class="footer-bar"><button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Save & Sync</button></div>
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
@@ -248,6 +248,14 @@ function forceSync(){
         return JSON.parse(txt);
     })
     .then(data=>{
+        // SECURITY CHECK
+        if(data.status === "error" && data.message.includes("ACCESS DENIED")) {
+            alert("⛔ ACCESS DENIED\n\nYour name is not on the authorized Staff list.\nPlease contact your administrator.");
+            navigate('settings');
+            document.getElementById('uploadBanner').classList.add('hidden');
+            return;
+        }
+
         const managedSites = data.sites.map(s=>({
             id: 'site_' + s.siteName.replace(/\s/g,''),
             name: s.siteName,
@@ -269,7 +277,6 @@ function forceSync(){
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         
-        // v44.0 FIX: FORCE RE-INJECT TRAVEL REPORT
         if(CONFIG.mileage) {
             state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         }
@@ -520,12 +527,7 @@ function triggerPanic() {
     alert('🚨 SOS SENT 🚨\n\nEmergency contacts have been notified.\nLocation broadcast active.');
 }
 function iamSafe() { withPinVerification(false, () => { playSound('safe'); processUploadQueue(buildPayload({ "Alarm Status": 'SAFE - MANUALLY CLEARED', "Notes": "Worker confirmed safe" })); state.activeVisit.isPanic = false; preDepart(true); }); }
-function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); const list = document.getElementById('templateList'); list.innerHTML = ''; const l = state.locations.find(x => x.id === state.activeVisit.locationId); const defaultName = l.templateName || "Standard Visit Note"; 
-    // v48.0 FIX: Clarify context
-    let title = l.name;
-    if (l.id === 'travel') title = "Travelling";
-    document.getElementById('modalMenuTitle').innerText = "Add Note: " + title;
-    list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName)); if (state.globalForms && state.globalForms.length > 0) state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name))); else list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>'; }
+function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); const list = document.getElementById('templateList'); list.innerHTML = ''; const l = state.locations.find(x => x.id === state.activeVisit.locationId); const defaultName = l.templateName || "Standard Visit Note"; list.appendChild(createTemplateBtn(`📍 ${defaultName}`, defaultName)); if (state.globalForms && state.globalForms.length > 0) state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name))); else list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>'; }
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
