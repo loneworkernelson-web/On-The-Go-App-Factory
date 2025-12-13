@@ -1,5 +1,5 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v56.0 (Golden Era Restoration)
+ * OTG APPSUITE - MASTER BACKEND v57.0 (Golden Edition Candidate)
  */
 
 const CONFIG = {
@@ -79,7 +79,7 @@ function doGet(e) {
     const data=sh.getDataRange().getValues();
     const headers=data.shift();
     const rows=data.map(r=>{ let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
-    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString() })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
   if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
   return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
@@ -101,13 +101,16 @@ function doPost(e) {
       sheet.appendRow(headers); sheet.setFrozenRows(1);
     }
     
-    // RESTORED GOLDEN ERA ASSET SAVING
+    // ASSET SAVING
     const assets = {};
+    const assetIds = {}; // Store IDs for embedding
     ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(key => {
-        if(p[key] && p[key].length > 200) { // Valid base64 check
+        if(p[key] && p[key].length > 200) {
              const safeWorker = (p['Worker Name'] || 'Worker').replace(/[^a-z0-9]/gi, '_');
              const suffix = key === 'Signature' ? 'png' : 'jpg';
-             assets[key] = saveImageToDrive(p[key], `${safeWorker}_${key.replace(' ', '')}_${Date.now()}.${suffix}`);
+             const result = saveImageToDrive(p[key], `${safeWorker}_${key.replace(' ', '')}_${Date.now()}.${suffix}`);
+             assets[key] = result.url;
+             assetIds[key] = result.id;
         } else { assets[key] = ""; }
     });
 
@@ -153,7 +156,8 @@ function doPost(e) {
         sheet.appendRow(row);
     }
     
-    if (p['Template Name']) processFormEmail(p, assets);
+    // PASS ASSET IDS TO EMAILER
+    if (p['Template Name']) processFormEmail(p, assetIds);
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -161,7 +165,7 @@ function doPost(e) {
   finally { lock.releaseLock(); }
 }
 
-function processFormEmail(p, assets) {
+function processFormEmail(p, assetIds) {
     try {
         const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
         const data = sh.getDataRange().getValues();
@@ -186,8 +190,13 @@ function processFormEmail(p, assets) {
             html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold;">${key}</td><td style="padding: 8px;">${val}</td></tr>`;
         }
         html += `</table><br>`;
-        if (assets['Photo 1']) html += `<p><strong>Photo 1:</strong> <a href="${assets['Photo 1']}">View Image</a></p>`;
-        if (assets['Signature']) html += `<p><strong>Signature:</strong> <a href="${assets['Signature']}">View Signature</a></p>`;
+        
+        // v57.0 FIX: EMBED IMAGES
+        // Uses Drive Thumbnail URL: https://drive.google.com/thumbnail?id={ID}&sz=w800
+        if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`;
+        
         html += `</div>`;
         MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html });
     } catch(e) { console.log("Email Error: " + e); }
@@ -195,42 +204,41 @@ function processFormEmail(p, assets) {
 
 function saveImageToDrive(base64String, filename) {
     try {
-        // ROBUST DECODER
-        const parts = base64String.split(',');
-        const data = parts.length > 1 ? parts[1] : parts[0]; 
-        const blob = Utilities.newBlob(Utilities.base64Decode(data), 'image/jpeg', filename);
+        const base64Clean = base64String.split(',').pop();
+        const data = Utilities.base64Decode(base64Clean);
+        const blob = Utilities.newBlob(data, 'image/jpeg', filename); 
         let folder;
         if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) {
              try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(e){ folder = DriveApp.getRootFolder(); }
         } else { folder = DriveApp.getRootFolder(); }
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        return file.getUrl();
-    } catch(e) { return "Error Saving: " + e.message; }
+        // v57.0 Return Object with URL and ID
+        return { url: file.getUrl(), id: file.getId() };
+    } catch(e) { return { url: "", id: "" }; }
 }
 
-function checkOverdueVisits() { /* ...Same as previous... */ }
-function parseQuestions(row) { /* ...Same as previous... */ 
-     const questions = [];
-     for(let i=4; i<row.length; i++) {
-         const val = row[i];
-         if(val && val !== "") {
-             let type='check', text=val;
-             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); }
-             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
-             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
-             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
-             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
-             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
-             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
-             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
-             questions.push({type, text});
-         }
-     }
-     return questions;
+// ... (Rest of helpers same as v56.0) ...
+function checkOverdueVisits() {
+  PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString());
+  const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return;
+  const lastRow = sheet.getLastRow(); if (lastRow <= 1) return;
+  const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
+  const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i]; const status = row[10]; const dueTimeStr = row[20];
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
+    const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue;
+    const timeOverdue = now - dueTime;
+    if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) {
+          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(i + 2, 11).setValue(newStatus);
+          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] });
+    } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(i + 2, 11).setValue("OVERDUE"); }
+  }
 }
-function setupReportTemplate() { /* ...Same as previous... */ }
-function sendAlert(data) { /* ...Same as previous... */ }
-function smartScribe(text) { /* ...Same as previous... */ }
-function archiveOldData() { /* ...Same as previous... */ }
-function runAllLongitudinalReports() { /* ...Same as previous... */ }
+function parseQuestions(row) { const questions = []; for(let i=4; i<row.length; i++) { const val = row[i]; if(val && val !== "") { let type='check', text=val; if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); } else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); } else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); } else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); } else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); } else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); } else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); } else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); } questions.push({type, text}); } } return questions; }
+function setupReportTemplate() { try { const doc = DocumentApp.create(`${CONFIG.ORG_NAME} Master Report Template`); const body = doc.getBody(); body.appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1); body.appendParagraph("VISIT REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING2); const cells = [["Worker:", "{{WorkerName}}"], ["Location:", "{{LocationName}}"], ["Date:", "{{Date}}"], ["Status:", "{{AlarmStatus}}"]]; cells.forEach(r => body.appendParagraph(`${r[0]} ${r[1]}`)); body.appendHorizontalRule(); body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{Notes}}"); body.appendHorizontalRule(); body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{VisitReportData}}"); body.appendHorizontalRule(); body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4); body.appendParagraph("{{Signature}}"); doc.saveAndClose(); PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID', doc.getId()); return "SUCCESS: Template Created. ID: " + doc.getId(); } catch(e) { return "ERROR: " + e.toString(); } }
+function sendAlert(data) { let recipients = [Session.getEffectiveUser().getEmail()]; let smsNumbers = []; if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); } recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status']; const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`; if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`; smsNumbers.forEach(phone => { const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), muteHttpExceptions: true }); } catch(e) {} }); }
+function smartScribe(text) { if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text; try { const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`; const payload = { "contents": [{ "parts": [{ "text": "Correct grammar to NZ English: " + text }] }] }; const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true }); return JSON.parse(response.getContentText()).candidates[0].content.parts[0].text.trim(); } catch (e) { return text; } }
+function archiveOldData() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); let archive = ss.getSheetByName('Archive'); if (!archive) archive = ss.insertSheet('Archive'); const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = []; for (let i = 1; i < data.length; i++) { const date = new Date(data[i][0]); const diff = (today - date) / (1000 * 60 * 60 * 24); if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) { rowsToArchive.push(data[i]); } else { rowsToKeep.push(data[i]); } } if (rowsToArchive.length > 0) { if (archive.getLastRow() === 0) archive.appendRow(data[0]); archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive); sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep); } }
+function runAllLongitudinalReports() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if (!sheet) return; const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM"); const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`; let reportFile; const files = DriveApp.getFilesByName(name); if (files.hasNext()) reportFile = files.next(); else reportFile = DriveApp.getFileById(SpreadsheetApp.create(name).getId()); const reportSS = SpreadsheetApp.open(reportFile); let sheetAct = reportSS.getSheetByName('Worker Activity'); if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity'); sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Avg Duration"]); sheetAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dbeafe"); const stats = {}; for (let i = 1; i < data.length; i++) { const worker = data[i][2]; const status = data[i][10]; if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 }; stats[worker].visits++; if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++; } const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]); if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 4).setValues(actRows); let sheetTrav = reportSS.getSheetByName('Travel Stats'); if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats'); sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]); sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7"); const tStats = {}; for (let i = 1; i < data.length; i++) { const worker = data[i][2]; const dist = parseFloat(data[i][18]) || 0; if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 }; if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; } } const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]); if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows); MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); }
