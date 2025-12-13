@@ -1,161 +1,256 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>%%ORG_NAME%% Monitor</title>
-<link rel="icon" href="%%LOGO_URL%%"> 
+<link rel="icon" href="%%LOGO_URL%%">
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-body{font-family:'Inter',sans-serif}
-@keyframes flash-red{0%,100%{background:#7f1d1d}50%{background:#ef4444}}
-@keyframes flash-purple{0%,100%{background:#581c87}50%{background:#a855f7}}
-.flashing-alert{animation:flash-red 1s infinite}
-.flashing-duress{animation:flash-purple 1s infinite}
-.dot-online { background-color: #4ade80; animation: pulse-green 2s infinite; }
-.dot-offline { background-color: #ef4444; }
-.dot-connecting { background-color: #eab308; }
-.long-press-btn { position: relative; overflow: hidden; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(0,0,0,0.2); transition: width 1.5s linear; }
-.long-press-btn.pressing::after { width: 100%; }
-#mapContainer { height: 100%; width: 100%; background: #0f172a; }
+  body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+  .card { background-color: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; transition: all 0.2s; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+  .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; }
+  .blink { animation: blinker 1.5s linear infinite; }
+  @keyframes blinker { 50% { opacity: 0; } }
+  /* Status Colors */
+  .st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; }
+  .st-warn { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
+  .st-danger { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 1s linear infinite; }
+  .st-offline { background-color: #64748b; }
+  .st-travel { background-color: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
 </style>
 </head>
-<body class="bg-gray-900 text-white h-full flex flex-col overflow-hidden" onclick="unlockAudio()">
+<body class="p-6">
 
-<div id="setupPage" class="h-full flex items-center justify-center p-4 z-50 bg-gray-900 absolute inset-0">
-  <div class="text-center space-y-6 max-w-md w-full bg-gray-800 p-10 rounded-2xl shadow-2xl border border-gray-700">
-    <div><img src="%%LOGO_URL%%" class="h-20 mx-auto mb-4 object-contain"><h1 class="text-3xl font-extrabold text-blue-400">Security Login</h1></div>
-    <input type="password" id="secretKeyInput" class="w-full bg-gray-900 p-4 rounded-xl text-white border border-gray-600 text-center tracking-widest text-xl" placeholder="Enter Key">
-    <button onclick="login()" class="w-full bg-blue-600 p-4 rounded-xl font-bold">Connect</button>
-  </div>
-</div>
-
-<div id="dashboardPage" class="hidden h-full flex flex-col">
-  <div id="audioWarning" class="hidden bg-red-600 text-white font-bold text-center py-2 uppercase cursor-pointer hover:bg-red-500 animate-pulse z-50">🔇 Audio Suspended - Click Here to Enable 🔇</div>
-  <div id="disconnectBanner" class="hidden bg-purple-900 text-purple-200 font-bold text-center py-2 border-b border-purple-500 z-50 animate-pulse">⚠️ CONNECTION LOST (Check Internet)</div>
-  <div id="serverFaultBanner" class="hidden bg-orange-600 text-white font-bold text-center py-2 border-b border-orange-400 z-50 animate-pulse">⚠️ SERVER FAULT: Watchdog Trigger Stopped (Check Google Script)</div>
-
-  <header class="bg-gray-800 p-4 shadow-xl flex justify-between items-center z-20 border-b border-gray-700">
-    <div class="flex items-center gap-3"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain"><div><h1 class="text-xl font-bold text-white">%%ORG_NAME%%</h1><span class="text-xs text-blue-400 font-mono">LIVE MONITOR</span></div></div>
+  <header class="flex justify-between items-center mb-8">
     <div class="flex items-center gap-4">
-      <div class="flex bg-gray-700 rounded-lg p-1"><button onclick="setView('grid')" id="btnViewGrid" class="px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold">Grid</button><button onclick="setView('map')" id="btnViewMap" class="px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold">Map</button></div>
-      <button onclick="toggleNotifications()" id="btnNotify" class="text-gray-500 hover:text-white text-xs uppercase border border-gray-600 px-2 py-1 rounded">Enable Alerts</button>
-      <div class="flex items-center gap-3 bg-gray-900 px-4 py-2 rounded-full border border-gray-700"><div id="connectionDot" class="w-3 h-3 rounded-full dot-connecting"></div><div class="text-right flex flex-col justify-center"><div id="clock" class="text-xs font-bold font-mono text-gray-300">00:00:00</div><div id="lastUpd" class="text-[10px] text-gray-500 leading-none font-mono">Init...</div></div></div>
-      <button onclick="logout()" class="text-gray-400 hover:text-white text-sm font-bold uppercase">Logout</button>
+      <img src="%%LOGO_URL%%" class="w-12 h-12 rounded bg-white object-contain p-1">
+      <div>
+        <h1 class="text-3xl font-extrabold tracking-tight">%%ORG_NAME%%</h1>
+        <div class="flex items-center gap-2 text-sm text-gray-400">
+           <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
+           <span class="text-gray-600">|</span>
+           <span>Last Update: <span id="lastUpdate" class="text-white font-mono">--:--:--</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-4">
+        <div class="text-right">
+            <div class="text-2xl font-bold" id="activeCount">0</div>
+            <div class="text-xs text-gray-400 uppercase">Active</div>
+        </div>
+        <div class="text-right">
+            <div class="text-2xl font-bold text-red-500" id="alertCount">0</div>
+            <div class="text-xs text-gray-400 uppercase">Alerts</div>
+        </div>
     </div>
   </header>
-  
-  <div id="dbWarning" class="hidden bg-yellow-600 text-white px-4 py-2 text-center text-sm font-bold cursor-pointer hover:bg-yellow-500" onclick="alert('Sheet > 2500 rows. Run Archive.')">⚠️ Database Large</div>
-  
-  <div class="bg-gray-900 border-b border-gray-800"><details class="group"><summary class="p-2 text-xs text-gray-500 cursor-pointer hover:text-gray-300 bg-gray-800/50 select-none flex justify-between px-4"><span>EVENT LOG</span><span>▼</span></summary><div id="logPanel" class="h-32 overflow-y-auto p-2 font-mono text-xs space-y-1 bg-black/20"></div></details></div>
 
-  <div class="relative flex-1 overflow-hidden">
-      <main id="workerList" class="absolute inset-0 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto pb-32"></main>
-      <div id="mapView" class="absolute inset-0 z-10 hidden"><div id="mapContainer"></div></div>
+  <div class="flex gap-4 mb-6">
+    <input type="text" id="searchBox" placeholder="Search workers..." class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm w-64 focus:outline-none focus:border-blue-500" onkeyup="renderGrid()">
+    <select id="filterStatus" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500" onchange="renderGrid()">
+        <option value="ALL">All Status</option>
+        <option value="ACTIVE">Active (On Site/Travel)</option>
+        <option value="ALERT">Alerts Only</option>
+        <option value="OFFLINE">Offline</option>
+    </select>
   </div>
-</div>
 
-<div id="alertOverlay" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center p-8 bg-red-900/95 text-white">
-  <div class="bg-red-950 p-12 rounded-3xl shadow-2xl text-center max-w-2xl w-full border-4 border-red-500 animate-pulse">
-      <h2 class="text-9xl mb-4">🚨</h2><h2 class="text-6xl font-black uppercase tracking-tighter mb-8">EMERGENCY</h2>
-      <div id="alertDetails" class="text-2xl font-mono text-red-200 mb-12 space-y-2"></div>
-      <button id="btnSilence" class="long-press-btn w-full bg-white text-red-900 font-black py-6 px-12 rounded-xl text-2xl shadow-2xl">HOLD TO ACKNOWLEDGE</button>
+  <div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+     </div>
+  
+  <div id="emptyState" class="hidden text-center py-20 text-gray-500">
+      <p class="text-xl">No workers found matching criteria.</p>
   </div>
-</div>
-
-<div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full border border-gray-600">
-        <h2 class="text-2xl font-bold text-white mb-2">Resolve Incident</h2>
-        <p class="text-gray-400 text-sm mb-6">Type name exactly to verify safety:</p>
-        <div id="resolveNameTarget" class="bg-gray-900 p-4 rounded border border-gray-700 text-center text-xl font-mono font-bold text-blue-400 mb-4 select-all"></div>
-        <input id="resolveInput" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-center font-bold" placeholder="Type Name Here">
-        <input id="resolveReason" class="w-full bg-gray-700 p-3 rounded text-white border border-gray-500 mb-4 text-sm" placeholder="Reason / Action Taken">
-        <div class="flex gap-3"><button onclick="closeResolve()" class="flex-1 py-3 bg-gray-600 rounded font-bold">Cancel</button><button onclick="confirmResolve()" class="flex-1 py-3 bg-green-600 rounded font-bold">DECLARE SAFE</button></div>
-    </div>
-</div>
 
 <script>
-const URL="%%SHEET_URL%%"; let SECRET="", pollInt, alarm, lastState={}, acknowledgedList=new Set(), activeWorkerToResolve=null, map, markers={}, currentView='grid', audioHeartbeat, failedPollCount=0;
+const SCRIPT_URL = "%%SHEET_URL%%";
+let workerData = [];
+let lastFetch = 0;
 
-function login(){ const k=document.getElementById('secretKeyInput').value; if(k){ SECRET=k; localStorage.setItem('otg_monitor_key', k); startSession(); }}
-async function startSession(){ document.getElementById('setupPage').classList.add('hidden'); document.getElementById('dashboardPage').classList.remove('hidden'); document.getElementById('dashboardPage').classList.add('flex'); try{await Tone.start();}catch(e){} initMap(); fetchData(); pollInt=setInterval(fetchData,10000); setInterval(updateClock,1000); audioHeartbeat=setInterval(checkAudioStatus,2000); setupLongPress(document.getElementById('btnSilence'), silenceAlarm); }
-window.onload=()=>{const s=localStorage.getItem('otg_monitor_key');if(s)document.getElementById('secretKeyInput').value=s;};
-function logout(){ clearInterval(pollInt); clearInterval(audioHeartbeat); localStorage.removeItem('otg_monitor_key'); location.reload(); }
+// Poll every 10 seconds
+setInterval(fetchData, 10000);
+// Update 'Time Ago' every second
+setInterval(updateTimeAgo, 1000);
 
-function setView(mode){ currentView=mode; document.getElementById('workerList').classList.toggle('hidden', mode==='map'); document.getElementById('mapView').classList.toggle('hidden', mode!=='map'); document.getElementById('btnViewGrid').className = mode==='grid'?"px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold":"px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold"; document.getElementById('btnViewMap').className = mode==='map'?"px-3 py-1 rounded bg-gray-600 text-white text-xs font-bold":"px-3 py-1 rounded text-gray-400 hover:text-white text-xs font-bold"; if(mode==='map'&&map)map.invalidateSize(); }
-function checkAudioStatus(){ document.getElementById('audioWarning').classList.toggle('hidden', Tone.context.state !== 'suspended'); }
-async function unlockAudio(){ if(Tone.context.state!=='running'){ await Tone.start(); checkAudioStatus(); }}
+window.onload = fetchData;
 
-function initMap(){ map=L.map('mapContainer').setView([-41.2,174.0],5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map); }
-function updateMapMarker(w){
-    if(!map)return; const name=w['Worker Name'], status=w['Alarm Status'];
-    if(status==='DEPARTED'||status==='COMPLETED'||status.includes('SAFE - MONITOR')){ if(markers[name]){map.removeLayer(markers[name]);delete markers[name];} return; }
-    if(!w['Last Known GPS']||!w['Last Known GPS'].includes(','))return;
-    const [lat,lon]=w['Last Known GPS'].split(',').map(parseFloat);
-    let color='#4ade80'; if(status==='OVERDUE')color='#f59e0b'; if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/))color='#ef4444'; if(status==='TRAVELLING')color='#60a5fa';
-    const icon=L.divIcon({className:'custom-pin',html:`<div style="background-color:${color};width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.5);animation:${status.match(/EMERGENCY|DURESS/)?'pulse-red 1s infinite':'none'}"></div>`,iconSize:[16,16]});
-    if(markers[name]){markers[name].setLatLng([lat,lon]);markers[name].setIcon(icon);markers[name].setPopupContent(buildMapPopup(w));} else {const m=L.marker([lat,lon],{icon:icon}).addTo(map);m.bindPopup(buildMapPopup(w));markers[name]=m;}
-}
-function buildMapPopup(w){ return `<strong>${w['Worker Name']}</strong><br>${w['Alarm Status']}<br>🔋 ${w['Battery Level']||'?'}`; }
-
-function fetchData(){
-  const s=document.createElement('script'), cb='cb_'+Date.now(); document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-connecting";
-  window[cb]=(resp)=>{ delete window[cb]; document.body.removeChild(s); if(resp.status==='error'){ handleFetchError(resp.message); return; } failedPollCount=0; document.getElementById('disconnectBanner').classList.add('hidden'); 
-  // WATCHDOG CHECK
-  if(resp.watchdog_last_run){ const last=new Date(resp.watchdog_last_run); const diff=(new Date()-last)/60000; document.getElementById('serverFaultBanner').classList.toggle('hidden', diff<15); } 
-  if((resp.workers||[]).length>2500) document.getElementById('dbWarning').classList.remove('hidden'); document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-online"; document.getElementById('lastUpd').innerText="Upd: "+new Date().toLocaleTimeString(); processAndRender(resp.workers||[]); };
-  s.src=URL+'?callback='+cb+'&key='+encodeURIComponent(SECRET); s.onerror=()=>handleFetchError("Network"); document.body.appendChild(s);
-}
-function handleFetchError(msg){ document.getElementById('connectionDot').className="w-3 h-3 rounded-full dot-offline"; document.getElementById('lastUpd').innerText="Conn Failed"; failedPollCount++; if(failedPollCount>=3){document.getElementById('disconnectBanner').classList.remove('hidden'); try{if(Tone.context.state==='running'){const s=new Tone.Synth().toDestination();s.triggerAttackRelease("C2","8n");}}catch(e){}} if(msg==='Invalid Key'){alert('Invalid Key');logout();} }
-
-function processAndRender(workersArray){
-  const list=document.getElementById('workerList'), workers={};
-  workersArray.forEach(row=>{ if(row['Worker Name']) workers[row['Worker Name']]=row; }); 
-  let anyCritical=false;
-  Object.values(workers).forEach(w=>{
-      const name=w['Worker Name'], status=w['Alarm Status'];
-      let overdueMins=0; if(w['Anticipated Departure Time']){const d=new Date(w['Anticipated Departure Time']);if(!isNaN(d))overdueMins=Math.floor((new Date()-d)/60000);}
-      const localCrit=(status==='OVERDUE'&&overdueMins>15), isCrit=status.match(/EMERGENCY|DURESS|MISSED|ESCALATION|ALERT/)||localCrit;
-      updateMapMarker(w);
-      if(lastState[name]!==status){ if(isCrit)acknowledgedList.delete(name); addLogEntry(`${name}: ${status}`, isCrit?"alert":"info"); } lastState[name]=status;
-      if(isCrit){ anyCritical=true; if(!acknowledgedList.has(name)) playAlarm(w,localCrit); }
-  });
-  if(!anyCritical){ stopAlarmSound(); acknowledgedList.clear(); }
-  list.innerHTML='';
-  const sorted=Object.values(workers).filter(w=>!['DEPARTED','COMPLETED'].includes(w['Alarm Status'])).sort((a,b)=>getPriorityScore(b['Alarm Status'])-getPriorityScore(a['Alarm Status']));
-  if(sorted.length===0){ list.innerHTML=`<div class="col-span-full flex flex-col items-center justify-center h-64 text-gray-600"><div class="text-6xl mb-4">☕</div><div class="text-xl">No Active Visits</div></div>`; return; }
-  sorted.forEach(w=>{
-    const status=w['Alarm Status'], name=w['Worker Name'];
-    let overdueMins=0; if(w['Anticipated Departure Time']){const d=new Date(w['Anticipated Departure Time']);if(!isNaN(d))overdueMins=Math.floor((new Date()-d)/60000);}
-    const localCrit=(status==='OVERDUE'&&overdueMins>15);
-    let cls="bg-gray-800 border-l-4 border-blue-500", stCls="text-blue-400", btn="";
-    if(status.match(/EMERGENCY|DURESS|ALERT|MISSED/)||localCrit){ cls=status.includes('DURESS')?"bg-purple-900 border-l-8 border-purple-500 animate-pulse":"bg-red-900 border-l-8 border-red-500 animate-pulse"; stCls="text-white font-black bg-red-600 px-2 rounded"; btn=`<button onclick="initiateResolve('${name.replace(/'/g,"\\'")}')" class="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg relative z-10 pointer-events-auto">✅ RESOLVE INCIDENT</button>`; }
-    else if(status==='OVERDUE'){ cls="bg-amber-900 border-l-8 border-amber-500"; stCls="text-white font-bold bg-amber-600 px-2 rounded"; }
-    else if(status==='TRAVELLING'){ cls="bg-indigo-900/40 border-l-4 border-indigo-500"; stCls="text-indigo-300"; }
-    let dueHtml=overdueMins>0?`<div class="mt-2 text-xs ${overdueMins>15?"bg-red-900/80 text-red-200 animate-pulse":"bg-amber-900/80 text-amber-200"} px-2 py-1 rounded inline-block font-bold font-mono">⚠️ Overdue ${overdueMins}m</div>`:`<div class="mt-2 text-xs bg-green-900/50 text-green-300 px-2 py-1 rounded inline-block font-mono">⏱️ ${Math.abs(overdueMins)}m remaining</div>`;
-    const div=document.createElement('div'); div.className=`rounded-xl shadow-lg p-5 flex flex-col justify-between ${cls} transition-all hover:scale-[1.02] relative cursor-pointer`; div.onclick=(e)=>{if(e.target.tagName!=='BUTTON'&&e.target.id!=='resolveInput')focusWorker(w);};
-    div.innerHTML=`<div><div class="flex justify-between items-start mb-2"><h3 class="text-2xl font-bold text-white truncate">${name}</h3></div><div class="text-gray-300 text-sm mb-1 truncate">📍 ${w['Location Name']||'Unknown'}</div><div class="flex items-center justify-between bg-black/20 p-3 rounded-lg"><span class="${stCls} uppercase text-sm font-bold tracking-wider">${localCrit?'EMERGENCY (OVERDUE)':status}</span><span class="text-xs font-mono">🔋 ${w['Battery Level']||'?'}</span></div>${dueHtml}</div><div class="mt-2 pointer-events-auto">${btn}</div>`;
-    list.appendChild(div);
-  });
+function fetchData() {
+    // JSONP Implementation to bypass CORS
+    const script = document.createElement('script');
+    const cbName = 'cb_' + Date.now();
+    window[cbName] = function(data) {
+        handleData(data);
+        document.body.removeChild(script);
+        delete window[cbName];
+    };
+    // Append callback parameter to URL
+    script.src = `${SCRIPT_URL}?callback=${cbName}&t=${Date.now()}`;
+    document.body.appendChild(script);
 }
 
-function focusWorker(w){ if(!w['Last Known GPS'])return; setView('map'); const[lat,lon]=w['Last Known GPS'].split(',').map(parseFloat); map.setView([lat,lon],16); if(markers[w['Worker Name']])markers[w['Worker Name']].openPopup(); }
-function getPriorityScore(s){if(s.includes('DURESS'))return 4;if(s.includes('EMERGENCY')||s.includes('ALERT'))return 3;if(s==='OVERDUE')return 2;return 1;}
-async function playAlarm(w, locOvd){ const ov=document.getElementById('alertOverlay'); ov.classList.remove('hidden'); ov.className=w['Alarm Status'].includes('DURESS')?'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-duress text-white':'fixed inset-0 z-50 flex flex-col items-center justify-center p-8 flashing-alert text-white'; document.getElementById('alertDetails').innerHTML=`<div class="text-4xl font-bold">${w['Worker Name']}</div><div class="text-xl opacity-75 mt-2">${w['Location Name']}</div>`; document.getElementById('btnSilence').dataset.worker=w['Worker Name']; if(Tone.context.state!=='running')await Tone.start(); if(Tone.context.state==='suspended')await Tone.context.resume(); alarm=new Tone.Oscillator(440,"square").toDestination().start(); new Tone.LFO("2n",400,800).start().connect(alarm.frequency); }
-function silenceAlarm(){ const n=document.getElementById('btnSilence').dataset.worker; acknowledgedList.add(n); document.getElementById('alertOverlay').classList.add('hidden'); stopAlarmSound(); }
-function stopAlarmSound(){ if(alarm){alarm.stop();alarm.dispose();alarm=null;} }
-function initiateResolve(n){ activeWorkerToResolve=n; document.getElementById('resolveNameTarget').innerText=n; document.getElementById('resolveInput').value=""; document.getElementById('resolveReason').value=""; document.getElementById('resolveModal').classList.remove('hidden'); }
-function closeResolve(){ document.getElementById('resolveModal').classList.add('hidden'); activeWorkerToResolve=null; }
-function confirmResolve(){ const v=document.getElementById('resolveInput').value.trim(); if(v!==activeWorkerToResolve){alert("Name mismatch");return;} const r=document.getElementById('resolveReason').value||"Cleared by Monitor"; const p=new URLSearchParams(); p.append('Worker Name',activeWorkerToResolve); p.append('Alarm Status','SAFE - MONITOR CLEARED'); p.append('Notes',`[RESOLUTION: ${r}]`); p.append('key',SECRET); fetch(URL,{method:'POST',body:p,mode:'no-cors'}).then(()=>{alert("Resolved"); closeResolve(); stopAlarmSound(); lastState[activeWorkerToResolve]='SAFE'; acknowledgedList.add(activeWorkerToResolve);}); }
-function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=btn.onmouseleave=()=>{clearTimeout(t);btn.classList.remove('pressing')}; }
-function toggleNotifications(){ Notification.requestPermission().then(p=>{if(p==='granted')document.getElementById('btnNotify').innerText="Alerts Active ✅"}); }
-function updateClock(){ document.getElementById('clock').innerText=new Date().toLocaleTimeString(); }
-function addLogEntry(m,t="info"){ const p=document.createElement('div'); p.className=`border-b border-gray-800 pb-1 ${t==='alert'?'text-red-400 font-bold':t==='success'?'text-green-400':'text-gray-400'}`; p.innerText=`[${new Date().toLocaleTimeString()}] ${m}`; document.getElementById('logPanel').prepend(p); }
+function handleData(response) {
+    const statusEl = document.getElementById('serverStatus');
+    
+    // v52.0 FIX: Handle JSON "Online" status properly
+    if (response && (response.workers || response.status === 'online')) {
+        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';
+        statusEl.classList.remove('text-red-400');
+        statusEl.classList.add('text-green-400');
+    } else {
+        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Error';
+        statusEl.classList.add('text-red-400');
+    }
+
+    if (response.workers) {
+        workerData = processWorkers(response.workers);
+        document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
+        lastFetch = Date.now();
+        renderGrid();
+    }
+}
+
+function processWorkers(rows) {
+    // Group by worker name, take latest entry
+    const workers = {};
+    rows.forEach(r => {
+        const name = r['Worker Name'];
+        if (!name) return;
+        // Spreadsheet columns mapping
+        const timestamp = new Date(r['Timestamp']).getTime();
+        
+        // Only keep if newer
+        if (!workers[name] || timestamp > workers[name].timestamp) {
+            workers[name] = {
+                name: name,
+                status: r['Alarm Status'],
+                phone: r['Worker Phone Number'],
+                notes: r['Notes'],
+                location: r['Location Name'] || r['Location Address'] || "Unknown",
+                gps: r['Last Known GPS'],
+                battery: r['Battery Level'],
+                timestamp: timestamp,
+                rawTime: r['Timestamp']
+            };
+        }
+    });
+    return Object.values(workers);
+}
+
+function renderGrid() {
+    const grid = document.getElementById('workerGrid');
+    const search = document.getElementById('searchBox').value.toLowerCase();
+    const filter = document.getElementById('filterStatus').value;
+    
+    grid.innerHTML = '';
+    let activeC = 0;
+    let alertC = 0;
+    let visibleC = 0;
+
+    // Sort: Alerts first, then Active, then Offline
+    workerData.sort((a,b) => getScore(b) - getScore(a));
+
+    workerData.forEach(w => {
+        // Counters
+        if(isAlert(w.status)) alertC++;
+        if(isActive(w.status)) activeC++;
+
+        // Filtering
+        if (search && !w.name.toLowerCase().includes(search)) return;
+        if (filter === 'ACTIVE' && !isActive(w.status)) return;
+        if (filter === 'ALERT' && !isAlert(w.status)) return;
+        if (filter === 'OFFLINE' && isActive(w.status)) return;
+
+        visibleC++;
+        
+        // Color Logic
+        let statusColor = "st-offline";
+        let statusText = "Offline";
+        let borderClass = "border-gray-700";
+        
+        if (isAlert(w.status)) {
+            statusColor = "st-danger"; 
+            statusText = w.status;
+            borderClass = "border-red-500 border-2";
+        } else if (w.status === 'TRAVELLING') {
+            statusColor = "st-travel";
+            statusText = "Travelling";
+            borderClass = "border-blue-500";
+        } else if (w.status === 'ON SITE') {
+            statusColor = "st-warn"; // Amber
+            statusText = "On Site";
+            borderClass = "border-yellow-500";
+        } else if (w.status === 'DEPARTED' || w.status === 'SAFE - MANUALLY CLEARED') {
+            statusColor = "st-ok";
+            statusText = "Safe / Departed";
+        }
+
+        const timeAgo = Math.floor((Date.now() - w.timestamp) / 60000);
+        let timeBadge = `${timeAgo}m ago`;
+        if (timeAgo > 60) timeBadge = `${Math.floor(timeAgo/60)}h ago`;
+
+        const card = document.createElement('div');
+        card.className = `card p-5 ${borderClass}`;
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-3">
+                <h3 class="font-bold text-xl text-white truncate">${w.name}</h3>
+                <div class="${statusColor} status-dot mt-2"></div>
+            </div>
+            <div class="space-y-2 text-sm text-gray-300">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Status</span>
+                    <span class="font-bold text-white">${statusText}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Location</span>
+                    <span class="truncate flex-1" title="${w.location}">${w.location}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Last Seen</span>
+                    <span>${timeBadge}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Battery</span>
+                    <span class="${getBatColor(w.battery)}">${w.battery || 'N/A'}</span>
+                </div>
+            </div>
+            
+            ${w.notes ? `<div class="mt-4 p-2 bg-gray-800 rounded text-xs italic text-gray-400 border-l-2 border-gray-600">"${w.notes}"</div>` : ''}
+
+            <div class="mt-4 pt-4 border-t border-gray-700 flex gap-2">
+                <a href="https://www.google.com/maps/search/?api=1&query=${w.gps}" target="_blank" class="flex-1 bg-blue-900 hover:bg-blue-800 text-blue-200 text-center py-2 rounded text-xs font-bold transition">📍 Map</a>
+                <a href="tel:${w.phone}" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold transition">📞 Call</a>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    document.getElementById('activeCount').innerText = activeC;
+    document.getElementById('alertCount').innerText = alertC;
+    document.getElementById('emptyState').classList.toggle('hidden', visibleC > 0);
+}
+
+// Helpers
+function isAlert(s) { return s && (s.includes('EMERGENCY') || s.includes('OVERDUE') || s.includes('PANIC') || s.includes('DURESS')); }
+function isActive(s) { return s === 'ON SITE' || s === 'TRAVELLING' || isAlert(s); }
+function getScore(w) {
+    if (isAlert(w.status)) return 1000 + w.timestamp;
+    if (w.status === 'TRAVELLING') return 500 + w.timestamp;
+    if (w.status === 'ON SITE') return 400 + w.timestamp;
+    return w.timestamp;
+}
+function getBatColor(b) {
+    if(!b) return 'text-gray-500';
+    const val = parseInt(b);
+    if(val < 20) return 'text-red-500 font-bold blink';
+    if(val < 50) return 'text-yellow-500';
+    return 'text-green-500';
+}
+function updateTimeAgo() {
+    if(Date.now() - lastFetch > 60000) fetchData(); // Force fetch if stale
+}
 </script>
 </body>
 </html>
