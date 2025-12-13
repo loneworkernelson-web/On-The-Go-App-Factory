@@ -129,10 +129,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a>
             <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a>
         </div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-center mb-2 hidden">🗺️ Navigate to Site</a>
+        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-center mb-2 hidden shadow-lg transform active:scale-95 transition">🗺️ Navigate to Site</a>
         
         <button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button>
     </div>
+
     <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend Visit</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
     <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric"><div class="mt-6 flex justify-end space-x-3"><button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
     <div id="templateModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="modalMenuTitle" class="text-xl font-bold mb-4 text-white">Select Report Type</h2><div id="templateList" class="space-y-3 overflow-y-auto max-h-64"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold text-white">Cancel</button></div>
@@ -189,7 +190,7 @@ let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, trave
 let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
 let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
-// ==================== CORE FUNCTIONS ====================
+// ==================== CORE FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
 function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));document.getElementById('locationModal').classList.add('hidden');}
 
@@ -266,7 +267,6 @@ function forceSync(){
     if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
     
-    // v58.0: Send Device ID
     const dId = getDeviceID();
     
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
@@ -344,7 +344,7 @@ function showSiteInfo(id, e) {
     let html = "";
     if(l.address) {
         html += `<p><strong>Address:</strong><br>${l.address}</p>`;
-        // v58.0 FIX: Navigate Button
+        // v59.0 FIX: Correct Google Maps Universal Link
         const btnNav = document.getElementById('btnSiteNav');
         btnNav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.address)}`;
         btnNav.classList.remove('hidden');
