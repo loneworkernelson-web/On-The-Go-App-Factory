@@ -164,16 +164,8 @@ const CONFIG = {
 const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
 // ==================== STATE MANAGEMENT ====================
-let state = { 
-    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
-    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
-    photoStore: {}, lowBatSent: false 
-};
-
-// Globals
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
-let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
-let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
+let state = { settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false };
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer, deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
 // ==================== CORE FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
@@ -186,7 +178,6 @@ function navigate(p){
     else clearTimeout(mainScreenReminderTimer); 
     
     if(p==='settings'){
-        // RE-POPULATE FIELDS
         document.getElementById('set_name').value=state.settings.workerName||"";
         document.getElementById('set_phone').value=state.settings.workerPhone||"";
         document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
@@ -198,12 +189,10 @@ function navigate(p){
         document.getElementById('set_pin').value=state.settings.pinCode||"";
         document.getElementById('set_duress').value=state.settings.duressPin||"";
         
-        // Fallback if URL injection failed
         if(!document.getElementById('set_url').value || document.getElementById('set_url').value.includes("%%")) {
              document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
         }
 
-        // UNLOCK LOGIC: Show Close button ONLY if data is present
         if(state.settings.workerName && state.settings.pinCode) {
             document.getElementById('btnCloseSettings').classList.remove('hidden');
         } else {
@@ -227,7 +216,6 @@ function saveSettings(){
     state.settings.googleSheetUrl = CONFIG.url;
     
     if(!state.settings.workerName || !state.settings.pinCode) return alert("Name and PIN required.");
-    
     saveState(); 
     navigate('main'); 
     forceSync(); 
@@ -248,7 +236,6 @@ function forceSync(){
         return JSON.parse(txt);
     })
     .then(data=>{
-        // SECURITY CHECK
         if(data.status === "error" && data.message.includes("ACCESS DENIED")) {
             alert("⛔ ACCESS DENIED\n\nYour name is not on the authorized Staff list.\nPlease contact your administrator.");
             navigate('settings');
@@ -277,7 +264,6 @@ function forceSync(){
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         
-        // v44.0 FIX: FORCE RE-INJECT TRAVEL REPORT
         if(CONFIG.mileage) {
             state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         }
@@ -293,7 +279,6 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
-    // Initial Load Logic
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
         state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
     }
@@ -349,7 +334,6 @@ function showSiteInfo(id, e) {
     if(l.contactEmail) { btnEmail.href = `mailto:${l.contactEmail}`; btnEmail.classList.remove('hidden'); }
 }
 
-// v55.0 HELPER: Click handler for the locked screen
 function showCurrentSiteInfo() {
     if(state.activeVisit) showSiteInfo(state.activeVisit.locationId);
 }
@@ -497,13 +481,13 @@ function submitReport(){
 
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
     
-    // v55.0 FIX: Robust Image Mapping
-    const photoKeys = Object.keys(state.photoStore);
-    photoKeys.forEach((key, idx) => {
-        // Ensure "Photo 1", "Photo 2" are set. 
-        // Backend keys are 1-based index: "Photo 1"
-        finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key];
-    });
+    // v56.0 FIX: SEQUENTIAL PACKING (GOLDEN ERA LOGIC)
+    const images = Object.values(state.photoStore);
+    if(images[0]) finalData['Photo 1'] = images[0];
+    if(images[1]) finalData['Photo 2'] = images[1];
+    if(images[2]) finalData['Photo 3'] = images[2];
+    if(images[3]) finalData['Photo 4'] = images[3];
+    
     if(d.sig) finalData["Signature"] = d.sig;
 
     if(isMidVisitUpdate) { 
