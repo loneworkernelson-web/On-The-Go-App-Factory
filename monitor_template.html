@@ -16,10 +16,9 @@
   @keyframes blinker { 50% { opacity: 0; } }
   /* Status Colors */
   .st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; }
-  .st-warn { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
-  .st-danger { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 1s linear infinite; }
+  .st-amber { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: blinker 2s linear infinite; }
+  .st-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 0.8s linear infinite; }
   .st-offline { background-color: #64748b; }
-  .st-travel { background-color: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
 </style>
 </head>
 <body class="p-6">
@@ -38,8 +37,8 @@
     </div>
     <div class="flex gap-4">
         <div class="text-right">
-            <div class="text-2xl font-bold" id="activeCount">0</div>
-            <div class="text-xs text-gray-400 uppercase">Active</div>
+            <div class="text-2xl font-bold text-green-400" id="activeCount">0</div>
+            <div class="text-xs text-gray-400 uppercase">Safe</div>
         </div>
         <div class="text-right">
             <div class="text-2xl font-bold text-red-500" id="alertCount">0</div>
@@ -48,91 +47,65 @@
     </div>
   </header>
 
-  <div class="flex gap-4 mb-6">
-    <input type="text" id="searchBox" placeholder="Search workers..." class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm w-64 focus:outline-none focus:border-blue-500" onkeyup="renderGrid()">
-    <select id="filterStatus" class="bg-gray-800 border border-gray-600 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500" onchange="renderGrid()">
-        <option value="ALL">All Status</option>
-        <option value="ACTIVE">Active (On Site/Travel)</option>
-        <option value="ALERT">Alerts Only</option>
-        <option value="OFFLINE">Offline</option>
-    </select>
-  </div>
-
-  <div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-     </div>
-  
-  <div id="emptyState" class="hidden text-center py-20 text-gray-500">
-      <p class="text-xl">No workers found matching criteria.</p>
-  </div>
+  <div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+  <div id="emptyState" class="hidden text-center py-20 text-gray-500">No active workers.</div>
 
 <script>
 const SCRIPT_URL = "%%SHEET_URL%%";
 let workerData = [];
-let lastFetch = 0;
+let escalationLimit = 15; // Default
 
-// Poll every 10 seconds
 setInterval(fetchData, 10000);
-// Update 'Time Ago' every second
-setInterval(updateTimeAgo, 1000);
-
+setInterval(renderGrid, 1000); // Re-render local timers
 window.onload = fetchData;
 
 function fetchData() {
-    // JSONP Implementation to bypass CORS
     const script = document.createElement('script');
     const cbName = 'cb_' + Date.now();
     window[cbName] = function(data) {
+        if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit);
         handleData(data);
         document.body.removeChild(script);
         delete window[cbName];
     };
-    // Append callback parameter to URL
     script.src = `${SCRIPT_URL}?callback=${cbName}&t=${Date.now()}`;
     document.body.appendChild(script);
 }
 
 function handleData(response) {
     const statusEl = document.getElementById('serverStatus');
-    
-    // v52.0 FIX: Handle JSON "Online" status properly
     if (response && (response.workers || response.status === 'online')) {
         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';
-        statusEl.classList.remove('text-red-400');
-        statusEl.classList.add('text-green-400');
+        statusEl.classList.remove('text-red-400'); statusEl.classList.add('text-green-400');
     } else {
         statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Error';
         statusEl.classList.add('text-red-400');
     }
-
     if (response.workers) {
         workerData = processWorkers(response.workers);
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
-        lastFetch = Date.now();
         renderGrid();
     }
 }
 
 function processWorkers(rows) {
-    // Group by worker name, take latest entry
     const workers = {};
     rows.forEach(r => {
-        const name = r['Worker Name'];
-        if (!name) return;
-        // Spreadsheet columns mapping
+        const name = r['Worker Name']; if (!name) return;
         const timestamp = new Date(r['Timestamp']).getTime();
-        
-        // Only keep if newer
         if (!workers[name] || timestamp > workers[name].timestamp) {
             workers[name] = {
                 name: name,
                 status: r['Alarm Status'],
                 phone: r['Worker Phone Number'],
+                iceName: r['Emergency Contact Name'],
+                icePhone: r['Emergency Contact Number'],
                 notes: r['Notes'],
                 location: r['Location Name'] || r['Location Address'] || "Unknown",
                 gps: r['Last Known GPS'],
                 battery: r['Battery Level'],
-                timestamp: timestamp,
-                rawTime: r['Timestamp']
+                dueTime: r['Anticipated Departure Time'],
+                timestamp: timestamp
             };
         }
     });
@@ -141,115 +114,94 @@ function processWorkers(rows) {
 
 function renderGrid() {
     const grid = document.getElementById('workerGrid');
-    const search = document.getElementById('searchBox').value.toLowerCase();
-    const filter = document.getElementById('filterStatus').value;
-    
     grid.innerHTML = '';
-    let activeC = 0;
-    let alertC = 0;
-    let visibleC = 0;
+    let activeC = 0; let alertC = 0;
+    const now = Date.now();
 
-    // Sort: Alerts first, then Active, then Offline
-    workerData.sort((a,b) => getScore(b) - getScore(a));
+    // Sort: Red -> Amber -> Green -> Offline
+    workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now));
 
     workerData.forEach(w => {
-        // Counters
-        if(isAlert(w.status)) alertC++;
-        if(isActive(w.status)) activeC++;
+        let state = 'offline'; 
+        let cardBorder = 'border-gray-700';
+        let statusDot = 'st-offline';
+        let statusText = w.status;
 
-        // Filtering
-        if (search && !w.name.toLowerCase().includes(search)) return;
-        if (filter === 'ACTIVE' && !isActive(w.status)) return;
-        if (filter === 'ALERT' && !isAlert(w.status)) return;
-        if (filter === 'OFFLINE' && isActive(w.status)) return;
-
-        visibleC++;
-        
-        // Color Logic
-        let statusColor = "st-offline";
-        let statusText = "Offline";
-        let borderClass = "border-gray-700";
-        
-        if (isAlert(w.status)) {
-            statusColor = "st-danger"; 
-            statusText = w.status;
-            borderClass = "border-red-500 border-2";
-        } else if (w.status === 'TRAVELLING') {
-            statusColor = "st-travel";
-            statusText = "Travelling";
-            borderClass = "border-blue-500";
-        } else if (w.status === 'ON SITE') {
-            statusColor = "st-warn"; // Amber
-            statusText = "On Site";
-            borderClass = "border-yellow-500";
-        } else if (w.status === 'DEPARTED' || w.status === 'SAFE - MANUALLY CLEARED') {
-            statusColor = "st-ok";
-            statusText = "Safe / Departed";
+        // --- TRAFFIC LIGHT LOGIC ---
+        if (w.status === 'ON SITE' || w.status === 'TRAVELLING') {
+            const due = new Date(w.dueTime).getTime();
+            if (isNaN(due) || due > now) {
+                // Not Overdue = GREEN
+                state = 'green';
+                statusDot = 'st-ok';
+                cardBorder = 'border-green-600';
+                activeC++;
+            } else {
+                const minsOver = (now - due) / 60000;
+                if (minsOver < escalationLimit) {
+                    // Overdue but within buffer = AMBER
+                    state = 'amber';
+                    statusDot = 'st-amber';
+                    cardBorder = 'border-yellow-500 border-2';
+                    statusText = "OVERDUE (" + Math.floor(minsOver) + "m)";
+                    alertC++;
+                } else {
+                    // Way Overdue = RED
+                    state = 'red';
+                    statusDot = 'st-red';
+                    cardBorder = 'border-red-600 border-4';
+                    statusText = "CRITICAL OVERDUE";
+                    alertC++;
+                }
+            }
+        } else if (w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('DURESS')) {
+            // Panic = RED
+            state = 'red';
+            statusDot = 'st-red';
+            cardBorder = 'border-red-600 border-4';
+            alertC++;
         }
 
-        const timeAgo = Math.floor((Date.now() - w.timestamp) / 60000);
-        let timeBadge = `${timeAgo}m ago`;
-        if (timeAgo > 60) timeBadge = `${Math.floor(timeAgo/60)}h ago`;
-
         const card = document.createElement('div');
-        card.className = `card p-5 ${borderClass}`;
+        card.className = `card p-5 ${cardBorder}`;
         card.innerHTML = `
             <div class="flex justify-between items-start mb-3">
                 <h3 class="font-bold text-xl text-white truncate">${w.name}</h3>
-                <div class="${statusColor} status-dot mt-2"></div>
+                <div class="${statusDot} status-dot mt-2"></div>
             </div>
             <div class="space-y-2 text-sm text-gray-300">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Status</span>
-                    <span class="font-bold text-white">${statusText}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Location</span>
-                    <span class="truncate flex-1" title="${w.location}">${w.location}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Last Seen</span>
-                    <span>${timeBadge}</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold uppercase text-gray-500 w-16">Battery</span>
-                    <span class="${getBatColor(w.battery)}">${w.battery || 'N/A'}</span>
-                </div>
+                <div class="flex justify-between"><span class="text-gray-500 font-bold uppercase">Status</span><span class="font-bold text-white">${statusText}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 font-bold uppercase">Loc</span><span class="truncate w-32 text-right" title="${w.location}">${w.location}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 font-bold uppercase">Batt</span><span class="${getBatColor(w.battery)}">${w.battery || '--'}</span></div>
+                
+                ${w.iceName ? `<div class="mt-2 pt-2 border-t border-gray-700">
+                    <span class="text-xs text-red-400 font-bold uppercase">ICE Contact</span>
+                    <div class="flex justify-between text-xs"><span>${w.iceName}</span><a href="tel:${w.icePhone}" class="text-blue-400 hover:underline">${w.icePhone}</a></div>
+                </div>` : ''}
             </div>
-            
-            ${w.notes ? `<div class="mt-4 p-2 bg-gray-800 rounded text-xs italic text-gray-400 border-l-2 border-gray-600">"${w.notes}"</div>` : ''}
-
-            <div class="mt-4 pt-4 border-t border-gray-700 flex gap-2">
-                <a href="https://www.google.com/maps/search/?api=1&query=${w.gps}" target="_blank" class="flex-1 bg-blue-900 hover:bg-blue-800 text-blue-200 text-center py-2 rounded text-xs font-bold transition">📍 Map</a>
-                <a href="tel:${w.phone}" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold transition">📞 Call</a>
-            </div>
-        `;
+            <div class="mt-4 flex gap-2">
+                <a href="https://www.google.com/maps/search/?api=1&query=${w.gps}" target="_blank" class="flex-1 bg-blue-900 hover:bg-blue-800 text-blue-200 text-center py-2 rounded text-xs font-bold">📍 Map</a>
+                <a href="tel:${w.phone}" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold">📞 Call</a>
+            </div>`;
         grid.appendChild(card);
     });
 
     document.getElementById('activeCount').innerText = activeC;
     document.getElementById('alertCount').innerText = alertC;
-    document.getElementById('emptyState').classList.toggle('hidden', visibleC > 0);
+    document.getElementById('emptyState').classList.toggle('hidden', workerData.length > 0);
 }
 
-// Helpers
-function isAlert(s) { return s && (s.includes('EMERGENCY') || s.includes('OVERDUE') || s.includes('PANIC') || s.includes('DURESS')); }
-function isActive(s) { return s === 'ON SITE' || s === 'TRAVELLING' || isAlert(s); }
-function getScore(w) {
-    if (isAlert(w.status)) return 1000 + w.timestamp;
-    if (w.status === 'TRAVELLING') return 500 + w.timestamp;
-    if (w.status === 'ON SITE') return 400 + w.timestamp;
-    return w.timestamp;
+function getUrgencyScore(w, now) {
+    if (w.status.includes('EMERGENCY')) return 1000;
+    const due = new Date(w.dueTime).getTime();
+    if (!isNaN(due) && due < now) return 500 + (now - due); // Overdue score
+    if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100;
+    return 0;
 }
 function getBatColor(b) {
-    if(!b) return 'text-gray-500';
     const val = parseInt(b);
     if(val < 20) return 'text-red-500 font-bold blink';
-    if(val < 50) return 'text-yellow-500';
-    return 'text-green-500';
-}
-function updateTimeAgo() {
-    if(Date.now() - lastFetch > 60000) fetchData(); // Force fetch if stale
+    return val < 50 ? 'text-yellow-500' : 'text-green-500';
 }
 </script>
 </body>
