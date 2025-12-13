@@ -73,8 +73,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
         <div id="locationList" class="space-y-3 pb-4"></div>
         <div class="flex gap-3 mt-4">
-             <button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button>
              <button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button>
+             <button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button>
         </div>
     </div>
     <div class="footer-bar">
@@ -164,8 +164,16 @@ const CONFIG = {
 const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
 // ==================== STATE MANAGEMENT ====================
-let state = { settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], photoStore: {}, lowBatSent: false };
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval, tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer, deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
+let state = { 
+    settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
+    activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
+    photoStore: {}, lowBatSent: false 
+};
+
+// Globals
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
+let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
+let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = ""; 
 
 // ==================== CORE FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
@@ -178,6 +186,7 @@ function navigate(p){
     else clearTimeout(mainScreenReminderTimer); 
     
     if(p==='settings'){
+        // RE-POPULATE FIELDS
         document.getElementById('set_name').value=state.settings.workerName||"";
         document.getElementById('set_phone').value=state.settings.workerPhone||"";
         document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
@@ -189,10 +198,12 @@ function navigate(p){
         document.getElementById('set_pin').value=state.settings.pinCode||"";
         document.getElementById('set_duress').value=state.settings.duressPin||"";
         
+        // Fallback if URL injection failed
         if(!document.getElementById('set_url').value || document.getElementById('set_url').value.includes("%%")) {
              document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
         }
 
+        // UNLOCK LOGIC: Show Close button ONLY if data is present
         if(state.settings.workerName && state.settings.pinCode) {
             document.getElementById('btnCloseSettings').classList.remove('hidden');
         } else {
@@ -292,7 +303,8 @@ function renderLocations(){
         if(loc.id==='travel') cls = state.selectedLocationId===loc.id ? 'border-purple-500 bg-purple-900' : 'border-purple-900/30 bg-gray-900';
         div.className = `p-4 rounded-lg border-2 ${cls} cursor-pointer flex justify-between items-center mb-2`;
         let infoBtn = loc.notes || loc.contactName || loc.id==='travel' ? `<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : '';
-        div.innerHTML=`<div><div class="text-xs text-gray-500 font-bold uppercase">${loc.companyName||''}</div><div class="font-bold text-lg text-white">${loc.name}</div></div><div class="flex gap-2">${infoBtn}</div>`;
+        // v57.0 FIX: Typography hierarchy
+        div.innerHTML=`<div><div class="text-lg font-bold text-white uppercase">${loc.companyName||''}</div><div class="text-sm text-gray-400">${loc.name}</div></div><div class="flex gap-2">${infoBtn}</div>`;
         div.onclick=(e)=>{if(e.target.tagName!=='BUTTON'){state.selectedLocationId=loc.id; renderLocations(); updateArrivedButtonState();}};
         l.appendChild(div);
     });
@@ -301,7 +313,6 @@ function renderLocations(){
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
     
-    // v55.0 FIX: CLEAR OLD DATA
     document.getElementById('infoTitle').innerText = "";
     document.getElementById('siteInfoContent').innerHTML = "";
     document.getElementById('btnSiteCall').classList.add('hidden');
@@ -430,9 +441,7 @@ function enterLockedScreen(){
     setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); 
 }
 function tick(){
-    // v55.0 FIX: Prevent crash if visit ended
     if(!state.activeVisit) { clearInterval(timerInt); return; }
-
     const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
     const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
@@ -462,7 +471,7 @@ function preDepart(){
 function loadFormAndShow(tpl){ 
     showModal('report'); 
     document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
-    currentActiveTemplate = tpl; // SAVE FOR EMAIL
+    currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
     if(isMidVisitUpdate) { newBtn.innerText="Send Update"; newBtn.classList.remove('long-press-btn'); newBtn.onclick=submitReport; } else { newBtn.innerText="HOLD TO SUBMIT & END"; newBtn.classList.add('long-press-btn'); setupLongPress(newBtn, submitReport); }
@@ -474,20 +483,17 @@ function submitReport(){
     // v47.0 FIX: Data Mapping for Backend Compatibility
     const finalData = {
         ...d.custom,
-        // BACKEND REQUIRES "Visit Report Data" as a string
         "Visit Report Data": JSON.stringify(d.jsonPayload),
-        "Template Name": currentActiveTemplate // v48.0 FIX: Required for Email
+        "Template Name": currentActiveTemplate
     };
 
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
     
-    // v56.0 FIX: SEQUENTIAL PACKING (GOLDEN ERA LOGIC)
-    const images = Object.values(state.photoStore);
-    if(images[0]) finalData['Photo 1'] = images[0];
-    if(images[1]) finalData['Photo 2'] = images[1];
-    if(images[2]) finalData['Photo 3'] = images[2];
-    if(images[3]) finalData['Photo 4'] = images[3];
-    
+    // v51.0 FIX: Map Photos & Signature to Top-Level Keys
+    const photoKeys = Object.keys(state.photoStore);
+    photoKeys.forEach((key, idx) => {
+        finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key];
+    });
     if(d.sig) finalData["Signature"] = d.sig;
 
     if(isMidVisitUpdate) { 
