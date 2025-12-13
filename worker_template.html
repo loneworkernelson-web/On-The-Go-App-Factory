@@ -291,7 +291,7 @@ function forceSync(){
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         
-        // v61.0: Ensure "Standard Visit Note" always exists
+        // Ensure "Standard Visit Note" always exists
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
@@ -308,7 +308,7 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
-    // v61.0: Initial Load Fallback
+    // Initial Load Fallback
     if(!state.cachedForms["Standard Visit Note"]) state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
 }
@@ -402,8 +402,14 @@ function submitReport(){
     const d = gatherFormData();
     const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
-    const photoKeys = Object.keys(state.photoStore);
-    photoKeys.forEach((key, idx) => { finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key]; });
+    
+    // v62.0 FIX: SEQUENTIAL PACKING (RESTORED GOLDEN ERA LOGIC)
+    const images = Object.values(state.photoStore);
+    if(images[0]) finalData['Photo 1'] = images[0];
+    if(images[1]) finalData['Photo 2'] = images[1];
+    if(images[2]) finalData['Photo 3'] = images[2];
+    if(images[3]) finalData['Photo 4'] = images[3];
+    
     if(d.sig) finalData["Signature"] = d.sig;
 
     if(isMidVisitUpdate) { 
@@ -445,19 +451,15 @@ async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 
-// v61.0 FIX: Build Form Logic
+// v62.0: Build Form Logic (Safe)
 function buildReportForm(n,c){
     state.photoStore={};
-    // Clean name
     const safeName = n ? n.trim() : "Standard Visit Note";
-    
-    // Find template logic
     let t = null;
     if(state.globalForms) t = state.globalForms.find(f => f.name.trim() === safeName)?.questions;
     if(!t && state.cachedForms) t = state.cachedForms[safeName];
     if(!t) t = state.cachedForms["(Standard)"];
     
-    // FALLBACK IF NOTHING FOUND
     if(!t) {
         console.warn("Template not found:", safeName);
         t = [{type:'note', text:'Standard Check-in (Default)'}, {type:'text', text:'Notes'}];
