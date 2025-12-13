@@ -23,6 +23,8 @@
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
+    details > summary { list-style: none; outline: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4">
@@ -30,7 +32,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v67.2 (Modular Architecture)</p>
+      <p class="text-gray-400">Diamond Edition v67.4 (Full)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -67,14 +69,18 @@
              <h3 class="text-xl font-bold text-white mb-4">Safety & Fleet Options</h3>
              <div class="grid md:grid-cols-2 gap-6">
                  <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Mins)</label>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
                     <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold">
+                    <span class="text-xs text-gray-400 block mt-1">Time between "Overdue" and "Emergency".</span>
                  </div>
                  <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Check-in Interval (Mins)</label>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Check-in Interval</label>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="chkCheckin" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleCheckin()">
-                        <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold hidden">
+                        <div id="checkinOptions" class="hidden flex items-center gap-2">
+                            <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
+                            <span class="text-xs text-gray-400">mins</span>
+                        </div>
                     </div>
                  </div>
              </div>
@@ -89,14 +95,24 @@
                         <span>Frequency (Days):</span>
                         <input type="number" id="vehFreq" value="60" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold">
                     </div>
-                    <p class="text-xs text-yellow-500 italic">⚠️ Note: This feature is suitable for personally owned, or permanently assigned vehicles.</p>
+                    <p class="text-xs text-yellow-500 italic mb-1">⚠️ Note: This feature is suitable for personally owned, or permanently assigned vehicles.</p>
+                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (14 days prior).</p>
                 </div>
              </div>
              
              <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
-                 <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Textbelt Key</label><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For SMS"></div>
-                 <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService Key</label><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Mileage"></div>
-                 <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini AI Key</label><input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Smart Scribe"></div>
+                 <div>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Textbelt Key</label>
+                    <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For SMS Alerts">
+                 </div>
+                 <div>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini AI Key</label>
+                    <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Smart Scribe">
+                 </div>
+                 <div>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService Key</label>
+                    <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage">
+                 </div>
              </div>
           </div>
           <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
@@ -104,26 +120,61 @@
 
         <div id="step2" class="step-section space-y-8">
           <div class="text-center"><a href="https://sheets.new" target="_blank" class="btn btn-success text-xl px-10 py-4 shadow-lg transform hover:-translate-y-1">1. Click to Create New Google Sheet</a></div>
+          
           <div class="grid md:grid-cols-2 gap-6">
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
+                <p class="text-xs text-gray-400">Where all data is stored.</p>
+                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
+                    <li>Rename workbook to <strong>"Safety System"</strong>.</li>
+                    <li>Rename bottom tab to <strong>Visits</strong>.</li>
+                    <li>Paste Headers into <strong>A1</strong>.</li>
+                    <li><strong>View > Freeze > 1 Row</strong>.</li>
+                </ol>
                 <button id="btnCopyHeaders" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
             </div>
+
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
+                <p class="text-xs text-gray-400">Define your Forms & Reports here.</p>
+                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
+                    <li>Create tab named <strong>Templates</strong>.</li>
+                    <li>Paste Setup into <strong>A1</strong>.</li>
+                    <li><em class="text-yellow-400">Use 'FORM' for ad-hoc, 'REPORT' for checklists.</em></li>
+                </ol>
                 <button id="btnCopyTemplates" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Templates' Setup</button>
             </div>
+
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
+                <p class="text-xs text-gray-400">Allocate sites to workers.</p>
+                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
+                    <li>Create tab named <strong>Sites</strong>.</li>
+                    <li>Paste Setup into <strong>A1</strong>.</li>
+                    <li><strong class="text-green-300">Smart Sync:</strong> Enter worker names in Col A to assign sites to them automatically.</li>
+                </ol>
                 <button id="btnCopySites" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy 'Sites' Setup</button>
             </div>
+          
             <div class="bg-gray-900 p-6 rounded-lg border-2 border-red-600 space-y-4 relative overflow-hidden">
                 <div class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-2 py-1">SECURITY</div>
                 <h3 class="font-bold text-lg text-red-400">D. Setup 'Staff' Tab</h3>
-                <p class="text-xs text-gray-400">Gatekeeper + Device Lock + Vehicle Tracking</p>
-                <button id="btnCopyStaff" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy 'Staff' Setup</button>
+                <p class="text-xs text-gray-400"><strong>Required:</strong> Gatekeeper + Device Lock + Vehicle Tracking.</p>
+                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
+                    <li>Create tab named <strong>Staff</strong>.</li>
+                    <li>Paste into <strong>A1</strong>.</li>
+                    <li><em class="text-white">Includes 'DeviceID' column for fingerprinting.</em></li>
+                </ol>
+                <button id="btnCopyStaff" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy 'Staff' Setup + Guide</button>
             </div>
           </div>
+          
+          <div class="mt-4 bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
+                <h3 class="font-bold text-lg text-yellow-400">E. Setup 'AI Reporting' Tab (Optional)</h3>
+                <p class="text-xs text-gray-400">Recipes for creating reports with AI.</p>
+                <button id="btnCopyReportGuide" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy Reporting Guide</button>
+          </div>
+
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
 
@@ -139,10 +190,23 @@
                 <li>Delete existing code. <strong>Paste</strong> new code.</li>
                 <li>Click <strong>Deploy > New Deployment</strong>. Select <strong>Web App</strong>.</li>
                 <li><strong>IMPORTANT:</strong> Set "Who has access" to <strong>Anyone</strong>.</li>
+                <li>Click <strong>Deploy</strong>. Copy the URL.</li>
              </ol>
           </div>
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-4 rounded-lg mt-4">
+             <details class="group">
+                <summary class="flex items-center justify-between font-bold text-yellow-400 text-lg hover:text-yellow-300 cursor-pointer"><span>⚠️ Vital Step: Set Automation Triggers</span><span>▼</span></summary>
+                <div class="mt-4 text-gray-300 space-y-4 text-sm">
+                   <ol class="list-decimal pl-5 space-y-3">
+                      <li>Apps Script > <strong>Alarm Clock icon</strong> (Left sidebar).</li>
+                      <li>Add Trigger: <code>checkOverdueVisits</code> (Time-driven, Minutes, Every 10 mins).</li>
+                      <li>Add Trigger: <code>archiveOldData</code> (Time-driven, Weekly).</li>
+                   </ol>
+                </div>
+             </details>
+          </div>
           <div><label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()"></div>
-          <div class="flex justify-center gap-4"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button></div>
+          <div class="flex justify-center gap-4"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button><button id="btnGenTemplate" onclick="triggerTemplateSetup()" disabled class="hidden btn bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">🪄 Auto-Generate PDF Template</button></div>
           <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
           <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button></div>
         </div>
@@ -159,9 +223,21 @@
                 <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
                     <li>Go to <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/signup</a>.</li>
                     <li>Create a free account.</li>
-                    <li>Drag the <strong>WorkerApp</strong> folder to the drop zone.</li>
-                    <li>Drag the <strong>MonitorApp</strong> folder to the drop zone.</li>
+                    <li>Go to the <strong>"Sites"</strong> tab. Scroll to the "Drag and drop" box at the bottom.</li>
+                    <li>Drag the <strong>WorkerApp</strong> folder. Copy the URL (e.g. <code>calm-badger.netlify.app</code>).</li>
+                    <li>Drag the <strong>MonitorApp</strong> folder. Copy that URL.</li>
                 </ol>
+            </div>
+            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
+                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">♻️</span><div><h2 class="text-2xl font-bold text-white">2. Update Backend</h2></div></div>
+                 <div class="bg-yellow-900/20 border border-yellow-600 p-4 rounded text-sm text-yellow-200">Apps Script > Deploy > Manage deployments > Edit > <strong>Version: New version</strong> > Deploy.</div>
+            </div>
+            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">📱</span><div><h2 class="text-2xl font-bold text-white">3. Install</h2></div></div>
+                <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-300">
+                    <div class="bg-gray-800 p-4 rounded"><strong class="text-white block mb-2">iOS (Safari)</strong><ol class="list-decimal pl-5 space-y-1"><li>Open URL.</li><li>Tap Share (Box+Arrow).</li><li>"Add to Home Screen".</li></ol></div>
+                    <div class="bg-gray-800 p-4 rounded"><strong class="text-white block mb-2">Android (Chrome)</strong><ol class="list-decimal pl-5 space-y-1"><li>Open URL.</li><li>Tap Menu (3 dots).</li><li>"Install App".</li></ol></div>
+                </div>
             </div>
             <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
         </div>
@@ -187,15 +263,18 @@
     };
 
     function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
-    // Diamond Template: Includes Vehicle Check
+    
+    // v67.0: Diamond Template with Vehicle Check
     function copyTemplatesSetup() { navigator.clipboard.writeText("Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid"); alert("Copied 'Templates' Setup!"); }
+    
     function copySitesSetup() { navigator.clipboard.writeText("Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"); alert("Copied 'Sites' Setup!"); }
-    // Diamond Staff: Includes Vehicle Columns
+    
+    // v67.0: Diamond Staff (Gatekeeper + Vehicle Cols)
     function copyStaffSetup() { 
         const h = "Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry"; 
         const s1 = "John Doe\tDriver\tActive\t\t\t\t"; 
         const spacer = "\n".repeat(17); 
-        const instr = "INSTRUCTIONS (Do not delete):\n1. GATEKEEPER: Existence of this tab enables security.\n2. DEVICE LOCK: Auto-fills Col E on first sync.\n3. VEHICLE: Col F & G update automatically from Vehicle Checks.";
+        const instr = "INSTRUCTIONS (Do not delete):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.";
         navigator.clipboard.writeText(h + "\n" + s1 + spacer + instr); 
         alert("Copied 'Staff' Setup!"); 
     }
@@ -221,7 +300,7 @@
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([ fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.js') ]);
-        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files. Ensure they are in the same folder.");
+        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files.");
         tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
         generateScript();
       } catch(e) { alert("Error: " + e.message); }
@@ -253,18 +332,20 @@
             .then(res => res.json())
             .then(data => {
                 if(data.status === "success") {
-                  result.textContent = "✅ Success!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
+                  result.textContent = "✅ Connection Successful!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
                   btnNext.disabled = false; btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
                   document.getElementById('btnGenTemplate').classList.remove('hidden'); document.getElementById('btnGenTemplate').disabled = false;
                   document.getElementById('finalAppName').innerText = document.getElementById('orgName').value + " Safety";
                 } else { throw new Error("Invalid Key"); }
-            }).catch(() => { result.textContent = "❌ Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block"; });
+            }).catch(() => { result.textContent = "❌ Connection Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block"; });
     }
     
     function triggerTemplateSetup() {
         const url = document.getElementById('webAppUrl').value;
         const key = document.getElementById('secretKey').value;
-        fetch(url + '?run=setupTemplate&key=' + encodeURIComponent(key)).then(res => res.text()).then(txt => { alert(txt); }).catch(err => { alert("Failed: " + err); });
+        const btn = document.getElementById('btnGenTemplate');
+        btn.innerText = "⏳ Generating..."; btn.disabled = true;
+        fetch(url + '?run=setupTemplate&key=' + encodeURIComponent(key)).then(res => res.text()).then(txt => { alert(txt); btn.innerText = "✅ Done"; }).catch(err => { alert("Failed: " + err); btn.disabled = false; });
     }
     
     function downloadZip() {
@@ -273,7 +354,6 @@
         const org = document.getElementById('orgName').value;
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
-        
         let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org)
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
             .replace(/%%LOGO_DATA%%/g, logoData)
@@ -284,6 +364,7 @@
             .replace(/%%IS_ADVANCED%%/g, "true")
             .replace(/%%ENABLE_MILEAGE%%/g, "true")
             .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
+            // v67.0 Injections
             .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
             .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
             
@@ -296,19 +377,18 @@
         
         const mFolder = zip.folder("MonitorApp"); 
         mFolder.file("index.html", mHtml);
-        
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
     }
 
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(tab) { if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } } }
-    function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'block' : 'none'; document.getElementById('checkinMins').style.display = document.getElementById('chkCheckin').checked ? 'block' : 'none'; }
+    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } }
+    function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
     function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
     
     document.getElementById('btnCopyHeaders').onclick = copyVisitsHeaders;
     document.getElementById('btnCopyTemplates').onclick = copyTemplatesSetup;
     document.getElementById('btnCopySites').onclick = copySitesSetup;
-    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; 
+    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; // Diamond: Linked
     document.getElementById('btnCopyReportGuide').onclick = copyReportGuide;
     document.getElementById('btnCopyCode').onclick = copyScript;
   </script>
