@@ -53,6 +53,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     📡 OFFLINE MODE - Data queued for upload
 </div>
 
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">
+    ⚠️ Vehicle Check Overdue - Tap to Complete
+</div>
+
 <div id="settingsPage" class="page active z-50 bg-gray-800">
     <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2 hidden">×</button></div>
     <div class="content-area pb-24">
@@ -173,7 +177,9 @@ const CONFIG = {
     checkinInterval: %%CHECKIN_INTERVAL%%,
     escalationMinutes: %%ESCALATION_MINUTES%%, 
     key: "%%SECRET_KEY%%",
-    orsKey: "%%ORS_API_KEY%%"
+    orsKey: "%%ORS_API_KEY%%",
+    vehEnabled: %%VEHICLE_ENABLED%%,
+    vehInterval: %%VEHICLE_INTERVAL%%
 }; 
 const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 270, 300, 360, 420, 480, 540, 600, 660, 720];
 
@@ -181,19 +187,20 @@ const DURATION_MAP = [0, 10, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 24
 let state = { 
     settings: {}, locations: [], selectedLocationId: null, visitDurationMinutes: 0, 
     activeVisit: null, cachedForms: {}, pendingUploads: [], globalForms: [], 
-    photoStore: {}, lowBatSent: false 
+    photoStore: {}, lowBatSent: false, meta: {} 
 };
 
 // Globals
 let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
 let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
 let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = "100%"; 
-let calculatedDist = null; // v66.0
+let calculatedDist = null; 
 
-// ==================== CORE FUNCTIONS ====================
+// ==================== CORE FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
 function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));document.getElementById('locationModal').classList.add('hidden');}
 
+// OFFLINE LISTENER
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 function updateNetworkStatus() {
@@ -201,19 +208,27 @@ function updateNetworkStatus() {
     if (navigator.onLine) {
         banner.classList.add('hidden');
         if(state.pendingUploads && state.pendingUploads.length > 0) processUploadQueue();
-    } else { banner.classList.remove('hidden'); }
+    } else {
+        banner.classList.remove('hidden');
+    }
 }
 
+// UUID GENERATOR
 function getDeviceID() {
     let id = localStorage.getItem('device_uuid');
-    if(!id) { id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now(); localStorage.setItem('device_uuid', id); }
+    if(!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('device_uuid', id);
+    }
     return id;
 }
 
 function navigate(p){
     document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
     document.getElementById(p+'Page').classList.add('active'); 
-    if(p==='main') startReminderTimer(); else clearTimeout(mainScreenReminderTimer); 
+    if(p==='main') startReminderTimer(); 
+    else clearTimeout(mainScreenReminderTimer); 
+    
     if(p==='settings'){
         document.getElementById('set_name').value=state.settings.workerName||"";
         document.getElementById('set_phone').value=state.settings.workerPhone||"";
@@ -228,8 +243,11 @@ function navigate(p){
         if(!document.getElementById('set_url').value || document.getElementById('set_url').value.includes("%%")) {
              document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
         }
-        if(state.settings.workerName && state.settings.pinCode) document.getElementById('btnCloseSettings').classList.remove('hidden');
-        else document.getElementById('btnCloseSettings').classList.add('hidden');
+        if(state.settings.workerName && state.settings.pinCode) {
+            document.getElementById('btnCloseSettings').classList.remove('hidden');
+        } else {
+            document.getElementById('btnCloseSettings').classList.add('hidden');
+        }
     }
 }
 
@@ -255,6 +273,7 @@ function forceSync(){
     if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
     const dId = getDeviceID();
+    
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r=>r.text())
     .then(txt=>{
@@ -278,15 +297,57 @@ function forceSync(){
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
-        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
+        state.meta = data.meta || {}; // v67.2 Diamond Feature
+        
+        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
+             state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
+        }
         if(CONFIG.mileage) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
-        saveState(); renderLocations();
+        
+        saveState(); renderLocations(); checkVehicleStatus(); // v67.2
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete!");
     }).catch(e=>{ 
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Failed: " + e.message); 
     });
+}
+
+// v67.2 DIAMOND LOGIC
+function checkVehicleStatus() {
+    if(!CONFIG.vehEnabled) return;
+    const bar = document.getElementById('vehNagBar');
+    let show = false;
+    
+    // Check 1: Safety Check
+    if (state.meta.lastVehCheck) {
+        const last = new Date(state.meta.lastVehCheck);
+        const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
+        if(diffDays > CONFIG.vehInterval) {
+            show = true;
+            bar.innerText = "⚠️ Vehicle Check Overdue - Tap to Complete";
+        }
+    } else {
+        // Never done
+        show = true;
+        bar.innerText = "⚠️ Vehicle Check Required";
+    }
+
+    // Check 2: WOF Expiry
+    if (state.meta.wofExpiry) {
+        const wof = new Date(state.meta.wofExpiry);
+        const daysUntil = (wof.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        if(daysUntil < 14) {
+            show = true;
+            bar.innerText = `⚠️ WOF Due: ${wof.toLocaleDateString()} - Book Now!`;
+        }
+    }
+    
+    if(show) bar.classList.remove('hidden'); else bar.classList.add('hidden');
+}
+
+function startVehicleCheck() {
+    loadFormAndShow('Vehicle Safety Check');
 }
 
 function initLocations() { 
@@ -323,9 +384,11 @@ function showSiteInfo(id, e) {
         document.getElementById('siteInfoContent').innerHTML = `<div class="space-y-3"><div class="bg-blue-900/50 p-3 rounded border border-blue-500"><strong>📡 GPS Tracking Active</strong><br>Your location is sent every 5 minutes.</div><div class="bg-yellow-900/50 p-3 rounded border border-yellow-500"><strong>⚠️ DO NOT LOCK SCREEN</strong><br>Pressing the power button stops GPS.</div><div class="bg-gray-700 p-3 rounded"><strong>🔋 Save Battery:</strong><br>Use the Moon Icon (🌙) to darken the screen without locking.</div></div>`;
         return;
     }
+    
     const l = state.locations.find(x => x.id === id);
     showModal('info'); 
     if(!l) { document.getElementById('infoTitle').innerText = "Unknown Location"; return; }
+
     document.getElementById('infoTitle').innerText = l.name;
     let html = "";
     if(l.address) {
@@ -351,14 +414,13 @@ function startVisit(){
     const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
     if(sel.id==='travel') startTravellingPulse(); 
     const now=new Date(); 
-    // v65.0 CAPTURE START GPS (Implicitly)
     navigator.geolocation.getCurrentPosition(pos => {
         state.activeVisit={ 
             locationId:sel.id, 
             startTime:now, 
             anticipatedDepartureTime:new Date(now.getTime()+state.visitDurationMinutes*60000), 
             fiveMinWarned:false,
-            startGPS: `${pos.coords.latitude},${pos.coords.longitude}` // Saved!
+            startGPS: `${pos.coords.latitude},${pos.coords.longitude}` 
         }; 
         state.lowBatSent=false; 
         saveState(); 
@@ -370,21 +432,26 @@ function startVisit(){
 }
 
 function enterLockedScreen(){ const l=state.locations.find(x=>x.id===state.activeVisit.locationId); document.getElementById('lockedLocationName').innerText=l.name; navigate('locked'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); timerInt=setInterval(tick,1000); setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false)); setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); }
-function tick(){ if(!state.activeVisit) { clearInterval(timerInt); return; } const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date(); const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000); document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`; if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); } if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); } if(rem<0) { document.getElementById('countdownTimer').classList.add('text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); const minsOver = Math.floor(Math.abs(rem)/60000); if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); } } if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); }
+function tick(){
+    if(!state.activeVisit) { clearInterval(timerInt); return; }
+    const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
+    const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
+    document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
+    if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
+    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
+    if(rem<0) { document.getElementById('countdownTimer').classList.add('text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); const minsOver = Math.floor(Math.abs(rem)/60000); if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); } } if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); }
 
-// v66.0 SMART DEPART LOGIC
 function preDepart(){ 
     isMidVisitUpdate = false; 
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     const startGPS = state.activeVisit.startGPS;
     
-    // Show spinner if we need calculation
     if(startGPS && CONFIG.orsKey) {
         document.getElementById('btnDepart').innerText = "Calculating...";
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const endGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
             calculatedDist = await getDistance(startGPS, endGPS);
-            document.getElementById('btnDepart').innerText = "HOLD TO END"; // Reset
+            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
             loadFormAndShow(l.templateName||"(Standard)");
         });
     } else {
@@ -393,7 +460,6 @@ function preDepart(){
     }
 }
 
-// v66.0 DISTANCE CALC
 async function getDistance(p1, p2) {
     if(!p1 || !p2) return { km: 0, type: 'none' };
     if(CONFIG.orsKey) {
@@ -425,7 +491,6 @@ function loadFormAndShow(tpl){
     currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     
-    // v66.0 AUTO FILL DISTANCE
     if (calculatedDist) {
         const distInput = document.querySelector('[data-key*="Distance"]');
         if(distInput) distInput.value = calculatedDist.km;
@@ -456,7 +521,7 @@ function submitReport(){
     } 
     processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes})); 
     if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
-    state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); 
+    state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); checkVehicleStatus();
 }
 
 function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const sn = document.getElementById('rep_notes'); if(sn) data.notes = sn.value; document.querySelectorAll('[data-key]').forEach(el => { const k = el.getAttribute('data-key'); let v = el.value; if(el.type === 'checkbox') v = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; v = el.value; } data.custom[k] = v; data.jsonPayload[k] = v; }); const c = document.getElementById('sig-canvas'); if(c) data.sig = c.toDataURL('image/png'); return data; }
@@ -486,44 +551,7 @@ function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGl
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-
-// v62.0: Build Form Logic (Safe)
-function buildReportForm(n,c){
-    state.photoStore={};
-    const safeName = n ? n.trim() : "Standard Visit Note";
-    let t = null;
-    if(state.globalForms) t = state.globalForms.find(f => f.name.trim() === safeName)?.questions;
-    if(!t && state.cachedForms) t = state.cachedForms[safeName];
-    if(!t) t = state.cachedForms["(Standard)"];
-    
-    if(!t) {
-        console.warn("Template not found:", safeName);
-        t = [{type:'note', text:'Standard Check-in (Default)'}, {type:'text', text:'Notes'}];
-    }
-
-    c.innerHTML='';
-    if(t.length===0){
-        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
-    }else{
-        t.forEach((f,i)=>{
-            let y=f.type||'check',x=f.text||f;
-            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}}
-            let h='';
-            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
-            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
-            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
-            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
-            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
-            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
-            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
-            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
-            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
-            c.innerHTML+=h;
-        });
-    }
-    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
-}
-// INIT
+// INIT (v67.2)
 window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
@@ -531,6 +559,7 @@ window.addEventListener('load', () => {
     if(!state.globalForms) state.globalForms = [];
     if(!state.cachedForms) state.cachedForms = {};
     state.settings.googleSheetUrl = CONFIG.url; 
+    
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -543,19 +572,24 @@ window.addEventListener('load', () => {
             upd(); b.addEventListener('levelchange', upd);
         });
     }
+
     if(!state.settings.pinCode || !state.settings.workerName) { 
         navigate('settings'); 
         document.getElementById('btnCloseSettings').classList.add('hidden'); 
     } 
     else if(state.activeVisit) { enterLockedScreen(); } 
-    else { navigate('main'); renderLocations(); }
+    else { navigate('main'); renderLocations(); checkVehicleStatus(); } // Check on load
+
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
+
     initLocations();
     if(CONFIG.isAdv) syncForms(); 
+
     updateArrivedButtonState(); 
     processUploadQueue(); 
     document.body.addEventListener('click', initAudio, { once: true }); 
     startReminderTimer();
+    
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock(); });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
 });
