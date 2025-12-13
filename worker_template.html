@@ -187,7 +187,7 @@ let state = {
 // Globals
 let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
 let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
-let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = "100%"; // v60.0 FIX
+let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = "100%"; 
 
 // ==================== CORE FUNCTIONS (HOISTED) ====================
 function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
@@ -265,7 +265,6 @@ function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(stat
 function forceSync(){
     if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
-    
     const dId = getDeviceID();
     
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
@@ -291,7 +290,13 @@ function forceSync(){
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
+        
+        // v61.0: Ensure "Standard Visit Note" always exists
+        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
+             state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
+        }
         if(CONFIG.mileage) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
+        
         saveState(); renderLocations();
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete!");
@@ -303,6 +308,8 @@ function forceSync(){
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
+    // v61.0: Initial Load Fallback
+    if(!state.cachedForms["Standard Visit Note"]) state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
     if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
 }
 
@@ -322,8 +329,6 @@ function renderLocations(){
 
 function showSiteInfo(id, e) {
     if(e) e.stopPropagation();
-    
-    // v55.0 FIX: CLEAR OLD DATA
     document.getElementById('infoTitle').innerText = "";
     document.getElementById('siteInfoContent').innerHTML = "";
     document.getElementById('btnSiteCall').classList.add('hidden');
@@ -339,7 +344,6 @@ function showSiteInfo(id, e) {
     
     const l = state.locations.find(x => x.id === id);
     showModal('info'); 
-    
     if(!l) { document.getElementById('infoTitle').innerText = "Unknown Location"; return; }
 
     document.getElementById('infoTitle').innerText = l.name;
@@ -362,7 +366,6 @@ function showSiteInfo(id, e) {
 function showCurrentSiteInfo() { if(state.activeVisit) showSiteInfo(state.activeVisit.locationId); }
 
 function updateArrivedButtonState(){ const val=DURATION_MAP[document.getElementById('durationSlider').value]; document.getElementById('durationDisplay').innerText=val>=60?(Math.floor(val/60)+' hr '+(val%60)+' min'):val+' min'; state.visitDurationMinutes=val; const btn=document.getElementById('btnStart'); if(state.selectedLocationId && val>0){ btn.disabled=false; btn.innerText="HOLD TO START"; btn.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all"; setupLongPress(btn,startVisit); } else { btn.disabled=true; btn.innerText=state.selectedLocationId?"Set Time":"Select Location"; btn.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all"; }}
-
 function startVisit(){ 
     const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
     if(sel.id==='travel') startTravellingPulse(); 
@@ -372,24 +375,10 @@ function startVisit(){
     saveState(); 
     enterLockedScreen(); 
     playSound('arrive'); 
-    // v60.0 FIX: Retry Logic for Start Packet
-    const payload = buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"});
-    processUploadQueue(payload);
-    // Double tap: Send again in 5s if queue is stuck (Robust Start)
+    processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
     setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
 }
-
-function enterLockedScreen(){ 
-    const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
-    document.getElementById('lockedLocationName').innerText=l.name; 
-    navigate('locked'); 
-    document.getElementById('btnDepart').classList.remove('hidden'); 
-    document.getElementById('btnSafe').classList.add('hidden'); 
-    timerInt=setInterval(tick,1000); 
-    setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false)); 
-    setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); 
-}
-
+function enterLockedScreen(){ const l=state.locations.find(x=>x.id===state.activeVisit.locationId); document.getElementById('lockedLocationName').innerText=l.name; navigate('locked'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); timerInt=setInterval(tick,1000); setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false)); setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); }
 function tick(){
     if(!state.activeVisit) { clearInterval(timerInt); return; }
     const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
@@ -397,17 +386,7 @@ function tick(){
     document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
     if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
     if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
-    if(rem<0) { 
-        document.getElementById('countdownTimer').classList.add('text-red-500'); 
-        document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden');
-        setupLongPress(document.getElementById('btnSafe'), iamSafe);
-        const minsOver = Math.floor(Math.abs(rem)/60000);
-        if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); }
-        else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); }
-    }
-    if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin();
-}
-
+    if(rem<0) { document.getElementById('countdownTimer').classList.add('text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); const minsOver = Math.floor(Math.abs(rem)/60000); if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); } } if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); }
 function preDepart(){ isMidVisitUpdate = false; const l=state.locations.find(x=>x.id===state.activeVisit.locationId); loadFormAndShow(l.templateName||"(Standard)"); }
 
 function loadFormAndShow(tpl){ 
@@ -423,13 +402,8 @@ function submitReport(){
     const d = gatherFormData();
     const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
-    
-    // v60.0 FIX: Robust Image Mapping
     const photoKeys = Object.keys(state.photoStore);
-    photoKeys.forEach((key, idx) => {
-        // Map '0', '1' -> 'Photo 1', 'Photo 2'
-        finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key];
-    });
+    photoKeys.forEach((key, idx) => { finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key]; });
     if(d.sig) finalData["Signature"] = d.sig;
 
     if(isMidVisitUpdate) { 
@@ -438,7 +412,6 @@ function submitReport(){
         processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes})); 
         alert("Update Sent"); isMidVisitUpdate = false; closeModal('report'); return; 
     } 
-    
     processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes})); 
     if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
     state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); 
@@ -446,7 +419,6 @@ function submitReport(){
 
 function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const sn = document.getElementById('rep_notes'); if(sn) data.notes = sn.value; document.querySelectorAll('[data-key]').forEach(el => { const k = el.getAttribute('data-key'); let v = el.value; if(el.type === 'checkbox') v = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; v = el.value; } data.custom[k] = v; data.jsonPayload[k] = v; }); const c = document.getElementById('sig-canvas'); if(c) data.sig = c.toDataURL('image/png'); return data; }
 function handlePhoto(input, key){ if(input.files[0]){ const btn=input.previousElementSibling; btn.innerText="Compressing..."; compressImg(input.files[0]).then(b64=>{ state.photoStore[key]=b64; btn.innerText="Photo Saved ✅"; }); } }
-// v60.0: More aggressive compression (600px, 0.4)
 function compressImg(f){ return new Promise(r=>{ const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'); const scale = Math.min(600/i.width, 600/i.height, 1); c.width=i.width*scale; c.height=i.height*scale; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.4)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
 function initSigPad(c){ const ctx=c.getContext('2d'); ctx.lineWidth=2; ctx.strokeStyle="#000"; let d=false; const g=e=>{ const r=c.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return{x:t.clientX-r.left,y:t.clientY-r.top}; }; const s=e=>{ d=true; ctx.beginPath(); const{x,y}=g(e); ctx.moveTo(x,y); }; const m=e=>{ if(!d)return; e.preventDefault(); const{x,y}=g(e); ctx.lineTo(x,y); ctx.stroke(); }; const n=()=>{ d=false; }; c.addEventListener('mousedown',s); c.addEventListener('mousemove',m); c.addEventListener('mouseup',n); c.addEventListener('touchstart',s); c.addEventListener('touchmove',m); c.addEventListener('touchend',n); }
 function clearSig(){ const c=document.getElementById('sig-canvas'); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
@@ -472,7 +444,48 @@ function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGl
 async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
 function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-// INIT (v60.0)
+
+// v61.0 FIX: Build Form Logic
+function buildReportForm(n,c){
+    state.photoStore={};
+    // Clean name
+    const safeName = n ? n.trim() : "Standard Visit Note";
+    
+    // Find template logic
+    let t = null;
+    if(state.globalForms) t = state.globalForms.find(f => f.name.trim() === safeName)?.questions;
+    if(!t && state.cachedForms) t = state.cachedForms[safeName];
+    if(!t) t = state.cachedForms["(Standard)"];
+    
+    // FALLBACK IF NOTHING FOUND
+    if(!t) {
+        console.warn("Template not found:", safeName);
+        t = [{type:'note', text:'Standard Check-in (Default)'}, {type:'text', text:'Notes'}];
+    }
+
+    c.innerHTML='';
+    if(t.length===0){
+        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+    }else{
+        t.forEach((f,i)=>{
+            let y=f.type||'check',x=f.text||f;
+            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}}
+            let h='';
+            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
+            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
+            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
+            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
+            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
+            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
+            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
+            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
+            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
+            c.innerHTML+=h;
+        });
+    }
+    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
+}
+// INIT
 window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
     if(s) { try { state = { ...state, ...JSON.parse(s) }; } catch(e){ console.error("State Error", e); } }
@@ -480,8 +493,6 @@ window.addEventListener('load', () => {
     if(!state.globalForms) state.globalForms = [];
     if(!state.cachedForms) state.cachedForms = {};
     state.settings.googleSheetUrl = CONFIG.url; 
-    
-    // v60.0: Default Battery 100%
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -494,24 +505,19 @@ window.addEventListener('load', () => {
             upd(); b.addEventListener('levelchange', upd);
         });
     }
-
     if(!state.settings.pinCode || !state.settings.workerName) { 
         navigate('settings'); 
         document.getElementById('btnCloseSettings').classList.add('hidden'); 
     } 
     else if(state.activeVisit) { enterLockedScreen(); } 
     else { navigate('main'); renderLocations(); }
-
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
-
     initLocations();
     if(CONFIG.isAdv) syncForms(); 
-
     updateArrivedButtonState(); 
     processUploadQueue(); 
     document.body.addEventListener('click', initAudio, { once: true }); 
     startReminderTimer();
-    
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock(); });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW Fail', err));
 });
