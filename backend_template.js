@@ -1,10 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v67.3 (Diamond Edition)
- * Features:
- * 1. Gatekeeper & Device Locking
- * 2. Automated Image Handling (Drive)
- * 3. Smart Monitor Feed (Includes WOF Data)
- * 4. Vehicle Safety Tracking
+ * OTG APPSUITE - MASTER BACKEND v67.5 (Diamond Edition)
+ * Fix: 'doPost' now correctly validates deviceId for write permissions.
  */
 
 const CONFIG = {
@@ -144,7 +140,7 @@ function doGet(e) {
     const r = t.getDataRange().getValues();
     const headers = r.shift();
     
-    // v67.3: Pre-load WOF Data from Staff Tab
+    // Pre-load WOF Data from Staff Tab
     const st = ss.getSheetByName('Staff');
     const stD = st ? st.getDataRange().getValues() : [];
     const wofMap = {};
@@ -182,7 +178,8 @@ function doPost(e) {
     const p = e.parameter;
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
     
-    const auth = checkAccess(p['Worker Name'], null); 
+    // Auth Check: Pass deviceId from parameter to checkAccess
+    const auth = checkAccess(p['Worker Name'], p.deviceId); 
     if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Unauthorized"}));
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -250,7 +247,7 @@ function doPost(e) {
         sheet.appendRow(row);
     }
     
-    // v67.0: Update Vehicle Data in Staff Tab
+    // Update Vehicle Data in Staff Tab
     if (p['Template Name'] === 'Vehicle Safety Check') {
         updateStaffVehCheck(worker, p['Visit Report Data']);
     }
