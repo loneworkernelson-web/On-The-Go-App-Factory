@@ -73,7 +73,7 @@ fullContent:
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.1</p>
+      <p class="text-gray-400">Diamond Edition v68.2</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -234,22 +234,22 @@ fullContent:
                 <li>Go to Google Sheet > <strong>Extensions > Apps Script</strong>.</li>
                 <li>Delete existing code. <strong>Paste</strong> new code.</li>
                 <li>Click <strong>Deploy > New Deployment</strong>. Select <strong>Web App</strong>.</li>
-                <li><strong>IMPORTANT:</strong> Set "Who has access" to <strong>Anyone</strong>.</li>
+                <li class="p-3 border-2 border-red-500 rounded bg-red-900/20 text-white font-bold">⚠️ CRITICAL STEP: Set "Who has access" to <span class="text-red-400 underline">"Anyone"</span>. <br><span class="text-xs font-normal text-gray-300">If you miss this, the App WILL CRASH.</span></li>
                 <li>Click <strong>Deploy</strong>. Copy the URL.</li>
              </ol>
           </div>
-          <div class="bg-yellow-900/30 border border-yellow-600/50 p-4 rounded-lg mt-4">
-             <details class="group">
-                <summary class="flex items-center justify-between font-bold text-yellow-400 text-lg hover:text-yellow-300 cursor-pointer"><span>⚠️ Vital Step: Set Automation Triggers</span><span>▼</span></summary>
-                <div class="mt-4 text-gray-300 space-y-4 text-sm">
-                   <ol class="list-decimal pl-5 space-y-3">
-                      <li>Apps Script > <strong>Alarm Clock icon</strong> (Left sidebar).</li>
-                      <li>Add Trigger: <code>checkOverdueVisits</code> (Time-driven, Minutes, Every 10 mins).</li>
-                      <li>Add Trigger: <code>archiveOldData</code> (Time-driven, Weekly).</li>
-                   </ol>
-                </div>
-             </details>
+          
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-6 rounded-lg mt-4">
+             <h3 class="font-bold text-yellow-400 text-lg flex items-center gap-2">⏰ Vital Step: Set Automation Triggers</h3>
+             <p class="text-xs text-gray-400 mb-4">Required for Safety Alerts & Maintenance.</p>
+             <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
+                <li>Apps Script > <strong>Alarm Clock icon</strong> (Left sidebar).</li>
+                <li>Click <strong>+ Add Trigger</strong> (Bottom Right).</li>
+                <li><strong class="text-white">Safety Watchdog:</strong> Function: <code>checkOverdueVisits</code> | Event Source: <code>Time-driven</code> | Type: <code>Minutes timer</code> | Interval: <code>Every 10 minutes</code>.</li>
+                <li><strong class="text-white">Auto-Archive:</strong> Function: <code>archiveOldData</code> | Event Source: <code>Time-driven</code> | Type: <code>Week timer</code>.</li>
+             </ol>
           </div>
+
           <div><label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()"></div>
           <div class="flex justify-center gap-4"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button><button id="btnGenTemplate" onclick="triggerTemplateSetup()" disabled class="hidden btn bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">🪄 Auto-Generate PDF Template</button></div>
           <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
@@ -273,10 +273,24 @@ fullContent:
                     <li>Drag the <strong>MonitorApp</strong> folder. Copy that URL.</li>
                 </ol>
             </div>
+            
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">♻️</span><div><h2 class="text-2xl font-bold text-white">2. Update Backend</h2></div></div>
-                 <div class="bg-yellow-900/20 border border-yellow-600 p-4 rounded text-sm text-yellow-200">Apps Script > Deploy > Manage deployments > Edit > <strong>Version: New version</strong> > Deploy.</div>
+                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">♻️</span><div><h2 class="text-2xl font-bold text-white">2. Update Backend (Without Breaking Links)</h2></div></div>
+                 <div class="space-y-4 text-sm text-gray-300">
+                    <p>When you update the code, <strong>do NOT create a "New Deployment"</strong> or your URL will change, and the app will stop working for everyone.</p>
+                    <div class="bg-blue-900/30 p-4 rounded border border-blue-500/30">
+                        <strong class="block text-blue-400 mb-2">Correct Update Method:</strong>
+                        <ol class="list-decimal pl-5 space-y-2">
+                            <li>Apps Script > <strong>Deploy</strong> > <strong>Manage Deployments</strong>.</li>
+                            <li>Click the <strong>Pencil Icon (Edit)</strong> next to your active deployment.</li>
+                            <li>Version dropdown: Select <strong>"New Version"</strong>.</li>
+                            <li>Click <strong>Deploy</strong>.</li>
+                        </ol>
+                        <p class="mt-2 text-xs text-gray-400">Result: Your URL stays the same. Staff phones update automatically.</p>
+                    </div>
+                 </div>
             </div>
+
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">📱</span><div><h2 class="text-2xl font-bold text-white">3. Install</h2></div></div>
                 <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-300">
