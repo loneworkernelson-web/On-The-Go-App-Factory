@@ -7,10 +7,13 @@
 <link rel="icon" href="%%LOGO_URL%%">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
 <style>
   body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   .main-layout { display: flex; flex: 1; overflow: hidden; }
-  .grid-area { flex: 3; overflow-y: auto; padding: 1.5rem; }
+  .grid-area { flex: 3; overflow-y: auto; padding: 1.5rem; position: relative; }
   .log-area { flex: 1; background-color: #1e293b; border-left: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
   .card { background-color: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; transition: all 0.2s; position: relative; overflow: hidden; }
   .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
@@ -29,6 +32,16 @@
   .bd-amber { border-color: #d97706; border-width: 2px; }
   .bd-red { border-color: #dc2626; border-width: 4px; }
   .bd-grey { border-color: #475569; opacity: 0.7; }
+  
+  /* Map Styles */
+  #mapView { background: #020617; z-index: 1; }
+  .map-icon { width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+  .map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
+  .map-icon.green { background: #10b981; }
+  .map-icon.amber { background: #f59e0b; }
+  .map-icon.grey { background: #64748b; }
+  .leaflet-popup-content-wrapper { background: #1e293b; color: white; border: 1px solid #475569; border-radius: 0.5rem; }
+  .leaflet-popup-tip { background: #1e293b; }
 </style>
 </head>
 <body>
@@ -37,7 +50,7 @@
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.1</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.4</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -45,6 +58,11 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
+            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600">
+                <button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-sm font-bold bg-gray-600 text-white shadow">⊞ Grid</button>
+                <button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-sm font-bold text-gray-400 hover:text-white transition">🗺️ Map</button>
+            </div>
+            
             <div class="relative">
                 <input type="text" id="searchBox" placeholder="Filter Names..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-48" onkeyup="renderGrid()">
                 <div class="absolute right-3 top-2.5 text-gray-500">🔍</div>
@@ -76,6 +94,7 @@
   <div class="main-layout">
       <div class="grid-area">
           <div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4"></div>
+          <div id="mapView" class="hidden h-full w-full rounded-xl overflow-hidden shadow-inner border border-gray-700 bg-gray-900 relative"></div>
           <div id="emptyState" class="hidden h-full flex flex-col items-center justify-center text-gray-600"><div class="text-4xl mb-2">😴</div><p>No active workers.</p></div>
       </div>
       <div class="log-area">
@@ -88,11 +107,36 @@ const SCRIPT_URL = "%%SHEET_URL%%";
 let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
-// THRESHOLDS: Adjust here if needed
 const LOAD_WARN = 20;
 const LOAD_CRIT = 40;
 
+// MAP VARIABLES
+let mapInstance = null;
+let markersLayer = null;
+let currentView = 'GRID'; // 'GRID' or 'MAP'
+
 window.onload = () => { fetchData(); setInterval(fetchData, 10000); setInterval(renderGrid, 1000); };
+
+function toggleView(view) {
+    currentView = view;
+    document.getElementById('workerGrid').classList.toggle('hidden', view === 'MAP');
+    document.getElementById('mapView').classList.toggle('hidden', view === 'GRID');
+    document.getElementById('emptyState').classList.add('hidden'); // Reset empty state
+    
+    // Toggle Buttons
+    const bgActive = "bg-gray-600 text-white shadow";
+    const bgInactive = "text-gray-400 hover:text-white";
+    document.getElementById('btnGrid').className = `px-3 py-1 rounded text-sm font-bold ${view==='GRID'?bgActive:bgInactive}`;
+    document.getElementById('btnMap').className = `px-3 py-1 rounded text-sm font-bold ${view==='MAP'?bgActive:bgInactive}`;
+
+    if(view === 'MAP') {
+        initMap();
+        renderMap();
+    } else {
+        renderGrid();
+    }
+}
+
 function fetchData() {
     const script = document.createElement('script');
     const cbName = 'cb_' + Date.now();
@@ -105,6 +149,7 @@ function fetchData() {
     script.src = `${SCRIPT_URL}?callback=${cbName}&t=${Date.now()}`;
     document.body.appendChild(script);
 }
+
 function handleData(response) {
     const statusEl = document.getElementById('serverStatus');
     if (response && (response.workers || response.status === 'online')) {
@@ -118,10 +163,12 @@ function handleData(response) {
         allRows = response.workers; 
         workerData = processWorkers(response.workers);
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
-        renderGrid();
+        if(currentView === 'GRID') renderGrid();
+        else renderMap();
         renderLog();
     }
 }
+
 function processWorkers(rows) {
     const workers = {};
     rows.forEach(r => {
@@ -133,6 +180,74 @@ function processWorkers(rows) {
     });
     return Object.values(workers);
 }
+
+// --- MAP LOGIC ---
+function initMap() {
+    if(mapInstance) {
+        mapInstance.invalidateSize(); 
+        return;
+    }
+    // Default to New Zealand view
+    mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(mapInstance);
+    markersLayer = L.layerGroup().addTo(mapInstance);
+}
+
+function renderMap() {
+    if(!mapInstance) return;
+    markersLayer.clearLayers();
+    const bounds = L.latLngBounds();
+    let hasMarkers = false;
+    const now = Date.now();
+
+    workerData.forEach(w => {
+        // Filter Logic same as Grid
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE');
+        const filter = document.getElementById('viewSelector').value;
+        if (filter === 'ACTIVE' && isSafe) return;
+        
+        if(!w.gps || w.gps.length < 5) return;
+        const [lat, lng] = w.gps.split(',').map(Number);
+        if(isNaN(lat) || isNaN(lng)) return;
+
+        // Determine Color
+        const urgency = getUrgencyScore(w, now);
+        let colorClass = 'grey';
+        if(urgency >= 1000) colorClass = 'red';
+        else if(urgency >= 500) colorClass = 'amber';
+        else if(urgency >= 100) colorClass = 'green';
+        else if(isSafe) colorClass = 'green'; // Departed but shown in history
+
+        const icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class="map-icon ${colorClass}"></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        const marker = L.marker([lat, lng], {icon: icon}).addTo(markersLayer);
+        const popupContent = `
+            <div class="text-sm font-sans">
+                <strong class="block text-base mb-1">${w.name}</strong>
+                <span class="text-xs uppercase font-bold text-gray-400">${w.status}</span><br>
+                <span class="text-xs">📍 ${w.location}</span><br>
+                <span class="text-xs">🔋 ${w.battery || '--'}</span>
+            </div>
+        `;
+        marker.bindPopup(popupContent);
+        bounds.extend([lat, lng]);
+        hasMarkers = true;
+    });
+
+    if(hasMarkers) {
+        mapInstance.fitBounds(bounds, {padding: [50, 50], maxZoom: 15});
+    }
+}
+
+// --- GRID LOGIC ---
 function renderGrid() {
     const grid = document.getElementById('workerGrid');
     const search = document.getElementById('searchBox').value.toLowerCase();
@@ -154,6 +269,9 @@ function renderGrid() {
         if (filter === 'ACTIVE' && isSafe) return;
         if (filter === 'ALERTS' && !isAlert) return;
         visibleCount++;
+        
+        if(currentView === 'MAP') return; // Don't build DOM elements if map is active
+
         let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status, timeClass = 'text-gray-500';
         if (isAlert) { borderClass = 'bd-red'; dotClass = 'st-red'; timeClass = 'text-red-400 font-bold'; } 
         else if (!isSafe) {
@@ -194,9 +312,10 @@ function renderGrid() {
             <div class="mt-3 grid grid-cols-2 gap-2"><a href="https://www.google.com/maps/search/?api=1&query=${w.gps}" target="_blank" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 text-center py-2 rounded text-xs font-bold transition">📍 Map</a><a href="tel:${w.phone}" class="bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold transition">📞 Worker</a></div>`;
         grid.appendChild(card);
     });
+    
     document.getElementById('activeCount').innerText = activeC;
     document.getElementById('alertCount').innerText = alertC;
-    document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0);
+    if(currentView === 'GRID') document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0);
 }
 
 function updateLoadWarning(count) {
