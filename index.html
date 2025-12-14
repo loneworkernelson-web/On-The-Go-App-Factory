@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: index.html
+fullContent:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,7 +73,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.2</p>
+      <p class="text-gray-400">Diamond Edition v68.3</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -139,15 +143,24 @@
              
              <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
                  <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Textbelt Key</label>
-                    <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For SMS Alerts">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label>
+                        <a href="https://textbelt.com/" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
+                    </div>
+                    <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Enter Key (Free: 'textbelt')">
                  </div>
                  <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Gemini AI Key</label>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
+                    </div>
                     <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Smart Scribe">
                  </div>
                  <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">OpenRouteService Key</label>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label>
+                        <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
+                    </div>
                     <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage">
                  </div>
              </div>
@@ -341,20 +354,146 @@
 
     function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
     
-    function copyTemplatesSetup() { navigator.clipboard.writeText("Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"); alert("Copied 'Templates' Setup!"); }
+    function copyTemplatesSetup() { 
+        const setup = "Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"; 
+        const nl = "\n".repeat(15);
+        const instr = "TEMPLATES GUIDE (Starting Cell A20):\n1. Define Forms & Reports here.\n2. Column A (Type): 'FORM' for ad-hoc reports, 'REPORT' for standard visits.\n3. Column C (Assigned To): Use 'ALL' or specific names (comma separated).\n4. Column D (Email): Optional. Sends a PDF copy to this email upon submission.\n5. Question Types: [TEXT], [PHOTO], [YESNO], [NUMBER], [GPS], [DATE], [SIGN], [HEADING], [NOTE].";
+        navigator.clipboard.writeText(setup + nl + instr); 
+        alert("Copied 'Templates' Setup + Instructions (See Row 20)!"); 
+    }
     
-    function copySitesSetup() { navigator.clipboard.writeText("Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"); alert("Copied 'Sites' Setup!"); }
+    function copySitesSetup() { 
+        const setup = "Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"; 
+        const nl = "\n".repeat(18);
+        const instr = "SITES GUIDE (Starting Cell A20):\n1. Use this tab to assign sites to workers.\n2. Column A (Assigned To): Enter a Worker Name (Exact Match) or 'ALL'.\n3. Template Name: Must match a name from the 'Templates' tab.\n4. Address: If populated, the app will show a 'Navigate' button.\n5. Contact Info: Shows a 'Call' button in the app.";
+        navigator.clipboard.writeText(setup + nl + instr); 
+        alert("Copied 'Sites' Setup + Instructions (See Row 20)!"); 
+    }
     
     function copyStaffSetup() { 
         const h = "Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry"; 
         const s1 = "John Doe\tDriver\tActive\t\t\t\t"; 
-        const spacer = "\n".repeat(17); 
-        const instr = "INSTRUCTIONS (Do not delete):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.";
-        navigator.clipboard.writeText(h + "\n" + s1 + spacer + instr); 
-        alert("Copied 'Staff' Setup!"); 
+        const nl = "\n".repeat(17); 
+        const instr = "STAFF GUIDE (Starting Cell A20):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.";
+        navigator.clipboard.writeText(h + "\n" + s1 + nl + instr); 
+        alert("Copied 'Staff' Setup + Instructions (See Row 20)!"); 
     }
     
-    function copyReportGuide() { navigator.clipboard.writeText("AI REPORTING GUIDE..."); alert("AI Guide Copied!"); }
+    function copyReportGuide() { 
+        const text = `Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
+
+---------------------------------------------------
+SECTION 1: DEPLOYMENT RULE (READ FIRST)
+---------------------------------------------------
+If you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):
+1. You DO NOT need to update the Web App Deployment.
+2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).
+3. The script runs "locally" inside the sheet.
+Only update the Web App Deployment if you change "doPost" or "doGet" (the core backend).
+
+---------------------------------------------------
+SECTION 2: DATA MAP (For the AI)
+---------------------------------------------------
+Paste this into your AI prompt so it knows your data structure:
+I have a Google Sheet named 'Visits'.
+The columns are mapped as follows:
+- Col A: Timestamp (Start of Visit)
+- Col C: Worker Name
+- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')
+- Col M: Location Name
+- Col P: Device Timestamp (End of Visit / Last Check-in)
+- Col Q: Battery Level (e.g. '85%')
+- Col S: Distance (km)
+- Col T: Visit Report Data (JSON string containing form answers)
+- Col U: Anticipated Departure Time
+
+---------------------------------------------------
+SECTION 2B: LONG-TERM HISTORY (THE ARCHIVE)
+---------------------------------------------------
+PRO TIP: If you need a report covering more than 30 days (e.g., Annual Mileage), you must tell the AI to look at the Archive.
+Add this to your prompt:
+Please note: Older data is moved to a sheet named 'Archive'. Please modify the script to read data from BOTH the 'Visits' sheet and the 'Archive' sheet, combine them into one array, and then generate the report.
+
+---------------------------------------------------
+SECTION 3: PROMPT RECIPES (Copy & Paste these)
+---------------------------------------------------
+
+RECIPE 1: MILEAGE REPORT
+Write a Google Apps Script function called 'generateMileageReport'.
+1. Read all data from 'Visits'.
+2. Create/Overwrite a sheet called 'Mileage Report'.
+3. Group data by Worker Name (Col C) and Location (Col M).
+4. Sum the Distance (Col S) for each group.
+5. Create a clean table: Worker | Location | Total KM.
+6. Add a Grand Total at the bottom.
+
+RECIPE 2: TIMESHEET (PAYROLL)
+Write a script called 'generateTimesheet'.
+1. Read 'Visits'.
+2. Calculate duration in minutes: (Col P - Col A).
+3. Ignore rows where Status is not 'DEPARTED'.
+4. Create a sheet 'Weekly Timesheet'.
+5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).
+6. Sum Total Hours per Worker.
+
+RECIPE 3: SAFETY AUDIT (COMPLIANCE)
+Write a script called 'auditSafety'.
+1. Read 'Visits'.
+2. Identify rows where Battery Level (Col Q) is < 20%.
+3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.
+4. Create a sheet 'Safety Audit'.
+5. List these high-risk visits.
+6. Highlight 'EMERGENCY' rows in Red.
+
+RECIPE 4: SITE HISTORY (JSON EXTRACTION)
+Write a script called 'collateSiteComments'.
+1. Read 'Visits'.
+2. Filter for Location Name = 'Main Office' (make this a variable).
+3. Parse the JSON in Col T ('Visit Report Data').
+4. Extract the field labeled 'Notes' or 'Comments' from that JSON.
+5. Create a sheet 'Site Log - Main Office'.
+6. List: Date | Worker | Extracted Notes.
+
+RECIPE 5: AFTER-HOURS WORK
+Write a script to find after-hours work.
+1. Read 'Visits'.
+2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.
+3. Output to a new sheet 'After Hours Log'.
+
+RECIPE 6: WORKER ACTIVITY SUMMARY
+Write a script for an Executive Summary.
+1. Count total unique visits per Worker.
+2. Calculate average duration per visit per Worker.
+3. Count total 'EMERGENCY' statuses per Worker.
+4. Output a summary table.
+
+RECIPE 7: MISSING REPORTS
+Write a script to find missing reports.
+1. Filter rows where Status is 'DEPARTED'.
+2. Check if Col T (Report Data) is empty or '{}'.
+3. List workers who departed without filing a report.
+
+RECIPE 8: TRAVEL VS ON-SITE
+Write a script to compare Travel vs Work.
+1. Sum duration for rows where Location Name contains 'Travel'.
+2. Sum duration for all other rows.
+3. Calculate the ratio per worker.
+
+RECIPE 9: MONTHLY ARCHIVE
+Write a script to move last month's data.
+1. Identify rows from the previous month.
+2. Move them to a sheet named 'Archive - [Month-Year]'.
+3. Delete them from 'Visits' to keep it fast.
+
+RECIPE 10: FORM DATA EXPORT
+Write a script to flatten the JSON form data.
+1. Read Col T.
+2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').
+3. Create a new sheet with these keys as Column Headers.
+4. Populate the rows with the values from the JSON.`;
+        navigator.clipboard.writeText(text); 
+        alert("AI Prompt Guide Copied!"); 
+    }
 
     function handleLogo(input) {
       const file = input.files[0];
@@ -470,4 +609,3 @@
   </script>
 </body>
 </html>
-
