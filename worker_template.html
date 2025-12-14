@@ -297,15 +297,15 @@ function forceSync(){
         state.locations = managedSites;
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
-        state.meta = data.meta || {}; // v67.2 Diamond Feature
+        state.meta = data.meta || {}; 
         
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
-        // v68.0: Only add hardcoded fallback if Sheet didn't provide one
+        // v68.0: Prefer Spreadsheet Travel Template
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         
-        saveState(); renderLocations(); checkVehicleStatus(); // v67.2
+        saveState(); renderLocations(); checkVehicleStatus();
         document.getElementById('uploadBanner').classList.add('hidden'); 
         alert("Sync Complete!");
     }).catch(e=>{ 
@@ -314,13 +314,11 @@ function forceSync(){
     });
 }
 
-// v67.2 DIAMOND LOGIC
 function checkVehicleStatus() {
     if(!CONFIG.vehEnabled) return;
     const bar = document.getElementById('vehNagBar');
     let show = false;
     
-    // Check 1: Safety Check
     if (state.meta.lastVehCheck) {
         const last = new Date(state.meta.lastVehCheck);
         const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
@@ -329,12 +327,10 @@ function checkVehicleStatus() {
             bar.innerText = "⚠️ Vehicle Check Overdue - Tap to Complete";
         }
     } else {
-        // Never done
         show = true;
         bar.innerText = "⚠️ Vehicle Check Required";
     }
 
-    // Check 2: WOF Expiry
     if (state.meta.wofExpiry) {
         const wof = new Date(state.meta.wofExpiry);
         const daysUntil = (wof.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
@@ -415,7 +411,6 @@ function startVisit(){
     const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
     if(sel.id==='travel') startTravellingPulse(); 
     const now=new Date(); 
-    // V68.0: Explicit GPS capture before State Init
     navigator.geolocation.getCurrentPosition(pos => {
         state.activeVisit={ 
             locationId:sel.id, 
@@ -428,7 +423,7 @@ function startVisit(){
         saveState(); 
         enterLockedScreen(); 
         playSound('arrive'); 
-        // V67.5 FIX: Include deviceId
+        // V67.5: Pass DeviceID
         processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
         setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
     });
@@ -449,7 +444,7 @@ function preDepart(){
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     const startGPS = state.activeVisit.startGPS;
     
-    // v68.0: Always try to get distance (Crow fly fallback if no key)
+    // v68.0: Correct Distance Logic
     if(startGPS) {
         document.getElementById('btnDepart').innerText = "Calculating...";
         navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -495,16 +490,13 @@ function loadFormAndShow(tpl){
     currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     
-    // v68.0: Smart Field Injection (Robust matching)
+    // v68.0: Smart Field Injection
     if (calculatedDist) {
-        // Try exact match first
         let distInput = document.querySelector('[data-key*="Distance"]');
-        // Try looser match (e.g., "Odometer" or "Km")
         if(!distInput) distInput = document.querySelector('input[type="number"]');
         
         if(distInput) {
             distInput.value = calculatedDist.km;
-            // Highlight it so user notices
             distInput.style.border = "2px solid #4ade80";
         }
         
@@ -555,7 +547,7 @@ function openMidVisitMenu() { isMidVisitUpdate = true; showModal('template'); co
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
-// v67.5 FIX: Add deviceId to Payload
+// v67.5 FIX: deviceId in payload
 function buildPayload(d){ let dueTime = ""; let locName = "Unknown"; let locAddr = ""; if (state.activeVisit) { if(state.activeVisit.anticipatedDepartureTime) dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); const l = state.locations.find(x => x.id === state.activeVisit.locationId); if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; } } return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), ...d }; }
 function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
 function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
