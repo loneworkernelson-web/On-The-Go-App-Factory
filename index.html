@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: index.html
+fullContent:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,14 +29,51 @@
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
     details > summary { list-style: none; outline: none; cursor: pointer; }
     details > summary::-webkit-details-marker { display: none; }
+    
+    /* Disclaimer Modal */
+    #disclaimerModal { backdrop-filter: blur(8px); }
   </style>
 </head>
-<body class="min-h-screen py-8 px-4">
+<body class="min-h-screen py-8 px-4 relative">
 
-  <div class="max-w-6xl mx-auto">
+  <div id="disclaimerModal" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+      <div class="bg-gray-900 border-2 border-yellow-600 rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-600 to-orange-600"></div>
+          <h2 class="text-3xl font-extrabold text-white mb-2">⚠️ Important Safety Notice</h2>
+          <p class="text-yellow-500 font-bold mb-6 uppercase tracking-wider text-sm">Target Audience & System Limitations</p>
+          
+          <div class="space-y-4 text-gray-300 text-sm mb-8 overflow-y-auto max-h-[60vh] pr-2">
+              <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution designed specifically for <strong>small non-profits, charities, and community groups</strong> with limited budgets.</p>
+              
+              <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                  <h3 class="font-bold text-white mb-2">❌ This is NOT for Critical Life-Safety</h3>
+                  <p class="mb-2">If you operate in high-risk environments (e.g., forestry, security, high-voltage), you should invest in a commercial, paid solution with 24/7 monitoring.</p>
+              </div>
+
+              <h3 class="font-bold text-white mt-4">Technical Limitations You Must Accept:</h3>
+              <ul class="list-disc pl-5 space-y-2">
+                  <li><strong>The "Sleep" Issue:</strong> This is a Web App. On many phones (especially iPhones), GPS tracking <strong>will stop</strong> if the screen is turned off or the phone sleeps for an extended period. Staff must keep the app active or wake it periodically.</li>
+                  <li><strong>Connectivity:</strong> The system requires an active data connection to send alerts. It will not work in dead zones (though it will queue data).</li>
+                  <li><strong>Free Infrastructure:</strong> This system runs on Google's free tiers. While reliable, there are no Service Level Agreements (SLAs) or guarantees of uptime.</li>
+              </ul>
+          </div>
+
+          <div class="pt-6 border-t border-gray-700">
+              <label class="flex items-start gap-3 cursor-pointer select-none group">
+                  <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5 rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500" onchange="toggleEnterBtn()">
+                  <span class="text-sm text-gray-400 group-hover:text-white transition">
+                      I am the Health & Safety Coordinator. I have read the limitations above and I acknowledge that this software is provided "as is", and I accept that it fits my organization's risk profile.
+                  </span>
+              </label>
+              <button id="btnEnter" disabled onclick="closeDisclaimer()" class="mt-6 w-full py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-lg transition-all">Accept & Enter Factory</button>
+          </div>
+      </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.0</p>
+      <p class="text-gray-400">Diamond Edition v68.1</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -174,6 +215,10 @@
                 <p class="text-xs text-gray-400">Recipes for creating reports with AI.</p>
                 <button id="btnCopyReportGuide" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy Reporting Guide</button>
           </div>
+          
+          <div class="mt-4 bg-blue-900/20 p-4 rounded border border-blue-500/50">
+             <p class="text-blue-300 text-sm font-bold text-center">ℹ️ Note: You will set up the automatic 30-day archiving trigger in the next step (Backend).</p>
+          </div>
 
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
@@ -261,6 +306,28 @@
         }
       } catch(e) {}
     };
+    
+    // DISCLAIMER LOGIC
+    function toggleEnterBtn() {
+        const chk = document.getElementById('chkAccept');
+        const btn = document.getElementById('btnEnter');
+        if(chk.checked) {
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-700', 'text-gray-500');
+            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('bg-gray-700', 'text-gray-500');
+            btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
+        }
+    }
+    
+    function closeDisclaimer() {
+        document.getElementById('disclaimerModal').style.opacity = '0';
+        document.getElementById('disclaimerModal').style.pointerEvents = 'none';
+        document.getElementById('mainContent').classList.remove('blur-sm');
+        setTimeout(() => document.getElementById('disclaimerModal').remove(), 500);
+    }
 
     function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
     
