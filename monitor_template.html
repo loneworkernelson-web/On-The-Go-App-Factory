@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: monitor_template.html
+fullContent:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,38 +36,46 @@
 </style>
 </head>
 <body>
-  <header class="bg-gray-900 border-b border-gray-800 p-4 flex justify-between items-center shrink-0 z-20 shadow-lg">
-    <div class="flex items-center gap-4">
-      <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
-      <div>
-        <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v67.3</span></h1>
-        <div class="flex items-center gap-2 text-xs text-gray-400">
-           <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
-           <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
+  <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
+    <div class="flex justify-between items-center mb-2">
+        <div class="flex items-center gap-4">
+          <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
+          <div>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.1</span></h1>
+            <div class="flex items-center gap-2 text-xs text-gray-400">
+               <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
+               <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
+            </div>
+          </div>
         </div>
-      </div>
+        <div class="flex items-center gap-3">
+            <div class="relative">
+                <input type="text" id="searchBox" placeholder="Filter Names..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-48" onkeyup="renderGrid()">
+                <div class="absolute right-3 top-2.5 text-gray-500">🔍</div>
+            </div>
+            <select id="viewSelector" class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 font-bold" onchange="renderGrid()">
+                <option value="ACTIVE">🟢 Active Workers</option>
+                <option value="ALL">📋 All History</option>
+                <option value="ALERTS">🚨 Alerts Only</option>
+            </select>
+        </div>
+        <div class="flex gap-6 border-l border-gray-700 pl-6">
+            <div class="text-center">
+                <div class="text-2xl font-bold text-green-400 leading-none" id="activeCount">0</div>
+                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Active</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-red-500 leading-none" id="alertCount">0</div>
+                <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Alerts</div>
+            </div>
+        </div>
     </div>
-    <div class="flex items-center gap-3">
-        <div class="relative">
-            <input type="text" id="searchBox" placeholder="Filter Names..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-48" onkeyup="renderGrid()">
-            <div class="absolute right-3 top-2.5 text-gray-500">🔍</div>
-        </div>
-        <select id="viewSelector" class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 font-bold" onchange="renderGrid()">
-            <option value="ACTIVE">🟢 Active Workers</option>
-            <option value="ALL">📋 All History</option>
-            <option value="ALERTS">🚨 Alerts Only</option>
-        </select>
+    
+    <div id="loadWarning" class="hidden rounded px-3 py-2 text-xs font-bold flex items-center justify-between">
+        <span id="loadMsg"></span>
+        <span class="opacity-80 font-normal">System bottleneck likely. Please stagger shifts.</span>
     </div>
-    <div class="flex gap-6 border-l border-gray-700 pl-6">
-        <div class="text-center">
-            <div class="text-2xl font-bold text-green-400 leading-none" id="activeCount">0</div>
-            <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Active</div>
-        </div>
-        <div class="text-center">
-            <div class="text-2xl font-bold text-red-500 leading-none" id="alertCount">0</div>
-            <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Alerts</div>
-        </div>
-    </div>
+
   </header>
   <div class="main-layout">
       <div class="grid-area">
@@ -80,6 +92,10 @@ const SCRIPT_URL = "%%SHEET_URL%%";
 let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
+// THRESHOLDS: Adjust here if needed
+const LOAD_WARN = 20;
+const LOAD_CRIT = 40;
+
 window.onload = () => { fetchData(); setInterval(fetchData, 10000); setInterval(renderGrid, 1000); };
 function fetchData() {
     const script = document.createElement('script');
@@ -129,6 +145,11 @@ function renderGrid() {
     grid.innerHTML = '';
     let activeC = 0; let alertC = 0; let visibleCount = 0;
     workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now));
+    
+    // Count Active for Load Warning
+    const totalActive = workerData.filter(w => w.status !== 'DEPARTED' && w.status !== 'COMPLETED').length;
+    updateLoadWarning(totalActive);
+
     workerData.forEach(w => {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE');
         const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
@@ -181,6 +202,24 @@ function renderGrid() {
     document.getElementById('alertCount').innerText = alertC;
     document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0);
 }
+
+function updateLoadWarning(count) {
+    const el = document.getElementById('loadWarning');
+    const msg = document.getElementById('loadMsg');
+    
+    if (count > LOAD_CRIT) {
+        el.className = "rounded px-3 py-2 text-xs font-bold flex items-center justify-between mt-2 bg-red-900 text-red-200 border border-red-500 animate-pulse";
+        msg.innerText = `⚠️ CRITICAL LOAD (${count} Users)`;
+        el.classList.remove('hidden');
+    } else if (count > LOAD_WARN) {
+        el.className = "rounded px-3 py-2 text-xs font-bold flex items-center justify-between mt-2 bg-yellow-900 text-yellow-200 border border-yellow-500";
+        msg.innerText = `⚠️ HIGH TRAFFIC (${count} Users)`;
+        el.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
+    }
+}
+
 function renderLog() {
     const list = document.getElementById('eventLogList');
     const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp));
