@@ -302,6 +302,7 @@ function forceSync(){
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
+        // v68.0: Prefer Spreadsheet Travel Template
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         
         saveState(); renderLocations(); checkVehicleStatus(); 
@@ -440,6 +441,7 @@ function startVisit(){
         saveState(); 
         enterLockedScreen(); 
         playSound('arrive'); 
+        // V67.5 FIX: Include deviceId
         processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
         setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
     });
@@ -513,6 +515,7 @@ function loadFormAndShow(tpl){
     currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     
+    // v68.2: Smart Field Injection
     if (calculatedDist) {
         let distInput = document.querySelector('[data-key*="Distance"]');
         if(!distInput) distInput = document.querySelector('input[type="number"]');
@@ -553,8 +556,12 @@ function submitReport(){
     const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
     
-    const photoKeys = Object.keys(state.photoStore);
-    photoKeys.forEach((key, idx) => { finalData[`Photo ${parseInt(key) + 1}`] = state.photoStore[key]; });
+    // v68.2 FIX: Sequential Photo Packing (Values, not Keys)
+    const images = Object.values(state.photoStore);
+    images.forEach((img, idx) => { 
+        finalData[`Photo ${idx + 1}`] = img; 
+    });
+    
     if(d.sig) finalData["Signature"] = d.sig;
 
     if(!state.activeVisit) {
