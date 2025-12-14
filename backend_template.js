@@ -446,5 +446,3 @@ function runAllLongitudinalReports() {
     
     MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); 
 }
-
-}
