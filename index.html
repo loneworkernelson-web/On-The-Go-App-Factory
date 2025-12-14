@@ -8,7 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0f172a; color: #f8fafc; }
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .step-section { display: none; }
     .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -32,7 +32,7 @@
   <div class="max-w-6xl mx-auto">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v67.4 (Full)</p>
+      <p class="text-gray-400">Diamond Edition v68.0 (Custom Travel Templates)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -140,7 +140,7 @@
                 <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
                     <li>Create tab named <strong>Templates</strong>.</li>
                     <li>Paste Setup into <strong>A1</strong>.</li>
-                    <li><em class="text-yellow-400">Use 'FORM' for ad-hoc, 'REPORT' for checklists.</em></li>
+                    <li><em class="text-white">v68: Now includes Travel Report template.</em></li>
                 </ol>
                 <button id="btnCopyTemplates" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Templates' Setup</button>
             </div>
@@ -264,12 +264,11 @@
 
     function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
     
-    // v67.0: Diamond Template with Vehicle Check
-    function copyTemplatesSetup() { navigator.clipboard.writeText("Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid"); alert("Copied 'Templates' Setup!"); }
+    // v68.0: Added Travel Report to Template Clipboard
+    function copyTemplatesSetup() { navigator.clipboard.writeText("Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"); alert("Copied 'Templates' Setup!"); }
     
     function copySitesSetup() { navigator.clipboard.writeText("Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"); alert("Copied 'Sites' Setup!"); }
     
-    // v67.0: Diamond Staff (Gatekeeper + Vehicle Cols)
     function copyStaffSetup() { 
         const h = "Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry"; 
         const s1 = "John Doe\tDriver\tActive\t\t\t\t"; 
@@ -300,7 +299,7 @@
     async function loadTemplatesAndGenerateScript() {
       try {
         const [resW, resM, resB] = await Promise.all([ fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.js') ]);
-        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files.");
+        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files. Ensure they are in the same folder.");
         tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
         generateScript();
       } catch(e) { alert("Error: " + e.message); }
@@ -354,6 +353,7 @@
         const org = document.getElementById('orgName').value;
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
+        
         let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org)
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
             .replace(/%%LOGO_DATA%%/g, logoData)
@@ -364,7 +364,6 @@
             .replace(/%%IS_ADVANCED%%/g, "true")
             .replace(/%%ENABLE_MILEAGE%%/g, "true")
             .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
-            // v67.0 Injections
             .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
             .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
             
@@ -377,18 +376,19 @@
         
         const mFolder = zip.folder("MonitorApp"); 
         mFolder.file("index.html", mHtml);
+        
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
     }
 
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } }
+    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(tab) { if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } } }
     function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
     function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
     
     document.getElementById('btnCopyHeaders').onclick = copyVisitsHeaders;
     document.getElementById('btnCopyTemplates').onclick = copyTemplatesSetup;
     document.getElementById('btnCopySites').onclick = copySitesSetup;
-    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; // Diamond: Linked
+    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; 
     document.getElementById('btnCopyReportGuide').onclick = copyReportGuide;
     document.getElementById('btnCopyCode').onclick = copyScript;
   </script>
