@@ -1,6 +1,7 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v67.5 (Diamond Edition)
- * Fix: 'doPost' now correctly validates deviceId for write permissions.
+ * OTG APPSUITE - MASTER BACKEND v68.1 (Diamond Edition)
+ * Fix: 'runAllLongitudinalReports' now includes 'Archive' data for complete history.
+ * Fix: 'doPost' correctly validates deviceId.
  */
 
 const CONFIG = {
@@ -383,4 +384,67 @@ function setupReportTemplate() { try { const doc = DocumentApp.create(`${CONFIG.
 function sendAlert(data) { let recipients = [Session.getEffectiveUser().getEmail()]; let smsNumbers = []; if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); } recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status']; const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`; if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`; smsNumbers.forEach(phone => { const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), muteHttpExceptions: true }); } catch(e) {} }); }
 function smartScribe(text) { if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text; try { const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`; const payload = { "contents": [{ "parts": [{ "text": "Correct grammar to NZ English: " + text }] }] }; const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true }); return JSON.parse(response.getContentText()).candidates[0].content.parts[0].text.trim(); } catch (e) { return text; } }
 function archiveOldData() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); let archive = ss.getSheetByName('Archive'); if (!archive) archive = ss.insertSheet('Archive'); const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = []; for (let i = 1; i < data.length; i++) { const date = new Date(data[i][0]); const diff = (today - date) / (1000 * 60 * 60 * 24); if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) { rowsToArchive.push(data[i]); } else { rowsToKeep.push(data[i]); } } if (rowsToArchive.length > 0) { if (archive.getLastRow() === 0) archive.appendRow(data[0]); archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive); sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep); } }
-function runAllLongitudinalReports() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if (!sheet) return; const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM"); const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`; let reportFile; const files = DriveApp.getFilesByName(name); if (files.hasNext()) reportFile = files.next(); else reportFile = DriveApp.getFileById(SpreadsheetApp.create(name).getId()); const reportSS = SpreadsheetApp.open(reportFile); let sheetAct = reportSS.getSheetByName('Worker Activity'); if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity'); sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Avg Duration"]); sheetAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dbeafe"); const stats = {}; for (let i = 1; i < data.length; i++) { const worker = data[i][2]; const status = data[i][10]; if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 }; stats[worker].visits++; if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++; } const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts, "N/A"]); if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 4).setValues(actRows); let sheetTrav = reportSS.getSheetByName('Travel Stats'); if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats'); sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]); sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7"); const tStats = {}; for (let i = 1; i < data.length; i++) { const worker = data[i][2]; const dist = parseFloat(data[i][18]) || 0; if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 }; if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; } } const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]); if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows); MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); }
+function runAllLongitudinalReports() { 
+    const ss = SpreadsheetApp.getActiveSpreadsheet(); 
+    let allData = [];
+    
+    // 1. Get Active Data
+    const sheet = ss.getSheetByName('Visits'); 
+    if (sheet) {
+        const vData = sheet.getDataRange().getValues();
+        if(vData.length > 1) allData = allData.concat(vData.slice(1));
+    }
+    
+    // 2. Get Archived Data (The Fix)
+    const archive = ss.getSheetByName('Archive');
+    if (archive) {
+        const aData = archive.getDataRange().getValues();
+        if(aData.length > 1) allData = allData.concat(aData.slice(1));
+    }
+
+    if (allData.length === 0) return; 
+
+    const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM"); 
+    const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`; 
+    let reportFile; 
+    const files = DriveApp.getFilesByName(name); 
+    if (files.hasNext()) reportFile = files.next(); else reportFile = DriveApp.getFileById(SpreadsheetApp.create(name).getId()); 
+    const reportSS = SpreadsheetApp.open(reportFile); 
+    
+    // A. Activity Stats
+    let sheetAct = reportSS.getSheetByName('Worker Activity'); 
+    if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity'); 
+    sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered"]); 
+    sheetAct.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dbeafe"); 
+    
+    const stats = {}; 
+    for (let i = 0; i < allData.length; i++) { 
+        const worker = allData[i][2]; 
+        const status = allData[i][10]; 
+        if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 }; 
+        stats[worker].visits++; 
+        if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++; 
+    } 
+    const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts]); 
+    if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 3).setValues(actRows); 
+
+    // B. Travel Stats
+    let sheetTrav = reportSS.getSheetByName('Travel Stats'); 
+    if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats'); 
+    sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]); 
+    sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7"); 
+    
+    const tStats = {}; 
+    for (let i = 0; i < allData.length; i++) { 
+        const worker = allData[i][2]; 
+        const dist = parseFloat(allData[i][18]) || 0; 
+        if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 }; 
+        if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; } 
+    } 
+    const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]); 
+    if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows); 
+    
+    MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); 
+}
+
+}
