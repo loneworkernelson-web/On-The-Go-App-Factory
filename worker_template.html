@@ -302,7 +302,8 @@ function forceSync(){
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
-        if(CONFIG.mileage) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
+        // v68.0: Only add hardcoded fallback if Sheet didn't provide one
+        if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         
         saveState(); renderLocations(); checkVehicleStatus(); // v67.2
         document.getElementById('uploadBanner').classList.add('hidden'); 
@@ -414,6 +415,7 @@ function startVisit(){
     const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
     if(sel.id==='travel') startTravellingPulse(); 
     const now=new Date(); 
+    // V68.0: Explicit GPS capture before State Init
     navigator.geolocation.getCurrentPosition(pos => {
         state.activeVisit={ 
             locationId:sel.id, 
@@ -447,7 +449,8 @@ function preDepart(){
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
     const startGPS = state.activeVisit.startGPS;
     
-    if(startGPS && CONFIG.orsKey) {
+    // v68.0: Always try to get distance (Crow fly fallback if no key)
+    if(startGPS) {
         document.getElementById('btnDepart').innerText = "Calculating...";
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const endGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
@@ -463,7 +466,7 @@ function preDepart(){
 
 async function getDistance(p1, p2) {
     if(!p1 || !p2) return { km: 0, type: 'none' };
-    if(CONFIG.orsKey) {
+    if(CONFIG.orsKey && CONFIG.orsKey.length > 5) {
         try {
             const u = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${CONFIG.orsKey}&start=${p1.split(',').reverse().join(',')}&end=${p2.split(',').reverse().join(',')}`;
             const r = await fetch(u);
@@ -492,9 +495,19 @@ function loadFormAndShow(tpl){
     currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     
+    // v68.0: Smart Field Injection (Robust matching)
     if (calculatedDist) {
-        const distInput = document.querySelector('[data-key*="Distance"]');
-        if(distInput) distInput.value = calculatedDist.km;
+        // Try exact match first
+        let distInput = document.querySelector('[data-key*="Distance"]');
+        // Try looser match (e.g., "Odometer" or "Km")
+        if(!distInput) distInput = document.querySelector('input[type="number"]');
+        
+        if(distInput) {
+            distInput.value = calculatedDist.km;
+            // Highlight it so user notices
+            distInput.style.border = "2px solid #4ade80";
+        }
+        
         if (calculatedDist.type === 'crow') {
             const noteInput = document.getElementById('rep_notes') || document.querySelector('[data-key="Notes"]');
             if(noteInput) noteInput.value = (noteInput.value + " [Distance: As the crow flies]").trim();
