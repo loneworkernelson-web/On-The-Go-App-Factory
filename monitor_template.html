@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: monitor_template.html
+fullContent:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,6 +48,16 @@
 </style>
 </head>
 <body>
+  <div id="authModal" class="hidden fixed inset-0 z-[100] bg-gray-900 flex items-center justify-center p-4">
+      <div class="bg-gray-800 border-2 border-blue-600 rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+          <div class="text-6xl mb-4">🔐</div>
+          <h1 class="text-2xl font-bold text-white mb-2">Security Access</h1>
+          <p class="text-gray-400 text-sm mb-6">Enter your Organisation Secret Key to authorize this Monitor Station.</p>
+          <input type="password" id="authKeyInput" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-4 text-white text-center text-lg tracking-widest mb-6 focus:border-blue-500 outline-none" placeholder="Enter Secret Key">
+          <button onclick="saveAuthKey()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg shadow-lg text-lg">Unlock Monitor</button>
+      </div>
+  </div>
+
   <div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm">
       <div class="text-9xl mb-4">🚨</div>
       <h1 class="text-6xl font-black text-white mb-4 drop-shadow-md">EMERGENCY ALERT</h1>
@@ -88,6 +102,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
             <button id="btnAudio" onclick="enableAudio()" class="px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition">🔇 Enable Sound</button>
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600">
                 <button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-sm font-bold bg-gray-600 text-white shadow">⊞ Grid</button>
@@ -119,16 +134,43 @@
 
 <script>
 const SCRIPT_URL = "%%SHEET_URL%%";
-const API_KEY = "%%SECRET_KEY%%"; // INJECTED BY FACTORY FOR RESOLUTION
+let API_KEY = localStorage.getItem('otg_monitor_key'); // LOAD FROM LOCAL STORAGE
 let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
 let mapInstance = null, markersLayer = null, currentView = 'GRID'; 
 let audioEnabled = false, synth = null;
-let acknowledgedAlerts = new Set(); // Tracks workers we have silenced
+let acknowledgedAlerts = new Set(); 
 let alertLoopInterval = null;
 
-window.onload = () => { fetchData(); setInterval(fetchData, 10000); setInterval(renderGrid, 1000); };
+// INIT
+window.onload = () => { 
+    if(!API_KEY) {
+        document.getElementById('authModal').classList.remove('hidden');
+    } else {
+        fetchData(); 
+        setInterval(fetchData, 10000); 
+        setInterval(renderGrid, 1000); 
+    }
+};
+
+function saveAuthKey() {
+    const k = document.getElementById('authKeyInput').value.trim();
+    if(k.length < 3) return alert("Invalid Key");
+    localStorage.setItem('otg_monitor_key', k);
+    API_KEY = k;
+    document.getElementById('authModal').classList.add('hidden');
+    fetchData(); 
+    setInterval(fetchData, 10000); 
+    setInterval(renderGrid, 1000);
+}
+
+function resetKey() {
+    if(confirm("Reset the Security Key for this station?")) {
+        localStorage.removeItem('otg_monitor_key');
+        location.reload();
+    }
+}
 
 async function enableAudio() {
     await Tone.start();
@@ -141,7 +183,7 @@ async function enableAudio() {
 }
 
 function startAlertLoop() {
-    if(alertLoopInterval) return; // Already running
+    if(alertLoopInterval) return; 
     alertLoopInterval = setInterval(() => {
         if(audioEnabled && synth) {
             const now = Tone.now();
@@ -156,7 +198,6 @@ function stopAlertLoop() {
 }
 
 function acknowledgeAlert() {
-    // Add all currently alerting workers to the acknowledged set
     workerData.forEach(w => {
         if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("OVERDUE")) {
             acknowledgedAlerts.add(w.name);
@@ -164,7 +205,7 @@ function acknowledgeAlert() {
     });
     document.getElementById('fullScreenAlert').classList.add('hidden');
     stopAlertLoop();
-    renderGrid(); // Refresh grid to show resolved/ack state
+    renderGrid(); 
 }
 
 function openResolve(name) {
@@ -186,14 +227,12 @@ function submitResolution() {
     if(targetName !== typedName) { alert("Error: Name does not match exactly."); return; }
     if(note.length < 5) { alert("Error: Please enter a resolution note."); return; }
     
-    // SEND RESOLUTION
     const formData = new FormData();
-    formData.append('action', 'resolve'); // Standard POST handled by backend logic
-    formData.append('key', API_KEY);
+    formData.append('action', 'resolve');
+    formData.append('key', API_KEY); // USE SAVED KEY
     formData.append('Worker Name', targetName);
     formData.append('Alarm Status', 'SAFE - MANUALLY CLEARED');
     formData.append('Notes', `[HQ RESOLVED]: ${note}`);
-    // Dummy fields to satisfy backend columns
     formData.append('Battery Level', 'N/A');
     formData.append('Location Name', 'HQ Manual Resolution');
     
@@ -201,7 +240,6 @@ function submitResolution() {
     .then(() => {
         alert("Resolution Sent. Update may take 10s.");
         closeResolve();
-        // Optimistic update
         acknowledgedAlerts.add(targetName);
         renderGrid();
     })
@@ -240,7 +278,6 @@ function handleData(response) {
         workerData = processWorkers(response.workers);
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
         
-        // CHECK ALERTS
         const alertWorkers = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("OVERDUE")) && !w.status.includes("SAFE"));
         const unacked = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name));
         
@@ -249,7 +286,6 @@ function handleData(response) {
             document.getElementById('alertNames').innerText = unacked.map(w => w.name).join(", ");
             startAlertLoop();
         } else {
-            // All alerts acked or no alerts
             document.getElementById('fullScreenAlert').classList.add('hidden');
             stopAlertLoop();
         }
@@ -281,7 +317,6 @@ function renderGrid() {
     workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now));
     const totalActive = workerData.filter(w => w.status !== 'DEPARTED' && w.status !== 'COMPLETED').length;
     
-    // Load Warning Logic
     const loadEl = document.getElementById('loadWarning');
     if (totalActive > 40) { loadEl.className = "bg-red-900 border-red-500 rounded px-3 py-2 text-xs font-bold flex justify-between animate-pulse"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ CRITICAL LOAD (${totalActive})`; }
     else if (totalActive > 20) { loadEl.className = "bg-yellow-900 border-yellow-500 rounded px-3 py-2 text-xs font-bold flex justify-between"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ HIGH TRAFFIC (${totalActive})`; }
@@ -385,3 +420,4 @@ function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return is
 </script>
 </body>
 </html>
+}
