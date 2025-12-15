@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: backend_template.js
-fullContent:
 /**
  * OTG APPSUITE - MASTER BACKEND v68.7 (Diamond Edition)
  * Fix: Added 'Admin Bypass' in doPost for Monitor Resolution.
@@ -395,6 +391,4 @@ function runAllLongitudinalReports() {
     if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows); 
     
     MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); 
-}
-
 }
