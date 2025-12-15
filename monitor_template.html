@@ -1,7 +1,3 @@
-{
-type: uploaded file
-fileName: monitor_template.html
-fullContent:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -94,7 +90,7 @@ fullContent:
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.6</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.7</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -139,7 +135,7 @@ let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
 let mapInstance = null, markersLayer = null, currentView = 'GRID'; 
-let audioEnabled = false, synth = null;
+let audioEnabled = true, synth = null;
 let acknowledgedAlerts = new Set(); 
 let alertLoopInterval = null;
 
@@ -152,6 +148,8 @@ window.onload = () => {
         setInterval(fetchData, 10000); 
         setInterval(renderGrid, 1000); 
     }
+    // Silent audio init
+    document.body.addEventListener('click', async () => { if(audioEnabled && !synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); } }, { once: true });
 };
 
 function saveAuthKey() {
@@ -173,13 +171,19 @@ function resetKey() {
 }
 
 async function enableAudio() {
-    await Tone.start();
-    synth = new Tone.Synth().toDestination();
-    audioEnabled = true;
-    document.getElementById('btnAudio').innerText = "🔊 Sound On";
-    document.getElementById('btnAudio').classList.replace('bg-gray-700', 'bg-green-600');
-    document.getElementById('btnAudio').classList.replace('text-gray-400', 'text-white');
-    synth.triggerAttackRelease("C5", "8n");
+    if(!synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); }
+    audioEnabled = !audioEnabled;
+    const btn = document.getElementById('btnAudio');
+    if(audioEnabled) {
+        btn.innerText = "🔊 Sound On";
+        btn.classList.replace('bg-gray-700', 'bg-green-600');
+        btn.classList.replace('text-gray-400', 'text-white');
+        synth.triggerAttackRelease("C5", "8n");
+    } else {
+        btn.innerText = "🔇 Sound Off";
+        btn.classList.replace('bg-green-600', 'bg-gray-700');
+        btn.classList.replace('text-white', 'text-gray-400');
+    }
 }
 
 function startAlertLoop() {
@@ -420,4 +424,3 @@ function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return is
 </script>
 </body>
 </html>
-}
