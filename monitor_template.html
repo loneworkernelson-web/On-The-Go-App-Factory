@@ -90,7 +90,7 @@
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.7</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.8</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -100,12 +100,19 @@
         <div class="flex items-center gap-3">
             <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
             <button id="btnAudio" onclick="enableAudio()" class="px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition">🔇 Enable Sound</button>
-            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600">
-                <button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-sm font-bold bg-gray-600 text-white shadow">⊞ Grid</button>
-                <button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-sm font-bold text-gray-400 hover:text-white transition">🗺️ Map</button>
+            
+            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4">
+                <button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white shadow transition">🟢 Active</button>
+                <button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">📋 All</button>
             </div>
+
+            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600">
+                <button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 text-white shadow">⊞ Grid</button>
+                <button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">🗺️ Map</button>
+            </div>
+            
             <div class="relative">
-                <input type="text" id="searchBox" placeholder="Filter Names..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-48" onkeyup="renderGrid()">
+                <input type="text" id="searchBox" placeholder="Filter..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-32" onkeyup="renderGrid()">
             </div>
         </div>
         <div class="flex gap-6 border-l border-gray-700 pl-6">
@@ -130,11 +137,12 @@
 
 <script>
 const SCRIPT_URL = "%%SHEET_URL%%";
-let API_KEY = localStorage.getItem('otg_monitor_key'); // LOAD FROM LOCAL STORAGE
+let API_KEY = localStorage.getItem('otg_monitor_key'); 
 let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
 let mapInstance = null, markersLayer = null, currentView = 'GRID'; 
+let currentFilter = 'ACTIVE'; // DEFAULT FILTER
 let audioEnabled = true, synth = null;
 let acknowledgedAlerts = new Set(); 
 let alertLoopInterval = null;
@@ -148,7 +156,6 @@ window.onload = () => {
         setInterval(fetchData, 10000); 
         setInterval(renderGrid, 1000); 
     }
-    // Silent audio init
     document.body.addEventListener('click', async () => { if(audioEnabled && !synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); } }, { once: true });
 };
 
@@ -233,7 +240,7 @@ function submitResolution() {
     
     const formData = new FormData();
     formData.append('action', 'resolve');
-    formData.append('key', API_KEY); // USE SAVED KEY
+    formData.append('key', API_KEY);
     formData.append('Worker Name', targetName);
     formData.append('Alarm Status', 'SAFE - MANUALLY CLEARED');
     formData.append('Notes', `[HQ RESOLVED]: ${note}`);
@@ -248,6 +255,30 @@ function submitResolution() {
         renderGrid();
     })
     .catch(e => alert("Connection Error: " + e));
+}
+
+function setFilter(f) {
+    currentFilter = f;
+    const btnAct = document.getElementById('btnFilterActive');
+    const btnAll = document.getElementById('btnFilterAll');
+    
+    if(f === 'ACTIVE') {
+        btnAct.classList.replace('text-gray-400', 'bg-blue-600');
+        btnAct.classList.replace('hover:text-white', 'text-white');
+        btnAll.classList.replace('bg-blue-600', 'text-gray-400');
+        btnAll.classList.replace('text-white', 'hover:text-white');
+        btnAll.classList.remove('shadow');
+        btnAct.classList.add('shadow');
+    } else {
+        btnAll.classList.replace('text-gray-400', 'bg-blue-600');
+        btnAll.classList.replace('hover:text-white', 'text-white');
+        btnAct.classList.replace('bg-blue-600', 'text-gray-400');
+        btnAct.classList.replace('text-white', 'hover:text-white');
+        btnAct.classList.remove('shadow');
+        btnAll.classList.add('shadow');
+    }
+    renderGrid();
+    if(currentView === 'MAP') renderMap();
 }
 
 function toggleView(view) {
@@ -327,10 +358,18 @@ function renderGrid() {
     else { loadEl.classList.add('hidden'); }
 
     workerData.forEach(w => {
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE');
+        // STRICT FILTER LOGIC
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
         const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
-        if(!isSafe) activeC++; if(isAlert) alertC++;
+        
+        if(!isSafe) activeC++; 
+        if(isAlert) alertC++;
+        
         if (search && !w.name.toLowerCase().includes(search)) return;
+        
+        // FILTER SWITCH
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return;
+
         visibleCount++;
         
         if(currentView === 'MAP') return; 
@@ -390,8 +429,10 @@ function renderMap() {
     let hasMarkers = false;
     const now = Date.now();
     workerData.forEach(w => {
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE');
-        if (document.getElementById('viewSelector').value === 'ACTIVE' && isSafe) return;
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
+        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return;
+        
         if(!w.gps || w.gps.length < 5) return;
         const [lat, lng] = w.gps.split(',').map(Number);
         if(isNaN(lat)) return;
