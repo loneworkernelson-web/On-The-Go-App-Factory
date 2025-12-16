@@ -302,7 +302,6 @@ function forceSync(){
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
-        // v68.0: Prefer Spreadsheet Travel Template
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         
         saveState(); renderLocations(); checkVehicleStatus(); 
@@ -347,9 +346,9 @@ function startVehicleCheck() {
     loadFormAndShow('Vehicle Safety Check');
 }
 
-// v68.1: OPEN TEMPLATE MENU FOR QUICK NOTES
 function openQuickMenu() {
     isMidVisitUpdate = false; 
+    calculatedDist = null; // FIX: Clear stale travel distance
     showModal('template');
     const list = document.getElementById('templateList');
     list.innerHTML = '';
@@ -409,7 +408,7 @@ function showSiteInfo(id, e) {
     if(l.address) {
         html += `<p><strong>Address:</strong><br>${l.address}</p>`;
         const btnNav = document.getElementById('btnSiteNav');
-        btnNav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.address)}`;
+        btnNav.href = `http://googleusercontent.com/maps.google.com/2{encodeURIComponent(l.address)}`;
         btnNav.classList.remove('hidden');
     }
     if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
@@ -441,7 +440,6 @@ function startVisit(){
         saveState(); 
         enterLockedScreen(); 
         playSound('arrive'); 
-        // V67.5 FIX: Include deviceId
         processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
         setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
     });
@@ -457,7 +455,6 @@ function tick(){
     if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
     if(rem<0) { document.getElementById('countdownTimer').classList.add('text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); const minsOver = Math.floor(Math.abs(rem)/60000); if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); } } if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); }
 
-// v68.1: Added Wake Lock Request
 async function requestWakeLock() {
     try {
         wakeLock = await navigator.wakeLock.request('screen');
@@ -515,7 +512,6 @@ function loadFormAndShow(tpl){
     currentActiveTemplate = tpl; 
     buildReportForm(tpl, document.getElementById('reportFields')); 
     
-    // v68.2: Smart Field Injection
     if (calculatedDist) {
         let distInput = document.querySelector('[data-key*="Distance"]');
         if(!distInput) distInput = document.querySelector('input[type="number"]');
@@ -527,13 +523,12 @@ function loadFormAndShow(tpl){
         
         if (calculatedDist.type === 'crow') {
             const noteInput = document.getElementById('rep_notes') || document.querySelector('[data-key="Notes"]');
-            if(noteInput) noteInput.value = (noteInput.value + " [Distance: As the crow flies]").trim();
+            if(noteInput) noteInput.value = (noteInput.value + " [Warning: As the crow flies calculation only]").trim();
         }
     }
 
     const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
     
-    // v68.1: Quick Note Mode vs Active Visit Mode
     if(!state.activeVisit) {
         newBtn.innerText = "SUBMIT REPORT";
         newBtn.classList.remove('long-press-btn');
@@ -556,7 +551,6 @@ function submitReport(){
     const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
     if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
     
-    // v68.2 FIX: Sequential Photo Packing (Values, not Keys)
     const images = Object.values(state.photoStore);
     images.forEach((img, idx) => { 
         finalData[`Photo ${idx + 1}`] = img; 
@@ -598,8 +592,19 @@ function iamSafe() { withPinVerification(false, () => { playSound('safe'); proce
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
-// v67.5 FIX: Add deviceId to Payload
-function buildPayload(d){ let dueTime = ""; let locName = "Unknown"; let locAddr = ""; if (state.activeVisit) { if(state.activeVisit.anticipatedDepartureTime) dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); const l = state.locations.find(x => x.id === state.activeVisit.locationId); if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; } } return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), ...d }; }
+// v68.8 FIX: Added deviceId, Fix Payload Logic
+function buildPayload(d){ let dueTime = ""; let locName = "Unknown"; let locAddr = ""; 
+    if (state.activeVisit) { 
+        if(state.activeVisit.anticipatedDepartureTime) dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); 
+        const l = state.locations.find(x => x.id === state.activeVisit.locationId); 
+        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; } 
+    } else if (state.selectedLocationId) {
+        // v68.8 FIX: Context Aware Quick Notes
+        const l = state.locations.find(x => x.id === state.selectedLocationId);
+        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; }
+    }
+    return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), ...d }; 
+}
 function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
 function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
 function withPinVerification(d,c){ showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) c(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(d) c(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
