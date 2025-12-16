@@ -362,6 +362,24 @@ function openQuickMenu() {
     }
 }
 
+// v68.8 FIX: Added missing openMidVisitMenu
+function openMidVisitMenu() {
+    isMidVisitUpdate = true;
+    calculatedDist = null; 
+    
+    // Determine context (Travelling or On Site)
+    const currentLocId = state.activeVisit ? state.activeVisit.locationId : null;
+    const loc = state.locations.find(l => l.id === currentLocId);
+    
+    if(loc && loc.id === 'travel') {
+        loadFormAndShow("Travel Report");
+    } else if(loc && loc.templateName) {
+        loadFormAndShow(loc.templateName);
+    } else {
+        loadFormAndShow("Standard Visit Note");
+    }
+}
+
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 
 function initLocations() { 
