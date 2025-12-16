@@ -90,7 +90,7 @@
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.9</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.11</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -99,7 +99,7 @@
         </div>
         <div class="flex items-center gap-3">
             <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
-            <button id="btnAudio" onclick="enableAudio()" class="px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition">🔇 Enable Sound</button>
+            <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
             
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4">
                 <button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white shadow transition">🟢 Active</button>
@@ -156,6 +156,7 @@ window.onload = () => {
         setInterval(fetchData, 10000); 
         setInterval(renderGrid, 1000); 
     }
+    // Silent audio init
     document.body.addEventListener('click', async () => { if(audioEnabled && !synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); } }, { once: true });
 };
 
@@ -177,19 +178,17 @@ function resetKey() {
     }
 }
 
-async function enableAudio() {
+async function toggleAudio() {
     if(!synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); }
     audioEnabled = !audioEnabled;
     const btn = document.getElementById('btnAudio');
     if(audioEnabled) {
         btn.innerText = "🔊 Sound On";
-        btn.classList.replace('bg-gray-700', 'bg-green-600');
-        btn.classList.replace('text-gray-400', 'text-white');
+        btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition";
         synth.triggerAttackRelease("C5", "8n");
     } else {
         btn.innerText = "🔇 Sound Off";
-        btn.classList.replace('bg-green-600', 'bg-gray-700');
-        btn.classList.replace('text-white', 'text-gray-400');
+        btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition";
     }
 }
 
@@ -210,7 +209,7 @@ function stopAlertLoop() {
 
 function acknowledgeAlert() {
     workerData.forEach(w => {
-        if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("OVERDUE")) {
+        if(w.status.includes("EMERGENCY") || w.status.includes("PANIC")) {
             acknowledgedAlerts.add(w.name);
         }
     });
@@ -313,7 +312,7 @@ function handleData(response) {
         workerData = processWorkers(response.workers);
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
         
-        const alertWorkers = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("OVERDUE")) && !w.status.includes("SAFE"));
+        const alertWorkers = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !w.status.includes("SAFE"));
         const unacked = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name));
         
         if(unacked.length > 0) {
@@ -359,13 +358,13 @@ function renderGrid() {
 
     workerData.forEach(w => {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
-        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
-        
+        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC');
+        const isOverdue = w.status.includes('OVERDUE');
         if(!isSafe) activeC++; 
-        if(isAlert) alertC++;
+        if(isAlert || isOverdue) alertC++;
         
         if (search && !w.name.toLowerCase().includes(search)) return;
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return;
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue) return;
 
         visibleCount++;
         
@@ -383,9 +382,11 @@ function renderGrid() {
             if (!isNaN(due)) {
                 if (due > now) { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
                 else {
-                    const minsOver = (now - due) / 60000;
-                    if (minsOver < escalationLimit) { borderClass = 'bd-amber'; dotClass = 'st-amber'; statusText = `OVERDUE (${Math.floor(minsOver)}m)`; } 
-                    else { borderClass = 'bd-red'; dotClass = 'st-red'; statusText = "CRITICAL OVERDUE"; }
+                    borderClass = 'bd-amber'; dotClass = 'st-amber'; timeClass = 'text-amber-500 font-bold';
+                    const minsOver = Math.floor((now - due) / 60000);
+                    if(minsOver >= escalationLimit) {
+                       borderClass = 'bd-red'; dotClass = 'st-red';
+                    }
                 }
             } else { borderClass = 'bd-green'; dotClass = 'st-ok'; }
         }
@@ -394,7 +395,6 @@ function renderGrid() {
         card.className = `card p-4 ${borderClass}`;
         let batClass = parseInt(w.battery) < 20 ? 'text-red-500 font-bold blink' : 'text-green-500';
         
-        // v68.9 Logic: Show Worker Phone by default. Show ICE only if Alert.
         let contactHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Mobile</span><span class="text-gray-300 font-mono">${w.phone||'--'}</span></div>`;
         if (isAlert && w.iceName) {
             contactHtml += `<div class="mt-2 pt-2 border-t border-gray-700 bg-red-900/30 -mx-4 px-4 py-2"><div class="flex justify-between items-center"><span class="text-[10px] text-red-400 font-bold uppercase">ICE: ${w.iceName}</span><a href="tel:${w.icePhone}" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-xs font-bold shadow">📞 Call ICE</a></div></div>`;
@@ -433,8 +433,9 @@ function renderMap() {
     const now = Date.now();
     workerData.forEach(w => {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
-        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return;
+        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC');
+        const isOverdue = w.status.includes('OVERDUE');
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue) return;
         
         if(!w.gps || w.gps.length < 5) return;
         const [lat, lng] = w.gps.split(',').map(Number);
@@ -468,4 +469,3 @@ function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return is
 </script>
 </body>
 </html>
-```
