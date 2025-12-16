@@ -1,7 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.8 (Diamond Edition)
- * Fix: Wrapped doGet in try/catch to prevent HTML errors during Sync.
- * Fix: Hardened checkAccess to prevent crashes when writing Device IDs.
+ * OTG APPSUITE - MASTER BACKEND v68.9 (Diamond Edition)
+ * Fix: Updated processFormEmail to include Photo 3 and Photo 4 in email reports.
  */
 
 const CONFIG = {
@@ -30,41 +29,32 @@ function checkAccess(workerName, deviceId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Staff');
   
-  // Basic Mode (No Staff Sheet)
   if (!sheet) return { allowed: true, meta: {} }; 
 
   const data = sheet.getDataRange().getValues();
-  // Safe Row Loop
   for (let i = 1; i < data.length; i++) {
-    // Safety check for empty rows
     if(!data[i] || !data[i][0]) continue;
     
     const rowName = String(data[i][0]).trim().toLowerCase();
     const targetName = String(workerName).trim().toLowerCase();
     
     if (rowName === targetName) {
-       // 1. Check Status
        if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
            return { allowed: false, msg: "Account Disabled" };
        }
 
-       // 2. Device Lock Logic
        const registeredId = String(data[i][4] || ""); 
        
        if (registeredId === "" || registeredId === "undefined") {
-           // First time login - Lock it
            if(deviceId) {
-               // Critical Fix: Ensure we don't crash if Col 5 doesn't exist yet
                try {
                    sheet.getRange(i + 1, 5).setValue(deviceId);
                } catch(e) {
                    console.error("Failed to lock device ID: " + e);
-                   // Proceed anyway, don't block login
                }
                return { allowed: true, meta: getRowMeta(data[i]) };
            }
        } else {
-           // Subsequent login
            if (registeredId === deviceId) {
                return { allowed: true, meta: getRowMeta(data[i]) };
            } else {
@@ -83,7 +73,6 @@ function getRowMeta(row) {
 
 // --- API ENDPOINTS ---
 function doGet(e) {
-  // SAFETY NET: Catch any crash and return JSON
   try {
       if(!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Params"})).setMimeType(ContentService.MimeType.JSON);
 
@@ -160,7 +149,6 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
 
   } catch(e) {
-      // Critical: Return JSON error so App doesn't crash
       return ContentService.createTextOutput(JSON.stringify({status: "error", message: "SERVER CRASH: " + e.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -172,10 +160,8 @@ function doPost(e) {
     if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error"}));
     const p = e.parameter;
     
-    // 1. KEY CHECK
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
     
-    // 2. AUTH CHECK (With Admin Bypass for Resolution)
     if (p.action !== 'resolve') {
         const auth = checkAccess(p['Worker Name'], p.deviceId); 
         if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Unauthorized"}));
@@ -301,8 +287,13 @@ function processFormEmail(p, assetIds) {
             html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${displayVal}</td></tr>`;
         }
         html += `</table><br>`;
+        
+        // v68.9 FIX: Added logic for Photos 3 & 4
         if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
         if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        
         if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`;
         html += `</div>`;
         MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html });
