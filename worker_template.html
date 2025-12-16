@@ -29,8 +29,9 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 
 /* INTERACTIVE ELEMENTS */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 1.5s linear; }
-.long-press-btn.pressing::after { width: 100%; }
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
+.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -451,7 +452,8 @@ function showSiteInfo(id, e) {
     if(l.address) {
         html += `<p><strong>Address:</strong><br>${l.address}</p>`;
         const btnNav = document.getElementById('btnSiteNav');
-        btnNav.href = `http://googleusercontent.com/maps.google.com/2{encodeURIComponent(l.address)}`;
+        // v68.17 FIX: Use Standard Universal Google Maps URL
+        btnNav.href = `https://maps.google.com/?q=${encodeURIComponent(l.address)}`;
         btnNav.classList.remove('hidden');
     }
     if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
@@ -636,64 +638,23 @@ function iamSafe() { withPinVerification(false, () => { playSound('safe'); proce
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
-// v68.8 FIX: Added deviceId, Fix Payload Logic
-function buildPayload(d){ let dueTime = ""; let locName = "Unknown"; let locAddr = ""; 
-    if (state.activeVisit) { 
-        if(state.activeVisit.anticipatedDepartureTime) dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); 
-        const l = state.locations.find(x => x.id === state.activeVisit.locationId); 
-        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; } 
-    } else if (state.selectedLocationId) {
-        // v68.8 FIX: Context Aware Quick Notes
-        const l = state.locations.find(x => x.id === state.selectedLocationId);
-        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; }
-    }
-    // v68.14: Added Worker Email
-    return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), 'Worker Email': state.settings.workerEmail, ...d }; 
-}
-function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
-function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
-function withPinVerification(d,c){ showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) c(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(d) c(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
-function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
-function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
-function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
-async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
-function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
-function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-function buildReportForm(n,c){
-    state.photoStore={};
-    const safeName = n ? n.trim() : "Standard Visit Note";
-    let t = null;
-    if(state.globalForms) t = state.globalForms.find(f => f.name.trim() === safeName)?.questions;
-    if(!t && state.cachedForms) t = state.cachedForms[safeName];
-    if(!t) t = state.cachedForms["(Standard)"];
-    
-    if(!t) {
-        console.warn("Template not found:", safeName);
-        t = [{type:'note', text:'Standard Check-in (Default)'}, {type:'text', text:'Notes'}];
-    }
-
-    c.innerHTML='';
-    if(t.length===0){
-        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
-    }else{
-        t.forEach((f,i)=>{
-            let y=f.type||'check',x=f.text||f;
-            if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}}
-            let h='';
-            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
-            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
-            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
-            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
-            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
-            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
-            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
-            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
-            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
-            else if(y==='date')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="date" data-key="${x}" class="form-input">`;
-            c.innerHTML+=h;
-        });
-    }
-    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
+// v68.15 FIX: setupLongPress cancels animation on mouseleave/mouseup
+function setupLongPress(btn, cb) {
+    let t;
+    const start = (e) => {
+        e.preventDefault();
+        btn.classList.add('pressing');
+        t = setTimeout(() => {
+            cb();
+            btn.classList.remove('pressing');
+        }, 1500);
+    };
+    const cancel = (e) => {
+        clearTimeout(t);
+        btn.classList.remove('pressing');
+    };
+    btn.onmousedown = btn.ontouchstart = start;
+    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel; // FIXED: Added onmouseleave
 }
 // INIT
 window.addEventListener('load', () => {
