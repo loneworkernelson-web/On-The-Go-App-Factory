@@ -1,7 +1,7 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.7 (Diamond Edition)
- * Fix: Added 'Admin Bypass' in doPost for Monitor Resolution.
- * (Allows Monitor to clear alerts without needing the Worker's Device ID)
+ * OTG APPSUITE - MASTER BACKEND v68.8 (Diamond Edition)
+ * Fix: Wrapped doGet in try/catch to prevent HTML errors during Sync.
+ * Fix: Hardened checkAccess to prevent crashes when writing Device IDs.
  */
 
 const CONFIG = {
@@ -30,26 +30,41 @@ function checkAccess(workerName, deviceId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Staff');
   
-  if (!sheet) return { allowed: true }; 
+  // Basic Mode (No Staff Sheet)
+  if (!sheet) return { allowed: true, meta: {} }; 
 
   const data = sheet.getDataRange().getValues();
+  // Safe Row Loop
   for (let i = 1; i < data.length; i++) {
+    // Safety check for empty rows
+    if(!data[i] || !data[i][0]) continue;
+    
     const rowName = String(data[i][0]).trim().toLowerCase();
     const targetName = String(workerName).trim().toLowerCase();
     
     if (rowName === targetName) {
+       // 1. Check Status
        if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
            return { allowed: false, msg: "Account Disabled" };
        }
 
+       // 2. Device Lock Logic
        const registeredId = String(data[i][4] || ""); 
        
        if (registeredId === "" || registeredId === "undefined") {
+           // First time login - Lock it
            if(deviceId) {
-               sheet.getRange(i + 1, 5).setValue(deviceId);
+               // Critical Fix: Ensure we don't crash if Col 5 doesn't exist yet
+               try {
+                   sheet.getRange(i + 1, 5).setValue(deviceId);
+               } catch(e) {
+                   console.error("Failed to lock device ID: " + e);
+                   // Proceed anyway, don't block login
+               }
                return { allowed: true, meta: getRowMeta(data[i]) };
            }
        } else {
+           // Subsequent login
            if (registeredId === deviceId) {
                return { allowed: true, meta: getRowMeta(data[i]) };
            } else {
@@ -68,74 +83,86 @@ function getRowMeta(row) {
 
 // --- API ENDPOINTS ---
 function doGet(e) {
-  if(e.parameter.test) {
-     if(e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
-     return ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
-  }
+  // SAFETY NET: Catch any crash and return JSON
+  try {
+      if(!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Params"})).setMimeType(ContentService.MimeType.JSON);
 
-  if(e.parameter.action === 'sync') {
-      const worker = e.parameter.worker;
-      const deviceId = e.parameter.deviceId; 
-      
-      const auth = checkAccess(worker, deviceId);
-      if (!auth.allowed) {
-          return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "ACCESS DENIED: " + auth.msg })).setMimeType(ContentService.MimeType.JSON);
+      if(e.parameter.test) {
+         if(e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
+         return ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
       }
 
-      const ss = SpreadsheetApp.getActiveSpreadsheet();
-      const tSheet = ss.getSheetByName('Templates');
-      const tData = tSheet ? tSheet.getDataRange().getValues() : [];
-      const forms = [];
-      const cachedTemplates = {};
-      for(let i=1; i<tData.length; i++) {
-          const row = tData[i];
-          if(row.length < 3) continue;
-          const type = row[0]; const name = row[1]; const assign = row[2]; 
-          if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { forms.push({ name: name, questions: parseQuestions(row) }); }
-          cachedTemplates[name] = parseQuestions(row);
-      }
-      
-      const sSheet = ss.getSheetByName('Sites');
-      const sData = sSheet ? sSheet.getDataRange().getValues() : [];
-      const sites = [];
-      for(let i=1; i<sData.length; i++) {
-          const row = sData[i];
-          if(row.length < 1) continue;
-          const assign = row[0]; 
-          if(assign.includes(worker) || assign === 'ALL') {
-              sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
+      if(e.parameter.action === 'sync') {
+          const worker = e.parameter.worker;
+          const deviceId = e.parameter.deviceId; 
+          
+          const auth = checkAccess(worker, deviceId);
+          if (!auth.allowed) {
+              return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "ACCESS DENIED: " + auth.msg })).setMimeType(ContentService.MimeType.JSON);
           }
+
+          const ss = SpreadsheetApp.getActiveSpreadsheet();
+          const tSheet = ss.getSheetByName('Templates');
+          const tData = tSheet ? tSheet.getDataRange().getValues() : [];
+          const forms = [];
+          const cachedTemplates = {};
+          for(let i=1; i<tData.length; i++) {
+              const row = tData[i];
+              if(row.length < 3) continue;
+              const type = row[0]; const name = row[1]; const assign = row[2]; 
+              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { forms.push({ name: name, questions: parseQuestions(row) }); }
+              cachedTemplates[name] = parseQuestions(row);
+          }
+          
+          const sSheet = ss.getSheetByName('Sites');
+          const sData = sSheet ? sSheet.getDataRange().getValues() : [];
+          const sites = [];
+          for(let i=1; i<sData.length; i++) {
+              const row = sData[i];
+              if(row.length < 1) continue;
+              const assign = row[0]; 
+              if(assign.includes(worker) || assign === 'ALL') {
+                  sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
+              }
+          }
+          
+          return ContentService.createTextOutput(JSON.stringify({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta })).setMimeType(ContentService.MimeType.JSON);
       }
-      
-      return ContentService.createTextOutput(JSON.stringify({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta })).setMimeType(ContentService.MimeType.JSON);
+
+      if(e.parameter.callback){
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const t = ss.getSheetByName('Visits');
+        if(!t) return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+        
+        const r = t.getDataRange().getValues();
+        const headers = r.shift();
+        const st = ss.getSheetByName('Staff');
+        const stD = st ? st.getDataRange().getValues() : [];
+        const wofMap = {};
+        if(stD.length > 1) {
+            for(let i=1; i<stD.length; i++) { 
+                if(stD[i] && stD[i][0]) wofMap[String(stD[i][0]).toLowerCase()] = stD[i][6] || ""; 
+            }
+        }
+
+        const rows = r.map(e => {
+            let obj = {};
+            headers.forEach((h, idx) => obj[h] = e[idx]);
+            const wName = obj['Worker Name'] ? String(obj['Worker Name']).toLowerCase() : "";
+            obj.WOFExpiry = wofMap[wName] || "";
+            return obj;
+        });
+
+        return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+
+      if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
+      return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
+
+  } catch(e) {
+      // Critical: Return JSON error so App doesn't crash
+      return ContentService.createTextOutput(JSON.stringify({status: "error", message: "SERVER CRASH: " + e.toString() })).setMimeType(ContentService.MimeType.JSON);
   }
-
-  if(e.parameter.callback){
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const t = ss.getSheetByName('Visits');
-    if(!t) return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-    
-    const r = t.getDataRange().getValues();
-    const headers = r.shift();
-    const st = ss.getSheetByName('Staff');
-    const stD = st ? st.getDataRange().getValues() : [];
-    const wofMap = {};
-    if(stD.length > 1) {
-        for(let i=1; i<stD.length; i++) { wofMap[String(stD[i][0]).toLowerCase()] = stD[i][6] || ""; }
-    }
-
-    const rows = r.map(e => {
-        let obj = {};
-        headers.forEach((h, idx) => obj[h] = e[idx]);
-        obj.WOFExpiry = wofMap[String(obj['Worker Name']).toLowerCase()] || "";
-        return obj;
-    });
-
-    return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
-  return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
