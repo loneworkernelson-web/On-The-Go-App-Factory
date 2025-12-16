@@ -1,12 +1,13 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.11 (Diamond Edition)
- * Critical Fix: "Sync Crash" resolved.
- * - Device Locking moved from doGet (Sync) to doPost (Report) to prevent Google 'Action not allowed' errors.
- * - Note to Self: Routes emails to worker's own address.
+ * OTG APPSUITE - MASTER BACKEND v68.12 (Diamond Edition)
+ * Critical Fix: "Sync Crash" on new devices.
+ * - Enforces Strict Read-Only mode during Sync (doGet).
+ * - Defers Device ID locking to the first Data Submission (doPost).
+ * - Includes 'Note to Self' routing and Full-Resolution Photos.
  */
 
 const CONFIG = {
-  SECRET_KEY: "%%SECRET_KEY%%", 
+  SECRET_KEY: "%%SECRET_KEY%%", // Must match your Factory setting
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
@@ -25,93 +26,44 @@ const pid = sp.getProperty('PDF_FOLDER_ID');
 if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
-// --- AUTHORIZATION LOGIC ---
-// v68.11: Added isReadOnly param to prevent writes during GET
-function checkAccess(workerName, deviceId, isReadOnly) {
-  if (!workerName) return { allowed: false, msg: "Name missing" };
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Staff');
-  
-  if (!sheet) return { allowed: true, meta: {} }; 
-
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if(!data[i] || !data[i][0]) continue;
-    
-    const rowName = String(data[i][0]).trim().toLowerCase();
-    const targetName = String(workerName).trim().toLowerCase();
-    
-    if (rowName === targetName) {
-       // 1. Check Account Status
-       if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
-           return { allowed: false, msg: "Account Disabled" };
-       }
-
-       const registeredId = String(data[i][4] || ""); 
-       
-       // 2. Device Lock Logic
-       if (registeredId === "" || registeredId === "undefined") {
-           // OPEN SLOT
-           if(deviceId) {
-               // Only lock if we are in a POST request (isReadOnly = false)
-               if (!isReadOnly) {
-                   try {
-                       sheet.getRange(i + 1, 5).setValue(deviceId);
-                   } catch(e) {
-                       console.warn("Device lock deferred: " + e);
-                   }
-               }
-               return { allowed: true, meta: getRowMeta(data[i]) };
-           }
-       } else {
-           // LOCKED SLOT
-           if (registeredId === deviceId) {
-               return { allowed: true, meta: getRowMeta(data[i]) };
-           } else {
-               return { allowed: false, msg: "Unauthorized Device. Contact Admin to reset." };
-           }
-       }
-       return { allowed: true, meta: getRowMeta(data[i]) }; 
-    }
-  }
-  return { allowed: false, msg: "Name not found in Staff list." };
-}
-
-function getRowMeta(row) {
-    return { lastVehCheck: row[5] || "", wofExpiry: row[6] || "" };
-}
-
 // --- API ENDPOINTS ---
 function doGet(e) {
+  // Global Safety Net: Ensures we ALWAYS return JSON, never HTML
   try {
-      if(!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error", message:"No Params"})).setMimeType(ContentService.MimeType.JSON);
+      if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
 
+      // 1. Connection Test
       if(e.parameter.test) {
-         if(e.parameter.key === CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);
-         return ContentService.createTextOutput(JSON.stringify({status:"error", message:"Invalid Key"})).setMimeType(ContentService.MimeType.JSON);
+         if(e.parameter.key === CONFIG.SECRET_KEY) return sendJSON({status:"success", version: "v68.12"});
+         return sendJSON({status:"error", message:"Invalid Key"});
       }
 
+      // 2. Worker App Sync
       if(e.parameter.action === 'sync') {
           const worker = e.parameter.worker;
           const deviceId = e.parameter.deviceId; 
           
-          // v68.11: TRUE = Read Only Mode (Don't write to sheet)
+          // CRITICAL FIX: Pass 'true' to forbid writing during Sync
           const auth = checkAccess(worker, deviceId, true);
           
           if (!auth.allowed) {
-              return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "ACCESS DENIED: " + auth.msg })).setMimeType(ContentService.MimeType.JSON);
+              return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
           }
 
+          // Fetch Configuration Data
           const ss = SpreadsheetApp.getActiveSpreadsheet();
           const tSheet = ss.getSheetByName('Templates');
           const tData = tSheet ? tSheet.getDataRange().getValues() : [];
           const forms = [];
           const cachedTemplates = {};
+          
           for(let i=1; i<tData.length; i++) {
               const row = tData[i];
               if(row.length < 3) continue;
               const type = row[0]; const name = row[1]; const assign = row[2]; 
-              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { forms.push({ name: name, questions: parseQuestions(row) }); }
+              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { 
+                  forms.push({ name: name, questions: parseQuestions(row) }); 
+              }
               cachedTemplates[name] = parseQuestions(row);
           }
           
@@ -127,41 +79,20 @@ function doGet(e) {
               }
           }
           
-          return ContentService.createTextOutput(JSON.stringify({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta })).setMimeType(ContentService.MimeType.JSON);
+          return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
       }
 
+      // 3. Monitor App Poll (JSONP)
       if(e.parameter.callback){
-        const ss = SpreadsheetApp.getActiveSpreadsheet();
-        const t = ss.getSheetByName('Visits');
-        if(!t) return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-        
-        const r = t.getDataRange().getValues();
-        const headers = r.shift();
-        const st = ss.getSheetByName('Staff');
-        const stD = st ? st.getDataRange().getValues() : [];
-        const wofMap = {};
-        if(stD.length > 1) {
-            for(let i=1; i<stD.length; i++) { 
-                if(stD[i] && stD[i][0]) wofMap[String(stD[i][0]).toLowerCase()] = stD[i][6] || ""; 
-            }
-        }
-
-        const rows = r.map(e => {
-            let obj = {};
-            headers.forEach((h, idx) => obj[h] = e[idx]);
-            const wName = obj['Worker Name'] ? String(obj['Worker Name']).toLowerCase() : "";
-            obj.WOFExpiry = wofMap[wName] || "";
-            return obj;
-        });
-
-        return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+        return handleMonitorPoll(e.parameter.callback);
       }
 
       if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
-      return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
+      return sendJSON({status: "online"});
 
-  } catch(e) {
-      return ContentService.createTextOutput(JSON.stringify({status: "error", message: "SERVER CRASH: " + e.toString() })).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+      // Emergency Error Catch: Returns JSON so App doesn't crash
+      return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()});
   }
 }
 
@@ -169,15 +100,15 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.tryLock(30000); 
   try {
-    if (!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error"}));
+    if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
     
-    if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
+    if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return sendJSON({status: "error"});
     
+    // AUTH CHECK: Pass 'false' to ALLOW writing (Locking Device ID)
     if (p.action !== 'resolve') {
-        // v68.11: FALSE = Allow Write. This is where Device Locking happens now.
         const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
-        if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Unauthorized"}));
+        if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized"});
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -188,6 +119,7 @@ function doPost(e) {
       sheet.appendRow(headers); sheet.setFrozenRows(1);
     }
     
+    // Process Images
     const assets = {};
     const assetIds = {}; 
     ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(key => {
@@ -205,6 +137,7 @@ function doPost(e) {
     let rowUpdated = false;
     const lastRow = sheet.getLastRow();
     
+    // Smart Row Update Logic
     if (lastRow > 1) {
       const searchDepth = Math.min(lastRow - 1, 200);
       const startRow = lastRow - searchDepth + 1;
@@ -250,15 +183,84 @@ function doPost(e) {
     }
     
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
-    
     if (p['Template Name']) processFormEmail(p, assetIds);
-    
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
-    return ContentService.createTextOutput("OK");
-  } catch(e) { return ContentService.createTextOutput("Error: " + e.toString()); } 
+    return sendJSON({status:"ok"});
+  } catch(e) { return sendJSON({status:"error", message: e.toString()}); } 
   finally { lock.releaseLock(); }
 }
+
+// --- HELPER FUNCTIONS ---
+
+function checkAccess(workerName, deviceId, isReadOnly) {
+  if (!workerName) return { allowed: false, msg: "Name missing" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { allowed: true, meta: {} }; 
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if(!data[i] || !data[i][0]) continue;
+    const rowName = String(data[i][0]).trim().toLowerCase();
+    
+    if (rowName === String(workerName).trim().toLowerCase()) {
+       // 1. Check Disabled
+       if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
+           return { allowed: false, msg: "Account Disabled" };
+       }
+
+       // 2. Device Locking
+       const registeredId = String(data[i][4] || ""); 
+       if (registeredId === "" || registeredId === "undefined") {
+           // OPEN SLOT
+           if(deviceId && !isReadOnly) { // Only write if NOT read-only
+               try { sheet.getRange(i + 1, 5).setValue(deviceId); } 
+               catch(e) { console.warn("Lock failed (benign): " + e); }
+           }
+           return { allowed: true, meta: getRowMeta(data[i]) };
+       } else {
+           // LOCKED SLOT
+           if (registeredId === deviceId) return { allowed: true, meta: getRowMeta(data[i]) };
+           else return { allowed: false, msg: "Unauthorized Device. Contact Admin to reset." };
+       }
+    }
+  }
+  return { allowed: false, msg: "Name not found in Staff list." };
+}
+
+function sendJSON(data) {
+    return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleMonitorPoll(callback) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const t = ss.getSheetByName('Visits');
+    if(!t) return ContentService.createTextOutput(callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+    
+    const r = t.getDataRange().getValues();
+    const headers = r.shift();
+    const st = ss.getSheetByName('Staff');
+    const stD = st ? st.getDataRange().getValues() : [];
+    const wofMap = {};
+    if(stD.length > 1) {
+        for(let i=1; i<stD.length; i++) { 
+            if(stD[i] && stD[i][0]) wofMap[String(stD[i][0]).toLowerCase()] = stD[i][6] || ""; 
+        }
+    }
+
+    const rows = r.map(e => {
+        let obj = {};
+        headers.forEach((h, idx) => obj[h] = e[idx]);
+        const wName = obj['Worker Name'] ? String(obj['Worker Name']).toLowerCase() : "";
+        obj.WOFExpiry = wofMap[wName] || "";
+        return obj;
+    });
+
+    return ContentService.createTextOutput(callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function getRowMeta(row) { return { lastVehCheck: row[5] || "", wofExpiry: row[6] || "" }; }
 
 function updateStaffVehCheck(worker, jsonString) {
     try {
@@ -285,13 +287,10 @@ function updateStaffVehCheck(worker, jsonString) {
 function processFormEmail(p, assetIds) {
     try {
         let recipient = "";
-        
+        // v68.12: Note to Self Logic
         if (String(p['Template Name']).trim() === "Note to Self") {
             recipient = p['Worker Email'];
-            if (!recipient || !recipient.includes('@')) {
-                console.log("Note to Self aborted: No valid worker email found in payload.");
-                return; 
-            }
+            if (!recipient || !recipient.includes('@')) { console.log("Note to Self aborted: No email."); return; }
         } else {
             const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
             const data = sh.getDataRange().getValues();
@@ -325,7 +324,6 @@ function processFormEmail(p, assetIds) {
         if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
         if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
         if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
-        
         if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`;
         html += `</div>`;
         MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html });
