@@ -1,177 +1,200 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>%%ORG_NAME%%</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#111827">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="%%LOGO_DATA%%">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>%%ORG_NAME%%</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#111827">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="%%LOGO_DATA%%">
 
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 
-<style>
-/* --- CORE STYLES --- */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
+    <style>
+        /* --- CORE LAYOUT --- */
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
+        
+        /* Page Transition System */
+        .page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
+        .page.active { display: flex; z-index: 10; }
 
-/* PAGE MANAGEMENT */
-.page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
-.page.active { display: flex; z-index: 10; }
+        /* Zones */
+        .header-bar { padding: 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
+        .content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
+        .footer-bar { padding: 1rem; background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; z-index: 20; }
 
-/* LAYOUT HELPERS */
-.header-bar { padding: 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
-.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
-.footer-bar { padding: 1rem; background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; z-index: 20; }
+        /* --- UI COMPONENTS --- */
+        /* Long Press Button Animation */
+        .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+        .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
+        .long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
 
-/* INTERACTIVE ELEMENTS */
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
-.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+        /* Range Slider */
+        .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+        
+        /* Loading Spinner */
+        .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
-.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+        /* Signature Pad */
+        canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 
-/* --- SETTINGS CARDS --- */
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
-.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
-</style>
+        /* Settings Forms */
+        .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+        .setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .form-input, .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+        .form-input:focus, .form-input-card:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+        
+        /* Colors */
+        .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+    </style>
 </head>
 <body class="bg-gray-900 text-white">
 
 <div id="app-container" class="relative h-full w-full">
 
-<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">
-    📡 OFFLINE MODE - Data queued for upload
-</div>
+    <div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">
+        📡 OFFLINE MODE - Data queued for upload
+    </div>
+    <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">
+        ⚠️ Vehicle Check Overdue - Tap to Complete
+    </div>
 
-<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">
-    ⚠️ Vehicle Check Overdue - Tap to Complete
-</div>
+    <div id="settingsPage" class="page active z-50 bg-gray-800">
+        <div class="header-bar">
+            <h1 class="text-2xl font-bold text-white">Settings</h1>
+            <button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2 hidden">×</button>
+        </div>
+        <div class="content-area pb-24">
+            <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div>
+            <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
+            
+            <div class="setting-card">
+                <label class="setting-label lbl-blue">Your Details</label>
+                <input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)">
+                <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+                <input id="set_email" type="email" class="form-input-card" placeholder="Your Email (For Note to Self)">
+            </div>
 
-<div id="settingsPage" class="page active z-50 bg-gray-800">
-    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2 hidden">×</button></div>
-    <div class="content-area pb-24">
-        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div>
-        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
+            <div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div>
+            <div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div>
+            <div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div>
+            
+            <div class="setting-card border-gray-600">
+                <label class="setting-label lbl-gray">System Actions</label>
+                <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%">
+                <div class="flex gap-2">
+                    <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button>
+                    <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bar"><button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Save & Sync</button></div>
+    </div>
+
+    <div id="mainPage" class="page">
+        <div class="header-bar">
+            <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
+            <div class="flex gap-2"><button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button><button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button></div>
+        </div>
+        <div class="content-area">
+            <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
+            <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
+            <div id="locationList" class="space-y-3 pb-4"></div>
+            <div class="flex gap-3 mt-4">
+                 <button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button>
+                 <button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button>
+            </div>
+        </div>
+        <div class="footer-bar">
+            <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+                <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
+                <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+            </div>
+            <div class="flex gap-2">
+                <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Note to Self</button>
+                <button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="lockedPage" class="page">
+        <div id="fiveMinBanner" class="hidden absolute top-0 left-0 w-full bg-yellow-600 text-white font-bold py-3 animate-pulse z-50 shadow-xl border-b-4 border-yellow-400 text-center">⚠️ 5 MINUTES REMAINING - EXTEND NOW</div>
+        <div class="flex-1 flex flex-col justify-between p-6">
+            <div class="flex justify-between items-start">
+                <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700">🌙</button>
+                <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
+            </div>
+            <div class="text-center">
+                <p class="text-gray-500 text-sm uppercase tracking-widest">Currently At</p>
+                <div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()">
+                    <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px]"></h2>
+                    <span class="text-blue-400 text-xl">ℹ️</span>
+                </div>
+                <div id="countdownTimer" class="text-7xl font-bold font-mono text-white tracking-tighter">00:00</div>
+                <p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p>
+            </div>
+            <div class="space-y-3 w-full">
+                <div class="flex gap-3">
+                    <button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg" onclick="showModal('extend')">Extend</button>
+                    <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">Notes</button>
+                </div>
+                <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button>
+                <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+            </div>
+        </div>
+        <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
+    </div>
+
+    <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
         
-        <div class="setting-card">
-            <label class="setting-label lbl-blue">Your Details</label>
-            <input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)">
-            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
-            <input id="set_email" type="email" class="form-input-card" placeholder="Your Email (For Note to Self)">
-        </div>
-
-        <div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div>
-        <div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div>
-        <div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div>
-        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
-    </div>
-    <div class="footer-bar"><button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Save & Sync</button></div>
-</div>
-
-<div id="mainPage" class="page">
-    <div class="header-bar">
-        <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
-        <div class="flex gap-2"><button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button><button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button></div>
-    </div>
-    <div class="content-area">
-        <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
-        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
-        <div id="locationList" class="space-y-3 pb-4"></div>
-        <div class="flex gap-3 mt-4">
-             <button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button>
-             <button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button>
-        </div>
-    </div>
-    <div class="footer-bar">
-        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
-        </div>
-        <div class="flex gap-2">
-            <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Note to Self</button>
-            <button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
-        </div>
-    </div>
-</div>
-
-<div id="lockedPage" class="page">
-    <div id="fiveMinBanner" class="hidden absolute top-0 left-0 w-full bg-yellow-600 text-white font-bold py-3 animate-pulse z-50 shadow-xl border-b-4 border-yellow-400 text-center">⚠️ 5 MINUTES REMAINING - EXTEND NOW</div>
-    <div class="flex-1 flex flex-col justify-between p-6">
-        <div class="flex justify-between items-start">
-            <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700">🌙</button>
-            <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button>
-        </div>
-        <div class="text-center">
-            <p class="text-gray-500 text-sm uppercase tracking-widest">Currently At</p>
-            <div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()">
-                <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px]"></h2>
-                <span class="text-blue-400 text-xl">ℹ️</span>
+        <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2>
+            <div id="siteInfoContent" class="text-gray-300 text-sm space-y-2 mb-4"></div>
+            <div class="flex gap-2 mb-4">
+                <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a>
+                <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a>
             </div>
-            <div id="countdownTimer" class="text-7xl font-bold font-mono text-white tracking-tighter">00:00</div>
-            <p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p>
+            <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-center mb-2 hidden shadow-lg transform active:scale-95 transition">🗺️ Navigate to Site</a>
+            <button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button>
         </div>
-        <div class="space-y-3 w-full">
-            <div class="flex gap-3">
-                <button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg" onclick="showModal('extend')">Extend</button>
-                <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">Notes</button>
+
+        <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend Visit</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
+        
+        <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric"><div class="mt-6 flex justify-end space-x-3"><button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
+        
+        <div id="templateModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="modalMenuTitle" class="text-xl font-bold mb-4 text-white">Select Report Type</h2><div id="templateList" class="space-y-3 overflow-y-auto max-h-64"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold text-white">Cancel</button></div>
+        
+        <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500"><h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2><p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p><div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div><button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM OK</button></div>
+        
+        <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl"><h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Visit Report</h2><div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div><div class="flex gap-3 flex-shrink-0"><button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button><button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button></div></div>
+        
+        <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2><p id="alertModalMessage" class="text-gray-300 mb-6"></p><button onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button></div>
+    </div>
+
+    <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+        <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
+        <input type="hidden" id="locId">
+        <div class="space-y-4">
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div>
+            <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1"><button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button></div></div>
+            <div id="advLocOptions" class="pt-2 border-t border-gray-700">
+               <div class="mb-3 bg-gray-900 p-2 rounded"><label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label><div class="flex gap-6"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500"><span class="text-sm text-white font-bold">Yes</span></label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500"><span class="text-sm text-gray-300">No</span></label></div></div>
+               <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Templates' sheet.</p></div>
             </div>
-            <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button>
-            <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
+            <div class="flex-1"></div>
+            <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
         </div>
     </div>
-    <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
-</div>
-
-<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
-    <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2>
-        <div id="siteInfoContent" class="text-gray-300 text-sm space-y-2 mb-4"></div>
-        <div class="flex gap-2 mb-4">
-            <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a>
-            <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a>
-        </div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-center mb-2 hidden shadow-lg transform active:scale-95 transition">🗺️ Navigate to Site</a>
-        <button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button>
-    </div>
-
-    <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend Visit</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
-    <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric"><div class="mt-6 flex justify-end space-x-3"><button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
-    <div id="templateModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="modalMenuTitle" class="text-xl font-bold mb-4 text-white">Select Report Type</h2><div id="templateList" class="space-y-3 overflow-y-auto max-h-64"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold text-white">Cancel</button></div>
-    <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500"><h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2><p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p><div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div><button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM OK</button></div>
-    <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl"><h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Visit Report</h2><div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div><div class="flex gap-3 flex-shrink-0"><button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button><button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button></div></div>
-    <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2><p id="alertModalMessage" class="text-gray-300 mb-6"></p><button onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button></div>
-</div>
-
-<div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
-    <h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2>
-    <input type="hidden" id="locId">
-    <div class="space-y-4">
-        <div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div>
-        <div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div>
-        <div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1"><button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button></div></div>
-        <div id="advLocOptions" class="pt-2 border-t border-gray-700">
-           <div class="mb-3 bg-gray-900 p-2 rounded"><label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label><div class="flex gap-6"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500"><span class="text-sm text-white font-bold">Yes</span></label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500"><span class="text-sm text-gray-300">No</span></label></div></div>
-           <div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Templates' sheet.</p></div>
-        </div>
-    </div>
-    <div class="mt-6 flex justify-end space-x-3">
-        <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button>
-        <div class="flex-1"></div>
-        <button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-        <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button>
-    </div>
-</div>
 </div>
 
 <script>
@@ -204,33 +227,36 @@ let tempPhoto = null, sigPad = null, panicTapCount = 0, panicTapTimer;
 let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", currentBatteryLevel = "100%"; 
 let calculatedDist = null; 
 
-// ==================== CORE FUNCTIONS (HOISTED) ====================
-function showModal(id){document.getElementById('modalBackdrop').classList.remove('hidden');document.getElementById('modalBackdrop').classList.add('flex');document.getElementById(id==='location'?'locationModal':id==='pin'?'pinModal':id==='report'?'modal-report':id==='checkin'?'checkinModal':id==='extend'?'extendModal':'infoModal').classList.remove('hidden');if(id==='template')document.getElementById('templateModal').classList.remove('hidden');}
-function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));document.getElementById('locationModal').classList.add('hidden');}
-
-// OFFLINE LISTENER
-window.addEventListener('online', updateNetworkStatus);
-window.addEventListener('offline', updateNetworkStatus);
-function updateNetworkStatus() {
-    const banner = document.getElementById('offlineBanner');
-    if (navigator.onLine) {
-        banner.classList.add('hidden');
-        if(state.pendingUploads && state.pendingUploads.length > 0) processUploadQueue();
-    } else {
-        banner.classList.remove('hidden');
-    }
+// ==================== UI HELPERS ====================
+function showModal(id){
+    document.getElementById('modalBackdrop').classList.remove('hidden');
+    document.getElementById('modalBackdrop').classList.add('flex');
+    const ids = ['locationModal','pinModal','modal-report','checkinModal','extendModal','infoModal','templateModal','alertModal'];
+    ids.forEach(i => {
+        const el = document.getElementById(i === 'locationModal' ? 'locationModal' : i === id ? (id === 'location' ? 'locationModal' : (id==='pin'?'pinModal':(id==='report'?'modal-report':(id==='checkin'?'checkinModal':(id==='extend'?'extendModal':(id==='template'?'templateModal':(id==='alert'?'alertModal':'infoModal'))))))) : null);
+        if(el) el.classList.add('hidden');
+    });
+    // Simplified logic for target modal
+    let target = 'infoModal';
+    if(id==='location') target='locationModal';
+    else if(id==='pin') target='pinModal';
+    else if(id==='report') target='modal-report';
+    else if(id==='checkin') target='checkinModal';
+    else if(id==='extend') target='extendModal';
+    else if(id==='template') target='templateModal';
+    else if(id==='alert') target='alertModal';
+    
+    document.getElementById(target).classList.remove('hidden');
 }
 
-// UUID GENERATOR
-function getDeviceID() {
-    let id = localStorage.getItem('device_uuid');
-    if(!id) {
-        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-        localStorage.setItem('device_uuid', id);
-    }
-    return id;
+function closeModal(id){
+    document.getElementById('modalBackdrop').classList.add('hidden');
+    document.getElementById('modalBackdrop').classList.remove('flex');
+    document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));
+    document.getElementById('locationModal').classList.add('hidden');
 }
 
+// ==================== NAVIGATION & SETUP ====================
 function navigate(p){
     document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
     document.getElementById(p+'Page').classList.add('active'); 
@@ -238,6 +264,7 @@ function navigate(p){
     else clearTimeout(mainScreenReminderTimer); 
     
     if(p==='settings'){
+        // Load settings into form
         document.getElementById('set_name').value=state.settings.workerName||"";
         document.getElementById('set_phone').value=state.settings.workerPhone||"";
         document.getElementById('set_email').value=state.settings.workerEmail||"";
@@ -279,6 +306,7 @@ function saveSettings(){
 
 function saveState(){ localStorage.setItem('loneWorkerState',JSON.stringify(state)); }
 
+// ==================== DATA SYNC & NETWORK ====================
 function forceSync(){
     if(!state.settings.workerName) return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
@@ -313,7 +341,7 @@ function forceSync(){
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
         
-        // v68.14: Hardcode Note to Self
+        // Hardcode Note to Self
         state.cachedForms["Note to Self"] = [{type:'text', text:'Note'}, {type:'photo', text:'Attachment'}];
 
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
@@ -327,64 +355,152 @@ function forceSync(){
     });
 }
 
-function checkVehicleStatus() {
-    if(!CONFIG.vehEnabled) return;
-    const bar = document.getElementById('vehNagBar');
-    let show = false;
+function processUploadQueue(d){ 
+    if(d) state.pendingUploads.push(d); 
+    if(navigator.onLine && state.pendingUploads.length){ 
+        const fd=new FormData(); 
+        for(let k in state.pendingUploads[0]) fd.append(k,state.pendingUploads[0][k]); 
+        fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd})
+        .then(()=>{
+            state.pendingUploads.shift();
+            saveState();
+            processUploadQueue();
+        }); 
+    } 
+    saveState(); 
+}
+
+function buildPayload(d){ 
+    let dueTime = ""; let locName = "Unknown"; let locAddr = ""; 
+    if (state.activeVisit) { 
+        if(state.activeVisit.anticipatedDepartureTime) dueTime = new Date(state.activeVisit.anticipatedDepartureTime).toISOString(); 
+        const l = state.locations.find(x => x.id === state.activeVisit.locationId); 
+        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; } 
+    } else if (state.selectedLocationId) {
+        const l = state.locations.find(x => x.id === state.selectedLocationId);
+        if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; }
+    }
+    return { 
+        'key': CONFIG.key, 
+        'Worker Name': state.settings.workerName, 
+        'Worker Phone Number': state.settings.workerPhone, 
+        'Emergency Contact Name': state.settings.emergencyName, 
+        'Emergency Contact Number': state.settings.emergencyPhone, 
+        'Emergency Contact Email': state.settings.emergencyEmail, 
+        'Escalation Contact Name': state.settings.escalationName, 
+        'Escalation Contact Number': state.settings.escalationPhone, 
+        'Escalation Contact Email': state.settings.escalationEmail, 
+        'Battery Level': currentBatteryLevel, 
+        'Location Name': locName, 
+        'Location Address': locAddr, 
+        'Anticipated Departure Time': dueTime, 
+        'Timestamp': new Date().toISOString(), 
+        'deviceId': getDeviceID(), 
+        'Worker Email': state.settings.workerEmail, 
+        ...d 
+    }; 
+}
+
+// ==================== LOGIC & TIMERS ====================
+function startVisit(){ 
+    const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
+    if(sel.id==='travel') startTravellingPulse(); 
+    const now=new Date(); 
+    navigator.geolocation.getCurrentPosition(pos => {
+        state.activeVisit={ 
+            locationId:sel.id, 
+            startTime:now, 
+            anticipatedDepartureTime:new Date(now.getTime()+state.visitDurationMinutes*60000), 
+            fiveMinWarned:false,
+            startGPS: `${pos.coords.latitude},${pos.coords.longitude}` 
+        }; 
+        state.lowBatSent=false; 
+        saveState(); 
+        enterLockedScreen(); 
+        playSound('arrive'); 
+        processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
+        setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
+    });
+}
+
+function tick(){
+    if(!state.activeVisit) { clearInterval(timerInt); return; }
+    const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
+    const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
+    document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
+    if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
     
-    if (state.meta.lastVehCheck) {
-        const last = new Date(state.meta.lastVehCheck);
-        const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
-        if(diffDays > CONFIG.vehInterval) {
-            show = true;
-            bar.innerText = "⚠️ Vehicle Check Overdue - Tap to Complete";
-        }
+    // 5 Minute Warning
+    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ 
+        state.activeVisit.fiveMinWarned=true; 
+        playSound('pre_alert'); 
+        document.getElementById('fiveMinBanner').classList.remove('hidden'); 
+        setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); 
+    }
+    
+    // Overdue Logic
+    if(rem<0) { 
+        document.getElementById('countdownTimer').classList.add('text-red-500'); 
+        document.getElementById('btnSafe').classList.remove('hidden'); 
+        document.getElementById('btnDepart').classList.add('hidden'); 
+        setupLongPress(document.getElementById('btnSafe'), iamSafe); 
+        
+        const minsOver = Math.floor(Math.abs(rem)/60000); 
+        if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { 
+            state.activeVisit.overdueSent=true; 
+            saveState(); 
+            triggerAutoAlert('OVERDUE'); 
+            playSound('warning'); 
+        } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { 
+            state.activeVisit.criticalSent=true; 
+            saveState(); 
+            triggerAutoAlert('EMERGENCY - OVERDUE'); 
+        } 
+    } 
+    
+    // Check-in
+    if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); 
+}
+
+function preDepart(){ 
+    isMidVisitUpdate = false; 
+    const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
+    const startGPS = state.activeVisit.startGPS;
+    
+    if(startGPS) {
+        document.getElementById('btnDepart').innerText = "Calculating...";
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const endGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
+            calculatedDist = await getDistance(startGPS, endGPS);
+            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
+            loadFormAndShow(l.templateName||"(Standard)");
+        });
     } else {
-        show = true;
-        bar.innerText = "⚠️ Vehicle Check Required";
+        calculatedDist = null;
+        loadFormAndShow(l.templateName||"(Standard)");
     }
-
-    if (state.meta.wofExpiry) {
-        const wof = new Date(state.meta.wofExpiry);
-        const daysUntil = (wof.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-        if(daysUntil < 14) {
-            show = true;
-            bar.innerText = `⚠️ WOF Due: ${wof.toLocaleDateString()} - Book Now!`;
-        }
-    }
-    
-    if(show) bar.classList.remove('hidden'); else bar.classList.add('hidden');
 }
 
-function startVehicleCheck() {
-    loadFormAndShow('Vehicle Safety Check');
-}
-
+// ==================== FORMS & REPORTS ====================
 function openQuickMenu() {
     isMidVisitUpdate = false; 
-    calculatedDist = null; // FIX: Clear stale travel distance
+    calculatedDist = null; 
     showModal('template');
     const list = document.getElementById('templateList');
     list.innerHTML = '';
-    
-    // v68.14: Renamed to Note to Self
     list.appendChild(createTemplateBtn(`📝 Note to Self (Email)`, "Note to Self"));
-
     if (state.globalForms && state.globalForms.length > 0) {
         state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name)));
     }
 }
 
-// v68.13 FIX: Rewrote openMidVisitMenu to show Menu instead of auto-loading
 function openMidVisitMenu() {
     isMidVisitUpdate = true;
     calculatedDist = null;
-    
     showModal('template');
     const list = document.getElementById('templateList');
     list.innerHTML = '';
     
-    // 1. Add specific site form if exists
     const currentLocId = state.activeVisit ? state.activeVisit.locationId : null;
     const loc = state.locations.find(l => l.id === currentLocId);
     
@@ -393,20 +509,123 @@ function openMidVisitMenu() {
     } else if (loc && loc.id === 'travel') {
         list.appendChild(createTemplateBtn(`📝 Travel Report`, "Travel Report"));
     }
-
-    // 2. Add Standard Note
     list.appendChild(createTemplateBtn(`📝 Note to Self (Email)`, "Note to Self"));
-
-    // 3. Add other global forms
     if (state.globalForms && state.globalForms.length > 0) {
         state.globalForms.forEach(f => {
-            if (loc && loc.templateName === f.name) return; // Don't duplicate
+            if (loc && loc.templateName === f.name) return; 
             list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name));
         });
     }
 }
 
-function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
+function loadFormAndShow(tpl){ 
+    showModal('report'); 
+    document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
+    currentActiveTemplate = tpl; 
+    buildReportForm(tpl, document.getElementById('reportFields')); 
+    
+    if (calculatedDist) {
+        let distInput = document.querySelector('[data-key*="Distance"]');
+        if(!distInput) distInput = document.querySelector('input[type="number"]');
+        if(distInput) {
+            distInput.value = calculatedDist.km;
+            distInput.style.border = "2px solid #4ade80";
+        }
+        if (calculatedDist.type === 'crow') {
+            const noteInput = document.getElementById('rep_notes') || document.querySelector('[data-key="Notes"]');
+            if(noteInput) noteInput.value = (noteInput.value + " [Warning: As the crow flies calculation only]").trim();
+        }
+    }
+
+    const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
+    
+    if(!state.activeVisit) {
+        newBtn.innerText = "SUBMIT REPORT";
+        newBtn.classList.remove('long-press-btn');
+        newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
+        newBtn.onclick = submitReport;
+    } 
+    else if(isMidVisitUpdate) { 
+        newBtn.innerText="Send Update"; 
+        newBtn.classList.remove('long-press-btn'); 
+        newBtn.onclick=submitReport; 
+    } else { 
+        newBtn.innerText="HOLD TO SUBMIT & END"; 
+        newBtn.classList.add('long-press-btn'); 
+        setupLongPress(newBtn, submitReport); 
+    }
+}
+
+function submitReport(){ 
+    const d = gatherFormData();
+    const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
+    if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
+    
+    const images = Object.values(state.photoStore);
+    images.forEach((img, idx) => { finalData[`Photo ${idx + 1}`] = img; });
+    if(d.sig) finalData["Signature"] = d.sig;
+
+    if(!state.activeVisit) {
+        processUploadQueue(buildPayload({...finalData, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Worker Email": state.settings.workerEmail}));
+        alert("Report Sent Successfully"); closeModal('report'); return;
+    }
+
+    if(isMidVisitUpdate) { 
+        let status = "ON SITE";
+        if(state.activeVisit.locationId === 'travel') status = "TRAVELLING";
+        processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
+        alert("Update Sent"); isMidVisitUpdate = false; closeModal('report'); return; 
+    } 
+    processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
+    if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
+    state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); checkVehicleStatus();
+}
+
+// ==================== UTILS & HELPERS ====================
+function getDeviceID() {
+    let id = localStorage.getItem('device_uuid');
+    if(!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('device_uuid', id);
+    }
+    return id;
+}
+
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+function updateNetworkStatus() {
+    const banner = document.getElementById('offlineBanner');
+    if (navigator.onLine) {
+        banner.classList.add('hidden');
+        if(state.pendingUploads && state.pendingUploads.length > 0) processUploadQueue();
+    } else {
+        banner.classList.remove('hidden');
+    }
+}
+
+function checkVehicleStatus() {
+    if(!CONFIG.vehEnabled) return;
+    const bar = document.getElementById('vehNagBar');
+    let show = false;
+    
+    if (state.meta.lastVehCheck) {
+        const last = new Date(state.meta.lastVehCheck);
+        const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
+        if(diffDays > CONFIG.vehInterval) { show = true; bar.innerText = "⚠️ Vehicle Check Overdue - Tap to Complete"; }
+    } else {
+        show = true; bar.innerText = "⚠️ Vehicle Check Required";
+    }
+
+    if (state.meta.wofExpiry) {
+        const wof = new Date(state.meta.wofExpiry);
+        const daysUntil = (wof.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        if(daysUntil < 14) { show = true; bar.innerText = `⚠️ WOF Due: ${wof.toLocaleDateString()} - Book Now!`; }
+    }
+    
+    if(show) bar.classList.remove('hidden'); else bar.classList.add('hidden');
+}
+
+function startVehicleCheck() { loadFormAndShow('Vehicle Safety Check'); }
 
 function initLocations() { 
     if(!state.locations) state.locations = []; 
@@ -452,8 +671,8 @@ function showSiteInfo(id, e) {
     if(l.address) {
         html += `<p><strong>Address:</strong><br>${l.address}</p>`;
         const btnNav = document.getElementById('btnSiteNav');
-        // v68.17 FIX: Use Standard Universal Google Maps URL
-        btnNav.href = `https://maps.google.com/?q=${encodeURIComponent(l.address)}`;
+        // v68.17: Universal Google Maps Link
+        btnNav.href = `https://maps.google.com/?q={encodeURIComponent(l.address)}`;
         btnNav.classList.remove('hidden');
     }
     if(l.contactName) html += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
@@ -469,61 +688,13 @@ function showCurrentSiteInfo() { if(state.activeVisit) showSiteInfo(state.active
 
 function updateArrivedButtonState(){ const val=DURATION_MAP[document.getElementById('durationSlider').value]; document.getElementById('durationDisplay').innerText=val>=60?(Math.floor(val/60)+' hr '+(val%60)+' min'):val+' min'; state.visitDurationMinutes=val; const btn=document.getElementById('btnStart'); if(state.selectedLocationId && val>0){ btn.disabled=false; btn.innerText="HOLD TO START"; btn.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all"; setupLongPress(btn,startVisit); } else { btn.disabled=true; btn.innerText=state.selectedLocationId?"Set Time":"Select Location"; btn.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all"; }}
 
-function startVisit(){ 
-    const sel=state.locations.find(x=>x.id===state.selectedLocationId); 
-    if(sel.id==='travel') startTravellingPulse(); 
-    const now=new Date(); 
-    navigator.geolocation.getCurrentPosition(pos => {
-        state.activeVisit={ 
-            locationId:sel.id, 
-            startTime:now, 
-            anticipatedDepartureTime:new Date(now.getTime()+state.visitDurationMinutes*60000), 
-            fiveMinWarned:false,
-            startGPS: `${pos.coords.latitude},${pos.coords.longitude}` 
-        }; 
-        state.lowBatSent=false; 
-        saveState(); 
-        enterLockedScreen(); 
-        playSound('arrive'); 
-        processUploadQueue(buildPayload({"Alarm Status":sel.id==='travel'?"TRAVELLING":"ON SITE", "Notes":"Started"})); 
-        setTimeout(() => { if(state.pendingUploads.length > 0) processUploadQueue(); }, 5000);
-    });
-}
-
 function enterLockedScreen(){ const l=state.locations.find(x=>x.id===state.activeVisit.locationId); document.getElementById('lockedLocationName').innerText=l.name; navigate('locked'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); timerInt=setInterval(tick,1000); setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false)); setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); }
-function tick(){
-    if(!state.activeVisit) { clearInterval(timerInt); return; }
-    const rem = new Date(state.activeVisit.anticipatedDepartureTime) - new Date();
-    const m=Math.floor(rem/60000), s=Math.floor((rem%60000)/1000);
-    document.getElementById('countdownTimer').innerText = rem<0 ? "OVERDUE" : `${m}:${s<10?'0':''}${s}`;
-    if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
-    if(m===5 && !state.activeVisit.fiveMinWarned && rem>0){ state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000); }
-    if(rem<0) { document.getElementById('countdownTimer').classList.add('text-red-500'); document.getElementById('btnSafe').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); const minsOver = Math.floor(Math.abs(rem)/60000); if(minsOver < CONFIG.escalationMinutes && !state.activeVisit.overdueSent) { state.activeVisit.overdueSent=true; saveState(); triggerAutoAlert('OVERDUE'); playSound('warning'); } else if(minsOver >= CONFIG.escalationMinutes && !state.activeVisit.criticalSent) { state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert('EMERGENCY - OVERDUE'); } } if(CONFIG.checkinEnabled && state.activeVisit.nextCheckin && new Date() > new Date(state.activeVisit.nextCheckin)) triggerCheckin(); }
 
 async function requestWakeLock() {
     try {
         wakeLock = await navigator.wakeLock.request('screen');
         wakeLock.addEventListener('release', () => { console.log('Screen Lock Released'); });
     } catch (err) { console.warn('Wake Lock Error', err); }
-}
-
-function preDepart(){ 
-    isMidVisitUpdate = false; 
-    const l=state.locations.find(x=>x.id===state.activeVisit.locationId); 
-    const startGPS = state.activeVisit.startGPS;
-    
-    if(startGPS) {
-        document.getElementById('btnDepart').innerText = "Calculating...";
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const endGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
-            calculatedDist = await getDistance(startGPS, endGPS);
-            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
-            loadFormAndShow(l.templateName||"(Standard)");
-        });
-    } else {
-        calculatedDist = null;
-        loadFormAndShow(l.templateName||"(Standard)");
-    }
 }
 
 async function getDistance(p1, p2) {
@@ -551,77 +722,6 @@ function haversine(p1, p2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-function loadFormAndShow(tpl){ 
-    showModal('report'); 
-    document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + tpl : "Visit Report";
-    currentActiveTemplate = tpl; 
-    buildReportForm(tpl, document.getElementById('reportFields')); 
-    
-    if (calculatedDist) {
-        let distInput = document.querySelector('[data-key*="Distance"]');
-        if(!distInput) distInput = document.querySelector('input[type="number"]');
-        
-        if(distInput) {
-            distInput.value = calculatedDist.km;
-            distInput.style.border = "2px solid #4ade80";
-        }
-        
-        if (calculatedDist.type === 'crow') {
-            const noteInput = document.getElementById('rep_notes') || document.querySelector('[data-key="Notes"]');
-            if(noteInput) noteInput.value = (noteInput.value + " [Warning: As the crow flies calculation only]").trim();
-        }
-    }
-
-    const btn = document.getElementById('btnSubmitRep'); const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
-    
-    if(!state.activeVisit) {
-        newBtn.innerText = "SUBMIT REPORT";
-        newBtn.classList.remove('long-press-btn');
-        newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
-        newBtn.onclick = submitReport;
-    } 
-    else if(isMidVisitUpdate) { 
-        newBtn.innerText="Send Update"; 
-        newBtn.classList.remove('long-press-btn'); 
-        newBtn.onclick=submitReport; 
-    } else { 
-        newBtn.innerText="HOLD TO SUBMIT & END"; 
-        newBtn.classList.add('long-press-btn'); 
-        setupLongPress(newBtn, submitReport); 
-    }
-}
-
-function submitReport(){ 
-    const d = gatherFormData();
-    const finalData = { ...d.custom, "Visit Report Data": JSON.stringify(d.jsonPayload), "Template Name": currentActiveTemplate };
-    if(d.custom && d.custom["Distance (km)"]) finalData["Distance"] = d.custom["Distance (km)"];
-    
-    const images = Object.values(state.photoStore);
-    images.forEach((img, idx) => { 
-        finalData[`Photo ${idx + 1}`] = img; 
-    });
-    
-    if(d.sig) finalData["Signature"] = d.sig;
-
-    // v68.14: Include Worker Email in payload
-    if(!state.activeVisit) {
-        processUploadQueue(buildPayload({...finalData, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Worker Email": state.settings.workerEmail}));
-        alert("Report Sent Successfully");
-        closeModal('report');
-        return;
-    }
-
-    if(isMidVisitUpdate) { 
-        let status = "ON SITE";
-        if(state.activeVisit.locationId === 'travel') status = "TRAVELLING";
-        processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
-        alert("Update Sent"); isMidVisitUpdate = false; closeModal('report'); return; 
-    } 
-    processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
-    if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
-    state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); checkVehicleStatus();
-}
-
 function gatherFormData() { const data = { custom: {}, notes: '', sig: null, jsonPayload: {} }; const sn = document.getElementById('rep_notes'); if(sn) data.notes = sn.value; document.querySelectorAll('[data-key]').forEach(el => { const k = el.getAttribute('data-key'); let v = el.value; if(el.type === 'checkbox') v = el.checked ? 'Yes' : 'No'; else if(el.type === 'radio') { if(!el.checked) return; v = el.value; } data.custom[k] = v; data.jsonPayload[k] = v; }); const c = document.getElementById('sig-canvas'); if(c) data.sig = c.toDataURL('image/png'); return data; }
 function handlePhoto(input, key){ if(input.files[0]){ const btn=input.previousElementSibling; btn.innerText="Compressing..."; compressImg(input.files[0]).then(b64=>{ state.photoStore[key]=b64; btn.innerText="Photo Saved ✅"; }); } }
 function compressImg(f){ return new Promise(r=>{ const rd=new FileReader(); rd.onload=e=>{ const i=new Image(); i.onload=()=>{ const c=document.createElement('canvas'); const scale = Math.min(600/i.width, 600/i.height, 1); c.width=i.width*scale; c.height=i.height*scale; c.getContext('2d').drawImage(i,0,0,c.width,c.height); r(c.toDataURL('image/jpeg',0.4)); }; i.src=e.target.result; }; rd.readAsDataURL(f); }); }
@@ -638,24 +738,71 @@ function iamSafe() { withPinVerification(false, () => { playSound('safe'); proce
 function createTemplateBtn(label, value) { const btn = document.createElement('button'); btn.className = "w-full bg-gray-700 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-2 text-left px-4"; btn.innerText = label; btn.onclick = () => { closeModal('template'); loadFormAndShow(value); }; return btn; }
 function startTravellingPulse() { toggleBatterySaver(); travellingInterval=setInterval(()=>{ navigator.geolocation.getCurrentPosition(p=>{ processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING", "Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`})); }) }, 300000); }
 function toggleBatterySaver() { document.getElementById('batterySaver').classList.toggle('hidden'); }
+
 // v68.15 FIX: setupLongPress cancels animation on mouseleave/mouseup
 function setupLongPress(btn, cb) {
     let t;
-    const start = (e) => {
-        e.preventDefault();
-        btn.classList.add('pressing');
-        t = setTimeout(() => {
-            cb();
-            btn.classList.remove('pressing');
-        }, 1500);
-    };
-    const cancel = (e) => {
-        clearTimeout(t);
-        btn.classList.remove('pressing');
-    };
+    const start = (e) => { e.preventDefault(); btn.classList.add('pressing'); t = setTimeout(() => { cb(); btn.classList.remove('pressing'); }, 1500); };
+    const cancel = (e) => { clearTimeout(t); btn.classList.remove('pressing'); };
     btn.onmousedown = btn.ontouchstart = start;
-    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel; // FIXED: Added onmouseleave
+    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel; 
 }
+
+function withPinVerification(d,c){ showModal('pin'); const input = document.getElementById('pinInput'); input.value = ''; input.focus(); const confirm = () => { const val = input.value; closeModal('pin'); if(val === state.settings.pinCode) c(); else if(val === state.settings.duressPin) { processUploadQueue(buildPayload({ "Alarm Status": "DURESS_CODE_ACTIVATED", "Notes": "Silent Alarm" })); if(d) c(); else alert("PIN Accepted"); } else alert("Incorrect PIN"); document.getElementById('confirmPinBtn').removeEventListener('click', confirm); }; document.getElementById('confirmPinBtn').addEventListener('click', confirm); document.getElementById('cancelPinBtn').onclick = () => closeModal('pin'); }
+function clearData() { if(confirm('Reset all data?')) { localStorage.clear(); location.reload(); } }
+function clearFormsCache() { state.cachedForms = {}; state.globalForms = []; syncForms(); alert("Forms Syncing..."); }
+function syncForms() { if(!CONFIG.url) return; fetch(`${CONFIG.url}?action=getGlobalForms`).then(r => r.json()).then(j => { if(Array.isArray(j)) { state.globalForms = j; saveState(); } }); }
+async function initAudio(){ if(!synth){ await Tone.start(); synth=new Tone.Synth().toDestination(); } }
+function playSound(t){ initAudio().then(()=>{ const n=Tone.now(); if(t==='arrive')synth.triggerAttackRelease("C4","8n",n); if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n); navigator.vibrate([1000,500,1000]);} if(t==='depart')synth.triggerAttackRelease("G4","8n",n); if(t==='warning')synth.triggerAttackRelease("E5","16n",n); if(t==='panic')synth.triggerAttackRelease("G5","16n",n); }); }
+function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
+
+function buildReportForm(n,c){
+    state.photoStore={};
+    const safeName = n ? n.trim() : "Standard Visit Note";
+    let t = null;
+    if(state.globalForms) t = state.globalForms.find(f => f.name.trim() === safeName)?.questions;
+    if(!t && state.cachedForms) t = state.cachedForms[safeName];
+    if(!t) t = state.cachedForms["(Standard)"];
+    
+    if(!t) {
+        console.warn("Template not found:", safeName);
+        t = [{type:'note', text:'Standard Check-in (Default)'}, {type:'text', text:'Notes'}];
+    }
+
+    c.innerHTML='';
+    if(t.length===0){
+        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+    }else{
+        t.forEach((f,i)=>{
+            let y=f.type||'check',x=f.text||f;
+            if(typeof f==='string'){
+                if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}
+                else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}
+                else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}
+                else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}
+                else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}
+                else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}
+                else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}
+                else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}
+                else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}
+            }
+            let h='';
+            if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;
+            else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
+            else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;
+            else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;
+            else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;
+            else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;
+            else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;
+            else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;
+            else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;
+            else if(y==='date')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="date" data-key="${x}" class="form-input">`;
+            c.innerHTML+=h;
+        });
+    }
+    const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);
+}
+
 // INIT
 window.addEventListener('load', () => {
     const s = localStorage.getItem('loneWorkerState');
@@ -664,6 +811,8 @@ window.addEventListener('load', () => {
     if(!state.globalForms) state.globalForms = [];
     if(!state.cachedForms) state.cachedForms = {};
     state.settings.googleSheetUrl = CONFIG.url; 
+    
+    // Battery
     if(navigator.getBattery) {
         navigator.getBattery().then(b => {
             const upd = () => { 
@@ -676,17 +825,23 @@ window.addEventListener('load', () => {
             upd(); b.addEventListener('levelchange', upd);
         });
     }
+
+    // Routing
     if(!state.settings.pinCode || !state.settings.workerName) { 
         navigate('settings'); 
         document.getElementById('btnCloseSettings').classList.add('hidden'); 
     } 
     else if(state.activeVisit) { enterLockedScreen(); } 
     else { navigate('main'); renderLocations(); checkVehicleStatus(); }
+    
+    // Startup
     if(state.activeVisit && state.activeVisit.locationId === 'travel') startTravellingPulse();
     initLocations();
     if(CONFIG.isAdv) syncForms(); 
     updateArrivedButtonState(); 
     processUploadQueue(); 
+    
+    // Listeners
     document.body.addEventListener('click', initAudio, { once: true }); 
     startReminderTimer();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.activeVisit) requestWakeLock(); });
