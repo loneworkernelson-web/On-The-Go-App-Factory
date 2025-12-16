@@ -1,10 +1,12 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.10 (Diamond Edition)
- * Fix: Updated processFormEmail to handle 'Note to Self' dynamic routing.
+ * OTG APPSUITE - MASTER BACKEND v68.11 (Diamond Edition)
+ * Critical Fix: "Sync Crash" resolved.
+ * - Device Locking moved from doGet (Sync) to doPost (Report) to prevent Google 'Action not allowed' errors.
+ * - Note to Self: Routes emails to worker's own address.
  */
 
 const CONFIG = {
-  SECRET_KEY: "%%SECRET_KEY%%",
+  SECRET_KEY: "%%SECRET_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
@@ -24,7 +26,8 @@ if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
 // --- AUTHORIZATION LOGIC ---
-function checkAccess(workerName, deviceId) {
+// v68.11: Added isReadOnly param to prevent writes during GET
+function checkAccess(workerName, deviceId, isReadOnly) {
   if (!workerName) return { allowed: false, msg: "Name missing" };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Staff');
@@ -39,22 +42,29 @@ function checkAccess(workerName, deviceId) {
     const targetName = String(workerName).trim().toLowerCase();
     
     if (rowName === targetName) {
+       // 1. Check Account Status
        if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
            return { allowed: false, msg: "Account Disabled" };
        }
 
        const registeredId = String(data[i][4] || ""); 
        
+       // 2. Device Lock Logic
        if (registeredId === "" || registeredId === "undefined") {
+           // OPEN SLOT
            if(deviceId) {
-               try {
-                   sheet.getRange(i + 1, 5).setValue(deviceId);
-               } catch(e) {
-                   console.error("Failed to lock device ID: " + e);
+               // Only lock if we are in a POST request (isReadOnly = false)
+               if (!isReadOnly) {
+                   try {
+                       sheet.getRange(i + 1, 5).setValue(deviceId);
+                   } catch(e) {
+                       console.warn("Device lock deferred: " + e);
+                   }
                }
                return { allowed: true, meta: getRowMeta(data[i]) };
            }
        } else {
+           // LOCKED SLOT
            if (registeredId === deviceId) {
                return { allowed: true, meta: getRowMeta(data[i]) };
            } else {
@@ -85,7 +95,9 @@ function doGet(e) {
           const worker = e.parameter.worker;
           const deviceId = e.parameter.deviceId; 
           
-          const auth = checkAccess(worker, deviceId);
+          // v68.11: TRUE = Read Only Mode (Don't write to sheet)
+          const auth = checkAccess(worker, deviceId, true);
+          
           if (!auth.allowed) {
               return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "ACCESS DENIED: " + auth.msg })).setMimeType(ContentService.MimeType.JSON);
           }
@@ -163,7 +175,8 @@ function doPost(e) {
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
     
     if (p.action !== 'resolve') {
-        const auth = checkAccess(p['Worker Name'], p.deviceId); 
+        // v68.11: FALSE = Allow Write. This is where Device Locking happens now.
+        const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
         if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Unauthorized"}));
     }
 
@@ -238,7 +251,6 @@ function doPost(e) {
     
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
     
-    // v68.10 Logic: Process emails (including Note to Self)
     if (p['Template Name']) processFormEmail(p, assetIds);
     
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
@@ -274,15 +286,13 @@ function processFormEmail(p, assetIds) {
     try {
         let recipient = "";
         
-        // v68.10 Logic: Note to Self
         if (String(p['Template Name']).trim() === "Note to Self") {
             recipient = p['Worker Email'];
             if (!recipient || !recipient.includes('@')) {
                 console.log("Note to Self aborted: No valid worker email found in payload.");
-                return; // User didn't put email in settings
+                return; 
             }
         } else {
-            // Standard Logic
             const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
             const data = sh.getDataRange().getValues();
             const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
