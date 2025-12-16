@@ -62,7 +62,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="content-area pb-24">
         <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div>
         <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
-        <div class="setting-card"><label class="setting-label lbl-blue">Your Details</label><input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)"><input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"></div>
+        
+        <div class="setting-card">
+            <label class="setting-label lbl-blue">Your Details</label>
+            <input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)">
+            <input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)">
+            <input id="set_email" type="email" class="form-input-card" placeholder="Your Email (For Note to Self)">
+        </div>
+
         <div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div>
         <div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div>
         <div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div>
@@ -91,7 +98,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
         <div class="flex gap-2">
-            <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Quick Note</button>
+            <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Note to Self</button>
             <button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
         </div>
     </div>
@@ -232,6 +239,7 @@ function navigate(p){
     if(p==='settings'){
         document.getElementById('set_name').value=state.settings.workerName||"";
         document.getElementById('set_phone').value=state.settings.workerPhone||"";
+        document.getElementById('set_email').value=state.settings.workerEmail||"";
         document.getElementById('set_emg_name').value=state.settings.emergencyName||"";
         document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";
         document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";
@@ -254,6 +262,7 @@ function navigate(p){
 function saveSettings(){ 
     state.settings.workerName=document.getElementById('set_name').value; 
     state.settings.workerPhone=document.getElementById('set_phone').value; 
+    state.settings.workerEmail=document.getElementById('set_email').value;
     state.settings.emergencyName=document.getElementById('set_emg_name').value; 
     state.settings.emergencyPhone=document.getElementById('set_emg_phone').value; 
     state.settings.emergencyEmail=document.getElementById('set_emg_email').value; 
@@ -302,6 +311,10 @@ function forceSync(){
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
              state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
+        
+        // v68.14: Hardcode Note to Self
+        state.cachedForms["Note to Self"] = [{type:'text', text:'Note'}, {type:'photo', text:'Attachment'}];
+
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         
         saveState(); renderLocations(); checkVehicleStatus(); 
@@ -353,30 +366,42 @@ function openQuickMenu() {
     const list = document.getElementById('templateList');
     list.innerHTML = '';
     
-    list.appendChild(createTemplateBtn(`📝 Quick Note (Generic)`, "Standard Visit Note"));
+    // v68.14: Renamed to Note to Self
+    list.appendChild(createTemplateBtn(`📝 Note to Self (Email)`, "Note to Self"));
 
     if (state.globalForms && state.globalForms.length > 0) {
         state.globalForms.forEach(f => list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name)));
-    } else {
-        list.innerHTML += '<p class="text-xs text-gray-500 mt-2 text-center">No extra forms found.</p>';
     }
 }
 
-// v68.8 FIX: Added missing openMidVisitMenu
+// v68.13 FIX: Rewrote openMidVisitMenu to show Menu instead of auto-loading
 function openMidVisitMenu() {
     isMidVisitUpdate = true;
-    calculatedDist = null; 
+    calculatedDist = null;
     
-    // Determine context (Travelling or On Site)
+    showModal('template');
+    const list = document.getElementById('templateList');
+    list.innerHTML = '';
+    
+    // 1. Add specific site form if exists
     const currentLocId = state.activeVisit ? state.activeVisit.locationId : null;
     const loc = state.locations.find(l => l.id === currentLocId);
     
-    if(loc && loc.id === 'travel') {
-        loadFormAndShow("Travel Report");
-    } else if(loc && loc.templateName) {
-        loadFormAndShow(loc.templateName);
-    } else {
-        loadFormAndShow("Standard Visit Note");
+    if (loc && loc.templateName) {
+        list.appendChild(createTemplateBtn(`📝 ${loc.templateName} (Site Default)`, loc.templateName));
+    } else if (loc && loc.id === 'travel') {
+        list.appendChild(createTemplateBtn(`📝 Travel Report`, "Travel Report"));
+    }
+
+    // 2. Add Standard Note
+    list.appendChild(createTemplateBtn(`📝 Note to Self (Email)`, "Note to Self"));
+
+    // 3. Add other global forms
+    if (state.globalForms && state.globalForms.length > 0) {
+        state.globalForms.forEach(f => {
+            if (loc && loc.templateName === f.name) return; // Don't duplicate
+            list.appendChild(createTemplateBtn(`📝 ${f.name}`, f.name));
+        });
     }
 }
 
@@ -576,8 +601,9 @@ function submitReport(){
     
     if(d.sig) finalData["Signature"] = d.sig;
 
+    // v68.14: Include Worker Email in payload
     if(!state.activeVisit) {
-        processUploadQueue(buildPayload({...finalData, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes}));
+        processUploadQueue(buildPayload({...finalData, "Alarm Status": "DATA_ENTRY_ONLY", "Notes": d.notes, "Worker Email": state.settings.workerEmail}));
         alert("Report Sent Successfully");
         closeModal('report');
         return;
@@ -586,10 +612,10 @@ function submitReport(){
     if(isMidVisitUpdate) { 
         let status = "ON SITE";
         if(state.activeVisit.locationId === 'travel') status = "TRAVELLING";
-        processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes})); 
+        processUploadQueue(buildPayload({...finalData, "Alarm Status": status, "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
         alert("Update Sent"); isMidVisitUpdate = false; closeModal('report'); return; 
     } 
-    processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes})); 
+    processUploadQueue(buildPayload({...finalData, "Alarm Status":"DEPARTED", "Notes": d.notes, "Worker Email": state.settings.workerEmail})); 
     if(navigator.onLine) alert("✅ Sent"); else alert("💾 Saved to Outbox"); 
     state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes = 0; isMidVisitUpdate = false; saveState(); closeModal('report'); navigate('main'); playSound('depart'); if(travellingInterval) clearInterval(travellingInterval); checkVehicleStatus();
 }
@@ -621,7 +647,8 @@ function buildPayload(d){ let dueTime = ""; let locName = "Unknown"; let locAddr
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         if (l) { locName = l.companyName ? `${l.companyName} - ${l.name}` : l.name; locAddr = l.address; }
     }
-    return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), ...d }; 
+    // v68.14: Added Worker Email
+    return { 'key': CONFIG.key, 'Worker Name': state.settings.workerName, 'Worker Phone Number': state.settings.workerPhone, 'Emergency Contact Name': state.settings.emergencyName, 'Emergency Contact Number': state.settings.emergencyPhone, 'Emergency Contact Email': state.settings.emergencyEmail, 'Escalation Contact Name': state.settings.escalationName, 'Escalation Contact Number': state.settings.escalationPhone, 'Escalation Contact Email': state.settings.escalationEmail, 'Battery Level': currentBatteryLevel, 'Location Name': locName, 'Location Address': locAddr, 'Anticipated Departure Time': dueTime, 'Timestamp': new Date().toISOString(), deviceId: getDeviceID(), 'Worker Email': state.settings.workerEmail, ...d }; 
 }
 function processUploadQueue(d){ if(d)state.pendingUploads.push(d); if(navigator.onLine && state.pendingUploads.length){ const fd=new FormData(); for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]); fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();}); } saveState(); }
 function setupLongPress(btn,cb){ let t; btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing')},1500)}; btn.onmouseup=btn.ontouchend=()=>clearTimeout(t); }
