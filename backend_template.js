@@ -1,6 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.9 (Diamond Edition)
- * Fix: Updated processFormEmail to include Photo 3 and Photo 4 in email reports.
+ * OTG APPSUITE - MASTER BACKEND v68.10 (Diamond Edition)
+ * Fix: Updated processFormEmail to handle 'Note to Self' dynamic routing.
  */
 
 const CONFIG = {
@@ -237,7 +237,10 @@ function doPost(e) {
     }
     
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
+    
+    // v68.10 Logic: Process emails (including Note to Self)
     if (p['Template Name']) processFormEmail(p, assetIds);
+    
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
 
     return ContentService.createTextOutput("OK");
@@ -269,17 +272,37 @@ function updateStaffVehCheck(worker, jsonString) {
 
 function processFormEmail(p, assetIds) {
     try {
-        const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
-        const data = sh.getDataRange().getValues();
-        const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
-        if (!row) return; 
-        const recipient = row[3]; 
+        let recipient = "";
+        
+        // v68.10 Logic: Note to Self
+        if (String(p['Template Name']).trim() === "Note to Self") {
+            recipient = p['Worker Email'];
+            if (!recipient || !recipient.includes('@')) {
+                console.log("Note to Self aborted: No valid worker email found in payload.");
+                return; // User didn't put email in settings
+            }
+        } else {
+            // Standard Logic
+            const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
+            const data = sh.getDataRange().getValues();
+            const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
+            if (!row) return; 
+            recipient = row[3]; 
+        }
+
         if (!recipient || !String(recipient).includes('@')) return; 
+        
         let reportData = {};
         try { reportData = JSON.parse(p['Visit Report Data']); } catch(e) {}
         const worker = p['Worker Name'];
         const loc = p['Location Name'] || "Unknown";
-        let html = `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border:1px solid #ccc;"><h2 style="color: #2563eb;">${p['Template Name']}</h2><p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p><div style="background:#f1f5f9; padding:10px; margin:15px 0;"><strong>Notes:</strong> ${p['Notes']||""}</div><table style="width:100%; border-collapse: collapse;">`;
+        
+        let html = `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border:1px solid #ccc;">
+        <h2 style="color: #2563eb;">${p['Template Name']}</h2>
+        <p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        <div style="background:#f1f5f9; padding:10px; margin:15px 0;"><strong>Notes:</strong> ${p['Notes']||""}</div>
+        <table style="width:100%; border-collapse: collapse;">`;
+        
         for (const [key, val] of Object.entries(reportData)) {
             if (key === 'Signature_Image') continue;
             let displayVal = val;
@@ -288,7 +311,6 @@ function processFormEmail(p, assetIds) {
         }
         html += `</table><br>`;
         
-        // v68.9 FIX: Added logic for Photos 3 & 4
         if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
         if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
         if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
