@@ -1,3 +1,13 @@
+I have updated the **Monitor App** logic to v68.9.
+
+**Changes made:**
+
+1.  **Green & Amber Phase:** The card now displays the **Worker's Mobile Number** in the details list by default. The Emergency Contact (ICE) info is hidden to reduce clutter.
+2.  **Red Phase (Alert):** When an alarm triggers (Emergency/Panic/Critical), a special **ICE Section** slides down at the bottom of the card, highlighted in red, with a direct "Call ICE" button.
+
+Here is the updated **Monitor App (`monitor_template.html`)**.
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,7 +100,7 @@
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.8</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.9</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -142,7 +152,7 @@ let workerData = [];
 let allRows = [];
 let escalationLimit = 15;
 let mapInstance = null, markersLayer = null, currentView = 'GRID'; 
-let currentFilter = 'ACTIVE'; // DEFAULT FILTER
+let currentFilter = 'ACTIVE'; 
 let audioEnabled = true, synth = null;
 let acknowledgedAlerts = new Set(); 
 let alertLoopInterval = null;
@@ -358,7 +368,6 @@ function renderGrid() {
     else { loadEl.classList.add('hidden'); }
 
     workerData.forEach(w => {
-        // STRICT FILTER LOGIC
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
         const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('OVERDUE');
         
@@ -366,8 +375,6 @@ function renderGrid() {
         if(isAlert) alertC++;
         
         if (search && !w.name.toLowerCase().includes(search)) return;
-        
-        // FILTER SWITCH
         if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return;
 
         visibleCount++;
@@ -397,13 +404,19 @@ function renderGrid() {
         card.className = `card p-4 ${borderClass}`;
         let batClass = parseInt(w.battery) < 20 ? 'text-red-500 font-bold blink' : 'text-green-500';
         
+        // v68.9 Logic: Show Worker Phone by default. Show ICE only if Alert.
+        let contactHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Mobile</span><span class="text-gray-300 font-mono">${w.phone||'--'}</span></div>`;
+        if (isAlert && w.iceName) {
+            contactHtml += `<div class="mt-2 pt-2 border-t border-gray-700 bg-red-900/30 -mx-4 px-4 py-2"><div class="flex justify-between items-center"><span class="text-[10px] text-red-400 font-bold uppercase">ICE: ${w.iceName}</span><a href="tel:${w.icePhone}" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-xs font-bold shadow">📞 Call ICE</a></div></div>`;
+        }
+
         card.innerHTML = `<div class="flex justify-between items-start mb-2"><h3 class="font-bold text-lg text-white truncate w-full">${w.name}</h3><div class="${dotClass} status-dot mt-1.5 shrink-0 ml-2"></div></div>
         <div class="space-y-1.5 text-xs text-gray-300">
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Status</span><span class="font-bold">${statusText}</span></div>
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Location</span><span class="truncate w-24 text-right" title="${w.location}">${w.location}</span></div>
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Due</span><span class="${timeClass}">${formatTime(w.dueTime)}</span></div>
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Battery</span><span class="${batClass}">${w.battery||'--'}</span></div>
-            ${w.iceName ? `<div class="mt-2 pt-2 border-t border-gray-700 flex justify-between items-center"><span class="text-[10px] text-red-400 font-bold uppercase">ICE: ${w.iceName}</span><a href="tel:${w.icePhone}" class="bg-red-900/50 hover:bg-red-800 text-red-200 px-2 py-1 rounded text-[10px] font-bold">📞</a></div>` : ''}
+            ${contactHtml}
         </div>
         <div class="mt-3 grid grid-cols-2 gap-2"><a href="https://www.google.com/maps/search/?api=1&query=${w.gps}" target="_blank" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 text-center py-2 rounded text-xs font-bold">📍 Map</a><a href="tel:${w.phone}" class="bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold">📞 Worker</a></div>
         ${resolveBtn}`;
@@ -465,3 +478,4 @@ function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return is
 </script>
 </body>
 </html>
+```
