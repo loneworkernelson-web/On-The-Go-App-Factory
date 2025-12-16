@@ -15,30 +15,40 @@
   body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
   .main-layout { display: flex; flex: 1; overflow: hidden; }
   .grid-area { flex: 3; overflow-y: auto; padding: 1.5rem; position: relative; }
-  /* v68.12: Reduced log font size and width flexibility */
   .log-area { flex: 0 0 250px; background-color: #1e293b; border-left: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
   .card { background-color: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; transition: all 0.2s; position: relative; overflow: hidden; }
   .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
   .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; }
   .blink { animation: blinker 1.5s linear infinite; }
   @keyframes blinker { 50% { opacity: 0; } }
+  
+  /* Status Colors */
   .st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; } 
   .st-amber { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: blinker 2s linear infinite; } 
   .st-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 0.5s linear infinite; } 
+  .st-purple { background-color: #d946ef; box-shadow: 0 0 15px #d946ef; animation: blinker 0.3s linear infinite; } /* Faster blink for duress */
   .st-grey { background-color: #64748b; } 
+
+  /* Borders */
   .bd-green { border-color: #059669; border-width: 2px; }
   .bd-amber { border-color: #d97706; border-width: 2px; }
   .bd-red { border-color: #dc2626; border-width: 4px; }
+  .bd-purple { border-color: #c026d3; border-width: 5px; }
   .bd-grey { border-color: #475569; opacity: 0.7; }
   
-  /* Full Screen Alert */
-  #fullScreenAlert { animation: pulseRed 1s infinite; z-index: 50; }
+  /* Full Screen Alert Animations */
+  #fullScreenAlert { z-index: 50; }
+  .alert-red { animation: pulseRed 1s infinite; }
+  .alert-purple { animation: pulsePurple 1s infinite; }
+  
   @keyframes pulseRed { 0% { background-color: rgba(220, 38, 38, 0.9); } 50% { background-color: rgba(153, 27, 27, 0.95); } 100% { background-color: rgba(220, 38, 38, 0.9); } }
+  @keyframes pulsePurple { 0% { background-color: rgba(147, 51, 234, 0.9); } 50% { background-color: rgba(107, 33, 168, 0.95); } 100% { background-color: rgba(147, 51, 234, 0.9); } }
   
   /* Map Styles */
   #mapView { background: #020617; z-index: 1; width: 100%; height: 100%; }
   .map-icon { width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
   .map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
+  .map-icon.purple { background: #d946ef; animation: blinker 0.3s linear infinite; box-shadow: 0 0 25px #d946ef; }
   .map-icon.green { background: #10b981; }
   .map-icon.amber { background: #f59e0b; }
   .map-icon.grey { background: #64748b; }
@@ -56,10 +66,10 @@
   </div>
 
   <div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm">
-      <div class="text-9xl mb-4">🚨</div>
-      <h1 class="text-6xl font-black text-white mb-4 drop-shadow-md">EMERGENCY ALERT</h1>
+      <div class="text-9xl mb-4" id="alertIcon">🚨</div>
+      <h1 class="text-6xl font-black text-white mb-4 drop-shadow-md" id="alertTitle">EMERGENCY ALERT</h1>
       <h2 id="alertNames" class="text-4xl font-bold text-white bg-black/30 px-6 py-2 rounded mb-8">Worker Name</h2>
-      <button onclick="acknowledgeAlert()" class="bg-white text-red-700 font-black text-2xl py-6 px-12 rounded-full shadow-2xl hover:scale-105 transition border-4 border-red-900">ACKNOWLEDGE ALARM</button>
+      <button onclick="acknowledgeAlert()" class="bg-white text-gray-900 font-black text-2xl py-6 px-12 rounded-full shadow-2xl hover:scale-105 transition border-4 border-gray-900">ACKNOWLEDGE ALARM</button>
       <p class="text-white mt-6 font-bold opacity-80">Clicking this silences the alarm but DOES NOT clear the emergency.</p>
   </div>
 
@@ -83,7 +93,7 @@
         <div class="flex items-center gap-4">
           <img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
           <div>
-            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.12</span></h1>
+            <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.13</span></h1>
             <div class="flex items-center gap-2 text-xs text-gray-400">
                <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -187,7 +197,12 @@ function startAlertLoop() {
 function stopAlertLoop() { if(alertLoopInterval) { clearInterval(alertLoopInterval); alertLoopInterval = null; } }
 
 function acknowledgeAlert() {
-    workerData.forEach(w => { if(w.status.includes("EMERGENCY") || w.status.includes("PANIC")) acknowledgedAlerts.add(w.name); });
+    // v68.13: Ack all types
+    workerData.forEach(w => { 
+        if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("DURESS")) {
+            acknowledgedAlerts.add(w.name); 
+        }
+    });
     document.getElementById('fullScreenAlert').classList.add('hidden');
     stopAlertLoop();
     renderGrid(); 
@@ -260,7 +275,6 @@ function toggleView(view) {
     btnM.classList.toggle('text-gray-400', view !== 'MAP');
 
     if(view === 'MAP') {
-        // v68.12 FIX: Wait for container to be visible before rendering map pins
         setTimeout(() => { initMap(); renderMap(); }, 150);
     } else {
         renderGrid();
@@ -289,15 +303,37 @@ function handleData(response) {
         workerData = processWorkers(response.workers);
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString();
         
+        // v68.13 Logic: Prioritize DURESS vs EMERGENCY
+        const duressWorkers = workerData.filter(w => w.status.includes("DURESS") && !w.status.includes("SAFE"));
         const alertWorkers = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !w.status.includes("SAFE"));
-        const unacked = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name));
         
-        if(unacked.length > 0) {
-            document.getElementById('fullScreenAlert').classList.remove('hidden');
-            document.getElementById('alertNames').innerText = unacked.map(w => w.name).join(", ");
+        const unackedDuress = duressWorkers.filter(w => !acknowledgedAlerts.has(w.name));
+        const unackedAlert = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name));
+        
+        const alertBox = document.getElementById('fullScreenAlert');
+        const alertTitle = document.getElementById('alertTitle');
+        const alertNames = document.getElementById('alertNames');
+        const alertIcon = document.getElementById('alertIcon');
+
+        if(unackedDuress.length > 0) {
+            alertBox.classList.remove('hidden');
+            alertBox.classList.remove('alert-red');
+            alertBox.classList.add('alert-purple');
+            alertTitle.innerText = "DURESS ALARM (SILENT)";
+            alertIcon.innerText = "🥷";
+            alertNames.innerText = unackedDuress.map(w => w.name).join(", ");
+            startAlertLoop();
+        } 
+        else if(unackedAlert.length > 0) {
+            alertBox.classList.remove('hidden');
+            alertBox.classList.remove('alert-purple');
+            alertBox.classList.add('alert-red');
+            alertTitle.innerText = "EMERGENCY ALERT";
+            alertIcon.innerText = "🚨";
+            alertNames.innerText = unackedAlert.map(w => w.name).join(", ");
             startAlertLoop();
         } else {
-            document.getElementById('fullScreenAlert').classList.add('hidden');
+            alertBox.classList.add('hidden');
             stopAlertLoop();
         }
 
@@ -335,12 +371,13 @@ function renderGrid() {
     workerData.forEach(w => {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
         const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC');
+        const isDuress = w.status.includes('DURESS');
         const isOverdue = w.status.includes('OVERDUE');
         if(!isSafe) activeC++; 
-        if(isAlert || isOverdue) alertC++;
+        if(isAlert || isOverdue || isDuress) alertC++;
         
         if (search && !w.name.toLowerCase().includes(search)) return;
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue) return;
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return;
 
         visibleCount++;
         
@@ -349,11 +386,13 @@ function renderGrid() {
         let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status, timeClass = 'text-gray-500';
         let resolveBtn = '';
 
-        if (isAlert) { 
+        if (isDuress) {
+            borderClass = 'bd-purple'; dotClass = 'st-purple'; timeClass = 'text-purple-400 font-bold';
+            resolveBtn = `<button onclick="openResolve('${w.name}')" class="mt-2 w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE DURESS</button>`;
+        } else if (isAlert) { 
             borderClass = 'bd-red'; dotClass = 'st-red'; timeClass = 'text-red-400 font-bold'; 
             resolveBtn = `<button onclick="openResolve('${w.name}')" class="mt-2 w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE ALERT</button>`;
-        } 
-        else if (!isSafe) {
+        } else if (!isSafe) {
             const due = new Date(w.dueTime).getTime();
             if (!isNaN(due)) {
                 if (due > now) { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
@@ -369,9 +408,8 @@ function renderGrid() {
         card.className = `card p-4 ${borderClass}`;
         let batClass = parseInt(w.battery) < 20 ? 'text-red-500 font-bold blink' : 'text-green-500';
         
-        // v68.12 FIX: SVG Icon for Call button to prevent encoding errors
         let contactHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Mobile</span><span class="text-gray-300 font-mono">${w.phone||'--'}</span></div>`;
-        if (isAlert && w.iceName) {
+        if ((isAlert || isDuress) && w.iceName) {
             contactHtml += `<div class="mt-2 pt-2 border-t border-gray-700 bg-red-900/30 -mx-4 px-4 py-2"><div class="flex justify-between items-center"><span class="text-[10px] text-red-400 font-bold uppercase">ICE: ${w.iceName}</span><a href="tel:${w.icePhone}" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-xs font-bold shadow">📞 Call ICE</a></div></div>`;
         }
 
@@ -410,8 +448,9 @@ function renderMap() {
     workerData.forEach(w => {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY';
         const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC');
+        const isDuress = w.status.includes('DURESS');
         const isOverdue = w.status.includes('OVERDUE');
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue) return;
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return;
         
         if(!w.gps || w.gps.length < 5) return;
         const [lat, lng] = w.gps.split(',').map(Number);
@@ -419,6 +458,8 @@ function renderMap() {
         let colorClass = 'grey';
         const urgency = getUrgencyScore(w, now);
         if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green';
+        if(isDuress) colorClass = 'purple'; // Override for duress
+
         const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [20, 20] });
         L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${w.name}</b><br>${w.status}<br>${w.location}`).addTo(markersLayer);
         bounds.extend([lat, lng]); hasMarkers = true;
@@ -434,14 +475,21 @@ function renderLog() {
     top.forEach(r => {
         const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         let color = "text-gray-300";
-        if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold";
+        if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold";
+        else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold";
         else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold";
-        // v68.12 FIX: Reduced font size for logs
         html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${r['Worker Name']}: ${r['Alarm Status']}</span></div>`;
     });
     list.innerHTML = html;
 }
-function getUrgencyScore(w, now) { if (w.status.includes('EMERGENCY')) return 1000; const due = new Date(w.dueTime).getTime(); if (!isNaN(due) && due < now && w.status !== 'DEPARTED') return 500 + (now - due); if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100; return 0; }
+function getUrgencyScore(w, now) { 
+    if (w.status.includes('DURESS')) return 2000; // Highest Priority
+    if (w.status.includes('EMERGENCY')) return 1000; 
+    const due = new Date(w.dueTime).getTime(); 
+    if (!isNaN(due) && due < now && w.status !== 'DEPARTED') return 500 + (now - due); 
+    if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100; 
+    return 0; 
+}
 function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return isNaN(d) ? "--:--" : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
 </script>
 </body>
