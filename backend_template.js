@@ -1,13 +1,13 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.12 (Diamond Edition)
- * Critical Fix: "Sync Crash" on new devices.
- * - Enforces Strict Read-Only mode during Sync (doGet).
- * - Defers Device ID locking to the first Data Submission (doPost).
- * - Includes 'Note to Self' routing and Full-Resolution Photos.
+ * OTG APPSUITE - MASTER BACKEND v68.9 (Security Patch)
+ * - Fixes: "Glass Wall" Vulnerability (Two-Key System implemented).
+ * - Fixes: Watchdog Timeout (Row limit applied).
+ * - Fixes: Monitor JSONP Open Access.
  */
 
 const CONFIG = {
-  SECRET_KEY: "%%SECRET_KEY%%", // Must match your Factory setting
+  MASTER_KEY: "%%SECRET_KEY%%", // High Privilege (Admin/Monitor)
+  WORKER_KEY: "%%WORKER_KEY%%", // Low Privilege (Staff PWA)
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
@@ -28,22 +28,25 @@ if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
 // --- API ENDPOINTS ---
 function doGet(e) {
-  // Global Safety Net: Ensures we ALWAYS return JSON, never HTML
   try {
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
 
-      // 1. Connection Test
+      // 1. Connection Test (Accepts either key)
       if(e.parameter.test) {
-         if(e.parameter.key === CONFIG.SECRET_KEY) return sendJSON({status:"success", version: "v68.12"});
+         const k = e.parameter.key;
+         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.9"});
          return sendJSON({status:"error", message:"Invalid Key"});
       }
 
-      // 2. Worker App Sync
+      // 2. Worker App Sync (Accepts either key)
       if(e.parameter.action === 'sync') {
+          const k = e.parameter.key;
+          if(k !== CONFIG.MASTER_KEY && k !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"Auth Failed"});
+          
           const worker = e.parameter.worker;
           const deviceId = e.parameter.deviceId; 
           
-          // CRITICAL FIX: Pass 'true' to forbid writing during Sync
+          // Pass 'true' to forbid writing during Sync
           const auth = checkAccess(worker, deviceId, true);
           
           if (!auth.allowed) {
@@ -82,8 +85,12 @@ function doGet(e) {
           return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
       }
 
-      // 3. Monitor App Poll (JSONP)
+      // 3. Monitor App Poll (MASTER KEY ONLY)
       if(e.parameter.callback){
+        // Strict Gating: Monitor must provide Master Key
+        if (e.parameter.key !== CONFIG.MASTER_KEY) {
+             return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")");
+        }
         return handleMonitorPoll(e.parameter.callback);
       }
 
@@ -103,7 +110,8 @@ function doPost(e) {
     if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
     
-    if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return sendJSON({status: "error"});
+    // AUTH CHECK: Accepts Master OR Worker Key
+    if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
     
     // AUTH CHECK: Pass 'false' to ALLOW writing (Locking Device ID)
     if (p.action !== 'resolve') {
@@ -238,6 +246,8 @@ function handleMonitorPoll(callback) {
     const t = ss.getSheetByName('Visits');
     if(!t) return ContentService.createTextOutput(callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
     
+    // Performance: Read only recent rows if needed, but Monitor needs snapshot. 
+    // We will stick to DataRange for Monitor as it needs active status, which could be anywhere.
     const r = t.getDataRange().getValues();
     const headers = r.shift();
     const st = ss.getSheetByName('Staff');
@@ -347,7 +357,13 @@ function checkOverdueVisits() {
   PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString());
   const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return;
   const lastRow = sheet.getLastRow(); if (lastRow <= 1) return;
-  const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues();
+  
+  // WATCHDOG CLAMP FIX: Only check the last 500 rows to prevent timeout
+  const CHECK_LIMIT = 500;
+  const startRow = Math.max(2, lastRow - CHECK_LIMIT);
+  const numRows = lastRow - startRow + 1;
+  const data = sheet.getRange(startRow, 1, numRows, 21).getValues();
+
   const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
   for (let i = 0; i < data.length; i++) {
     const row = data[i]; const status = row[10]; const dueTimeStr = row[20];
@@ -355,9 +371,9 @@ function checkOverdueVisits() {
     const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue;
     const timeOverdue = now - dueTime;
     if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) {
-          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(i + 2, 11).setValue(newStatus);
+          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(startRow + i, 11).setValue(newStatus);
           sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] });
-    } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(i + 2, 11).setValue("OVERDUE"); }
+    } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(startRow + i, 11).setValue("OVERDUE"); }
   }
 }
 function parseQuestions(row) { 
@@ -385,58 +401,3 @@ function setupReportTemplate() { try { const doc = DocumentApp.create(`${CONFIG.
 function sendAlert(data) { let recipients = [Session.getEffectiveUser().getEmail()]; let smsNumbers = []; if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); } recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status']; const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`; if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`; smsNumbers.forEach(phone => { const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), muteHttpExceptions: true }); } catch(e) {} }); }
 function smartScribe(text) { if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text; try { const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`; const payload = { "contents": [{ "parts": [{ "text": "Correct grammar to NZ English: " + text }] }] }; const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true }); return JSON.parse(response.getContentText()).candidates[0].content.parts[0].text.trim(); } catch (e) { return text; } }
 function archiveOldData() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); let archive = ss.getSheetByName('Archive'); if (!archive) archive = ss.insertSheet('Archive'); const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = []; for (let i = 1; i < data.length; i++) { const date = new Date(data[i][0]); const diff = (today - date) / (1000 * 60 * 60 * 24); if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) { rowsToArchive.push(data[i]); } else { rowsToKeep.push(data[i]); } } if (rowsToArchive.length > 0) { if (archive.getLastRow() === 0) archive.appendRow(data[0]); archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive); sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep); } }
-function runAllLongitudinalReports() { 
-    const ss = SpreadsheetApp.getActiveSpreadsheet(); 
-    let allData = [];
-    const sheet = ss.getSheetByName('Visits'); 
-    if (sheet) {
-        const vData = sheet.getDataRange().getValues();
-        if(vData.length > 1) allData = allData.concat(vData.slice(1));
-    }
-    const archive = ss.getSheetByName('Archive');
-    if (archive) {
-        const aData = archive.getDataRange().getValues();
-        if(aData.length > 1) allData = allData.concat(aData.slice(1));
-    }
-    if (allData.length === 0) return; 
-
-    const dateStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM"); 
-    const name = `Longitudinal Report - ${dateStr} - ${CONFIG.ORG_NAME}`; 
-    let reportFile; 
-    const files = DriveApp.getFilesByName(name); 
-    if (files.hasNext()) reportFile = files.next(); else reportFile = DriveApp.getFileById(SpreadsheetApp.create(name).getId()); 
-    const reportSS = SpreadsheetApp.open(reportFile); 
-    
-    let sheetAct = reportSS.getSheetByName('Worker Activity'); 
-    if (sheetAct) sheetAct.clear(); else sheetAct = reportSS.insertSheet('Worker Activity'); 
-    sheetAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered"]); 
-    sheetAct.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dbeafe"); 
-    
-    const stats = {}; 
-    for (let i = 0; i < allData.length; i++) { 
-        const worker = allData[i][2]; 
-        const status = allData[i][10]; 
-        if (!stats[worker]) stats[worker] = { visits: 0, alerts: 0 }; 
-        stats[worker].visits++; 
-        if (status.includes("EMERGENCY") || status.includes("OVERDUE")) stats[worker].alerts++; 
-    } 
-    const actRows = Object.keys(stats).map(w => [w, stats[w].visits, stats[w].alerts]); 
-    if (actRows.length > 0) sheetAct.getRange(2, 1, actRows.length, 3).setValues(actRows); 
-
-    let sheetTrav = reportSS.getSheetByName('Travel Stats'); 
-    if (sheetTrav) sheetTrav.clear(); else sheetTrav = reportSS.insertSheet('Travel Stats'); 
-    sheetTrav.appendRow(["Worker Name", "Total Distance (km)", "Trips"]); 
-    sheetTrav.getRange(1,1,1,3).setFontWeight("bold").setBackground("#dcfce7"); 
-    
-    const tStats = {}; 
-    for (let i = 0; i < allData.length; i++) { 
-        const worker = allData[i][2]; 
-        const dist = parseFloat(allData[i][18]) || 0; 
-        if (!tStats[worker]) tStats[worker] = { km: 0, trips: 0 }; 
-        if (dist > 0) { tStats[worker].km += dist; tStats[worker].trips++; } 
-    } 
-    const travRows = Object.keys(tStats).map(w => [w, tStats[w].km.toFixed(2), tStats[w].trips]); 
-    if (travRows.length > 0) sheetTrav.getRange(2, 1, travRows.length, 3).setValues(travRows); 
-    
-    MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: `Report: ${name}`, htmlBody: `<a href="${reportSS.getUrl()}">View Report</a>` }); 
-}
