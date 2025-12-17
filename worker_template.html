@@ -1,68 +1,4 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTG Factory 💎</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; }
-        .step-card { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }
-        .input-field { width: 100%; background: #0f172a; border: 1px solid #475569; padding: 0.75rem; border-radius: 0.5rem; color: white; margin-top: 0.5rem; }
-        .input-field:focus { border-color: #3b82f6; outline: none; }
-        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: bold; transition: all 0.2s; cursor: pointer; }
-        .btn-primary { background: #2563eb; color: white; }
-        .btn-primary:hover { background: #1d4ed8; }
-        .btn-copy { background: #334155; color: #94a3b8; font-size: 0.8rem; padding: 0.5rem 1rem; }
-        .btn-copy:hover { background: #475569; color: white; }
-        .code-block { display: none; }
-    </style>
-</head>
-<body class="max-w-4xl mx-auto p-6">
-
-    <header class="text-center mb-12">
-        <h1 class="text-5xl font-black text-blue-500 mb-2">OTG Factory 💎</h1>
-        <p class="text-gray-400">Patched Build v68.19 (Fixes LocModal & Meta)</p>
-    </header>
-
-    <div class="step-card">
-        <h2 class="text-2xl font-bold mb-6 text-blue-400">1. Configuration</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><label class="text-sm font-bold text-gray-400">Organisation Name</label><input id="orgName" class="input-field" placeholder="e.g. Acme Community Care"></div>
-            <div><label class="text-sm font-bold text-gray-400">Logo URL (Optional)</label><input id="logoUrl" class="input-field" placeholder="https://..."></div>
-            <div class="col-span-1 md:col-span-2">
-                <label class="text-sm font-bold text-purple-400">SECRET KEY</label>
-                <input id="secretKey" class="input-field border-purple-500" placeholder="Create a strong password">
-            </div>
-        </div>
-        <h3 class="text-lg font-bold mt-8 mb-4 text-gray-300">API Keys (Optional)</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><label class="text-xs font-bold text-gray-500">OpenRouteService</label><input id="orsKey" class="input-field text-sm"></div>
-            <div><label class="text-xs font-bold text-gray-500">Gemini AI</label><input id="geminiKey" class="input-field text-sm"></div>
-            <div><label class="text-xs font-bold text-gray-500">Textbelt</label><input id="textbeltKey" class="input-field text-sm"></div>
-        </div>
-    </div>
-
-    <div class="step-card border-green-900/50 bg-green-900/10">
-        <h2 class="text-2xl font-bold mb-4 text-green-400">2. Database Headers</h2>
-        <div class="space-y-4">
-            <div class="flex justify-between items-center bg-gray-900 p-3 rounded"><span class="font-mono text-sm text-yellow-400">Tab: Visits</span><button onclick="copyHeader('visits')" class="btn btn-copy">Copy</button></div>
-            <div class="flex justify-between items-center bg-gray-900 p-3 rounded"><span class="font-mono text-sm text-blue-400">Tab: Staff</span><button onclick="copyHeader('staff')" class="btn btn-copy">Copy</button></div>
-            <div class="flex justify-between items-center bg-gray-900 p-3 rounded"><span class="font-mono text-sm text-purple-400">Tab: Templates</span><button onclick="copyHeader('templates')" class="btn btn-copy">Copy</button></div>
-            <div class="flex justify-between items-center bg-gray-900 p-3 rounded"><span class="font-mono text-sm text-orange-400">Tab: Sites</span><button onclick="copyHeader('sites')" class="btn btn-copy">Copy</button></div>
-        </div>
-    </div>
-
-    <div class="step-card text-center">
-        <h2 class="text-2xl font-bold mb-4 text-white">3. Generate AppSuite</h2>
-        <button onclick="generateSuite()" class="btn btn-primary text-xl w-full py-4 shadow-lg">💎 DOWNLOAD DIAMOND ZIP</button>
-    </div>
-
-<script type="text/plain" id="tpl_worker">
-<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
 <meta charset="UTF-8">
@@ -171,6 +107,7 @@ async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 function buildReportForm(n,c){state.photoStore={};const sn=n?n.trim():"Standard Visit Note";let t=null;if(state.globalForms)t=state.globalForms.find(f=>f.name.trim()===sn)?.questions;if(!t&&state.cachedForms)t=state.cachedForms[sn];if(!t)t=state.cachedForms["(Standard)"];if(!t){console.warn("Template not found:",sn);t=[{type:'note',text:'Standard Check-in (Default)'},{type:'text',text:'Notes'}];}c.innerHTML='';if(t.length===0){c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';}else{t.forEach((f,i)=>{let y=f.type||'check',x=f.text||f;if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}}let h='';if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;else if(y==='date')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="date" data-key="${x}" class="form-input">`;c.innerHTML+=h;});}const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);}
+// PATCH: ADDED MISSING FUNCTIONS FOR MANUAL LOCATION
 function openLocModal(){showModal('location');document.getElementById('locId').value='';document.getElementById('locModalTitle').innerText="Add Manual Location";document.getElementById('locBusiness').value='';document.getElementById('locName').value='';document.getElementById('locAddr').value='';document.getElementById('btnDelLoc').classList.add('hidden');}
 function saveLoc(){const id=document.getElementById('locId').value||'loc_'+Date.now();const b=document.getElementById('locBusiness').value;const n=document.getElementById('locName').value;const a=document.getElementById('locAddr').value;const t=document.getElementById('locTemplate').value;if(!n)return alert("Site Name Required");const l={id:id,name:n,companyName:b,address:a,templateName:t,noReport:false};if(document.getElementById('locId').value){const idx=state.locations.findIndex(x=>x.id===id);if(idx>=0)state.locations[idx]=l;}else{state.locations.push(l);}saveState();renderLocations();closeModal('location');}
 function deleteLoc(){const id=document.getElementById('locId').value;if(!id)return;if(confirm("Delete this location?")){state.locations=state.locations.filter(x=>x.id!==id);saveState();renderLocations();closeModal('location');}}
@@ -180,152 +117,262 @@ window.addEventListener('load',()=>{const s=localStorage.getItem('loneWorkerStat
 </script>
 </script>
 
+<script type="text/plain" id="tpl_monitor">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>%%ORG_NAME%% Monitor</title>
+<link rel="icon" href="%%LOGO_URL%%">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<style>
+body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+.main-layout { display: flex; flex: 1; overflow: hidden; }
+.grid-area { flex: 3; overflow-y: auto; padding: 1.5rem; position: relative; }
+.log-area { flex: 0 0 250px; background-color: #1e293b; border-left: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
+.card { background-color: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; transition: all 0.2s; position: relative; overflow: hidden; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+.status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; }
+.blink { animation: blinker 1.5s linear infinite; }
+@keyframes blinker { 50% { opacity: 0; } }
+.st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; } 
+.st-amber { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: blinker 2s linear infinite; } 
+.st-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 0.5s linear infinite; } 
+.st-purple { background-color: #d946ef; box-shadow: 0 0 15px #d946ef; animation: blinker 0.3s linear infinite; }
+.st-grey { background-color: #64748b; } 
+.bd-green { border-color: #059669; border-width: 2px; }
+.bd-amber { border-color: #d97706; border-width: 2px; }
+.bd-red { border-color: #dc2626; border-width: 4px; }
+.bd-purple { border-color: #c026d3; border-width: 5px; }
+.bd-grey { border-color: #475569; opacity: 0.7; }
+#fullScreenAlert { z-index: 50; }
+.alert-red { animation: pulseRed 1s infinite; }
+.alert-purple { animation: pulsePurple 1s infinite; }
+@keyframes pulseRed { 0% { background-color: rgba(220, 38, 38, 0.9); } 50% { background-color: rgba(153, 27, 27, 0.95); } 100% { background-color: rgba(220, 38, 38, 0.9); } }
+@keyframes pulsePurple { 0% { background-color: rgba(147, 51, 234, 0.9); } 50% { background-color: rgba(107, 33, 168, 0.95); } 100% { background-color: rgba(147, 51, 234, 0.9); } }
+#mapView { background: #020617; z-index: 1; width: 100%; height: 100%; }
+.custom-div-icon { background: transparent; border: none; } 
+.map-icon { width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: block; }
+.map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
+.map-icon.purple { background: #d946ef; animation: blinker 0.3s linear infinite; box-shadow: 0 0 25px #d946ef; }
+.map-icon.green { background: #10b981; }
+.map-icon.amber { background: #f59e0b; }
+.map-icon.grey { background: #64748b; }
+</style>
+</head>
+<body>
+<div id="authModal" class="hidden fixed inset-0 z-[100] bg-gray-900 flex items-center justify-center p-4"><div class="bg-gray-800 border-2 border-blue-600 rounded-xl shadow-2xl max-w-md w-full p-8 text-center"><div class="text-6xl mb-4">🔐</div><h1 class="text-2xl font-bold text-white mb-2">Security Access</h1><p class="text-gray-400 text-sm mb-6">Enter your Organisation Secret Key to authorize this Monitor Station.</p><input type="password" id="authKeyInput" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-4 text-white text-center text-lg tracking-widest mb-6 focus:border-blue-500 outline-none" placeholder="Enter Secret Key"><button onclick="saveAuthKey()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg shadow-lg text-lg">Unlock Monitor</button></div></div>
+<div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm"><div class="text-9xl mb-4" id="alertIcon">🚨</div><h1 class="text-6xl font-black text-white mb-4 drop-shadow-md" id="alertTitle">EMERGENCY ALERT</h1><h2 id="alertNames" class="text-4xl font-bold text-white bg-black/30 px-6 py-2 rounded mb-8">Worker Name</h2><button onclick="acknowledgeAlert()" class="bg-white text-gray-900 font-black text-2xl py-6 px-12 rounded-full shadow-2xl hover:scale-105 transition border-4 border-gray-900">ACKNOWLEDGE ALARM</button><p class="text-white mt-6 font-bold opacity-80">Clicking this silences the alarm but DOES NOT clear the emergency.</p></div>
+<div id="resolveModal" class="hidden fixed inset-0 z-40 bg-black/90 flex items-center justify-center p-4"><div class="bg-gray-800 border-2 border-green-600 rounded-xl shadow-2xl max-w-md w-full p-6"><h2 class="text-2xl font-bold text-white mb-2">Resolve Emergency</h2><p class="text-gray-400 text-sm mb-4">You are manually clearing <span id="resWorkerNameDisplay" class="font-bold text-white"></span>.</p><div class="space-y-4"><div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">1. Confirm Worker Name</label><input type="text" id="resNameInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white" placeholder="Type name exactly..."></div><div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">2. Resolution Note (Log)</label><textarea id="resNoteInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white h-24" placeholder="e.g. Spoke to worker, false alarm."></textarea></div></div><div class="flex gap-3 mt-6"><button onclick="closeResolve()" class="flex-1 bg-gray-700 text-white font-bold py-3 rounded">Cancel</button><button onclick="submitResolution()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg">✅ MARK SAFE</button></div></div></div>
+<header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg"><div class="flex justify-between items-center mb-2"><div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.14</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div><div class="flex items-center gap-3"><button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button><button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button><div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white shadow transition">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">📋 All</button></div><div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"><button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 text-white shadow">⊞ Grid</button><button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">🗺️ Map</button></div><div class="relative"><input type="text" id="searchBox" placeholder="Filter..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:border-blue-500 w-32" onkeyup="renderGrid()"></div></div><div class="flex gap-6 border-l border-gray-700 pl-6"><div class="text-center"><div class="text-2xl font-bold text-green-400 leading-none" id="activeCount">0</div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Active</div></div><div class="text-center"><div class="text-2xl font-bold text-red-500 leading-none" id="alertCount">0</div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Alerts</div></div></div></div><div id="loadWarning" class="hidden rounded px-3 py-2 text-xs font-bold flex items-center justify-between"><span id="loadMsg"></span><span class="opacity-80 font-normal">System bottleneck likely. Please stagger shifts.</span></div></header>
+<div class="main-layout"><div class="grid-area"><div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4"></div><div id="mapView" class="hidden h-full w-full rounded-xl overflow-hidden shadow-inner border border-gray-700 bg-gray-900 relative"></div><div id="emptyState" class="hidden h-full flex flex-col items-center justify-center text-gray-600"><div class="text-4xl mb-2">😴</div><p>No active workers.</p></div></div><div class="log-area"><div class="p-2 bg-gray-800 border-b border-gray-700 font-bold text-[10px] text-gray-400 uppercase tracking-wider sticky top-0">Activity Log</div><div id="eventLogList" class="flex-1 overflow-y-auto px-2 py-2 space-y-1"></div></div></div>
 <script>
-// --- 1. HEADERS DEFINITION ---
-const SHEET_HEADERS = {
-    visits: "Timestamp,Date,Worker Name,Worker Phone Number,Emergency Contact Name,Emergency Contact Number,Emergency Contact Email,Escalation Contact Name,Escalation Contact Number,Escalation Contact Email,Alarm Status,Notes,Location Name,Location Address,Last Known GPS,GPS Timestamp,Battery Level,Photo 1,Distance (km),Visit Report Data,Anticipated Departure Time,Signature,Photo 2,Photo 3,Photo 4",
-    staff: "Name,Role,Status,Token,DeviceID,LastVehCheck,WOFExpiry",
-    templates: "Type,Template Name,Assigned To,Email Recipient,Question 1",
-    sites: "Assigned To,Template Name,Company Name,Site Name,Address,Contact Name,Contact Phone,Contact Email,Notes"
+const SCRIPT_URL="%%SHEET_URL%%";let API_KEY=localStorage.getItem('otg_monitor_key');let workerData=[];let allRows=[];let escalationLimit=15;let mapInstance=null,markersLayer=null,currentView='GRID';let currentFilter='ACTIVE';let audioEnabled=true,synth=null;let acknowledgedAlerts=new Set();let alertLoopInterval=null;
+window.onload=()=>{if(!API_KEY){document.getElementById('authModal').classList.remove('hidden');}else{fetchData();setInterval(fetchData,10000);setInterval(renderGrid,1000);}document.body.addEventListener('click',async()=>{if(audioEnabled&&!synth){await Tone.start();synth=new Tone.Synth().toDestination();}},{once:true});};
+function saveAuthKey(){const k=document.getElementById('authKeyInput').value.trim();if(k.length<3)return alert("Invalid Key");localStorage.setItem('otg_monitor_key',k);API_KEY=k;document.getElementById('authModal').classList.add('hidden');fetchData();setInterval(fetchData,10000);setInterval(renderGrid,1000);}
+function resetKey(){if(confirm("Reset the Security Key?")){localStorage.removeItem('otg_monitor_key');location.reload();}}
+async function toggleAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}audioEnabled=!audioEnabled;const btn=document.getElementById('btnAudio');if(audioEnabled){btn.innerText="🔊 Sound On";btn.className="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition";synth.triggerAttackRelease("C5","8n");}else{btn.innerText="🔇 Sound Off";btn.className="px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition";}}
+function startAlertLoop(){if(alertLoopInterval)return;alertLoopInterval=setInterval(()=>{if(audioEnabled&&synth){const now=Tone.now();synth.triggerAttackRelease("C6","0.1",now);synth.triggerAttackRelease("G5","0.1",now+0.15);}},1000);}
+function stopAlertLoop(){if(alertLoopInterval){clearInterval(alertLoopInterval);alertLoopInterval=null;}}
+function acknowledgeAlert(){workerData.forEach(w=>{if(w.status.includes("EMERGENCY")||w.status.includes("PANIC")||w.status.includes("DURESS")){acknowledgedAlerts.add(w.name);}});document.getElementById('fullScreenAlert').classList.add('hidden');stopAlertLoop();renderGrid();}
+function openResolve(name){document.getElementById('resolveModal').classList.remove('hidden');document.getElementById('resWorkerNameDisplay').innerText=name;document.getElementById('resNameInput').value="";document.getElementById('resNoteInput').value="";}
+function closeResolve(){document.getElementById('resolveModal').classList.add('hidden');}
+function submitResolution(){const tn=document.getElementById('resWorkerNameDisplay').innerText;const yn=document.getElementById('resNameInput').value.trim();const n=document.getElementById('resNoteInput').value.trim();if(tn!==yn){alert("Error: Name does not match exactly.");return;}if(n.length<5){alert("Error: Please enter a resolution note.");return;}const fd=new FormData();fd.append('action','resolve');fd.append('key',API_KEY);fd.append('Worker Name',tn);fd.append('Alarm Status','SAFE - MANUALLY CLEARED');fd.append('Notes',`[HQ RESOLVED]: ${n}`);fd.append('Battery Level','N/A');fd.append('Location Name','HQ Manual Resolution');fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:fd}).then(()=>{alert("Resolution Sent.");closeResolve();acknowledgedAlerts.add(tn);renderGrid();}).catch(e=>alert("Connection Error: "+e));}
+function setFilter(f){currentFilter=f;const ba=document.getElementById('btnFilterActive');const bl=document.getElementById('btnFilterAll');if(f==='ACTIVE'){ba.classList.replace('text-gray-400','bg-blue-600');ba.classList.replace('hover:text-white','text-white');bl.classList.replace('bg-blue-600','text-gray-400');bl.classList.replace('text-white','hover:text-white');bl.classList.remove('shadow');ba.classList.add('shadow');}else{bl.classList.replace('text-gray-400','bg-blue-600');bl.classList.replace('hover:text-white','text-white');ba.classList.replace('bg-blue-600','text-gray-400');ba.classList.replace('text-white','hover:text-white');ba.classList.remove('shadow');bl.classList.add('shadow');}renderGrid();if(currentView==='MAP')renderMap();}
+function focusWorker(gps){if(!gps||gps.length<5)return alert("No GPS data available.");document.getElementById('btnMap').click();const[lat,lng]=gps.split(',').map(Number);setTimeout(()=>{if(mapInstance){mapInstance.invalidateSize();mapInstance.flyTo([lat,lng],17,{animate:true,duration:1.5});}},250);}
+function toggleView(v){currentView=v;const g=document.getElementById('workerGrid');const m=document.getElementById('mapView');const bg=document.getElementById('btnGrid');const bm=document.getElementById('btnMap');g.classList.toggle('hidden',v==='MAP');m.classList.toggle('hidden',v==='GRID');document.getElementById('emptyState').classList.add('hidden');bg.classList.toggle('bg-gray-600',v==='GRID');bg.classList.toggle('text-white',v==='GRID');bg.classList.toggle('text-gray-400',v!=='GRID');bm.classList.toggle('bg-gray-600',v==='MAP');bm.classList.toggle('text-white',v==='MAP');bm.classList.toggle('text-gray-400',v!=='MAP');if(v==='MAP'){setTimeout(()=>{initMap();renderMap();},150);}else{renderGrid();}}
+function fetchData(){const s=document.createElement('script');const c='cb_'+Date.now();window[c]=function(d){if(d.escalation_limit)escalationLimit=parseInt(d.escalation_limit);handleData(d);document.body.removeChild(s);delete window[c];};s.src=`${SCRIPT_URL}?callback=${c}&t=${Date.now()}`;document.body.appendChild(s);}
+function handleData(r){if(r&&(r.workers||r.status==='online')){document.getElementById('serverStatus').innerHTML='<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';}if(r.workers){allRows=r.workers;workerData=processWorkers(r.workers);document.getElementById('lastUpdate').innerText=new Date().toLocaleTimeString();const dw=workerData.filter(w=>w.status.includes("DURESS")&&!w.status.includes("SAFE"));const aw=workerData.filter(w=>(w.status.includes("EMERGENCY")||w.status.includes("PANIC"))&&!w.status.includes("SAFE"));const ud=dw.filter(w=>!acknowledgedAlerts.has(w.name));const ua=aw.filter(w=>!acknowledgedAlerts.has(w.name));const ab=document.getElementById('fullScreenAlert');const at=document.getElementById('alertTitle');const an=document.getElementById('alertNames');const ai=document.getElementById('alertIcon');if(ud.length>0){ab.classList.remove('hidden');ab.classList.remove('alert-red');ab.classList.add('alert-purple');at.innerText="DURESS ALARM (SILENT)";ai.innerText="🥷";an.innerText=ud.map(w=>w.name).join(", ");startAlertLoop();}else if(ua.length>0){ab.classList.remove('hidden');ab.classList.remove('alert-purple');ab.classList.add('alert-red');at.innerText="EMERGENCY ALERT";ai.innerText="🚨";an.innerText=ua.map(w=>w.name).join(", ");startAlertLoop();}else{ab.classList.add('hidden');stopAlertLoop();}if(currentView==='GRID')renderGrid();else renderMap();renderLog();}}
+function processWorkers(rows){const workers={};rows.forEach(r=>{const name=r['Worker Name'];if(!name)return;const ts=new Date(r['Timestamp']).getTime();if(!workers[name]||ts>workers[name].timestamp){workers[name]={name:name,status:r['Alarm Status'],phone:r['Worker Phone Number'],iceName:r['Emergency Contact Name'],icePhone:r['Emergency Contact Number'],notes:r['Notes'],location:r['Location Name']||r['Location Address']||"Unknown",gps:r['Last Known GPS'],battery:r['Battery Level'],dueTime:r['Anticipated Departure Time'],wofExpiry:r['WOFExpiry'],timestamp:ts};}});return Object.values(workers);}
+function renderGrid(){const g=document.getElementById('workerGrid');const s=document.getElementById('searchBox').value.toLowerCase();const now=Date.now();g.innerHTML='';let ac=0;let alc=0;let vc=0;workerData.sort((a,b)=>getUrgencyScore(b,now)-getUrgencyScore(a,now));const ta=workerData.filter(w=>w.status!=='DEPARTED'&&w.status!=='COMPLETED').length;const le=document.getElementById('loadWarning');if(ta>40){le.className="bg-red-900 border-red-500 rounded px-3 py-2 text-xs font-bold flex justify-between animate-pulse";le.classList.remove('hidden');document.getElementById('loadMsg').innerText=`⚠️ CRITICAL LOAD (${ta})`;}else if(ta>20){le.className="bg-yellow-900 border-yellow-500 rounded px-3 py-2 text-xs font-bold flex justify-between";le.classList.remove('hidden');document.getElementById('loadMsg').innerText=`⚠️ HIGH TRAFFIC (${ta})`;}else{le.classList.add('hidden');}workerData.forEach(w=>{const safe=w.status==='DEPARTED'||w.status==='COMPLETED'||w.status.includes('SAFE')||w.status==='DATA_ENTRY_ONLY';const alert=w.status.includes('EMERGENCY')||w.status.includes('PANIC');const duress=w.status.includes('DURESS');const overdue=w.status.includes('OVERDUE');if(!safe)ac++;if(alert||overdue||duress)alc++;if(s&&!w.name.toLowerCase().includes(s))return;if(currentFilter==='ACTIVE'&&safe&&!alert&&!overdue&&!duress)return;vc++;if(currentView==='MAP')return;let bc='bd-grey',dc='st-grey',st=w.status,tc='text-gray-500';let rb='';if(duress){bc='bd-purple';dc='st-purple';tc='text-purple-400 font-bold';rb=`<button onclick="openResolve('${w.name}')" class="mt-2 w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE DURESS</button>`;}else if(alert){bc='bd-red';dc='st-red';tc='text-red-400 font-bold';rb=`<button onclick="openResolve('${w.name}')" class="mt-2 w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE ALERT</button>`;}else if(!safe){const due=new Date(w.dueTime).getTime();if(!isNaN(due)){if(due>now){bc='bd-green';dc='st-ok';}else{bc='bd-amber';dc='st-amber';tc='text-amber-500 font-bold';const mo=Math.floor((now-due)/60000);if(mo>=escalationLimit){bc='bd-red';dc='st-red';}}}else{bc='bd-green';dc='st-ok';}}const c=document.createElement('div');c.className=`card p-4 ${bc}`;let bcl=parseInt(w.battery)<20?'text-red-500 font-bold blink':'text-green-500';let ch=`<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Mobile</span><span class="text-gray-300 font-mono">${w.phone||'--'}</span></div>`;if((alert||duress)&&w.iceName){ch+=`<div class="mt-2 pt-2 border-t border-gray-700 bg-red-900/30 -mx-4 px-4 py-2"><div class="flex justify-between items-center"><span class="text-[10px] text-red-400 font-bold uppercase">ICE: ${w.iceName}</span><a href="tel:${w.icePhone}" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-xs font-bold shadow">📞 Call ICE</a></div></div>`;}const ci=`<svg xmlns="http://www.w3.org/2000/svg" class="inline w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>`;c.innerHTML=`<div class="flex justify-between items-start mb-2"><h3 onclick="focusWorker('${w.gps}')" class="font-bold text-lg text-white truncate w-full cursor-pointer hover:text-blue-400 transition" title="Click to locate">${w.name}</h3><div class="${dc} status-dot mt-1.5 shrink-0 ml-2"></div></div><div class="space-y-1.5 text-xs text-gray-300"><div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Status</span><span class="font-bold">${st}</span></div><div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Location</span><span class="truncate w-24 text-right" title="${w.location}">${w.location}</span></div><div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Due</span><span class="${tc}">${formatTime(w.dueTime)}</span></div><div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Battery</span><span class="${bcl}">${w.battery||'--'}</span></div>${ch}</div><div class="mt-3 grid grid-cols-2 gap-2"><button onclick="focusWorker('${w.gps}')" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 text-center py-2 rounded text-xs font-bold">📍 Map</button><a href="tel:${w.phone}" class="bg-gray-700 hover:bg-gray-600 text-white text-center py-2 rounded text-xs font-bold flex items-center justify-center">${ci} Call</a></div>${rb}`;g.appendChild(c);});document.getElementById('activeCount').innerText=ac;document.getElementById('alertCount').innerText=alc;if(currentView==='GRID')document.getElementById('emptyState').classList.toggle('hidden',vc>0);}
+function initMap(){if(mapInstance){mapInstance.invalidateSize();return;}mapInstance=L.map('mapView').setView([-40.9006,174.8860],5);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(mapInstance);markersLayer=L.layerGroup().addTo(mapInstance);}
+function renderMap(){if(!mapInstance)return;markersLayer.clearLayers();const b=L.latLngBounds();let hm=false;const now=Date.now();workerData.forEach(w=>{const safe=w.status==='DEPARTED'||w.status==='COMPLETED'||w.status.includes('SAFE')||w.status==='DATA_ENTRY_ONLY';const alert=w.status.includes('EMERGENCY')||w.status.includes('PANIC');const duress=w.status.includes('DURESS');const overdue=w.status.includes('OVERDUE');if(currentFilter==='ACTIVE'&&safe&&!alert&&!overdue&&!duress)return;if(!w.gps||w.gps.length<5)return;const[lat,lng]=w.gps.split(',').map(Number);if(isNaN(lat))return;let cc='grey';const u=getUrgencyScore(w,now);if(u>=2000)cc='purple';else if(u>=1000)cc='red';else if(u>=500)cc='amber';else if(u>=100)cc='green';const i=L.divIcon({className:'custom-div-icon',html:`<div class="map-icon ${cc}"></div>`,iconSize:[24,24]});L.marker([lat,lng],{icon:i}).bindPopup(`<b>${w.name}</b><br>${w.status}<br>${w.location}`).addTo(markersLayer);b.extend([lat,lng]);hm=true;});if(hm&&!mapInstance._isFocused)mapInstance.fitBounds(b,{padding:[50,50],maxZoom:15});}
+function renderLog(){const l=document.getElementById('eventLogList');const s=[...allRows].sort((a,b)=>new Date(b.Timestamp)-new Date(a.Timestamp));const t=s.slice(0,50);let h='';t.forEach(r=>{const time=new Date(r['Timestamp']).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});let c="text-gray-300";if(r['Alarm Status'].includes("DURESS"))c="text-purple-400 font-bold";else if(r['Alarm Status'].includes("EMERGENCY"))c="text-red-400 font-bold";else if(r['Alarm Status'].includes("RESOLVED"))c="text-green-400 font-bold";h+=`<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${c}">${r['Worker Name']}: ${r['Alarm Status']}</span></div>`;});l.innerHTML=h;}
+function getUrgencyScore(w,now){if(w.status.includes('DURESS'))return 2000;if(w.status.includes('EMERGENCY'))return 1000;const due=new Date(w.dueTime).getTime();if(!isNaN(due)&&due<now&&w.status!=='DEPARTED')return 500+(now-due);if(w.status==='ON SITE'||w.status==='TRAVELLING')return 100;return 0;}
+function formatTime(t){if(!t)return"--:--";const d=new Date(t);return isNaN(d)?"--:--":d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+</script>
+</script>
+
+<script type="text/plain" id="tpl_backend">
+/**
+ * OTG APPSUITE - MASTER BACKEND v68.12 (Reverted Stable)
+ */
+const CONFIG = {
+  SECRET_KEY: "%%SECRET_KEY%%", 
+  ORS_API_KEY: "%%ORS_API_KEY%%", 
+  GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
+  TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
+  PHOTOS_FOLDER_ID: "", 
+  PDF_FOLDER_ID: "",        
+  REPORT_TEMPLATE_ID: "",   
+  ORG_NAME: "%%ORGANISATION_NAME%%",
+  TIMEZONE: Session.getScriptTimeZone(),
+  ARCHIVE_DAYS: 30,
+  ESCALATION_MINUTES: %%ESCALATION_MINUTES%%
 };
 
-// --- 2. COPY FUNCTION ---
-async function copyHeader(type) {
-    try {
-        await navigator.clipboard.writeText(SHEET_HEADERS[type]);
-        alert(`✅ Headers for '${type.toUpperCase()}' copied to clipboard!`);
-    } catch(err) {
-        alert("❌ Failed to copy. Please manually copy from the console.");
-        console.log(SHEET_HEADERS[type]);
+const sp = PropertiesService.getScriptProperties();
+const tid = sp.getProperty('REPORT_TEMPLATE_ID');
+const pid = sp.getProperty('PDF_FOLDER_ID');
+if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
+if(pid) CONFIG.PDF_FOLDER_ID = pid;
+
+function checkAccess(workerName, deviceId, isReadOnly) {
+  if (!workerName) return { allowed: false, msg: "Name missing" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { allowed: true, meta: {} }; 
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if(!data[i] || !data[i][0]) continue;
+    const rowName = String(data[i][0]).trim().toLowerCase();
+    const targetName = String(workerName).trim().toLowerCase();
+    if (rowName === targetName) {
+       if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) return { allowed: false, msg: "Account Disabled" };
+       const registeredId = String(data[i][4] || ""); 
+       if (registeredId === "" || registeredId === "undefined") {
+           if(deviceId && !isReadOnly) { try { sheet.getRange(i + 1, 5).setValue(deviceId); } catch(e) {} }
+           return { allowed: true, meta: { lastVehCheck: data[i][5] || "", wofExpiry: data[i][6] || "" } };
+       } else {
+           if (registeredId === deviceId) return { allowed: true, meta: { lastVehCheck: data[i][5] || "", wofExpiry: data[i][6] || "" } };
+           else return { allowed: false, msg: "Unauthorized Device" };
+       }
     }
+  }
+  return { allowed: false, msg: "Name not found" };
 }
 
-// --- 3. GENERATOR LOGIC ---
-async function generateSuite() {
-    // A. Gather Inputs
-    const orgName = document.getElementById('orgName').value.trim();
-    const secretKey = document.getElementById('secretKey').value.trim();
-    const logoUrl = document.getElementById('logoUrl').value.trim();
-    const orsKey = document.getElementById('orsKey').value.trim();
-    const geminiKey = document.getElementById('geminiKey').value.trim();
-    const textbeltKey = document.getElementById('textbeltKey').value.trim();
+function doGet(e) {
+  try {
+      if(!e || !e.parameter) return ContentService.createTextOutput(JSON.stringify({status:"error"})).setMimeType(ContentService.MimeType.JSON);
+      if(e.parameter.test) return ContentService.createTextOutput(JSON.stringify({status: e.parameter.key === CONFIG.SECRET_KEY ? "success" : "error"})).setMimeType(ContentService.MimeType.JSON);
+      
+      if(e.parameter.action === 'sync') {
+          const auth = checkAccess(e.parameter.worker, e.parameter.deviceId, true);
+          if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({ status: "error", message: auth.msg })).setMimeType(ContentService.MimeType.JSON);
+          
+          const ss = SpreadsheetApp.getActiveSpreadsheet();
+          const tData = ss.getSheetByName('Templates') ? ss.getSheetByName('Templates').getDataRange().getValues() : [];
+          const sData = ss.getSheetByName('Sites') ? ss.getSheetByName('Sites').getDataRange().getValues() : [];
+          const forms = [], sites = [], cachedTemplates = {};
+          
+          for(let i=1; i<tData.length; i++) {
+              if(tData[i].length < 3) continue;
+              if(tData[i][0] === 'FORM' && (tData[i][2].includes(e.parameter.worker) || tData[i][2] === 'ALL')) forms.push({ name: tData[i][1], questions: parseQuestions(tData[i]) });
+              cachedTemplates[tData[i][1]] = parseQuestions(tData[i]);
+          }
+          for(let i=1; i<sData.length; i++) {
+              if(sData[i][0].includes(e.parameter.worker) || sData[i][0] === 'ALL') sites.push({ template: sData[i][1], company: sData[i][2], siteName: sData[i][3], address: sData[i][4], contactName: sData[i][5], contactPhone: sData[i][6], contactEmail: sData[i][7], notes: sData[i][8] });
+          }
+          return ContentService.createTextOutput(JSON.stringify({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta })).setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      if(e.parameter.callback) {
+          const ss = SpreadsheetApp.getActiveSpreadsheet();
+          const r = ss.getSheetByName('Visits').getDataRange().getValues();
+          const headers = r.shift();
+          const st = ss.getSheetByName('Staff').getDataRange().getValues();
+          const wofMap = {};
+          for(let i=1; i<st.length; i++) if(st[i][0]) wofMap[String(st[i][0]).toLowerCase()] = st[i][6] || "";
+          const rows = r.map(row => { let obj = {}; headers.forEach((h, i) => obj[h] = row[i]); obj.WOFExpiry = wofMap[String(obj['Worker Name']).toLowerCase()] || ""; return obj; });
+          return ContentService.createTextOutput(e.parameter.callback+"("+JSON.stringify({ workers: rows, escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify({status: "online"})).setMimeType(ContentService.MimeType.JSON);
+  } catch(e) { return ContentService.createTextOutput(JSON.stringify({status: "error", message: e.toString()})).setMimeType(ContentService.MimeType.JSON); }
+}
 
-    // B. Validation
-    if (!orgName || !secretKey) {
-        return alert("⚠️ Missing Required Fields:\nPlease enter Organisation Name and Secret Key.");
+function doPost(e) {
+  const lock = LockService.getScriptLock();
+  lock.tryLock(30000);
+  try {
+    const p = e.parameter;
+    if (p.key !== CONFIG.SECRET_KEY) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
+    if (p.action !== 'resolve') {
+        const auth = checkAccess(p['Worker Name'], p.deviceId, false);
+        if (!auth.allowed) return ContentService.createTextOutput(JSON.stringify({status: "error"}));
     }
-
-    // C. Get Templates from Script Blocks
-    // This respects the "Don't Merge" rule by reading raw text from the DOM
-    const rawWorker = document.getElementById('tpl_worker').innerHTML;
-    const rawMonitor = document.getElementById('tpl_monitor').innerHTML;
-    const rawBackend = document.getElementById('tpl_backend').innerHTML;
-
-    if (rawWorker.length < 100 || rawMonitor.length < 100 || rawBackend.length < 100) {
-        return alert("⚠️ TEMPLATES EMPTY!\nPlease paste the Worker, Monitor, and Backend code into the script blocks at the bottom of the Factory HTML file.");
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
+    if(sheet.getLastColumn() === 0) {
+        sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
     }
-
-    // D. Define Replacements
-    const replacements = {
-        '%%ORG_NAME%%': orgName,
-        '%%SECRET_KEY%%': secretKey,
-        '%%LOGO_DATA%%': logoUrl || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>",
-        '%%LOGO_URL%%': logoUrl || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>",
-        '%%ORS_API_KEY%%': orsKey,
-        '%%GEMINI_API_KEY%%': geminiKey,
-        '%%TEXTBELT_API_KEY%%': textbeltKey,
-        // Backend Config Defaults
-        '%%IS_ADVANCED%%': 'true',
-        '%%ENABLE_MILEAGE%%': 'true',
-        '%%CHECKIN_ENABLED%%': 'true',
-        '%%CHECKIN_INTERVAL%%': '120',
-        '%%ESCALATION_MINUTES%%': '15',
-        '%%VEHICLE_ENABLED%%': 'true',
-        '%%VEHICLE_INTERVAL%%': '7',
-        '%%PHOTOS_FOLDER_ID%%': ''
-    };
-
-    // E. Inject Config
-    const finalWorker = injectConfig(rawWorker, replacements);
-    const finalMonitor = injectConfig(rawMonitor, replacements);
-    const finalBackend = injectConfig(rawBackend, replacements);
-
-    // F. Create ZIP
-    const zip = new JSZip();
+    const assets = {};
+    ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(k => {
+        if(p[k] && p[k].length > 100) {
+            const blob = Utilities.newBlob(Utilities.base64Decode(p[k].split(',').pop()), 'image/jpeg', p['Worker Name'] + '_' + k);
+            const file = DriveApp.createFile(blob);
+            file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            assets[k] = file.getUrl();
+        } else assets[k] = "";
+    });
     
-    // 1. Worker App
-    const workerFolder = zip.folder("WorkerApp");
-    workerFolder.file("index.html", finalWorker);
-    workerFolder.file("manifest.json", generateManifest(orgName, replacements['%%LOGO_DATA%%']));
-    workerFolder.file("sw.js", generateSW());
-
-    // 2. Monitor App
-    const monitorFolder = zip.folder("MonitorApp");
-    monitorFolder.file("index.html", finalMonitor);
-
-    // 3. Backend Code
-    zip.file("Backend_Code.gs", finalBackend);
-
-    // 4. Readme
-    zip.file("README.txt", generateReadme(orgName, secretKey));
-
-    // G. Download
-    const blob = await zip.generateAsync({type:"blob"});
-    saveAs(blob, "Diamond_AppSuite.zip");
-}
-
-// --- 4. UTILS ---
-function injectConfig(code, config) {
-    let result = code;
-    // Decode HTML entities that might have been created when reading innerHTML
-    const parser = new DOMParser();
-    result = parser.parseFromString(result, 'text/html').documentElement.textContent;
-
-    // Replace keys
-    for (const [key, value] of Object.entries(config)) {
-        result = result.replaceAll(key, value);
+    let rowUpdated = false;
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+        const data = sheet.getRange(Math.max(2, lastRow - 200), 1, Math.min(lastRow - 1, 200), 25).getValues();
+        for (let i = data.length - 1; i >= 0; i--) {
+            if (data[i][2] === p['Worker Name'] && !['DEPARTED', 'COMPLETED'].includes(data[i][10])) {
+                const rIdx = Math.max(2, lastRow - 200) + i;
+                if (p['Alarm Status'] !== 'DATA_ENTRY_ONLY' || data[i][10] === 'DATA_ENTRY_ONLY') sheet.getRange(rIdx, 11).setValue(p['Alarm Status']);
+                if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
+                if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
+                if (p['Anticipated Departure Time']) sheet.getRange(rIdx, 21).setValue(p['Anticipated Departure Time']);
+                if (p['Notes']) sheet.getRange(rIdx, 12).setValue(data[i][11] ? data[i][11] + " | " + p['Notes'] : p['Notes']);
+                if (p['Distance']) sheet.getRange(rIdx, 19).setValue(p['Distance']);
+                if (p['Visit Report Data']) sheet.getRange(rIdx, 20).setValue(data[i][19] ? data[i][19] + " | " + p['Visit Report Data'] : p['Visit Report Data']);
+                if(assets['Photo 1']) sheet.getRange(rIdx, 18).setValue(assets['Photo 1']);
+                if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']);
+                rowUpdated = true; break;
+            }
+        }
     }
-    return result;
+    if (!rowUpdated) sheet.appendRow([new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"), p['Worker Name'], "'" + p['Worker Phone Number'], p['Emergency Contact Name'], "'" + p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], "'" + p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], new Date().toISOString(), p['Battery Level'], assets['Photo 1'], p['Distance'], p['Visit Report Data'], p['Anticipated Departure Time'], assets['Signature'], assets['Photo 2'], assets['Photo 3'], assets['Photo 4']]);
+    
+    if (p['Template Name']) {
+        let recipient = "";
+        if (String(p['Template Name']).trim() === "Note to Self") recipient = p['Worker Email'];
+        else {
+            const tData = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates').getDataRange().getValues();
+            const row = tData.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
+            if (row) recipient = row[3];
+        }
+        if (recipient && recipient.includes('@')) {
+             MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${p['Worker Name']}`, htmlBody: `<h2>${p['Template Name']}</h2><p>Worker: ${p['Worker Name']}<br>Location: ${p['Location Name']}</p><p>Notes: ${p['Notes']}</p><p>Data: ${p['Visit Report Data']}</p>` });
+        }
+    }
+    if(p['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
+    return ContentService.createTextOutput("OK");
+  } catch(e) { return ContentService.createTextOutput("Error: " + e.toString()); } finally { lock.releaseLock(); }
 }
 
-function generateManifest(name, icon) {
-    return JSON.stringify({
-        "name": name,
-        "short_name": "WorkerApp",
-        "start_url": "./index.html",
-        "display": "standalone",
-        "background_color": "#111827",
-        "theme_color": "#111827",
-        "icons": [{ "src": icon, "sizes": "192x192", "type": "image/png" }]
-    }, null, 2);
+function parseQuestions(row) { 
+     const questions = [];
+     for(let i=4; i<row.length; i++) {
+         const val = row[i];
+         if(val && val !== "") {
+             let type='check', text=val;
+             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); }
+             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
+             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
+             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
+             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
+             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
+             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
+             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
+             else if(val.includes('[DATE]')) { type='date'; text=val.replace('[DATE]','').trim(); }
+             questions.push({type, text});
+         }
+     }
+     return questions;
 }
 
-function generateSW() {
-    return `
-const CACHE_NAME = 'otg-offline-v68';
-self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./', './index.html']))));
-self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
-    `.trim();
-}
-
-function generateReadme(name, key) {
-    return `
-OTG APPSUITE - ${name}
-================================
-Secret Key: ${key}
-
-INSTRUCTIONS:
-1. Google Sheet: Create a sheet and paste the contents of 'Backend_Code.gs' into Extensions > Apps Script.
-2. Deploy Backend: Deploy as Web App -> Access: "Anyone".
-3. Copy URL: Copy the Web App URL.
-4. Update Apps: 
-   - Open WorkerApp/index.html and MonitorApp/index.html
-   - Find '%%GOOGLE_SHEET_URL%%' (if not already replaced) and paste your URL.
-   *Note: If you used the Factory, you will need to paste the URL into the Settings screen of the running Worker App.*
-
-5. Host: Upload the 'WorkerApp' and 'MonitorApp' folders to your web host.
-    `.trim();
+function sendAlert(data) {
+    const email = Session.getEffectiveUser().getEmail();
+    MailApp.sendEmail({to: email, subject: "🚨 ALERT: " + data['Worker Name'], htmlBody: `<h1>${data['Alarm Status']}</h1><p>Worker: ${data['Worker Name']}</p><p>GPS: ${data['Last Known GPS']}</p>`});
 }
 </script>
-</body>
-</html>
