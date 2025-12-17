@@ -1,495 +1,403 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
-    .step-section { display: none; }
-    .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; transition: border-color 0.2s; }
-    .input-field:focus { border-color: #3b82f6; outline: none; }
-    .btn { padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-    .btn-primary { background: linear-gradient(to right, #2563eb, #3b82f6); color: white; }
-    .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
-    .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
-    .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
-    .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
-    .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
-    a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
-    details > summary { list-style: none; outline: none; cursor: pointer; }
-    details > summary::-webkit-details-marker { display: none; }
-    
-    /* Disclaimer Modal */
-    #disclaimerModal { backdrop-filter: blur(8px); }
-  </style>
-</head>
-<body class="min-h-screen py-8 px-4 relative">
+/**
+ * OTG APPSUITE - MASTER BACKEND v68.9 (Security Patch)
+ * - Fixes: "Glass Wall" Vulnerability (Two-Key System implemented).
+ * - Fixes: Watchdog Timeout (Row limit applied).
+ * - Fixes: Monitor JSONP Open Access.
+ */
 
-  <div id="disclaimerModal" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-      <div class="bg-gray-900 border-2 border-yellow-600 rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative overflow-hidden">
-          <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-600 to-orange-600"></div>
-          <h2 class="text-3xl font-extrabold text-white mb-2">⚠️ Important Safety Notice</h2>
-          <p class="text-yellow-500 font-bold mb-6 uppercase tracking-wider text-sm">Target Audience & System Limitations</p>
+const CONFIG = {
+  MASTER_KEY: "GregoryTheGreat@", // High Privilege (Admin/Monitor)
+  WORKER_KEY: "public-safety", // Low Privilege (Staff PWA)
+  ORS_API_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImMxMTkzMGVjNTRmNjQ2YTY4MTFkYjVlZGIwZjBjMjZiIiwiaCI6Im11cm11cjY0In0=", 
+  GEMINI_API_KEY: "AIzaSyBTdnDyBoThMMH8jODhfq1oUAcICbU8R9Y", 
+  TEXTBELT_API_KEY: "textbelt",
+  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
+  PDF_FOLDER_ID: "",        
+  REPORT_TEMPLATE_ID: "",   
+  ORG_NAME: "Workplace Support",
+  TIMEZONE: Session.getScriptTimeZone(),
+  ARCHIVE_DAYS: 30,
+  ESCALATION_MINUTES: 15
+};
+
+const sp = PropertiesService.getScriptProperties();
+const tid = sp.getProperty('REPORT_TEMPLATE_ID');
+const pid = sp.getProperty('PDF_FOLDER_ID');
+if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
+if(pid) CONFIG.PDF_FOLDER_ID = pid;
+
+// --- API ENDPOINTS ---
+function doGet(e) {
+  try {
+      if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
+
+      // 1. Connection Test (Accepts either key)
+      if(e.parameter.test) {
+         const k = e.parameter.key;
+         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.9"});
+         return sendJSON({status:"error", message:"Invalid Key"});
+      }
+
+      // 2. Worker App Sync (Accepts either key)
+      if(e.parameter.action === 'sync') {
+          const k = e.parameter.key;
+          if(k !== CONFIG.MASTER_KEY && k !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"Auth Failed"});
           
-          <div class="space-y-4 text-gray-300 text-sm mb-8 overflow-y-auto max-h-[60vh] pr-2">
-              <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution designed specifically for <strong>small non-profits, charities, and community groups</strong> with limited budgets.</p>
-              
-              <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                  <h3 class="font-bold text-white mb-2">❌ This is NOT for Critical Life-Safety</h3>
-                  <p class="mb-2">If you operate in high-risk environments (e.g., forestry, security, high-voltage), you should invest in a commercial, paid solution with 24/7 monitoring.</p>
-              </div>
-
-              <h3 class="font-bold text-white mt-4">Technical Limitations You Must Accept:</h3>
-              <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>The "Sleep" Issue:</strong> This is a Web App. On many phones (especially iPhones), GPS tracking <strong>will stop</strong> if the screen is turned off or the phone sleeps for an extended period. Staff must keep the app active or wake it periodically.</li>
-                  <li><strong>Connectivity:</strong> The system requires an active data connection to send alerts. It will not work in dead zones (though it will queue data).</li>
-                  <li><strong>Free Infrastructure:</strong> This system runs on Google's free tiers. While reliable, there are no Service Level Agreements (SLAs) or guarantees of uptime.</li>
-              </ul>
-          </div>
-
-          <div class="pt-6 border-t border-gray-700">
-              <label class="flex items-start gap-3 cursor-pointer select-none group">
-                  <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5 rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500" onchange="toggleEnterBtn()">
-                  <span class="text-sm text-gray-400 group-hover:text-white transition">
-                      I am the Health & Safety Coordinator. I have read the limitations above and I acknowledge that this software is provided "as is", and I accept that it fits my organization's risk profile.
-                  </span>
-              </label>
-              <button id="btnEnter" disabled onclick="closeDisclaimer()" class="mt-6 w-full py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-lg transition-all">Accept & Enter Factory</button>
-          </div>
-      </div>
-  </div>
-
-  <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
-    <header class="text-center mb-10">
-      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.9 (Security Patch)</p>
-    </header>
-
-    <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
-      <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base">
-        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
-        <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Spreadsheet</button>
-        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Backend</button>
-        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Download</button>
-        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
-      </div>
-
-      <div class="p-6 md:p-10">
-
-        <div id="step1" class="step-section active space-y-8">
-          <div class="grid md:grid-cols-2 gap-8">
-            <div class="space-y-4">
-              <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation"></div>
-              
-              <div class="bg-gray-900 p-4 rounded-xl border border-blue-500/30">
-                  <div class="mb-4">
-                      <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Master Secret Key (Private)</label>
-                      <input type="text" id="secretKey" class="input-field" value="ChangeMe123!">
-                      <p class="text-xs text-red-400 mt-2 font-bold">⚠️ For Admin/Monitor Use Only. Full Access.</p>
-                  </div>
-                  <div>
-                      <label class="block text-green-300 font-bold mb-2 text-sm uppercase">Worker API Key (Public)</label>
-                      <input type="text" id="workerKey" class="input-field border-green-700/50" value="public-safety">
-                      <p class="text-xs text-gray-400 mt-2">Safe to embed in the Worker App. Restricted Access.</p>
-                  </div>
-              </div>
-            </div>
-            <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo (Optional)</label>
-              <div class="relative cursor-pointer w-full" onclick="document.getElementById('logoInput').click()">
-                <div id="logoPreviewArea" class="h-32 w-32 mx-auto bg-gray-800 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden hover:border-blue-500 transition"><span id="logoText" class="text-gray-500 text-sm">Click to Upload<br>(or use icon.png)</span><img id="logoImg" class="hidden h-full w-full object-cover"></div>
-              </div>
-              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
-            </div>
-          </div>
-
-          <div class="highlight-box border-blue-500/30">
-             <h3 class="text-xl font-bold text-white mb-4">Safety & Fleet Options</h3>
-             <div class="grid md:grid-cols-2 gap-6">
-                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
-                    <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold">
-                    <span class="text-xs text-gray-400 block mt-1">Time between "Overdue" and "Emergency".</span>
-                 </div>
-                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Check-in Interval</label>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="chkCheckin" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleCheckin()">
-                        <div id="checkinOptions" class="hidden flex items-center gap-2">
-                            <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
-                            <span class="text-xs text-gray-400">mins</span>
-                        </div>
-                    </div>
-                 </div>
-             </div>
-
-             <div class="mt-4 pt-4 border-t border-gray-600">
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" id="chkVehicle" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleVehicle()">
-                    <span class="text-white font-bold">Enable Vehicle Safety Checks?</span>
-                </label>
-                <div id="vehOptions" class="hidden pl-8 mt-2 text-sm text-gray-400">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span>Frequency (Days):</span>
-                        <input type="number" id="vehFreq" value="60" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold">
-                    </div>
-                    <p class="text-xs text-yellow-500 italic mb-1">⚠️ Note: This feature is suitable for personally owned, or permanently assigned vehicles.</p>
-                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (14 days prior).</p>
-                </div>
-             </div>
-             
-             <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label>
-                        <a href="https://textbelt.com/" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Enter Key (Free: 'textbelt')">
-                 </div>
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label>
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Smart Scribe">
-                 </div>
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label>
-                        <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage">
-                 </div>
-             </div>
-          </div>
-          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
-        </div>
-
-        <div id="step2" class="step-section space-y-8">
-          <div class="text-center"><a href="https://sheets.new" target="_blank" class="btn btn-success text-xl px-10 py-4 shadow-lg transform hover:-translate-y-1">1. Click to Create New Google Sheet</a></div>
+          const worker = e.parameter.worker;
+          const deviceId = e.parameter.deviceId; 
           
-          <div class="grid md:grid-cols-2 gap-6">
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
-                <p class="text-xs text-gray-400">Where all data is stored.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Rename workbook to <strong>"Safety System"</strong>.</li>
-                    <li>Rename bottom tab to <strong>Visits</strong>.</li>
-                    <li>Paste Headers into <strong>A1</strong>.</li>
-                    <li><strong>View > Freeze > 1 Row</strong>.</li>
-                </ol>
-                <button id="btnCopyHeaders" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
-            </div>
-
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
-                <p class="text-xs text-gray-400">Define your Forms & Reports here.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Templates</strong>.</li>
-                    <li>Paste Setup into <strong>A1</strong>.</li>
-                </ol>
-                <button id="btnCopyTemplates" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Templates' Setup</button>
-            </div>
-
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
-                <p class="text-xs text-gray-400">Allocate sites to workers.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Sites</strong>.</li>
-                    <li>Paste Setup into <strong>A1</strong>.</li>
-                </ol>
-                <button id="btnCopySites" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy 'Sites' Setup</button>
-            </div>
+          // Pass 'true' to forbid writing during Sync
+          const auth = checkAccess(worker, deviceId, true);
           
-            <div class="bg-gray-900 p-6 rounded-lg border-2 border-red-600 space-y-4 relative overflow-hidden">
-                <div class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-2 py-1">SECURITY</div>
-                <h3 class="font-bold text-lg text-red-400">D. Setup 'Staff' Tab</h3>
-                <p class="text-xs text-gray-400"><strong>Required:</strong> Gatekeeper + Device Lock.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Staff</strong>.</li>
-                    <li>Paste into <strong>A1</strong>.</li>
-                </ol>
-                <button id="btnCopyStaff" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy 'Staff' Setup + Guide</button>
-            </div>
-          </div>
-          
-          <div class="mt-4 bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-yellow-400">E. Setup 'AI Reporting' Tab (Optional)</h3>
-                <button id="btnCopyReportGuide" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy Reporting Guide</button>
-          </div>
-
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
-        </div>
-
-        <div id="step3" class="step-section space-y-6">
-          <div class="relative">
-            <button id="btnCopyCode" class="absolute top-2 right-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">COPY CODE</button>
-            <pre id="codeDisplay" class="code-scroll">Loading templates...</pre>
-          </div>
-          <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 text-sm text-gray-300 space-y-4">
-             <h3 class="font-bold text-green-400 text-lg">Deploy Backend</h3>
-             <ol class="list-decimal pl-5 space-y-3">
-                <li>Go to Google Sheet > <strong>Extensions > Apps Script</strong>.</li>
-                <li>Delete existing code. <strong>Paste</strong> new code.</li>
-                <li>Click <strong>Deploy > New Deployment</strong>. Select <strong>Web App</strong>.</li>
-                <li class="p-3 border-2 border-red-500 rounded bg-red-900/20 text-white font-bold">⚠️ CRITICAL STEP: Set "Who has access" to <span class="text-red-400 underline">"Anyone"</span>. <br><span class="text-xs font-normal text-gray-300">If you miss this, the App WILL CRASH.</span></li>
-                <li>Click <strong>Deploy</strong>. Copy the URL.</li>
-             </ol>
-          </div>
-          
-          <div class="bg-yellow-900/30 border border-yellow-600/50 p-6 rounded-lg mt-4">
-             <h3 class="font-bold text-yellow-400 text-lg flex items-center gap-2">⏰ Vital Step: Set Automation Triggers</h3>
-             <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
-                <li>Apps Script > <strong>Alarm Clock icon</strong> (Left sidebar).</li>
-                <li>Click <strong>+ Add Trigger</strong> (Bottom Right).</li>
-                <li><strong class="text-white">Safety Watchdog:</strong> Function: <code>checkOverdueVisits</code> | Event Source: <code>Time-driven</code> | Type: <code>Minutes timer</code> | Interval: <code>Every 10 minutes</code>.</li>
-                <li><strong class="text-white">Auto-Archive:</strong> Function: <code>archiveOldData</code> | Event Source: <code>Time-driven</code> | Type: <code>Week timer</code>.</li>
-             </ol>
-          </div>
-
-          <div><label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()"></div>
-          <div class="flex justify-center gap-4"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button><button id="btnGenTemplate" onclick="triggerTemplateSetup()" disabled class="hidden btn bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">🪄 Auto-Generate PDF Template</button></div>
-          <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button></div>
-        </div>
-
-        <div id="step4" class="step-section text-center space-y-10 py-8">
-          <div><h2 class="text-4xl font-bold text-white mb-2">Ready to Build</h2><p class="text-gray-400">Files generated for: <span id="finalAppName" class="text-blue-400">App</span></p></div>
-          <button onclick="downloadZip()" class="w-full max-w-md mx-auto btn btn-success py-5 text-2xl shadow-xl transform hover:scale-105">Download Diamond.zip</button>
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(3)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Next: Deployment Guide →</button></div>
-        </div>
-
-        <div id="step5" class="step-section space-y-10">
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Host the Apps (Netlify)</h2></div></div>
-                <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
-                    <li>Go to <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/signup</a>.</li>
-                    <li>Create a free account.</li>
-                    <li>Go to the <strong>"Sites"</strong> tab. Scroll to the "Drag and drop" box at the bottom.</li>
-                    <li>Drag the <strong>WorkerApp</strong> folder. Copy the URL (e.g. <code>calm-badger.netlify.app</code>).</li>
-                    <li>Drag the <strong>MonitorApp</strong> folder. Copy that URL.</li>
-                </ol>
-            </div>
-            
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">♻️</span><div><h2 class="text-2xl font-bold text-white">2. Update Backend (Without Breaking Links)</h2></div></div>
-                 <div class="space-y-4 text-sm text-gray-300">
-                    <p>When you update the code, <strong>do NOT create a "New Deployment"</strong> or your URL will change, and the app will stop working for everyone.</p>
-                    <div class="bg-blue-900/30 p-4 rounded border border-blue-500/30">
-                        <strong class="block text-blue-400 mb-2">Correct Update Method:</strong>
-                        <ol class="list-decimal pl-5 space-y-2">
-                            <li>Apps Script > <strong>Deploy</strong> > <strong>Manage Deployments</strong>.</li>
-                            <li>Click the <strong>Pencil Icon (Edit)</strong> next to your active deployment.</li>
-                            <li>Version dropdown: Select <strong>"New Version"</strong>.</li>
-                            <li>Click <strong>Deploy</strong>.</li>
-                        </ol>
-                        <p class="mt-2 text-xs text-gray-400">Result: Your URL stays the same. Staff phones update automatically.</p>
-                    </div>
-                 </div>
-            </div>
-
-            <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <script>
-    let logoData = "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png"; 
-    let tplWorker = "", tplMonitor = "", tplBackend = "";
-
-    window.onload = async () => {
-      try {
-        const resp = await fetch('icon.png');
-        if(resp.ok) {
-          const blob = await resp.blob();
-          const reader = new FileReader();
-          reader.onload = e => { logoData = e.target.result; document.getElementById('logoImg').src = logoData; document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoText').textContent = "Loaded icon.png"; document.getElementById('logoPreviewArea').classList.add('border-blue-500'); };
-          reader.readAsDataURL(blob);
-        }
-      } catch(e) {}
-    };
-    
-    function toggleEnterBtn() {
-        const chk = document.getElementById('chkAccept');
-        const btn = document.getElementById('btnEnter');
-        if(chk.checked) {
-            btn.disabled = false;
-            btn.classList.remove('bg-gray-700', 'text-gray-500');
-            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
-        } else {
-            btn.disabled = true;
-            btn.classList.add('bg-gray-700', 'text-gray-500');
-            btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
-        }
-    }
-    
-    function closeDisclaimer() {
-        document.getElementById('disclaimerModal').style.opacity = '0';
-        document.getElementById('disclaimerModal').style.pointerEvents = 'none';
-        document.getElementById('mainContent').classList.remove('blur-sm');
-        setTimeout(() => document.getElementById('disclaimerModal').remove(), 500);
-    }
-
-    function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
-    
-    function copyTemplatesSetup() { 
-        const setup = "Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"; 
-        const nl = "\n".repeat(15);
-        const instr = "TEMPLATES GUIDE (Starting Cell A20):\n1. Define Forms & Reports here.\n2. Column A (Type): 'FORM' for ad-hoc reports, 'REPORT' for standard visits.\n3. Column C (Assigned To): Use 'ALL' or specific names (comma separated).\n4. Column D (Email): Optional. Sends a PDF copy to this email upon submission.\n5. Question Types:\n- [TEXT] : Multi-line text box\n- [NUMBER] : Numeric keypad input\n- [YESNO] : Yes/No buttons\n- [CHECK] : Simple checkbox\n- [PHOTO] : Camera button\n- [GPS] : Button to capture current location\n- [SIGN] : Signature pad\n- [HEADING] : Section Title (Visual separator)\n- [NOTE] : Read-only instruction text";
-        navigator.clipboard.writeText(setup + nl + instr); 
-        alert("Copied 'Templates' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copySitesSetup() { 
-        const setup = "Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"; 
-        const nl = "\n".repeat(18);
-        const instr = "SITES GUIDE (Starting Cell A20):\n1. Use this tab to assign sites to workers.\n2. Column A (Assigned To): Enter a Worker Name (Exact Match) or 'ALL'.\n3. Template Name: Must match a name from the 'Templates' tab.\n4. Address: If populated, the app will show a 'Navigate' button.\n5. Contact Info: Shows a 'Call' button in the app.";
-        navigator.clipboard.writeText(setup + nl + instr); 
-        alert("Copied 'Sites' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copyStaffSetup() { 
-        const h = "Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry"; 
-        const s1 = "John Doe\tDriver\tActive\t\t\t\t"; 
-        const nl = "\n".repeat(17); 
-        const instr = "STAFF GUIDE (Starting Cell A20):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.";
-        navigator.clipboard.writeText(h + "\n" + s1 + nl + instr); 
-        alert("Copied 'Staff' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copyReportGuide() { 
-        const text = `Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
-        [... Standard Report Guide text truncated for brevity - using existing text ...]`;
-        navigator.clipboard.writeText(text); 
-        alert("AI Prompt Guide Copied!"); 
-    }
-
-    function handleLogo(input) {
-      const file = input.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const img = new Image();
-          img.onload = function() {
-            const canvas = document.createElement('canvas'); canvas.width = 192; canvas.height = 192; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
-            logoData = canvas.toDataURL('image/png'); document.getElementById('logoImg').src = logoData; document.getElementById('logoImg').classList.remove('hidden');
+          if (!auth.allowed) {
+              return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
           }
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+
+          // Fetch Configuration Data
+          const ss = SpreadsheetApp.getActiveSpreadsheet();
+          const tSheet = ss.getSheetByName('Templates');
+          const tData = tSheet ? tSheet.getDataRange().getValues() : [];
+          const forms = [];
+          const cachedTemplates = {};
+          
+          for(let i=1; i<tData.length; i++) {
+              const row = tData[i];
+              if(row.length < 3) continue;
+              const type = row[0]; const name = row[1]; const assign = row[2]; 
+              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { 
+                  forms.push({ name: name, questions: parseQuestions(row) }); 
+              }
+              cachedTemplates[name] = parseQuestions(row);
+          }
+          
+          const sSheet = ss.getSheetByName('Sites');
+          const sData = sSheet ? sSheet.getDataRange().getValues() : [];
+          const sites = [];
+          for(let i=1; i<sData.length; i++) {
+              const row = sData[i];
+              if(row.length < 1) continue;
+              const assign = row[0]; 
+              if(assign.includes(worker) || assign === 'ALL') {
+                  sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
+              }
+          }
+          
+          return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
+      }
+
+      // 3. Monitor App Poll (MASTER KEY ONLY)
+      if(e.parameter.callback){
+        // Strict Gating: Monitor must provide Master Key
+        if (e.parameter.key !== CONFIG.MASTER_KEY) {
+             return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")");
+        }
+        return handleMonitorPoll(e.parameter.callback);
+      }
+
+      if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
+      return sendJSON({status: "online"});
+
+  } catch(err) {
+      // Emergency Error Catch: Returns JSON so App doesn't crash
+      return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()});
+  }
+}
+
+function doPost(e) {
+  const lock = LockService.getScriptLock();
+  lock.tryLock(30000); 
+  try {
+    if (!e || !e.parameter) return sendJSON({status:"error"});
+    const p = e.parameter;
+    
+    // AUTH CHECK: Accepts Master OR Worker Key
+    if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
+    
+    // AUTH CHECK: Pass 'false' to ALLOW writing (Locking Device ID)
+    if (p.action !== 'resolve') {
+        const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
+        if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized"});
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
+    
+    if(sheet.getLastColumn() === 0) {
+      const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
+      sheet.appendRow(headers); sheet.setFrozenRows(1);
+    }
+    
+    // Process Images
+    const assets = {};
+    const assetIds = {}; 
+    ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(key => {
+        if(p[key] && p[key].length > 100) { 
+             const safeWorker = (p['Worker Name'] || 'Worker').replace(/[^a-z0-9]/gi, '_');
+             const suffix = key === 'Signature' ? 'png' : 'jpg';
+             const result = saveImageToDrive(p[key], `${safeWorker}_${key.replace(' ', '')}_${Date.now()}.${suffix}`);
+             assets[key] = result.url;
+             assetIds[key] = result.id;
+        } else { assets[key] = ""; }
+    });
+
+    const worker = p['Worker Name'];
+    const newStatus = p['Alarm Status'];
+    let rowUpdated = false;
+    const lastRow = sheet.getLastRow();
+    
+    // Smart Row Update Logic
+    if (lastRow > 1) {
+      const searchDepth = Math.min(lastRow - 1, 200);
+      const startRow = lastRow - searchDepth + 1;
+      const data = sheet.getRange(startRow, 1, searchDepth, 25).getValues(); 
+      for (let i = data.length - 1; i >= 0; i--) {
+        const rowWorker = data[i][2];
+        const rowStatus = data[i][10];
+        
+        if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus))) {
+             const rIdx = startRow + i;
+             
+             if (newStatus !== 'DATA_ENTRY_ONLY' || rowStatus === 'DATA_ENTRY_ONLY') {
+                 sheet.getRange(rIdx, 11).setValue(newStatus);
+             }
+             
+             if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
+             if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
+             if (p['Anticipated Departure Time']) sheet.getRange(rIdx, 21).setValue(p['Anticipated Departure Time']);
+             if (p['Notes'] && !p['Notes'].includes("Locating")) {
+                const oldNotes = data[i][11];
+                if (!oldNotes.includes(p['Notes'])) sheet.getRange(rIdx, 12).setValue(oldNotes ? oldNotes + " | " + p['Notes'] : p['Notes']);
+             }
+             if (p['Distance']) sheet.getRange(rIdx, 19).setValue(p['Distance']);
+             if (p['Visit Report Data'] && p['Visit Report Data'].length > 5) {
+                 const oldData = data[i][19];
+                 sheet.getRange(rIdx, 20).setValue(oldData ? oldData + " | " + p['Visit Report Data'] : p['Visit Report Data']);
+             }
+             
+             if(assets['Photo 1']) sheet.getRange(rIdx, 18).setValue(assets['Photo 1']);
+             if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']);
+             if(assets['Photo 2']) sheet.getRange(rIdx, 23).setValue(assets['Photo 2']);
+             if(assets['Photo 3']) sheet.getRange(rIdx, 24).setValue(assets['Photo 3']);
+             if(assets['Photo 4']) sheet.getRange(rIdx, 25).setValue(assets['Photo 4']);
+             rowUpdated = true;
+             break;
+        }
       }
     }
-    
-    async function loadTemplatesAndGenerateScript() {
-      try {
-        const [resW, resM, resB] = await Promise.all([ fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.js') ]);
-        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files. Ensure they are in the same folder.");
-        tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
-        generateScript();
-      } catch(e) { alert("Error: " + e.message); }
+
+    if (!rowUpdated) {
+        const row = [new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"), p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), p['Emergency Contact Name'], "'" + (p['Emergency Contact Number'] || ""), p['Emergency Contact Email'], p['Escalation Contact Name'], "'" + (p['Escalation Contact Number'] || ""), p['Escalation Contact Email'], newStatus, p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(), p['Battery Level'], assets['Photo 1'], p['Distance'], p['Visit Report Data'], p['Anticipated Departure Time'], assets['Signature'], assets['Photo 2'], assets['Photo 3'], assets['Photo 4']];
+        sheet.appendRow(row);
     }
     
-    function generateScript() {
-        // SECURITY UPDATE: Injects both MASTER and WORKER keys
-        const code = tplBackend
-            .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
-            .replace('%%WORKER_KEY%%', document.getElementById('workerKey').value)
-            .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
-            .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
-            .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
-            .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
-            .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value);
-        document.getElementById('codeDisplay').textContent = code;
-        gotoStep(3);
+    if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
+    if (p['Template Name']) processFormEmail(p, assetIds);
+    if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
+
+    return sendJSON({status:"ok"});
+  } catch(e) { return sendJSON({status:"error", message: e.toString()}); } 
+  finally { lock.releaseLock(); }
+}
+
+// --- HELPER FUNCTIONS ---
+
+function checkAccess(workerName, deviceId, isReadOnly) {
+  if (!workerName) return { allowed: false, msg: "Name missing" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { allowed: true, meta: {} }; 
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if(!data[i] || !data[i][0]) continue;
+    const rowName = String(data[i][0]).trim().toLowerCase();
+    
+    if (rowName === String(workerName).trim().toLowerCase()) {
+       // 1. Check Disabled
+       if (data[i][2] && String(data[i][2]).toLowerCase().includes('inactive')) {
+           return { allowed: false, msg: "Account Disabled" };
+       }
+
+       // 2. Device Locking
+       const registeredId = String(data[i][4] || ""); 
+       if (registeredId === "" || registeredId === "undefined") {
+           // OPEN SLOT
+           if(deviceId && !isReadOnly) { // Only write if NOT read-only
+               try { sheet.getRange(i + 1, 5).setValue(deviceId); } 
+               catch(e) { console.warn("Lock failed (benign): " + e); }
+           }
+           return { allowed: true, meta: getRowMeta(data[i]) };
+       } else {
+           // LOCKED SLOT
+           if (registeredId === deviceId) return { allowed: true, meta: getRowMeta(data[i]) };
+           else return { allowed: false, msg: "Unauthorized Device. Contact Admin to reset." };
+       }
     }
+  }
+  return { allowed: false, msg: "Name not found in Staff list." };
+}
+
+function sendJSON(data) {
+    return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleMonitorPoll(callback) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const t = ss.getSheetByName('Visits');
+    if(!t) return ContentService.createTextOutput(callback+"("+JSON.stringify({status:"error"})+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
     
-    async function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Code copied!"); }
-    
-    function resetTest() { document.getElementById('btnNextDownload').disabled = true; document.getElementById('testResult').classList.add('hidden'); }
-    
-    function testConnection() {
-        const url = document.getElementById('webAppUrl').value;
-        const result = document.getElementById('testResult');
-        const btnNext = document.getElementById('btnNextDownload');
-        if(!url.includes('/exec')) { alert('Invalid URL'); return; }
-        result.classList.remove('hidden'); result.textContent = "Testing..."; result.className = "text-center font-bold text-lg text-yellow-400 p-3 rounded-lg bg-gray-900 inline-block";
-        // Tests using MASTER KEY
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value))
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === "success") {
-                  result.textContent = "✅ Connection Successful!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
-                  btnNext.disabled = false; btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
-                  document.getElementById('btnGenTemplate').classList.remove('hidden'); document.getElementById('btnGenTemplate').disabled = false;
-                  document.getElementById('finalAppName').innerText = document.getElementById('orgName').value + " Safety";
-                } else { throw new Error("Invalid Key"); }
-            }).catch(() => { result.textContent = "❌ Connection Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block"; });
-    }
-    
-    function triggerTemplateSetup() {
-        const url = document.getElementById('webAppUrl').value;
-        const key = document.getElementById('secretKey').value; // Must use Master Key
-        const btn = document.getElementById('btnGenTemplate');
-        btn.innerText = "⏳ Generating..."; btn.disabled = true;
-        fetch(url + '?run=setupTemplate&key=' + encodeURIComponent(key)).then(res => res.text()).then(txt => { alert(txt); btn.innerText = "✅ Done"; }).catch(err => { alert("Failed: " + err); btn.disabled = false; });
-    }
-    
-    function downloadZip() {
-        if (!tplWorker) { alert("Templates not loaded."); gotoStep(2); return; }
-        const zip = new JSZip();
-        const org = document.getElementById('orgName').value;
-        const url = document.getElementById('webAppUrl').value;
-        const secret = document.getElementById('secretKey').value;
-        const workerKey = document.getElementById('workerKey').value;
-        
-        // WORKER APP: Injects WORKER_KEY (Public)
-        let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-            .replace(/%%LOGO_DATA%%/g, logoData)
-            .replace(/%%WORKER_KEY%%/g, workerKey) // GLASS WALL FIX
-            .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
-            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
-            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-            .replace(/%%IS_ADVANCED%%/g, "true")
-            .replace(/%%ENABLE_MILEAGE%%/g, "true")
-            .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
-            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
-            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
-            
-        // MONITOR APP: No keys injected here (User must enter Master Key manually)
-        let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData);
-        
-        const wFolder = zip.folder("WorkerApp"); 
-        wFolder.file("index.html", wHtml); 
-        wFolder.file("manifest.json", JSON.stringify({name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{src: logoData, sizes: "192x192", type: "image/png", purpose: "any maskable"}, {src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable"}] }, null, 2)); 
-        wFolder.file("sw.js", `const C='v${Date.now()}';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>c!==C?caches.delete(c):null)))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`);
-        
-        const mFolder = zip.folder("MonitorApp"); 
-        mFolder.file("index.html", mHtml);
-        
-        zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
-        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
+    // Performance: Read only recent rows if needed, but Monitor needs snapshot. 
+    // We will stick to DataRange for Monitor as it needs active status, which could be anywhere.
+    const r = t.getDataRange().getValues();
+    const headers = r.shift();
+    const st = ss.getSheetByName('Staff');
+    const stD = st ? st.getDataRange().getValues() : [];
+    const wofMap = {};
+    if(stD.length > 1) {
+        for(let i=1; i<stD.length; i++) { 
+            if(stD[i] && stD[i][0]) wofMap[String(stD[i][0]).toLowerCase()] = stD[i][6] || ""; 
+        }
     }
 
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(tab) { if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } } }
-    function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
-    function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
-    
-    document.getElementById('btnCopyHeaders').onclick = copyVisitsHeaders;
-    document.getElementById('btnCopyTemplates').onclick = copyTemplatesSetup;
-    document.getElementById('btnCopySites').onclick = copySitesSetup;
-    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; 
-    document.getElementById('btnCopyReportGuide').onclick = copyReportGuide;
-    document.getElementById('btnCopyCode').onclick = copyScript;
-  </script>
-</body>
-</html>
+    const rows = r.map(e => {
+        let obj = {};
+        headers.forEach((h, idx) => obj[h] = e[idx]);
+        const wName = obj['Worker Name'] ? String(obj['Worker Name']).toLowerCase() : "";
+        obj.WOFExpiry = wofMap[wName] || "";
+        return obj;
+    });
+
+    return ContentService.createTextOutput(callback+"("+JSON.stringify({ workers: rows, server_time: new Date().toISOString(), escalation_limit: CONFIG.ESCALATION_MINUTES })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function getRowMeta(row) { return { lastVehCheck: row[5] || "", wofExpiry: row[6] || "" }; }
+
+function updateStaffVehCheck(worker, jsonString) {
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName('Staff');
+        if(!sheet) return;
+        const data = sheet.getDataRange().getValues();
+        let wofDate = "";
+        const now = new Date().toISOString();
+        try {
+            const j = JSON.parse(jsonString);
+            for (const key in j) { if (key.includes("Expiry") || key.includes("Due")) { wofDate = j[key]; break; } }
+        } catch(e) {}
+        for (let i = 1; i < data.length; i++) {
+            if (String(data[i][0]).toLowerCase() === String(worker).toLowerCase()) {
+                sheet.getRange(i + 1, 6).setValue(now);
+                if (wofDate) sheet.getRange(i + 1, 7).setValue(wofDate);
+                break;
+            }
+        }
+    } catch(e) {}
+}
+
+function processFormEmail(p, assetIds) {
+    try {
+        let recipient = "";
+        // v68.12: Note to Self Logic
+        if (String(p['Template Name']).trim() === "Note to Self") {
+            recipient = p['Worker Email'];
+            if (!recipient || !recipient.includes('@')) { console.log("Note to Self aborted: No email."); return; }
+        } else {
+            const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
+            const data = sh.getDataRange().getValues();
+            const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim());
+            if (!row) return; 
+            recipient = row[3]; 
+        }
+
+        if (!recipient || !String(recipient).includes('@')) return; 
+        
+        let reportData = {};
+        try { reportData = JSON.parse(p['Visit Report Data']); } catch(e) {}
+        const worker = p['Worker Name'];
+        const loc = p['Location Name'] || "Unknown";
+        
+        let html = `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border:1px solid #ccc;">
+        <h2 style="color: #2563eb;">${p['Template Name']}</h2>
+        <p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+        <div style="background:#f1f5f9; padding:10px; margin:15px 0;"><strong>Notes:</strong> ${p['Notes']||""}</div>
+        <table style="width:100%; border-collapse: collapse;">`;
+        
+        for (const [key, val] of Object.entries(reportData)) {
+            if (key === 'Signature_Image') continue;
+            let displayVal = val;
+            if (typeof val === 'string' && val.length > 20 && !val.includes('http')) displayVal = smartScribe(val);
+            html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${displayVal}</td></tr>`;
+        }
+        html += `</table><br>`;
+        
+        if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`;
+        if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`;
+        html += `</div>`;
+        MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html });
+    } catch(e) { console.log("Email Error: " + e); }
+}
+
+function saveImageToDrive(base64String, filename) {
+    try {
+        const base64Clean = base64String.split(',').pop();
+        const data = Utilities.base64Decode(base64Clean);
+        const blob = Utilities.newBlob(data, 'image/jpeg', filename); 
+        let folder;
+        if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(e){ folder = DriveApp.getRootFolder(); } } else { folder = DriveApp.getRootFolder(); }
+        const file = folder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return { url: file.getUrl(), id: file.getId() };
+    } catch(e) { return { url: "", id: "" }; }
+}
+
+function checkOverdueVisits() {
+  PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString());
+  const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return;
+  const lastRow = sheet.getLastRow(); if (lastRow <= 1) return;
+  
+  // WATCHDOG CLAMP FIX: Only check the last 500 rows to prevent timeout
+  const CHECK_LIMIT = 500;
+  const startRow = Math.max(2, lastRow - CHECK_LIMIT);
+  const numRows = lastRow - startRow + 1;
+  const data = sheet.getRange(startRow, 1, numRows, 21).getValues();
+
+  const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i]; const status = row[10]; const dueTimeStr = row[20];
+    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
+    const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue;
+    const timeOverdue = now - dueTime;
+    if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) {
+          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(startRow + i, 11).setValue(newStatus);
+          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] });
+    } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(startRow + i, 11).setValue("OVERDUE"); }
+  }
+}
+function parseQuestions(row) { 
+     const questions = [];
+     for(let i=4; i<row.length; i++) {
+         const val = row[i];
+         if(val && val !== "") {
+             let type='check', text=val;
+             if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); }
+             else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); }
+             else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); }
+             else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); }
+             else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } 
+             else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); }
+             else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); }
+             else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); }
+             else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); }
+             else if(val.includes('[DATE]')) { type='date'; text=val.replace('[DATE]','').trim(); }
+             questions.push({type, text});
+         }
+     }
+     return questions;
+}
+function setupReportTemplate() { try { const doc = DocumentApp.create(`${CONFIG.ORG_NAME} Master Report Template`); const body = doc.getBody(); body.appendParagraph(CONFIG.ORG_NAME).setHeading(DocumentApp.ParagraphHeading.HEADING1); body.appendParagraph("VISIT REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING2); const cells = [["Worker:", "{{WorkerName}}"], ["Location:", "{{LocationName}}"], ["Date:", "{{Date}}"], ["Status:", "{{AlarmStatus}}"]]; cells.forEach(r => body.appendParagraph(`${r[0]} ${r[1]}`)); body.appendHorizontalRule(); body.appendParagraph("NOTES").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{Notes}}"); body.appendHorizontalRule(); body.appendParagraph("FORM DATA").setHeading(DocumentApp.ParagraphHeading.HEADING3); body.appendParagraph("{{VisitReportData}}"); body.appendHorizontalRule(); body.appendParagraph("Authorized Signature:").setHeading(DocumentApp.ParagraphHeading.HEADING4); body.appendParagraph("{{Signature}}"); doc.saveAndClose(); PropertiesService.getScriptProperties().setProperty('REPORT_TEMPLATE_ID', doc.getId()); return "SUCCESS: Template Created. ID: " + doc.getId(); } catch(e) { return "ERROR: " + e.toString(); } }
+function sendAlert(data) { let recipients = [Session.getEffectiveUser().getEmail()]; let smsNumbers = []; if (data['Alarm Status'] === 'ESCALATION_SENT') { if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']); if(data['Escalation Contact Number']) smsNumbers.push(data['Escalation Contact Number']); } else { if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); } recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); const subject = "🚨 SAFETY ALERT: " + data['Worker Name'] + " - " + data['Alarm Status']; const body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`; if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; const smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`; smsNumbers.forEach(phone => { const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), muteHttpExceptions: true }); } catch(e) {} }); }
+function smartScribe(text) { if (!CONFIG.GEMINI_API_KEY || !text || text.length < 5) return text; try { const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`; const payload = { "contents": [{ "parts": [{ "text": "Correct grammar to NZ English: " + text }] }] }; const response = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true }); return JSON.parse(response.getContentText()).candidates[0].content.parts[0].text.trim(); } catch (e) { return text; } }
+function archiveOldData() { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); let archive = ss.getSheetByName('Archive'); if (!archive) archive = ss.insertSheet('Archive'); const data = sheet.getDataRange().getValues(); if (data.length <= 1) return; const today = new Date(); const rowsToKeep = [data[0]]; const rowsToArchive = []; for (let i = 1; i < data.length; i++) { const date = new Date(data[i][0]); const diff = (today - date) / (1000 * 60 * 60 * 24); if (diff > CONFIG.ARCHIVE_DAYS && (data[i][10] === 'DEPARTED' || data[i][10] === 'COMPLETED')) { rowsToArchive.push(data[i]); } else { rowsToKeep.push(data[i]); } } if (rowsToArchive.length > 0) { if (archive.getLastRow() === 0) archive.appendRow(data[0]); archive.getRange(archive.getLastRow() + 1, 1, rowsToArchive.length, rowsToArchive[0].length).setValues(rowsToArchive); sheet.clearContents(); sheet.getRange(1, 1, rowsToKeep.length, rowsToKeep[0].length).setValues(rowsToKeep); } }
