@@ -35,6 +35,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 .chip-btn { background-color: #374151; color: #e5e7eb; font-weight: 600; font-size: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #4b5563; flex: 1; transition: all 0.1s; }
 .chip-btn:active { background-color: #2563eb; border-color: #3b82f6; transform: scale(0.95); }
+.panic-mode { background-color: #7f1d1d !important; } /* Red background for panic */
 </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -46,14 +47,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="text-6xl mb-4">🛑</div>
     <h1 class="text-2xl font-bold text-red-500 mb-2">WOF EXPIRED</h1>
     <p class="text-gray-300 mb-6 text-sm">Your vehicle Warrant of Fitness is recorded as overdue.</p>
-    
     <div class="bg-gray-800 p-4 rounded-lg border border-red-900/50 mb-6 w-full">
         <label class="flex items-start gap-3 text-left">
             <input type="checkbox" id="chkWofAck" class="mt-1 w-6 h-6 rounded bg-gray-700 border-gray-500 text-blue-600" onchange="toggleWofContinue()">
             <span class="text-sm text-gray-400 font-bold">I acknowledge that I must NOT use this overdue vehicle for work purposes until it has a current WOF.</span>
         </label>
     </div>
-
     <button id="btnWofContinue" disabled onclick="closeWofBlocker()" class="w-full py-4 bg-gray-700 text-gray-500 font-bold rounded-xl mb-4 transition-colors">Continue (Non-Vehicle Work)</button>
     <button onclick="closeWofBlocker(); startVehicleCheck();" class="text-blue-400 text-sm font-bold underline p-2">I have a new WOF (Update Now)</button>
 </div>
@@ -62,22 +61,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="mainPage" class="page"><div class="header-bar"><div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div><div class="flex gap-2"><button onclick="showModal('info')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">ℹ️</button><button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button></div></div><div class="content-area"><div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div><div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div><div id="locationList" class="space-y-3 pb-4"></div><div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button></div></div>
 <div class="footer-bar">
     <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-        <div class="flex justify-between mb-2">
-            <span class="text-gray-400 text-sm font-bold">Duration</span>
-            <span id="durationDisplay" class="font-bold text-blue-400">0 mins</span>
-        </div>
-        <div class="flex gap-2 mb-3">
-            <button onclick="quickSetTime(15)" class="chip-btn">15m</button>
-            <button onclick="quickSetTime(30)" class="chip-btn">30m</button>
-            <button onclick="quickSetTime(60)" class="chip-btn">1h</button>
-            <button onclick="quickSetTime(120)" class="chip-btn">2h</button>
-        </div>
+        <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
+        <div class="flex gap-2 mb-3"><button onclick="quickSetTime(15)" class="chip-btn">15m</button><button onclick="quickSetTime(30)" class="chip-btn">30m</button><button onclick="quickSetTime(60)" class="chip-btn">1h</button><button onclick="quickSetTime(120)" class="chip-btn">2h</button></div>
         <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
     </div>
-    <div class="flex gap-2">
-        <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Note to Self</button>
-        <button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button>
-    </div>
+    <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Note to Self</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Select Location</button></div>
 </div>
 </div>
 <div id="lockedPage" class="page"><div id="fiveMinBanner" class="hidden absolute top-0 left-0 w-full bg-yellow-600 text-white font-bold py-3 animate-pulse z-50 shadow-xl border-b-4 border-yellow-400 text-center">⚠️ 5 MINUTES REMAINING - EXTEND NOW</div><div class="flex-1 flex flex-col justify-between p-6"><div class="flex justify-between items-start"><button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700">🌙</button><button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none">SOS</button></div><div class="text-center"><p class="text-gray-500 text-sm uppercase tracking-widest">Currently At</p><div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()"><h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px]"></h2><span class="text-blue-400 text-xl">ℹ️</span></div><div id="countdownTimer" class="text-7xl font-bold font-mono text-white tracking-tighter">00:00</div><p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p></div><div class="space-y-3 w-full"><div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">Notes</button></div><button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button><button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button></div></div><div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div></div>
@@ -130,7 +118,23 @@ function showSiteInfo(id,e){if(e)e.stopPropagation();document.getElementById('in
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
 function updateArrivedButtonState(){const v=DURATION_MAP[document.getElementById('durationSlider').value];document.getElementById('durationDisplay').innerText=v>=60?(Math.floor(v/60)+' hr '+(v%60)+' min'):v+' min';state.visitDurationMinutes=v;const b=document.getElementById('btnStart');if(state.selectedLocationId&&v>0){b.disabled=false;b.innerText="HOLD TO START";b.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all";setupLongPress(b,startVisit);}else{b.disabled=true;b.innerText=state.selectedLocationId?"Set Time":"Select Location";b.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all";}}
 function startVisit(){const s=state.locations.find(x=>x.id===state.selectedLocationId);if(s.id==='travel')startTravellingPulse();const n=new Date();navigator.geolocation.getCurrentPosition(p=>{state.activeVisit={locationId:s.id,startTime:n,anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000),fiveMinWarned:false,startGPS:`${p.coords.latitude},${p.coords.longitude}`};state.lowBatSent=false;saveState();enterLockedScreen();playSound('arrive');processUploadQueue(buildPayload({"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":"Started", "Last Known GPS": state.activeVisit.startGPS}));setTimeout(()=>{if(state.pendingUploads.length>0)processUploadQueue();},5000);});}
-function enterLockedScreen(){const l=state.locations.find(x=>x.id===state.activeVisit.locationId);document.getElementById('lockedLocationName').innerText=l.name;navigate('locked');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnSafe').classList.add('hidden');timerInt=setInterval(tick,1000);setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false));setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend'));}
+// FIXED: Check for Panic State on Load (Persistence)
+function enterLockedScreen(){
+    const l=state.locations.find(x=>x.id===state.activeVisit.locationId);
+    document.getElementById('lockedLocationName').innerText=l.name;
+    navigate('locked');
+    if(state.activeVisit && state.activeVisit.isPanic) {
+        renderPanicState();
+    } else {
+        document.getElementById('btnDepart').classList.remove('hidden');
+        document.getElementById('btnSafe').classList.add('hidden');
+        document.getElementById('btnExtend').classList.remove('hidden');
+        document.getElementById('lockedPage').classList.remove('panic-mode'); // Ensure no red
+    }
+    timerInt=setInterval(tick,1000);
+    setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false));
+    setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend'));
+}
 function tick(){if(!state.activeVisit){clearInterval(timerInt);return;}const r=new Date(state.activeVisit.anticipatedDepartureTime)-new Date();const m=Math.floor(r/60000),s=Math.floor((r%60000)/1000);document.getElementById('countdownTimer').innerText=r<0?"OVERDUE":`${m}:${s<10?'0':''}${s}`;if(state.activeVisit.anticipatedDepartureTime)document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(m===5&&!state.activeVisit.fiveMinWarned&&r>0){state.activeVisit.fiveMinWarned=true;playSound('pre_alert');document.getElementById('fiveMinBanner').classList.remove('hidden');setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000);}if(r<0){document.getElementById('countdownTimer').classList.add('text-red-500');document.getElementById('btnSafe').classList.remove('hidden');document.getElementById('btnDepart').classList.add('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);const mo=Math.floor(Math.abs(r)/60000);if(mo<CONFIG.escalationMinutes&&!state.activeVisit.overdueSent){state.activeVisit.overdueSent=true;saveState();triggerAutoAlert('OVERDUE');playSound('warning');}else if(mo>=CONFIG.escalationMinutes&&!state.activeVisit.criticalSent){state.activeVisit.criticalSent=true;saveState();triggerAutoAlert('EMERGENCY - OVERDUE');}}if(CONFIG.checkinEnabled&&state.activeVisit.nextCheckin&&new Date()>new Date(state.activeVisit.nextCheckin))triggerCheckin();}
 async function requestWakeLock(){try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{console.log('Lock Released');});}catch(e){console.warn('Wake Lock Error',e);}}
 function preDepart(){isMidVisitUpdate=false;const l=state.locations.find(x=>x.id===state.activeVisit.locationId);const sg=state.activeVisit.startGPS;if(sg){document.getElementById('btnDepart').innerText="Calculating...";navigator.geolocation.getCurrentPosition(async(pos)=>{const eg=`${pos.coords.latitude},${pos.coords.longitude}`;calculatedDist=await getDistance(sg,eg);document.getElementById('btnDepart').innerText="HOLD TO END";loadFormAndShow(l.templateName||"(Standard)");});}else{calculatedDist=null;loadFormAndShow(l.templateName||"(Standard)");}}
@@ -149,8 +153,37 @@ function triggerCheckin(){if(!document.getElementById('checkinModal').classList.
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();playSound('extend');processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
 function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3){triggerPanic();panicTapCount=0;}}
-function triggerPanic(){state.activeVisit=state.activeVisit||{};state.activeVisit.isPanic=true;saveState();playSound('panic');processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Button Pressed"}));alert('🚨 SOS SENT 🚨\n\nEmergency contacts have been notified.\nLocation broadcast active.');}
-function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker confirmed safe"}));state.activeVisit.isPanic=false;preDepart(true);});}
+// FIXED: Immediate UI Update + Alert Safety
+function triggerPanic(){
+    state.activeVisit=state.activeVisit||{};
+    state.activeVisit.isPanic=true;
+    saveState();
+    renderPanicState(); // UI FIRST
+    playSound('panic');
+    processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Button Pressed"}));
+    setTimeout(()=>alert('🚨 SOS SENT 🚨\n\nEmergency contacts have been notified.\nLocation broadcast active.'), 100);
+}
+// FIXED: Render Panic State Logic
+function renderPanicState() {
+    document.getElementById('lockedPage').classList.add('panic-mode'); // Use CSS class
+    document.getElementById('btnDepart').classList.add('hidden');
+    document.getElementById('btnExtend').classList.add('hidden');
+    document.getElementById('btnSafe').classList.remove('hidden');
+    setupLongPress(document.getElementById('btnSafe'),iamSafe);
+}
+function iamSafe(){
+    withPinVerification(false,()=>{
+        playSound('safe');
+        processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker confirmed safe"}));
+        state.activeVisit.isPanic=false;
+        // UI RESET
+        document.getElementById('lockedPage').classList.remove('panic-mode');
+        document.getElementById('btnSafe').classList.add('hidden');
+        document.getElementById('btnDepart').classList.remove('hidden');
+        document.getElementById('btnExtend').classList.remove('hidden');
+        preDepart(true);
+    });
+}
 function startTravellingPulse(){toggleBatterySaver();travellingInterval=setInterval(()=>{navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING","Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));})},300000);}
 function toggleBatterySaver(){document.getElementById('batterySaver').classList.toggle('hidden');}
 function buildPayload(d){let dt="";let ln="Unknown";let la="";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps = d['Last Known GPS'] || ""; if(!gps && state.activeVisit && state.activeVisit.startGPS) { gps = state.activeVisit.startGPS; }return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Emergency Contact Name':state.settings.emergencyName,'Emergency Contact Number':state.settings.emergencyPhone,'Emergency Contact Email':state.settings.emergencyEmail,'Escalation Contact Name':state.settings.escalationName,'Escalation Contact Number':state.settings.escalationPhone,'Escalation Contact Email':state.settings.escalationEmail,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS': gps,...d};}
