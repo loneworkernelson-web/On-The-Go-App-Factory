@@ -56,11 +56,12 @@
         </div>
     </div>
 
-    <div id="connectionOverlay" class="hidden fixed inset-0 z-[95] bg-gray-900/80 flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center">
-            <div class="text-4xl mb-4 animate-spin">⏳</div>
-            <h2 class="text-2xl font-bold text-white">Connection Lost</h2>
-            <p class="text-gray-400 mt-2">Reconnecting to HQ...</p>
+    <div id="connectionOverlay" class="hidden fixed inset-0 z-[95] bg-gray-900/90 flex items-center justify-center backdrop-blur-md transition-opacity duration-500">
+        <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center max-w-sm mx-4">
+            <div class="text-5xl mb-6 animate-pulse">📡</div>
+            <h2 class="text-3xl font-bold text-white mb-2">Connection Lost</h2>
+            <p class="text-red-400 font-mono text-sm mb-4">SYSTEM OFFLINE</p>
+            <p class="text-gray-400 text-xs">The dashboard is not receiving updates. Check internet connection.</p>
         </div>
     </div>
 
@@ -96,7 +97,7 @@
 
     <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
         <div class="flex justify-between items-center mb-2">
-            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v69.0</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
+            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v70.0</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
@@ -116,6 +117,7 @@
 const SCRIPT_URL = "%%SHEET_URL%%";
 let API_KEY = localStorage.getItem('otg_monitor_key'); 
 let workerData = []; let allRows = []; let escalationLimit = 15; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null;
+let lastHeartbeat = Date.now(); 
 let watchdogTimer = null;
 
 async function startApp() {
@@ -127,7 +129,12 @@ async function startApp() {
 function startPolling() {
     fetchData(); 
     setInterval(fetchData, 10000); 
-    setInterval(renderGrid, 1000); 
+    setInterval(renderGrid, 1000);
+    // Connection Watchdog
+    setInterval(() => {
+        if (Date.now() - lastHeartbeat > 45000) document.getElementById('connectionOverlay').classList.remove('hidden');
+        else document.getElementById('connectionOverlay').classList.add('hidden');
+    }, 2000);
 }
 
 function saveAuthKey() { 
@@ -161,21 +168,15 @@ function acknowledgeAlert() {
 }
 
 function fetchData() { 
-    // WATCHDOG START
-    clearTimeout(watchdogTimer);
-    watchdogTimer = setTimeout(() => { document.getElementById('connectionOverlay').classList.remove('hidden'); }, 45000);
-
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
     window[cbName] = function(data) { 
-        clearTimeout(watchdogTimer); // WATCHDOG RESET
-        document.getElementById('connectionOverlay').classList.add('hidden');
+        lastHeartbeat = Date.now();
         if(data.error) { alert("Security Error: " + data.error); return; } 
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
         document.body.removeChild(script); delete window[cbName]; 
     }; 
-    script.onerror = () => { /* Watchdog will catch timeout */ };
     script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&t=${Date.now()}`; 
     document.body.appendChild(script); 
 }
@@ -210,11 +211,25 @@ function handleData(response) {
     } 
 }
 
+// UPGRADED: BREADCRUMB BUILDER
 function processWorkers(rows) { 
     const workers = {}; 
+    const history = {};
+    
+    // Sort chronological to build paths
+    rows.sort((a,b) => new Date(a.Timestamp) - new Date(b.Timestamp));
+
     rows.forEach(r => { 
         const name = r['Worker Name']; if (!name) return; 
         const timestamp = new Date(r['Timestamp']).getTime(); 
+        
+        // Build History
+        if(!history[name]) history[name] = [];
+        if(r['Last Known GPS'] && r['Last Known GPS'].includes(',')) {
+            history[name].push(r['Last Known GPS']);
+        }
+
+        // Keep Latest Status
         if (!workers[name] || timestamp > workers[name].timestamp) { 
             workers[name] = { 
                 name: name, status: r['Alarm Status'], phone: r['Worker Phone Number'], 
@@ -225,6 +240,12 @@ function processWorkers(rows) {
             }; 
         } 
     }); 
+    
+    // Attach recent history (last 10 points)
+    Object.keys(workers).forEach(k => {
+        workers[k].history = history[k] ? history[k].slice(-10) : [];
+    });
+
     return Object.values(workers); 
 }
 
@@ -247,7 +268,6 @@ function renderGrid() {
         let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status, timeClass = 'text-gray-500'; 
         let resolveBtn = ''; 
         
-        // CHECK WOF
         let isWofExpired = false;
         if(w.wofExpiry) {
             const exp = new Date(w.wofExpiry).getTime();
@@ -272,10 +292,8 @@ function renderGrid() {
             } else { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
         } 
         
-        // OVERRIDE FOR WOF (Visual Only)
         if(isWofExpired && !isAlert && !isDuress && !isOverdue) {
-            borderClass = 'bd-amber'; 
-            statusText += ' [⚠️ WOF EXP]';
+            borderClass = 'bd-amber'; statusText += ' [⚠️ WOF EXP]';
         }
 
         const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
@@ -289,9 +307,42 @@ function renderGrid() {
     if(currentView === 'GRID') document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0); 
 }
 
-function escapeHtml(text) { if (text === null || text === undefined || text === false) return ""; return String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+function escapeHtml(text) { if (text === null || text === undefined || text === false) return ""; return String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'"); }
 function initMap() { if(mapInstance) { mapInstance.invalidateSize(); return; } mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); markersLayer = L.layerGroup().addTo(mapInstance); }
-function renderMap() { if(!mapInstance) return; markersLayer.clearLayers(); const bounds = L.latLngBounds(); let hasMarkers = false; const now = Date.now(); workerData.forEach(w => { const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC'); const isDuress = w.status.includes('DURESS'); const isOverdue = w.status.includes('OVERDUE'); if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return; if(!w.gps || w.gps.length < 5) return; const [lat, lng] = w.gps.split(',').map(Number); if(isNaN(lat)) return; let colorClass = 'grey'; const urgency = getUrgencyScore(w, now); if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); bounds.extend([lat, lng]); hasMarkers = true; }); if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); }
+
+// UPGRADED: MAP RENDERER WITH BREADCRUMBS
+function renderMap() { 
+    if(!mapInstance) return; 
+    markersLayer.clearLayers(); 
+    const bounds = L.latLngBounds(); 
+    let hasMarkers = false; 
+    const now = Date.now(); 
+    
+    workerData.forEach(w => { 
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
+        if (currentFilter === 'ACTIVE' && isSafe && !w.status.includes('EMERGENCY')) return; 
+        
+        if(!w.gps || w.gps.length < 5) return; 
+        const [lat, lng] = w.gps.split(',').map(Number); 
+        if(isNaN(lat)) return; 
+        
+        let colorClass = 'grey'; 
+        const urgency = getUrgencyScore(w, now); 
+        if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; 
+        
+        // DRAW TAIL (Breadcrumbs)
+        if(w.history && w.history.length > 1) {
+            const path = w.history.map(h => h.split(',').map(Number));
+            L.polyline(path, {color: '#3b82f6', weight: 3, opacity: 0.5, dashArray: '5, 10'}).addTo(markersLayer);
+        }
+
+        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); 
+        L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); 
+        bounds.extend([lat, lng]); hasMarkers = true; 
+    }); 
+    if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); 
+}
+
 function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const [lat, lng] = gps.split(',').map(Number); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
 function toggleView(view) { currentView = view; const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); document.getElementById('emptyState').classList.add('hidden'); btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } }
 function renderLog() { const list = document.getElementById('eventLogList'); const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)); const top = sorted.slice(0, 50); let html = ''; top.forEach(r => { const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); let color = "text-gray-300"; if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold"; else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold"; else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold"; html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`; }); list.innerHTML = html; }
