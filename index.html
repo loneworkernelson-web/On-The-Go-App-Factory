@@ -69,7 +69,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.9</p>
+      <p class="text-gray-400">Diamond Edition v68.9.2</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -565,13 +565,19 @@ Write a script to flatten the JSON form data.
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
         
-        // v68.9 SECURITY PATCH: Robust Key Injection
+        // AUTO-GENERATE RANDOM WORKER KEY
+        // This is the "Low Security" key shared by staff. 
+        // Admin keeps the "Master Key" (secret) for Monitor/Backend.
+        const workerKey = "wk_" + Math.random().toString(36).substr(2, 6);
+
+        // v68.9 SECURITY PATCH: Split Key Injection
+        
+        // 1. WORKER APP gets the LOW ACCESS key
         let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org)
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-            .replace(/%%SHEET_URL%%/g, url)  // PATCH: Catch both placeholder variations
+            .replace(/%%SHEET_URL%%/g, url)
             .replace(/%%LOGO_DATA%%/g, logoData)
-            .replace(/%%SECRET_KEY%%/g, secret)
-            .replace(/%%WORKER_KEY%%/g, secret) // PATCH: Catch Worker Key if used in new backend
+            .replace(/%%SECRET_KEY%%/g, workerKey) // INJECT RANDOM WORKER KEY HERE
             .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
             .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
@@ -581,12 +587,21 @@ Write a script to flatten the JSON form data.
             .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
             .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
             
-        // Monitor Change: Monitor uses LocalStorage or prompts user. We only inject URL/Org.
+        // 2. MONITOR APP gets the HIGH ACCESS key (User's Secret)
+        // Note: Monitor stores this in LocalStorage, so we don't necessarily need to bake it in, 
+        // but for legacy template compatibility we swap it if it exists.
         let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org)
             .replace(/%%SHEET_URL%%/g, url)
-            .replace(/%%GOOGLE_SHEET_URL%%/g, url) // PATCH: Safety net
+            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+            .replace(/%%SECRET_KEY%%/g, secret) 
             .replace(/%%LOGO_URL%%/g, logoData);
         
+        // 3. BACKEND gets BOTH keys so it can validate everyone
+        // It replaces the placeholder %%WORKER_KEY%% or the hardcoded "otg-public-key"
+        let bCode = document.getElementById('codeDisplay').textContent;
+        bCode = bCode.replace(/%%WORKER_KEY%%/g, workerKey)
+                     .replace(/otg-public-key/g, workerKey); // Catch hardcoded default if present
+
         const wFolder = zip.folder("WorkerApp"); 
         wFolder.file("index.html", wHtml); 
         wFolder.file("manifest.json", JSON.stringify({name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{src: logoData, sizes: "192x192", type: "image/png", purpose: "any maskable"}, {src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable"}] }, null, 2)); 
@@ -595,7 +610,10 @@ Write a script to flatten the JSON form data.
         const mFolder = zip.folder("MonitorApp"); 
         mFolder.file("index.html", mHtml);
         
-        zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
+        // Note: We include the Backend code in the ZIP for reference/backup, 
+        // ensuring it has the generated key stamped in it.
+        zip.file("Backend_Code_Reference.gs", bCode);
+        
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
     }
 
