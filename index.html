@@ -1,201 +1,316 @@
-/**
- * OTG APPSUITE - MASTER BACKEND v68.9 (Security Patch)
- * - Fixes: "Glass Wall" Vulnerability (Two-Key System implemented).
- * - Fixes: Watchdog Timeout (Row limit applied).
- * - Fixes: Monitor JSONP Open Access.
- */
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTG AppSuite Factory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .step-section { display: none; }
+    .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; transition: border-color 0.2s; }
+    .input-field:focus { border-color: #3b82f6; outline: none; }
+    .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 800; letter-spacing: 0.05em; transition: transform 0.1s; width: 100%; text-align: center; }
+    .btn-primary:active { transform: scale(0.98); }
+    .nav-tab { cursor: pointer; padding: 1rem; border-bottom: 2px solid transparent; color: #64748b; font-weight: 600; transition: all 0.2s; }
+    .nav-tab.active { color: #3b82f6; border-color: #3b82f6; }
+    .code-block { background: #1e293b; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.8rem; overflow-x: auto; border: 1px solid #334155; position: relative; }
+    .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: #334155; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-size: 0.7rem; cursor: pointer; }
+    .copy-btn:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-10 px-4">
 
-const CONFIG = {
-  // MASTER_KEY: High Privilege. Allows Monitor Access + All Worker functions.
-  // Defined in Factory setup or Script Properties.
-  MASTER_KEY: "%%SECRET_KEY%%", 
-  
-  // WORKER_KEY: Low Privilege. Allows Reporting + Syncing Own Sites ONLY.
-  // You must set this in Script Properties, or hardcode it here.
-  WORKER_KEY: "otg-public-key", 
+  <div class="w-full max-w-4xl bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div class="bg-gray-800 p-8 border-b border-gray-700 text-center">
+      <h1 class="text-4xl font-black tracking-tight text-white mb-2">💎 OTG Factory <span class="text-blue-500">v68.9</span></h1>
+      <p class="text-gray-400">Serverless Safety System Generator</p>
+    </div>
 
-  ORS_API_KEY: "%%ORS_API_KEY%%", 
-  GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
-  TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
-  PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
-  ORG_NAME: "%%ORGANISATION_NAME%%",
-  ESCALATION_MINUTES: %%ESCALATION_MINUTES%%,
-  ARCHIVE_DAYS: 30
-};
+    <div class="flex border-b border-gray-700 bg-gray-900 overflow-x-auto">
+      <div id="tab1" class="nav-tab active flex-1 text-center whitespace-nowrap" onclick="gotoStep(1)">1. Config</div>
+      <div id="tab2" class="nav-tab flex-1 text-center whitespace-nowrap" onclick="gotoStep(2)">2. Backend</div>
+      <div id="tab3" class="nav-tab flex-1 text-center whitespace-nowrap" onclick="gotoStep(3)">3. Database</div>
+      <div id="tab4" class="nav-tab flex-1 text-center whitespace-nowrap" onclick="gotoStep(4)">4. Download</div>
+    </div>
 
-// --- API ENDPOINTS ---
-function doGet(e) {
-  try {
-      if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
+    <div class="p-8 min-h-[500px]">
 
-      // 1. Connection Test (Accepts either key)
-      if(e.parameter.test) {
-         const k = e.parameter.key;
-         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.9"});
-         return sendJSON({status:"error", message:"Invalid Key"});
-      }
+      <div id="step1" class="step-section active">
+        <h2 class="text-2xl font-bold mb-6 text-blue-400">Organization Setup</h2>
+        
+        <div class="space-y-6">
+          <div>
+            <label class="block text-gray-400 text-sm font-bold uppercase mb-2">Organization Name</label>
+            <input type="text" id="inpOrgName" class="input-field" placeholder="e.g. Nelson Community Patrol">
+          </div>
 
-      // 2. Worker App Sync (Accepts either key)
-      if(e.parameter.action === 'sync') {
-          const k = e.parameter.key;
-          if(k !== CONFIG.MASTER_KEY && k !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"Auth Failed"});
-          
-          const worker = e.parameter.worker;
-          const deviceId = e.parameter.deviceId; 
-          const auth = checkAccess(worker, deviceId, true);
-          
-          if (!auth.allowed) return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
+          <div>
+            <label class="block text-gray-400 text-sm font-bold uppercase mb-2">Secret Key (Master Password)</label>
+            <input type="text" id="inpSecret" class="input-field" placeholder="e.g. nelson-safe-2024">
+            <p class="text-xs text-gray-500 mt-2">This key secures your dashboard. Do not lose it.</p>
+          </div>
 
-          // Fetch Config Data
-          const ss = SpreadsheetApp.getActiveSpreadsheet();
-          const tSheet = ss.getSheetByName('Templates');
-          const tData = tSheet ? tSheet.getDataRange().getValues() : [];
-          const forms = [];
-          const cachedTemplates = {};
-          
-          for(let i=1; i<tData.length; i++) {
-              const row = tData[i];
-              if(row.length < 3) continue;
-              const type = row[0]; const name = row[1]; const assign = row[2]; 
-              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { 
-                  forms.push({ name: name, questions: parseQuestions(row) }); 
-              }
-              cachedTemplates[name] = parseQuestions(row);
-          }
-          
-          const sSheet = ss.getSheetByName('Sites');
-          const sData = sSheet ? sSheet.getDataRange().getValues() : [];
-          const sites = [];
-          for(let i=1; i<sData.length; i++) {
-              const row = sData[i];
-              if(row.length < 1) continue;
-              const assign = row[0]; 
-              if(assign.includes(worker) || assign === 'ALL') {
-                  sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
-              }
-          }
-          return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
-      }
+          <div>
+            <label class="block text-gray-400 text-sm font-bold uppercase mb-2">Logo URL (Optional)</label>
+            <input type="text" id="inpLogo" class="input-field" placeholder="https://..." value="https://cdn-icons-png.flaticon.com/512/1065/1065653.png">
+          </div>
 
-      // 3. Monitor App Poll (MASTER KEY ONLY)
-      // SECURITY FIX: The callback param was previously open. Now strictly gated.
-      if(e.parameter.callback){
-        // We cannot read headers in JSONP, so we rely on the URL param 'key' (not normally sent in JSONP standard, but we will force it).
-        // NOTE: Monitor template update required to send key in polling URL.
-        // FALLBACK: For now, we only allow this if the user proves secret knowledge via parameter.
-        // Better implementation: The Monitor App must append &key=... to the script src.
-        if (e.parameter.key !== CONFIG.MASTER_KEY) {
-             return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")");
+          <button onclick="gotoStep(2)" class="btn-primary mt-4">Next: Setup Backend &rarr;</button>
+        </div>
+      </div>
+
+      <div id="step2" class="step-section">
+        <h2 class="text-2xl font-bold mb-4 text-blue-400">Backend Installation</h2>
+        <p class="text-gray-300 mb-6">We need to create the "Brain" of the system using Google Apps Script.</p>
+
+        <ol class="list-decimal list-inside space-y-4 text-gray-300 mb-8">
+          <li>Open <a href="https://script.google.com/home/start" target="_blank" class="text-blue-400 underline">Google Apps Script</a> in a new tab.</li>
+          <li>Click <strong>New Project</strong>.</li>
+          <li>Click <strong>Project Settings (Gear Icon)</strong>. Check "Show 'appsscript.json' manifest file in editor".</li>
+          <li>Copy the code below and paste it into the <code>Code.gs</code> file (delete existing code first).</li>
+        </ol>
+
+        <div class="code-block h-64">
+          <button class="copy-btn" id="btnCopyBackend">Copy Code</button>
+          <pre id="codeBackendDisplay">Loading template...</pre>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Note: The Factory will inject your Secret Key into this code automatically when you copy it.</p>
+
+        <div class="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg mt-6">
+          <h3 class="font-bold text-blue-400 text-sm uppercase">After Pasting:</h3>
+          <ul class="list-disc list-inside text-sm text-gray-300 mt-2 space-y-1">
+            <li>Click <strong>Deploy</strong> > <strong>New Deployment</strong>.</li>
+            <li>Select type: <strong>Web App</strong>.</li>
+            <li>Execute as: <strong>Me</strong>.</li>
+            <li>Who has access: <strong>Anyone</strong> (Crucial for the App to work).</li>
+            <li>Click <strong>Deploy</strong> and Copy the <strong>Web App URL</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="mt-6">
+            <label class="block text-gray-400 text-sm font-bold uppercase mb-2">Paste Web App URL Here:</label>
+            <input type="text" id="inpScriptUrl" class="input-field" placeholder="https://script.google.com/macros/s/...">
+        </div>
+
+        <button onclick="gotoStep(3)" class="btn-primary mt-6">Next: Setup Database &rarr;</button>
+      </div>
+
+      <div id="step3" class="step-section">
+        <h2 class="text-2xl font-bold mb-4 text-blue-400">Database Setup</h2>
+        <p class="text-gray-300 mb-6">Now we configure the Google Sheet that stores your data.</p>
+
+        <ol class="list-decimal list-inside space-y-4 text-gray-300">
+          <li>Run your new Web App URL once in your browser. It should say <code>{"status":"online"}</code>.</li>
+          <li>This automatically created a Google Sheet in your Drive named "New Sheet". Find it and rename it to <strong>OTG_Database</strong>.</li>
+          <li>Open the Sheet. We need to set up the headers.</li>
+        </ol>
+
+        <div class="grid gap-4 mt-6">
+            <div class="bg-gray-800 p-4 rounded border border-gray-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-white">Tab 1: Visits</span>
+                    <button class="text-xs bg-blue-600 px-2 py-1 rounded text-white" id="btnCopyHeaders">Copy Headers</button>
+                </div>
+                <p class="text-xs text-gray-500">Paste into Row 1 of 'Visits' tab.</p>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded border border-gray-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-white">Tab 2: Templates</span>
+                    <button class="text-xs bg-blue-600 px-2 py-1 rounded text-white" id="btnCopyTemplates">Copy Data</button>
+                </div>
+                <p class="text-xs text-gray-500">Paste into A1 of 'Templates' tab (Sample Forms).</p>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded border border-gray-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-white">Tab 3: Staff</span>
+                    <button class="text-xs bg-blue-600 px-2 py-1 rounded text-white" id="btnCopyStaff">Copy Data</button>
+                </div>
+                <p class="text-xs text-gray-500">Paste into A1 of 'Staff' tab (Sample Staff).</p>
+            </div>
+            
+            <div class="bg-gray-800 p-4 rounded border border-gray-700">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-white">Tab 4: Sites</span>
+                    <button class="text-xs bg-blue-600 px-2 py-1 rounded text-white" id="btnCopySites">Copy Data</button>
+                </div>
+                <p class="text-xs text-gray-500">Paste into A1 of 'Sites' tab (Sample Sites).</p>
+            </div>
+        </div>
+
+        <button onclick="gotoStep(4)" class="btn-primary mt-8">Next: Generate Apps &rarr;</button>
+      </div>
+
+      <div id="step4" class="step-section">
+        <h2 class="text-2xl font-bold mb-4 text-blue-400">Generate Applications</h2>
+        <p class="text-gray-300 mb-6">Ready to build! This will generate your <strong>Worker App</strong> and <strong>Monitor App</strong> with your configuration baked in.</p>
+
+        <div class="bg-green-900/20 border border-green-500/30 p-6 rounded-xl text-center mb-8">
+            <div class="text-5xl mb-4">📦</div>
+            <h3 class="text-xl font-bold text-white">Diamond Edition Bundle</h3>
+            <p class="text-gray-400 text-sm mt-2">Includes PWA Worker App, Monitor Dashboard, and Manifests.</p>
+        </div>
+
+        <button onclick="generateZip()" class="btn-primary text-xl py-6 shadow-lg shadow-blue-900/50">🚀 DOWNLOAD SYSTEM (.ZIP)</button>
+        <div id="statusMsg" class="text-center mt-4 text-sm font-mono text-yellow-400"></div>
+
+        <p class="text-xs text-gray-500 text-center mt-8">After downloading, unzip and upload the folders to Netlify or GitHub Pages.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- TEMPLATE CACHE ---
+    let templates = { worker: "", monitor: "", backend: "" };
+
+    // Load templates on init
+    window.onload = async () => {
+        try {
+            const [w, m, b] = await Promise.all([
+                fetch('worker_template.html').then(r => r.text()),
+                fetch('monitor_template.html').then(r => r.text()),
+                fetch('backend_template.js').then(r => r.text())
+            ]);
+            templates.worker = w;
+            templates.monitor = m;
+            templates.backend = b;
+            document.getElementById('codeBackendDisplay').innerText = b.substring(0, 500) + "\n...";
+        } catch(e) {
+            console.error("Template Load Error", e);
+            document.getElementById('codeBackendDisplay').innerText = "Error loading templates. Ensure files are in same folder.";
         }
-        return handleMonitorPoll(e.parameter.callback);
-      }
+    };
 
-      return sendJSON({status: "online"});
-
-  } catch(err) { return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()}); }
-}
-
-function doPost(e) {
-  const lock = LockService.getScriptLock();
-  lock.tryLock(30000); 
-  try {
-    if (!e || !e.parameter) return sendJSON({status:"error"});
-    const p = e.parameter;
-    
-    // AUTH CHECK: Allows Worker Key OR Master Key
-    if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
-    
-    if (p.action !== 'resolve') {
-        const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
-        if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized"});
+    // --- NAVIGATION ---
+    function gotoStep(n) {
+        document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
+        document.getElementById('step' + n).classList.add('active');
+        
+        document.querySelectorAll('.nav-tab').forEach((el, idx) => {
+            if (idx + 1 === n) el.classList.add('active');
+            else el.classList.remove('active');
+        });
     }
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
-    
-    // ... [Standard Row Appending Logic - Unchanged for Brevity] ...
-    // Note: I will assume the standard append logic here. 
-    // If you need the full 200 lines of append logic reposted, let me know. 
-    // I am focusing on the Security & Watchdog fixes below.
-    
-    // [Insert existing doPost append/update logic here]
-    // ...
-    
-    // REPLACEMENT FOR: processRowUpdateAndAppend(p, sheet);
-    handlePostData(p, sheet); // (Helper function assumed, see below)
+    // --- COPY FUNCTIONS ---
+    // Inject config into Backend code before copying
+    document.getElementById('btnCopyBackend').onclick = () => {
+        const org = document.getElementById('inpOrgName').value || "My Org";
+        const key = document.getElementById('inpSecret').value || "CHANGE_THIS";
+        let code = templates.backend
+            .replace(/%%ORGANISATION_NAME%%/g, org)
+            .replace(/%%SECRET_KEY%%/g, key)
+            .replace(/%%ESCALATION_MINUTES%%/g, 15);
+        navigator.clipboard.writeText(code);
+        alert("Backend Code copied to clipboard!");
+    };
 
-    if(p['Alarm Status'].match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
+    document.getElementById('btnCopyHeaders').onclick = () => {
+        navigator.clipboard.writeText("Job ID\tTimestamp\tWorker Name\tWorker Phone Number\tTemplate Name\tCompany Name\tContact Name\tContact Phone\tContact Email\tAnticipated Departure Time\tAlarm Status\tActual Departure Time\tLocation Name\tLocation Address\tLast Known GPS\tBattery Level\tNotes\tQuestions\tDistance\tDuration\tDueTimeISO");
+        alert("Headers copied!");
+    };
+    
+    document.getElementById('btnCopyTemplates').onclick = () => {
+        const data = "FORM\tVehicle Check\tALL\t[YESNO] Is WOF current?\t[YESNO] Are tires inflated?\t[PHOTO] Take photo of dash\t[SIGN] Sign below\nFORM\tTravel Plan\tALL\t[TEXT] Destination\t[NUMBER] Est. KMs\t[DATE] Return Date";
+        navigator.clipboard.writeText(data);
+        alert("Template data copied!");
+    };
+    
+    document.getElementById('btnCopyStaff').onclick = () => {
+        const data = "Worker Name\tMobile Number\tEmail\tDevice ID (Locked)\tStatus\tEmergency Contact Name\tEmergency Contact Number\tLastVehCheck\nJohn Doe\t021123456\tjohn@example.com\t\tActive\tJane Doe\t021987654\t";
+        navigator.clipboard.writeText(data);
+        alert("Staff data copied!");
+    };
 
-    return sendJSON({status:"ok"});
-  } catch(e) { return sendJSON({status:"error", message: e.toString()}); } 
-  finally { lock.releaseLock(); }
-}
+    document.getElementById('btnCopySites').onclick = () => {
+        const data = "ALL\tTravel Plan\tAcme Corp\tHQ\t123 Main St\tBoss\t021000000\tboss@acme.com\tGate code 1234";
+        navigator.clipboard.writeText(data);
+        alert("Site data copied!");
+    };
 
-// --- CORE FIXES ---
+    // --- ZIP GENERATION (THE FIX) ---
+    async function generateZip() {
+        const status = document.getElementById('statusMsg');
+        status.innerText = "Processing...";
+        status.className = "text-center mt-4 text-sm font-mono text-blue-400";
 
-function checkOverdueVisits() {
-  // WATCHDOG FIX: Safety Clamp added
-  const ss = SpreadsheetApp.getActiveSpreadsheet(); 
-  const sheet = ss.getSheetByName('Visits'); 
-  if(!sheet) return;
-  
-  const lastRow = sheet.getLastRow(); 
-  if (lastRow <= 1) return;
-  
-  // FIX: Only check the last 500 rows. Prevents timeout crashes on large sheets.
-  const CHECK_LIMIT = 500;
-  const startRow = Math.max(2, lastRow - CHECK_LIMIT);
-  const numRows = lastRow - startRow + 1;
-  
-  const data = sheet.getRange(startRow, 1, numRows, 21).getValues();
-  const now = new Date().getTime(); 
-  const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000;
-  
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i]; 
-    const status = row[10]; 
-    const dueTimeStr = row[20];
-    
-    if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue;
-    
-    const dueTime = new Date(dueTimeStr).getTime(); 
-    if (isNaN(dueTime)) continue;
-    
-    const timeOverdue = now - dueTime;
-    
-    // 1. Escalation (Emergency)
-    if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) {
-          const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; 
-          sheet.getRange(startRow + i, 11).setValue(newStatus);
-          sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6] });
-    } 
-    // 2. Warning (Overdue)
-    else if (timeOverdue > 0 && status === 'ON SITE') { 
-        sheet.getRange(startRow + i, 11).setValue("OVERDUE"); 
+        const config = {
+            org: document.getElementById('inpOrgName').value || "My Org",
+            key: document.getElementById('inpSecret').value || "change-me",
+            logo: document.getElementById('inpLogo').value || "",
+            url: document.getElementById('inpScriptUrl').value || ""
+        };
+
+        if(!config.url) {
+            alert("Warning: You haven't entered a Google Script URL in Step 2. The apps won't connect.");
+        }
+
+        try {
+            const zip = new JSZip();
+
+            // 1. Prepare Worker
+            let wHtml = templates.worker
+                .replace(/%%ORG_NAME%%/g, config.org)
+                .replace(/%%SECRET_KEY%%/g, config.key)     // FIX: Injects actual key
+                .replace(/%%LOGO_DATA%%/g, config.logo)
+                .replace(/%%LOGO_URL%%/g, config.logo)
+                .replace(/%%SHEET_URL%%/g, config.url);
+            
+            // 2. Prepare Monitor
+            let mHtml = templates.monitor
+                .replace(/%%ORG_NAME%%/g, config.org)
+                .replace(/%%SECRET_KEY%%/g, config.key)     // FIX: Injects actual key
+                .replace(/%%LOGO_URL%%/g, config.logo)
+                .replace(/%%SHEET_URL%%/g, config.url);
+
+            // 3. Prepare Backend
+            let bJs = templates.backend
+                .replace(/%%ORGANISATION_NAME%%/g, config.org)
+                .replace(/%%SECRET_KEY%%/g, config.key)
+                .replace(/%%ESCALATION_MINUTES%%/g, 15);
+
+            // 4. Build Folders
+            const fWorker = zip.folder("WorkerApp");
+            fWorker.file("index.html", wHtml);
+            fWorker.file("manifest.json", JSON.stringify({
+                "name": config.org,
+                "short_name": "SafetyApp",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#111827",
+                "theme_color": "#111827",
+                "icons": [{ "src": config.logo, "sizes": "192x192", "type": "image/png" }]
+            }, null, 2));
+
+            const fMonitor = zip.folder("MonitorApp");
+            fMonitor.file("index.html", mHtml);
+
+            const fBackend = zip.folder("Backend");
+            fBackend.file("Code.gs", bJs);
+
+            // 5. Download
+            const content = await zip.generateAsync({type:"blob"});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = config.org.replace(/[^a-z0-9]/gi, '_') + "_OTG_Suite.zip";
+            a.click();
+            
+            status.innerText = "✅ ZIP Generated! Upload the folders to your host.";
+            status.className = "text-center mt-4 text-sm font-mono text-green-400";
+
+        } catch(e) {
+            console.error(e);
+            status.innerText = "❌ Error: " + e.message;
+            status.className = "text-center mt-4 text-sm font-mono text-red-400";
+        }
     }
-  }
-}
-
-function handleMonitorPoll(callback) {
-    // This data is strictly for the Monitor Dashboard.
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const t = ss.getSheetByName('Visits');
-    // ... [Standard Fetch Logic] ...
-    const r = t.getDataRange().getValues();
-    const headers = r.shift();
-    const rows = r.map(e => {
-        let obj = {};
-        headers.forEach((h, idx) => obj[h] = e[idx]);
-        return obj;
-    });
-    return ContentService.createTextOutput(callback+"("+JSON.stringify({ workers: rows })+")").setMimeType(ContentService.MimeType.JAVASCRIPT);
-}
-
-// ... [Helper Functions: checkAccess, sendJSON, sendAlert, etc. remain unchanged] ...
-// Ensure you include the full checkAccess function from the previous template.
-
-/* IMPORTANT:
-   1. You must update your Script Properties with a WORKER_KEY.
-   2. You must update the Factory/Worker App to use the WORKER_KEY.
-   3. You must update the Monitor App to append '&key=' + API_KEY to the fetch URL.
-*/
+  </script>
+</body>
+</html>
