@@ -35,7 +35,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 .chip-btn { background-color: #374151; color: #e5e7eb; font-weight: 600; font-size: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #4b5563; flex: 1; transition: all 0.1s; }
 .chip-btn:active { background-color: #2563eb; border-color: #3b82f6; transform: scale(0.95); }
-.panic-mode { background-color: #7f1d1d !important; } /* Red background for panic */
+.panic-mode { background-color: #7f1d1d !important; }
 </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -135,7 +135,61 @@ function enterLockedScreen(){
     setupLongPress(document.getElementById('btnDepart'),()=>preDepart(false));
     setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend'));
 }
-function tick(){if(!state.activeVisit){clearInterval(timerInt);return;}const r=new Date(state.activeVisit.anticipatedDepartureTime)-new Date();const m=Math.floor(r/60000),s=Math.floor((r%60000)/1000);document.getElementById('countdownTimer').innerText=r<0?"OVERDUE":`${m}:${s<10?'0':''}${s}`;if(state.activeVisit.anticipatedDepartureTime)document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(m===5&&!state.activeVisit.fiveMinWarned&&r>0){state.activeVisit.fiveMinWarned=true;playSound('pre_alert');document.getElementById('fiveMinBanner').classList.remove('hidden');setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000);}if(r<0){document.getElementById('countdownTimer').classList.add('text-red-500');document.getElementById('btnSafe').classList.remove('hidden');document.getElementById('btnDepart').classList.add('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);const mo=Math.floor(Math.abs(r)/60000);if(mo<CONFIG.escalationMinutes&&!state.activeVisit.overdueSent){state.activeVisit.overdueSent=true;saveState();triggerAutoAlert('OVERDUE');playSound('warning');}else if(mo>=CONFIG.escalationMinutes&&!state.activeVisit.criticalSent){state.activeVisit.criticalSent=true;saveState();triggerAutoAlert('EMERGENCY - OVERDUE');}}if(CONFIG.checkinEnabled&&state.activeVisit.nextCheckin&&new Date()>new Date(state.activeVisit.nextCheckin))triggerCheckin();}
+function tick(){
+    if(!state.activeVisit){clearInterval(timerInt);return;}
+    const now = new Date().getTime();
+    const dueTime = new Date(state.activeVisit.anticipatedDepartureTime).getTime();
+    const remaining = dueTime - now; // Negative means overdue
+    const escTime = (CONFIG.escalationMinutes || 15) * 60000;
+    const timeUntilEscalation = remaining + escTime; // When this hits 0, the server alarms
+
+    if(remaining >= 0) {
+        // Standard positive countdown
+        const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
+        document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`;
+        document.getElementById('countdownTimer').classList.remove('text-red-500', 'animate-pulse');
+        
+        // 5 minute warning logic (Positive time)
+        const mRem = Math.floor(remaining/60000);
+        if(mRem===5 && !state.activeVisit.fiveMinWarned){
+            state.activeVisit.fiveMinWarned=true;
+            playSound('pre_alert');
+            document.getElementById('fiveMinBanner').classList.remove('hidden');
+            setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000);
+        }
+    } else {
+        // Negative Countdown (Overdue but not yet Escalated)
+        if(timeUntilEscalation > 0) {
+            const absRem = Math.abs(remaining);
+            const m=Math.floor(absRem/60000),s=Math.floor((absRem%60000)/1000);
+            document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`;
+            document.getElementById('countdownTimer').classList.add('text-red-500', 'animate-pulse');
+            
+            // Warnings relative to ESCALATION time
+            // 5 Mins to alarm
+            if(timeUntilEscalation <= 300000 && timeUntilEscalation > 298000) {
+                 playSound('warning'); navigator.vibrate([500,200,500]);
+            }
+            // 2 Mins to alarm (Speak)
+            if(timeUntilEscalation <= 120000 && timeUntilEscalation > 118000) {
+                 playSound('warning'); navigator.vibrate([1000,500,1000]);
+                 if('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance("Warning. Safety alarm will activate in two minutes."));
+            }
+        } else {
+            // Alarm Active
+            document.getElementById('countdownTimer').innerText="ALARM SENT";
+            // Check if we need to send the Critical Trigger
+            if(!state.activeVisit.criticalSent) {
+                state.activeVisit.criticalSent=true;
+                saveState();
+                triggerAutoAlert('EMERGENCY - OVERDUE');
+            }
+        }
+    }
+    
+    if(state.activeVisit.anticipatedDepartureTime)document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    if(CONFIG.checkinEnabled&&state.activeVisit.nextCheckin&&new Date()>new Date(state.activeVisit.nextCheckin))triggerCheckin();
+}
 async function requestWakeLock(){try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{console.log('Lock Released');});}catch(e){console.warn('Wake Lock Error',e);}}
 function preDepart(){isMidVisitUpdate=false;const l=state.locations.find(x=>x.id===state.activeVisit.locationId);const sg=state.activeVisit.startGPS;if(sg){document.getElementById('btnDepart').innerText="Calculating...";navigator.geolocation.getCurrentPosition(async(pos)=>{const eg=`${pos.coords.latitude},${pos.coords.longitude}`;calculatedDist=await getDistance(sg,eg);document.getElementById('btnDepart').innerText="HOLD TO END";loadFormAndShow(l.templateName||"(Standard)");});}else{calculatedDist=null;loadFormAndShow(l.templateName||"(Standard)");}}
 async function getDistance(p1,p2){if(!p1||!p2)return{km:0,type:'none'};if(CONFIG.orsKey&&CONFIG.orsKey.length>5){try{const u=`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${CONFIG.orsKey}&start=${p1.split(',').reverse().join(',')}&end=${p2.split(',').reverse().join(',')}`;const r=await fetch(u);const j=await r.json();const m=j.features[0].properties.segments[0].distance;return{km:(m/1000).toFixed(2),type:'road'};}catch(e){console.warn("ORS Fail",e);}}const d=haversine(p1,p2);return{km:d.toFixed(2),type:'crow'};}
