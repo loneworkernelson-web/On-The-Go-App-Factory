@@ -1,11 +1,11 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.14 (Diamond Edition)
- * - Fixes: "Missing Photos" bug during Visit Updates.
- * - Feature: Server-side Geocoding (Converts GPS to Address).
+ * OTG APPSUITE - MASTER BACKEND v68.15
+ * - Fixes: Missing photos logic.
+ * - Reminder: REPLACE %%SECRET_KEY%% if pasting manually.
  */
 
 const CONFIG = {
-  SECRET_KEY: "%%SECRET_KEY%%", 
+  SECRET_KEY: "%%SECRET_KEY%%", // <--- REPLACE THIS IF PASTING MANUALLY
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
@@ -24,18 +24,13 @@ const pid = sp.getProperty('PDF_FOLDER_ID');
 if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
-// --- API ENDPOINTS ---
 function doGet(e) {
   try {
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
-
-      // 1. Connection Test
       if(e.parameter.test) {
-         if(e.parameter.key === CONFIG.SECRET_KEY) return sendJSON({status:"success", version: "v68.14"});
+         if(e.parameter.key === CONFIG.SECRET_KEY) return sendJSON({status:"success", version: "v68.15"});
          return sendJSON({status:"error", message:"Invalid Key"});
       }
-
-      // 2. Geocode Proxy (New in v68.14)
       if(e.parameter.action === 'geocode') {
           if(!e.parameter.lat || !e.parameter.lon) return sendJSON({address: "Invalid Coords"});
           try {
@@ -46,20 +41,16 @@ function doGet(e) {
               return sendJSON({address: "Unknown Location"});
           } catch(err) { return sendJSON({address: "Geocode Failed"}); }
       }
-
-      // 3. Worker App Sync
       if(e.parameter.action === 'sync') {
           const worker = e.parameter.worker;
           const deviceId = e.parameter.deviceId; 
           const auth = checkAccess(worker, deviceId, true);
           if (!auth.allowed) return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
-
           const ss = SpreadsheetApp.getActiveSpreadsheet();
           const tSheet = ss.getSheetByName('Templates');
           const tData = tSheet ? tSheet.getDataRange().getValues() : [];
           const forms = [];
           const cachedTemplates = {};
-          
           for(let i=1; i<tData.length; i++) {
               const row = tData[i];
               if(row.length < 3) continue;
@@ -69,7 +60,6 @@ function doGet(e) {
               }
               cachedTemplates[name] = parseQuestions(row);
           }
-          
           const sSheet = ss.getSheetByName('Sites');
           const sData = sSheet ? sSheet.getDataRange().getValues() : [];
           const sites = [];
@@ -83,15 +73,11 @@ function doGet(e) {
           }
           return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
       }
-
-      // 4. Monitor App Poll
       if(e.parameter.callback){
         return handleMonitorPoll(e.parameter.callback);
       }
-
       if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
       return sendJSON({status: "online"});
-
   } catch(err) { return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()}); }
 }
 
@@ -101,23 +87,17 @@ function doPost(e) {
   try {
     if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
-    
     if (!p.key || p.key.trim() !== CONFIG.SECRET_KEY.trim()) return sendJSON({status: "error"});
-    
     if (p.action !== 'resolve') {
         const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
         if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized"});
     }
-
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
-    
     if(sheet.getLastColumn() === 0) {
       const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
       sheet.appendRow(headers); sheet.setFrozenRows(1);
     }
-    
-    // Process Images
     const assets = {};
     const assetIds = {}; 
     ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4', 'Signature'].forEach(key => {
@@ -129,13 +109,10 @@ function doPost(e) {
              assetIds[key] = result.id;
         } else { assets[key] = ""; }
     });
-
     const worker = p['Worker Name'];
     const newStatus = p['Alarm Status'];
     let rowUpdated = false;
     const lastRow = sheet.getLastRow();
-    
-    // Smart Row Update Logic
     if (lastRow > 1) {
       const searchDepth = Math.min(lastRow - 1, 200);
       const startRow = lastRow - searchDepth + 1;
@@ -143,10 +120,8 @@ function doPost(e) {
       for (let i = data.length - 1; i >= 0; i--) {
         const rowWorker = data[i][2];
         const rowStatus = data[i][10];
-        
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus))) {
              const rIdx = startRow + i;
-             
              if (newStatus !== 'DATA_ENTRY_ONLY' || rowStatus === 'DATA_ENTRY_ONLY') sheet.getRange(rIdx, 11).setValue(newStatus);
              if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
@@ -160,35 +135,28 @@ function doPost(e) {
                  const oldData = data[i][19];
                  sheet.getRange(rIdx, 20).setValue(oldData ? oldData + " | " + p['Visit Report Data'] : p['Visit Report Data']);
              }
-             
-             // BUG FIX v68.14: Explicitly save ALL photos during an update
              if(assets['Photo 1']) sheet.getRange(rIdx, 18).setValue(assets['Photo 1']);
-             if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']); // Fix Signature
-             if(assets['Photo 2']) sheet.getRange(rIdx, 23).setValue(assets['Photo 2']); // Fix Photo 2
-             if(assets['Photo 3']) sheet.getRange(rIdx, 24).setValue(assets['Photo 3']); // Fix Photo 3
-             if(assets['Photo 4']) sheet.getRange(rIdx, 25).setValue(assets['Photo 4']); // Fix Photo 4
-             
+             if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']);
+             if(assets['Photo 2']) sheet.getRange(rIdx, 23).setValue(assets['Photo 2']);
+             if(assets['Photo 3']) sheet.getRange(rIdx, 24).setValue(assets['Photo 3']);
+             if(assets['Photo 4']) sheet.getRange(rIdx, 25).setValue(assets['Photo 4']);
              rowUpdated = true;
              break;
         }
       }
     }
-
     if (!rowUpdated) {
         const row = [new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"), p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), p['Emergency Contact Name'], "'" + (p['Emergency Contact Number'] || ""), p['Emergency Contact Email'], p['Escalation Contact Name'], "'" + (p['Escalation Contact Number'] || ""), p['Escalation Contact Email'], newStatus, p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'] || new Date().toISOString(), p['Battery Level'], assets['Photo 1'], p['Distance'], p['Visit Report Data'], p['Anticipated Departure Time'], assets['Signature'], assets['Photo 2'], assets['Photo 3'], assets['Photo 4']];
         sheet.appendRow(row);
     }
-    
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
     if (p['Template Name']) processFormEmail(p, assetIds);
     if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
-
     return sendJSON({status:"ok"});
   } catch(e) { return sendJSON({status:"error", message: e.toString()}); } 
   finally { lock.releaseLock(); }
 }
 
-// --- HELPER FUNCTIONS ---
 function checkAccess(workerName, deviceId, isReadOnly) {
   if (!workerName) return { allowed: false, msg: "Name missing" };
   const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Staff');
