@@ -1,21 +1,20 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.16
- * - Fixes: Restored "Two-Key" Logic (Worker Key + Master Key).
- * - Fixes: Missing Photos & Signature saving.
+ * OTG APPSUITE - MASTER BACKEND v68.19
+ * - Feature: Auto-Magic GPS Linking in Email Reports.
+ * - Includes: Two-Key Security, Photo Fixes, Watchdog.
  */
 
 const CONFIG = {
-  // --- SECURITY KEYS ---
-  // If pasting manually, replace these placeholders with your actual keys!
+  // SECURITY KEYS (Replace if pasting manually)
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
 
-  // --- API KEYS ---
+  // API KEYS
   ORS_API_KEY: "%%ORS_API_KEY%%", 
   GEMINI_API_KEY: "%%GEMINI_API_KEY%%", 
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
   
-  // --- CONFIG ---
+  // CONFIG
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
   PDF_FOLDER_ID: "",        
   REPORT_TEMPLATE_ID: "",   
@@ -25,7 +24,6 @@ const CONFIG = {
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%
 };
 
-// ... (Rest of configuration logic) ...
 const sp = PropertiesService.getScriptProperties();
 const tid = sp.getProperty('REPORT_TEMPLATE_ID');
 const pid = sp.getProperty('PDF_FOLDER_ID');
@@ -39,8 +37,8 @@ function doGet(e) {
       // 1. Connection Test (Accepts EITHER Key)
       if(e.parameter.test) {
          const k = e.parameter.key;
-         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.16"});
-         return sendJSON({status:"error", message:"Invalid Key: Server expects " + CONFIG.MASTER_KEY.substr(0,3) + "..."});
+         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.19"});
+         return sendJSON({status:"error", message:"Invalid Key"});
       }
 
       // 2. Geocode Proxy
@@ -116,7 +114,7 @@ function doPost(e) {
     if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
     
-    // RESTORED: Check both keys
+    // Check keys
     if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
     
     if (p.action !== 'resolve') {
@@ -235,7 +233,63 @@ function handleMonitorPoll(callback) {
 }
 function getRowMeta(row) { return { lastVehCheck: row[5] || "", wofExpiry: row[6] || "" }; }
 function updateStaffVehCheck(worker, jsonString) { try { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Staff'); if(!sheet) return; const data = sheet.getDataRange().getValues(); let wofDate = ""; const now = new Date().toISOString(); try { const j = JSON.parse(jsonString); for (const key in j) { if (key.includes("Expiry") || key.includes("Due")) { wofDate = j[key]; break; } } } catch(e) {} for (let i = 1; i < data.length; i++) { if (String(data[i][0]).toLowerCase() === String(worker).toLowerCase()) { sheet.getRange(i + 1, 6).setValue(now); if (wofDate) sheet.getRange(i + 1, 7).setValue(wofDate); break; } } } catch(e) {} }
-function processFormEmail(p, assetIds) { try { let recipient = ""; if (String(p['Template Name']).trim() === "Note to Self") { recipient = p['Worker Email']; if (!recipient || !recipient.includes('@')) return; } else { const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); const data = sh.getDataRange().getValues(); const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim()); if (!row) return; recipient = row[3]; } if (!recipient || !String(recipient).includes('@')) return; let reportData = {}; try { reportData = JSON.parse(p['Visit Report Data']); } catch(e) {} const worker = p['Worker Name']; const loc = p['Location Name'] || "Unknown"; let html = `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border:1px solid #ccc;"><h2 style="color: #2563eb;">${p['Template Name']}</h2><p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p><div style="background:#f1f5f9; padding:10px; margin:15px 0;"><strong>Notes:</strong> ${p['Notes']||""}</div><table style="width:100%; border-collapse: collapse;">`; for (const [key, val] of Object.entries(reportData)) { if (key === 'Signature_Image') continue; let displayVal = val; if (typeof val === 'string' && val.length > 20 && !val.includes('http')) displayVal = smartScribe(val); html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${displayVal}</td></tr>`; } html += `</table><br>`; if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`; html += `</div>`; MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html }); } catch(e) { console.log("Email Error: " + e); } }
+
+// UPGRADED EMAIL PROCESSOR
+function processFormEmail(p, assetIds) { 
+    try { 
+        let recipient = ""; 
+        if (String(p['Template Name']).trim() === "Note to Self") { 
+            recipient = p['Worker Email']; 
+            if (!recipient || !recipient.includes('@')) return; 
+        } else { 
+            const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Templates'); 
+            const data = sh.getDataRange().getValues(); 
+            const row = data.find(r => String(r[1]).trim() === String(p['Template Name']).trim()); 
+            if (!row) return; 
+            recipient = row[3]; 
+        } 
+        if (!recipient || !String(recipient).includes('@')) return; 
+        
+        let reportData = {}; 
+        try { reportData = JSON.parse(p['Visit Report Data']); } catch(e) {} 
+        
+        const worker = p['Worker Name']; 
+        const loc = p['Location Name'] || "Unknown"; 
+        
+        let html = `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; border:1px solid #ccc;"><h2 style="color: #2563eb;">${p['Template Name']}</h2><p><strong>Submitted by:</strong> ${worker}<br><strong>Location:</strong> ${loc}<br><strong>Time:</strong> ${new Date().toLocaleString()}</p><div style="background:#f1f5f9; padding:10px; margin:15px 0;"><strong>Notes:</strong> ${p['Notes']||""}</div><table style="width:100%; border-collapse: collapse;">`; 
+        
+        for (const [key, val] of Object.entries(reportData)) { 
+            if (key === 'Signature_Image') continue; 
+            let displayVal = val; 
+            
+            // --- SMART LINKING START ---
+            if (typeof val === 'string') {
+                // 1. Detect GPS (e.g. -41.2, 174.7)
+                if (val.match(/^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/)) {
+                    displayVal = `<a href="https://www.google.com/maps/search/?api=1&query=${val}" target="_blank" style="color:#2563eb; text-decoration:underline;">📍 ${val}</a>`;
+                }
+                // 2. Smart Scribe (if Long Text)
+                else if (val.length > 20 && !val.includes('http') && !val.includes('data:image')) {
+                    displayVal = smartScribe(val);
+                }
+            }
+            // --- SMART LINKING END ---
+
+            html += `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px; font-weight: bold; color: #555;">${key}</td><td style="padding: 8px;">${displayVal}</td></tr>`; 
+        } 
+        
+        html += `</table><br>`; 
+        if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
+        if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
+        if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
+        if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
+        if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`; 
+        html += `</div>`; 
+        
+        MailApp.sendEmail({ to: recipient, subject: `[${CONFIG.ORG_NAME}] ${p['Template Name']} - ${worker}`, htmlBody: html }); 
+    } catch(e) { console.log("Email Error: " + e); } 
+}
+
 function saveImageToDrive(base64String, filename) { try { const base64Clean = base64String.split(',').pop(); const data = Utilities.base64Decode(base64Clean); const blob = Utilities.newBlob(data, 'image/jpeg', filename); let folder; if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(e){ folder = DriveApp.getRootFolder(); } } else { folder = DriveApp.getRootFolder(); } const file = folder.createFile(blob); file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); return { url: file.getUrl(), id: file.getId() }; } catch(e) { return { url: "", id: "" }; } }
 function checkOverdueVisits() { PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString()); const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return; const lastRow = sheet.getLastRow(); if (lastRow <= 1) return; const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000; for (let i = 0; i < data.length; i++) { const row = data[i]; const status = row[10]; const dueTimeStr = row[20]; if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue; const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue; const timeOverdue = now - dueTime; if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) { const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(i + 2, 11).setValue(newStatus); sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] }); } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(i + 2, 11).setValue("OVERDUE"); } } }
 function parseQuestions(row) { const questions = []; for(let i=4; i<row.length; i++) { const val = row[i]; if(val && val !== "") { let type='check', text=val; if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); } else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); } else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); } else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); } else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); } else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); } else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); } else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); } else if(val.includes('[DATE]')) { type='date'; text=val.replace('[DATE]','').trim(); } questions.push({type, text}); } } return questions; }
