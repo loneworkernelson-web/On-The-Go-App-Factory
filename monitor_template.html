@@ -56,6 +56,14 @@
         </div>
     </div>
 
+    <div id="connectionOverlay" class="hidden fixed inset-0 z-[95] bg-gray-900/80 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center">
+            <div class="text-4xl mb-4 animate-spin">⏳</div>
+            <h2 class="text-2xl font-bold text-white">Connection Lost</h2>
+            <p class="text-gray-400 mt-2">Reconnecting to HQ...</p>
+        </div>
+    </div>
+
     <div id="authModal" class="hidden fixed inset-0 z-[90] bg-gray-900/95 flex items-center justify-center p-4">
         <div class="bg-gray-800 border-2 border-blue-600 rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
             <div class="text-6xl mb-4">🔐</div>
@@ -88,7 +96,7 @@
 
     <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
         <div class="flex justify-between items-center mb-2">
-            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v68.20</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
+            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v69.0</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
@@ -108,32 +116,26 @@
 const SCRIPT_URL = "%%SHEET_URL%%";
 let API_KEY = localStorage.getItem('otg_monitor_key'); 
 let workerData = []; let allRows = []; let escalationLimit = 15; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null;
+let watchdogTimer = null;
 
 async function startApp() {
-    // AUDIO UNLOCK: Only works inside a user interaction event
-    await Tone.start();
-    synth = new Tone.Synth().toDestination();
-    console.log("Audio Context Unlocked");
-    
+    await Tone.start(); synth = new Tone.Synth().toDestination();
     document.getElementById('startOverlay').classList.add('hidden');
-    if(!API_KEY) { 
-        document.getElementById('authModal').classList.remove('hidden'); 
-    } else { 
-        fetchData(); 
-        setInterval(fetchData, 10000); 
-        setInterval(renderGrid, 1000); 
-    }
+    if(!API_KEY) { document.getElementById('authModal').classList.remove('hidden'); } else { startPolling(); }
+}
+
+function startPolling() {
+    fetchData(); 
+    setInterval(fetchData, 10000); 
+    setInterval(renderGrid, 1000); 
 }
 
 function saveAuthKey() { 
     const k = document.getElementById('authKeyInput').value.trim(); 
     if(k.length < 3) return alert("Invalid Key"); 
-    localStorage.setItem('otg_monitor_key', k); 
-    API_KEY = k; 
+    localStorage.setItem('otg_monitor_key', k); API_KEY = k; 
     document.getElementById('authModal').classList.add('hidden'); 
-    fetchData(); 
-    setInterval(fetchData, 10000); 
-    setInterval(renderGrid, 1000); 
+    startPolling();
 }
 
 function resetKey() { if(confirm("Reset the Security Key?")) { localStorage.removeItem('otg_monitor_key'); location.reload(); } }
@@ -142,50 +144,38 @@ async function toggleAudio() {
     if(!synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); } 
     audioEnabled = !audioEnabled; 
     const btn = document.getElementById('btnAudio'); 
-    if(audioEnabled) { 
-        btn.innerText = "🔊 Sound On"; 
-        btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition"; 
-        synth.triggerAttackRelease("C5", "8n"); 
-    } else { 
-        btn.innerText = "🔇 Sound Off"; 
-        btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition"; 
-    } 
+    if(audioEnabled) { btn.innerText = "🔊 Sound On"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition"; synth.triggerAttackRelease("C5", "8n"); } else { btn.innerText = "🔇 Sound Off"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition"; } 
 }
 
 function startAlertLoop() { 
     if(alertLoopInterval) return; 
-    alertLoopInterval = setInterval(() => { 
-        if(audioEnabled && synth) { 
-            const now = Tone.now(); 
-            synth.triggerAttackRelease("C6", "0.1", now); 
-            synth.triggerAttackRelease("G5", "0.1", now + 0.15); 
-        } 
-    }, 1000); 
+    alertLoopInterval = setInterval(() => { if(audioEnabled && synth) { const now = Tone.now(); synth.triggerAttackRelease("C6", "0.1", now); synth.triggerAttackRelease("G5", "0.1", now + 0.15); } }, 1000); 
 }
 
 function stopAlertLoop() { if(alertLoopInterval) { clearInterval(alertLoopInterval); alertLoopInterval = null; } }
 
 function acknowledgeAlert() { 
-    workerData.forEach(w => { 
-        if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("DURESS")) { 
-            acknowledgedAlerts.add(w.name); 
-        } 
-    }); 
+    workerData.forEach(w => { if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("DURESS")) { acknowledgedAlerts.add(w.name); } }); 
     document.getElementById('fullScreenAlert').classList.add('hidden'); 
-    stopAlertLoop(); 
-    renderGrid(); 
+    stopAlertLoop(); renderGrid(); 
 }
 
 function fetchData() { 
+    // WATCHDOG START
+    clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(() => { document.getElementById('connectionOverlay').classList.remove('hidden'); }, 45000);
+
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
     window[cbName] = function(data) { 
+        clearTimeout(watchdogTimer); // WATCHDOG RESET
+        document.getElementById('connectionOverlay').classList.add('hidden');
         if(data.error) { alert("Security Error: " + data.error); return; } 
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
-        document.body.removeChild(script); 
-        delete window[cbName]; 
+        document.body.removeChild(script); delete window[cbName]; 
     }; 
+    script.onerror = () => { /* Watchdog will catch timeout */ };
     script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&t=${Date.now()}`; 
     document.body.appendChild(script); 
 }
@@ -209,16 +199,12 @@ function handleData(response) {
         if(unackedDuress.length > 0) { 
             alertBox.classList.remove('hidden'); alertBox.classList.remove('alert-red'); alertBox.classList.add('alert-purple'); 
             alertTitle.innerText = "DURESS ALARM (SILENT)"; alertIcon.innerText = "🥷"; 
-            alertNames.innerText = unackedDuress.map(w => w.name).join(", "); 
-            startAlertLoop(); 
+            alertNames.innerText = unackedDuress.map(w => w.name).join(", "); startAlertLoop(); 
         } else if(unackedAlert.length > 0) { 
             alertBox.classList.remove('hidden'); alertBox.classList.remove('alert-purple'); alertBox.classList.add('alert-red'); 
             alertTitle.innerText = "EMERGENCY ALERT"; alertIcon.innerText = "🚨"; 
-            alertNames.innerText = unackedAlert.map(w => w.name).join(", "); 
-            startAlertLoop(); 
-        } else { 
-            alertBox.classList.add('hidden'); stopAlertLoop(); 
-        } 
+            alertNames.innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
+        } else { alertBox.classList.add('hidden'); stopAlertLoop(); } 
         if(currentView === 'GRID') renderGrid(); else renderMap(); 
         renderLog(); 
     } 
@@ -235,7 +221,7 @@ function processWorkers(rows) {
                 iceName: r['Emergency Contact Name'], icePhone: r['Emergency Contact Number'], 
                 notes: r['Notes'], location: r['Location Name'] || r['Location Address'] || "Unknown", 
                 gps: r['Last Known GPS'], battery: r['Battery Level'], dueTime: r['Anticipated Departure Time'], 
-                timestamp: timestamp 
+                timestamp: timestamp, wofExpiry: r['WOFExpiry'] 
             }; 
         } 
     }); 
@@ -243,18 +229,7 @@ function processWorkers(rows) {
 }
 
 function renderGrid() { 
-    const grid = document.getElementById('workerGrid'); 
-    const search = document.getElementById('searchBox').value.toLowerCase(); 
-    const now = Date.now(); 
-    grid.innerHTML = ''; 
-    let activeC = 0; let alertC = 0; let visibleCount = 0; 
-    workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now)); 
-    const totalActive = workerData.filter(w => w.status !== 'DEPARTED' && w.status !== 'COMPLETED').length; 
-    const loadEl = document.getElementById('loadWarning'); 
-    
-    if (totalActive > 40) { loadEl.className = "bg-red-900 border-red-500 rounded px-3 py-2 text-xs font-bold flex justify-between animate-pulse"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ CRITICAL LOAD (${totalActive})`; } 
-    else if (totalActive > 20) { loadEl.className = "bg-yellow-900 border-yellow-500 rounded px-3 py-2 text-xs font-bold flex justify-between"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ HIGH TRAFFIC (${totalActive})`; } 
-    else { loadEl.classList.add('hidden'); } 
+    const grid = document.getElementById('workerGrid'); const search = document.getElementById('searchBox').value.toLowerCase(); const now = Date.now(); grid.innerHTML = ''; let activeC = 0; let alertC = 0; let visibleCount = 0; workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now)); const totalActive = workerData.filter(w => w.status !== 'DEPARTED' && w.status !== 'COMPLETED').length; const loadEl = document.getElementById('loadWarning'); if (totalActive > 40) { loadEl.className = "bg-red-900 border-red-500 rounded px-3 py-2 text-xs font-bold flex justify-between animate-pulse"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ CRITICAL LOAD (${totalActive})`; } else if (totalActive > 20) { loadEl.className = "bg-yellow-900 border-yellow-500 rounded px-3 py-2 text-xs font-bold flex justify-between"; loadEl.classList.remove('hidden'); document.getElementById('loadMsg').innerText = `⚠️ HIGH TRAFFIC (${totalActive})`; } else { loadEl.classList.add('hidden'); } 
     
     workerData.forEach(w => { 
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
@@ -263,7 +238,6 @@ function renderGrid() {
         const isOverdue = w.status.includes('OVERDUE'); 
         if(!isSafe) activeC++; 
         if(isAlert || isOverdue || isDuress) alertC++; 
-        
         if (search && !w.name.toLowerCase().includes(search)) return; 
         if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return; 
         
@@ -272,9 +246,21 @@ function renderGrid() {
         
         let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status, timeClass = 'text-gray-500'; 
         let resolveBtn = ''; 
-        if (isDuress) { borderClass = 'bd-purple'; dotClass = 'st-purple'; timeClass = 'text-purple-400 font-bold'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE DURESS</button>`; } 
-        else if (isAlert) { borderClass = 'bd-red'; dotClass = 'st-red'; timeClass = 'text-red-400 font-bold'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE ALERT</button>`; } 
-        else if (!isSafe) { 
+        
+        // CHECK WOF
+        let isWofExpired = false;
+        if(w.wofExpiry) {
+            const exp = new Date(w.wofExpiry).getTime();
+            if(!isNaN(exp) && (exp - now) < 0) isWofExpired = true;
+        }
+
+        if (isDuress) { 
+            borderClass = 'bd-purple'; dotClass = 'st-purple'; timeClass = 'text-purple-400 font-bold'; 
+            resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE DURESS</button>`; 
+        } else if (isAlert) { 
+            borderClass = 'bd-red'; dotClass = 'st-red'; timeClass = 'text-red-400 font-bold'; 
+            resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 rounded text-xs animate-pulse">✅ RESOLVE ALERT</button>`; 
+        } else if (!isSafe) { 
             const due = new Date(w.dueTime).getTime(); 
             if (!isNaN(due)) { 
                 if (due > now) { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
@@ -286,6 +272,12 @@ function renderGrid() {
             } else { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
         } 
         
+        // OVERRIDE FOR WOF (Visual Only)
+        if(isWofExpired && !isAlert && !isDuress && !isOverdue) {
+            borderClass = 'bd-amber'; 
+            statusText += ' [⚠️ WOF EXP]';
+        }
+
         const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
         let batClass = parseInt(w.battery) < 20 ? 'text-red-500 font-bold blink' : 'text-green-500'; 
         let contactHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">Mobile</span><span class="text-gray-300 font-mono">${escapeHtml(w.phone||'--')}</span></div>`; 
@@ -298,80 +290,11 @@ function renderGrid() {
 }
 
 function escapeHtml(text) { if (text === null || text === undefined || text === false) return ""; return String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
-
-function initMap() { 
-    if(mapInstance) { mapInstance.invalidateSize(); return; } 
-    mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); 
-    markersLayer = L.layerGroup().addTo(mapInstance); 
-}
-
-function renderMap() { 
-    if(!mapInstance) return; 
-    markersLayer.clearLayers(); 
-    const bounds = L.latLngBounds(); 
-    let hasMarkers = false; 
-    const now = Date.now(); 
-    workerData.forEach(w => { 
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
-        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC'); 
-        const isDuress = w.status.includes('DURESS'); 
-        const isOverdue = w.status.includes('OVERDUE'); 
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return; 
-        if(!w.gps || w.gps.length < 5) return; 
-        const [lat, lng] = w.gps.split(',').map(Number); 
-        if(isNaN(lat)) return; 
-        let colorClass = 'grey'; 
-        const urgency = getUrgencyScore(w, now); 
-        if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; 
-        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); 
-        L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); 
-        bounds.extend([lat, lng]); hasMarkers = true; 
-    }); 
-    if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); 
-}
-
-function focusWorker(gps) { 
-    if(!gps || gps.length < 5) return alert("No GPS data available."); 
-    // FIX: Ensure map is initialized before focusing
-    document.getElementById('btnMap').click(); 
-    setTimeout(() => {
-        if(!mapInstance) initMap(); 
-        const [lat, lng] = gps.split(',').map(Number); 
-        mapInstance._isFocused = true; 
-        mapInstance.invalidateSize(); 
-        mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); 
-        setTimeout(() => { mapInstance._isFocused = false; }, 5000); 
-    }, 200); 
-}
-
-function toggleView(view) { 
-    currentView = view; 
-    const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); 
-    const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); 
-    grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); 
-    document.getElementById('emptyState').classList.add('hidden'); 
-    btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); 
-    btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); 
-    if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } 
-}
-
-function renderLog() { 
-    const list = document.getElementById('eventLogList'); 
-    const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)); 
-    const top = sorted.slice(0, 50); 
-    let html = ''; 
-    top.forEach(r => { 
-        const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); 
-        let color = "text-gray-300"; 
-        if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold"; 
-        else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold"; 
-        else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold"; 
-        html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`; 
-    }); 
-    list.innerHTML = html; 
-}
-
+function initMap() { if(mapInstance) { mapInstance.invalidateSize(); return; } mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); markersLayer = L.layerGroup().addTo(mapInstance); }
+function renderMap() { if(!mapInstance) return; markersLayer.clearLayers(); const bounds = L.latLngBounds(); let hasMarkers = false; const now = Date.now(); workerData.forEach(w => { const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC'); const isDuress = w.status.includes('DURESS'); const isOverdue = w.status.includes('OVERDUE'); if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return; if(!w.gps || w.gps.length < 5) return; const [lat, lng] = w.gps.split(',').map(Number); if(isNaN(lat)) return; let colorClass = 'grey'; const urgency = getUrgencyScore(w, now); if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); bounds.extend([lat, lng]); hasMarkers = true; }); if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); }
+function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const [lat, lng] = gps.split(',').map(Number); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
+function toggleView(view) { currentView = view; const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); document.getElementById('emptyState').classList.add('hidden'); btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } }
+function renderLog() { const list = document.getElementById('eventLogList'); const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)); const top = sorted.slice(0, 50); let html = ''; top.forEach(r => { const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); let color = "text-gray-300"; if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold"; else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold"; else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold"; html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`; }); list.innerHTML = html; }
 function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000; if (w.status.includes('EMERGENCY')) return 1000; const due = new Date(w.dueTime).getTime(); if (!isNaN(due) && due < now && w.status !== 'DEPARTED') return 500 + (now - due); if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100; return 0; }
 function setFilter(f) { currentFilter = f; const btnAct = document.getElementById('btnFilterActive'); const btnAll = document.getElementById('btnFilterAll'); if(f === 'ACTIVE') { btnAct.classList.replace('text-gray-400', 'bg-blue-600'); btnAct.classList.replace('hover:text-white', 'text-white'); btnAll.classList.replace('bg-blue-600', 'text-gray-400'); btnAll.classList.replace('text-white', 'hover:text-white'); btnAll.classList.remove('shadow'); btnAct.classList.add('shadow'); } else { btnAll.classList.replace('text-gray-400', 'bg-blue-600'); btnAll.classList.replace('hover:text-white', 'text-white'); btnAct.classList.replace('bg-blue-600', 'text-gray-400'); btnAct.classList.replace('text-white', 'hover:text-white'); btnAct.classList.remove('shadow'); btnAll.classList.add('shadow'); } renderGrid(); if(currentView === 'MAP') renderMap(); }
 function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; document.getElementById('resNameInput').value = ""; document.getElementById('resNoteInput').value = ""; }
