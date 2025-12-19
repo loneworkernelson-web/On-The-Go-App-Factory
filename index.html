@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory v73.1</title>
+  <title>OTG AppSuite Factory v73.3</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -75,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Tactical Edition v73.1</p>
+      <p class="text-gray-400">Tactical Edition v73.3</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -269,7 +269,110 @@
     let TEMPLATES = {};
     const workerKey = "wk_" + Math.random().toString(36).substr(2, 9); // CONSTANT KEY
 
-    const AI_GUIDE_TEXT = `AI REPORTING GUIDE\n==================\nUse this guide to ask Gemini or ChatGPT to write custom report scripts for you.\n\nSECTION 1: DEPLOYMENT RULE (READ FIRST)\n---------------------------------------\nIf you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):\n1. You DO NOT need to update the Web App Deployment.\n2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).\n3. The script runs "locally" inside the sheet.\nOnly update the Web App Deployment if you change "doPost" or "doGet" (the core backend).\n\nSECTION 2: DATA MAP (For the AI)\n--------------------------------\nPaste this into your AI prompt so it knows your data structure:\nI have a Google Sheet named 'Visits'.\nThe columns are mapped as follows:\n- Col A: Timestamp (Start of Visit)\n- Col C: Worker Name\n- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')\n- Col M: Location Name\n- Col P: Device Timestamp (End of Visit / Last Check-in)\n- Col Q: Battery Level (e.g. '85%')\n- Col S: Distance (km)\n- Col T: Visit Report Data (JSON string containing form answers)\n- Col U: Anticipated Departure Time\n\nSECTION 3: PROMPT RECIPES\n-------------------------\nRECIPE 1: MILEAGE REPORT\n"Write a Google Apps Script function called 'generateMileageReport'. Read 'Visits'. Group by Worker. Sum Distance."\n\nRECIPE 2: MISSING REPORTS\n"Write a script to find rows where Status is 'DEPARTED' but Col T (Report Data) is empty."`; 
+    const AI_GUIDE_TEXT = `AI REPORTING GUIDE
+==================
+Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
+
+SECTION 1: DEPLOYMENT RULE (READ FIRST)
+---------------------------------------
+If you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):
+1. You DO NOT need to update the Web App Deployment.
+2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).
+3. The script runs "locally" inside the sheet.
+Only update the Web App Deployment if you change "doPost" or "doGet" (the core backend).
+
+SECTION 2: DATA MAP (For the AI)
+--------------------------------
+Paste this into your AI prompt so it knows your data structure:
+I have a Google Sheet named 'Visits'.
+The columns are mapped as follows:
+- Col A: Timestamp (Start of Visit)
+- Col C: Worker Name
+- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')
+- Col M: Location Name
+- Col P: Device Timestamp (End of Visit / Last Check-in)
+- Col Q: Battery Level (e.g. '85%')
+- Col S: Distance (km)
+- Col T: Visit Report Data (JSON string containing form answers)
+- Col U: Anticipated Departure Time
+
+---------------------------------------------------
+SECTION 3: PROMPT RECIPES (Copy & Paste these)
+---------------------------------------------------
+
+RECIPE 1: MILEAGE REPORT
+Write a Google Apps Script function called 'generateMileageReport'.
+1. Read all data from 'Visits'.
+2. Create/Overwrite a sheet called 'Mileage Report'.
+3. Group data by Worker Name (Col C) and Location (Col M).
+4. Sum the Distance (Col S) for each group.
+5. Create a clean table: Worker | Location | Total KM.
+6. Add a Grand Total at the bottom.
+
+RECIPE 2: TIMESHEET (PAYROLL)
+Write a script called 'generateTimesheet'.
+1. Read 'Visits'.
+2. Calculate duration in minutes: (Col P - Col A).
+3. Ignore rows where Status is not 'DEPARTED'.
+4. Create a sheet 'Weekly Timesheet'.
+5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).
+6. Sum Total Hours per Worker.
+
+RECIPE 3: SAFETY AUDIT (COMPLIANCE)
+Write a script called 'auditSafety'.
+1. Read 'Visits'.
+2. Identify rows where Battery Level (Col Q) is < 20%.
+3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.
+4. Create a sheet 'Safety Audit'.
+5. List these high-risk visits.
+6. Highlight 'EMERGENCY' rows in Red.
+
+RECIPE 4: SITE HISTORY (JSON EXTRACTION)
+Write a script called 'collateSiteComments'.
+1. Read 'Visits'.
+2. Filter for Location Name = 'Main Office' (make this a variable).
+3. Parse the JSON in Col T ('Visit Report Data').
+4. Extract the field labeled 'Notes' or 'Comments' from that JSON.
+5. Create a sheet 'Site Log - Main Office'.
+6. List: Date | Worker | Extracted Notes.
+
+RECIPE 5: AFTER-HOURS WORK
+Write a script to find after-hours work.
+1. Read 'Visits'.
+2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.
+3. Output to a new sheet 'After Hours Log'.
+
+RECIPE 6: WORKER ACTIVITY SUMMARY
+Write a script for an Executive Summary.
+1. Count total unique visits per Worker.
+2. Calculate average duration per visit per Worker.
+3. Count total 'EMERGENCY' statuses per Worker.
+4. Output a summary table.
+
+RECIPE 7: MISSING REPORTS
+Write a script to find missing reports.
+1. Filter rows where Status is 'DEPARTED'.
+2. Check if Col T (Report Data) is empty or '{}'.
+3. List workers who departed without filing a report.
+
+RECIPE 8: TRAVEL VS ON-SITE
+Write a script to compare Travel vs Work.
+1. Sum duration for rows where Location Name contains 'Travel'.
+2. Sum duration for all other rows.
+3. Calculate the ratio per worker.
+
+RECIPE 9: MONTHLY ARCHIVE
+Write a script to move last month's data.
+1. Identify rows from the previous month.
+2. Move them to a sheet named 'Archive - [Month-Year]'.
+3. Delete them from 'Visits' to keep it fast.
+
+RECIPE 10: FORM DATA EXPORT
+Write a script to flatten the JSON form data.
+1. Read Col T.
+2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').
+3. Create a new sheet with these keys as Column Headers.
+4. Populate the rows with the values from the JSON.`;
 
     window.onload = async () => { 
         loadPersistedData(); 
@@ -309,7 +412,14 @@
         }
     }
 
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(i===n){ tab.classList.add('active'); } else { tab.classList.remove('active'); } } if(n===3) generateScript(); }
+    function gotoStep(n) { 
+        document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); 
+        document.getElementById('step'+n).classList.add('active'); 
+        for(let i=1; i<=5; i++){ 
+            const tab = document.getElementById('tab'+i); 
+            if(i===n){ tab.classList.add('active'); } else { tab.classList.remove('active'); } 
+        } 
+    }
     
     function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
     function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
