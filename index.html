@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory v73.0</title>
+  <title>OTG AppSuite Factory v73.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -75,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Tactical Edition v73.0</p>
+      <p class="text-gray-400">Tactical Edition v73.1</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -367,63 +367,65 @@
         zip.folder("MonitorApp").file("index.html", mHtml);
         zip.file("Code.gs", bCode);
         
-        // --- OPERATIONS MANUAL ---
-        zip.file("OPERATIONS_MANUAL.txt", `OTG SAFETY SYSTEM: OPERATIONS MANUAL
-====================================
-Organisation: ${org}
-Generated: ${new Date().toLocaleString()}
+        // --- OPERATIONS MANUAL (HTML) ---
+        const manualHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Operations Manual - ${org}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:2rem}h1{color:#2563eb;border-bottom:2px solid #e5e7eb;padding-bottom:0.5rem}h2{color:#1f2937;margin-top:2rem;background:#f3f4f6;padding:0.5rem;border-radius:0.5rem}code{background:#eee;padding:0.2rem 0.4rem;border-radius:0.25rem;font-family:monospace}.box{background:#eff6ff;border:1px solid #bfdbfe;padding:1rem;border-radius:0.5rem;margin:1rem 0}.warning{background:#fef2f2;border:1px solid #fecaca;padding:1rem;border-radius:0.5rem;margin:1rem 0;color:#991b1b}</style></head><body>
+        <h1>${org} Safety System - Operations Manual</h1>
+        <p>Generated: ${new Date().toLocaleString()}</p>
 
-[1] KEYS & CREDENTIALS
-----------------------
-Master Key: ${secret}
-(Used for the Admin Monitor Dashboard)
+        <div class="box">
+            <h3>🔑 System Credentials</h3>
+            <p><strong>Admin Master Key:</strong> <code>${secret}</code></p>
+            <p><strong>Worker App Key:</strong> <code>${workerKey}</code> (Embedded)</p>
+        </div>
 
-Worker Key: ${workerKey}
-(Embedded in the Worker App)
+        <h2>1. Monitor Dashboard Guide</h2>
+        <p>To view your live dashboard:</p>
+        <ol>
+            <li>Go to your deployed Monitor URL (e.g. on Netlify).</li>
+            <li>Enter your <strong>Master Key</strong>.</li>
+            <li>Click <strong>Sound On</strong> immediately. Browsers block audio until you interact.</li>
+        </ol>
+        <ul>
+            <li><strong>Green:</strong> All Safe / On Track.</li>
+            <li><strong>Amber:</strong> Late (Overdue) or WOF Issue.</li>
+            <li><strong>Red:</strong> Emergency / Panic Button.</li>
+            <li><strong>Purple:</strong> Duress (Silent Alarm).</li>
+        </ul>
 
-[2] ADMIN DASHBOARD (MONITOR APP)
----------------------------------
-1. Open your hosted Monitor URL (e.g. ${org.replace(/\s/g,'-').toLowerCase()}-hq.netlify.app).
-2. Enter the Master Key.
-3. Click "Sound On" to enable audio alerts.
-   - GREEN: On Site / Safe
-   - AMBER: Overdue or WOF Expired
-   - RED: Emergency / Panic
-   - PURPLE: Duress (Silent Alarm)
+        <h2>2. Managing Devices & Staff</h2>
+        <p>The system "Fingerprints" every phone to prevent unauthorized access.</p>
+        <div class="warning">
+            <strong>CRITICAL:</strong> If a worker gets a new phone, clears their cookies, or uses a different browser, they will be blocked.
+        </div>
+        <h3>To Authorize a New Device:</h3>
+        <ol>
+            <li>Open your Google Sheet.</li>
+            <li>Go to the <strong>'Staff'</strong> tab.</li>
+            <li>Find the worker's row.</li>
+            <li><strong>DELETE the text in Column E (DeviceID).</strong></li>
+            <li>Tell the worker to open the app and press "Sync". The new ID will appear automatically.</li>
+        </ol>
 
-[3] MANAGING WORKERS & DEVICES
-------------------------------
-The system "Fingerprints" phones for security.
->> ADDING A WORKER:
-1. Open your Google Sheet > 'Staff' Tab.
-2. Add their Name (Col A) and Role (Col B).
-3. Set Status to "Active".
+        <h2>3. Creating New Forms</h2>
+        <p>To change the questions in the app, edit the <strong>'Templates'</strong> tab in your spreadsheet.</p>
+        <p>Use these tags in the columns (E onwards):</p>
+        <ul>
+            <li><code>[TEXT] Question Label</code> - Multi-line text box.</li>
+            <li><code>[YESNO] Is it safe?</code> - Yes/No buttons.</li>
+            <li><code>[PHOTO] Take a picture</code> - Camera button.</li>
+            <li><code>[GPS] Record Location</code> - Saves coordinates.</li>
+            <li><code>[HEADING] Section Name</code> - Visual divider.</li>
+        </ul>
 
->> CHANGING A PHONE (IMPORTANT):
-If a worker gets a new phone or clears their cookies, they will get "Access Denied".
-To fix this:
-1. Go to the 'Staff' Tab.
-2. Find the worker's row.
-3. DELETE the text in the 'DeviceID' column (Col E).
-4. Ask them to press "Sync" on their new phone. It will register automatically.
+        <h2>4. Troubleshooting</h2>
+        <p><strong>"Network Error" or "Sync Failed":</strong></p>
+        <ul>
+            <li>Check your Google Sheet deployment. Go to Extensions > Apps Script > Deploy > Manage Deployments.</li>
+            <li>Ensure "Who has access" is set to <strong>"Anyone"</strong>. This allows the app to talk to the sheet without a Google Login prompt.</li>
+        </ul>
+        </body></html>`;
 
-[4] BUILDING FORMS (TEMPLATES TAB)
-----------------------------------
-To change the questions in the app, edit the 'Templates' tab.
-Syntax for questions:
-- [TEXT] Question Label
-- [YESNO] Is it safe?
-- [PHOTO] Take a picture
-- [GPS] Record Location
-- [SIGN] Signature Pad
-- [HEADING] Section Header
-
-[5] TROUBLESHOOTING
--------------------
-- "Network Error": Check if your Google Sheet deployment "Who has access" is set to "Anyone".
-- "GPS Accuracy Poor": Ensure the worker is outside.
-- "WOF Block": Update the 'WOFExpiry' date in the Staff tab (YYYY-MM-DD).
-`);
+        zip.file("OPERATIONS_MANUAL.html", manualHtml);
 
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
     }
