@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTG Factory v70.0</title>
+    <title>OTG Factory v70.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -21,12 +21,17 @@
         .btn-green:hover { background: #15803d; }
         .preview-phone { background: #111827; border: 4px solid #374151; border-radius: 20px; padding: 10px; width: 300px; margin: 0 auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
         .preview-header { padding: 1rem; background-color: #111827; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Drag & Drop Styles */
+        .drop-zone { border: 2px dashed #475569; border-radius: 8px; padding: 20px; text-align: center; margin-top: 8px; transition: all 0.2s; background: #0f172a; cursor: pointer; position: relative; overflow: hidden; }
+        .drop-zone.dragover { border-color: #3b82f6; background: #1e293b; }
+        .drop-zone:hover { border-color: #64748b; }
     </style>
 </head>
 <body class="p-6 max-w-5xl mx-auto">
 
     <div class="text-center mb-10">
-        <h1 class="text-4xl font-extrabold text-blue-500 tracking-tight">OTG AppFactory <span class="text-gray-600 text-lg ml-2">v70.0 (Tactical)</span></h1>
+        <h1 class="text-4xl font-extrabold text-blue-500 tracking-tight">OTG AppFactory <span class="text-gray-600 text-lg ml-2">v70.1</span></h1>
         <p class="text-gray-400 mt-2">Serverless Safety System Generator</p>
     </div>
 
@@ -38,8 +43,17 @@
                 <label class="text-xs font-bold text-gray-400 uppercase">Organisation Name</label>
                 <input id="orgName" class="input-dark" placeholder="Acme Church Safety" oninput="updatePreview(); saveInput(this);">
                 
-                <label class="text-xs font-bold text-gray-400 uppercase mt-4 block">Logo URL (Transparent PNG recommended)</label>
-                <input id="logoUrl" class="input-dark" placeholder="https://example.com/logo.png" oninput="updatePreview(); saveInput(this);">
+                <label class="text-xs font-bold text-gray-400 uppercase mt-4 block">App Logo</label>
+                <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                    <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(this)">
+                    <p class="text-sm text-gray-300 font-bold pointer-events-none">☁️ Drag & Drop Logo Here</p>
+                    <p class="text-xs text-gray-500 mt-1 pointer-events-none">or click to upload (Auto-resized to 192px)</p>
+                </div>
+                
+                <div class="mt-2">
+                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-1">OR PASTE URL MANUALLY:</p>
+                    <input id="logoUrl" class="input-dark text-xs" placeholder="https://example.com/logo.png" oninput="updatePreview(); saveInput(this);">
+                </div>
             </div>
 
             <div class="step-card">
@@ -109,28 +123,21 @@
             </div>
 
             <div class="bg-black rounded-lg p-4 font-mono text-xs h-64 overflow-y-auto border border-gray-800">
-                <div class="text-green-500 mb-1">> Factory v70.0 initialized...</div>
-                <div class="text-blue-500 mb-1">> Loaded templates: Worker (v70.1), Monitor (v70.0), Backend (v68.20)</div>
+                <div class="text-green-500 mb-1">> Factory v70.1 initialized...</div>
+                <div class="text-blue-500 mb-1">> Modules: Drag-Drop, Auto-Resize, Manifest Gen</div>
                 <div id="consoleLog"></div>
             </div>
         </div>
     </div>
 
 <script>
-    // --- TEMPLATE LOADERS ---
-    // These paths assume the file structure is flat in the same folder
-    const FILES = {
-        worker: 'worker_template.html',
-        monitor: 'monitor_template.html',
-        backend: 'backend_template.js'
-    };
-    
+    const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js' };
     let TEMPLATES = {};
 
-    // --- INIT ---
     window.onload = async () => {
         loadPersistedData();
         await loadTemplates();
+        setupDragDrop();
         updatePreview();
     };
 
@@ -153,10 +160,7 @@
         }
     }
 
-    // --- UX FUNCTIONS ---
-    function saveInput(el) {
-        localStorage.setItem('otg_' + el.id, el.value);
-    }
+    function saveInput(el) { localStorage.setItem('otg_' + el.id, el.value); }
 
     function loadPersistedData() {
         ['orgName', 'logoUrl', 'masterKey', 'sheetUrl'].forEach(id => {
@@ -168,42 +172,76 @@
     function updatePreview() {
         const name = document.getElementById('orgName').value || "Your Org";
         const logo = document.getElementById('logoUrl').value;
-        
         document.getElementById('prevTitle').innerText = name;
         const logoImg = document.getElementById('prevLogo');
-        
-        if (logo && logo.length > 5) {
-            logoImg.src = logo;
-            logoImg.style.display = 'block';
-        } else {
-            logoImg.style.display = 'none';
-        }
+        if (logo && logo.length > 5) { logoImg.src = logo; logoImg.style.display = 'block'; } 
+        else { logoImg.style.display = 'none'; }
     }
 
     function validateKey() {
         const k = document.getElementById('masterKey').value;
         const w = document.getElementById('keyWarning');
-        if(k.length > 0 && k.length < 8) w.classList.remove('hidden');
-        else w.classList.add('hidden');
+        if(k.length > 0 && k.length < 8) w.classList.remove('hidden'); else w.classList.add('hidden');
+    }
+
+    // --- DRAG & DROP LOGIC ---
+    function setupDragDrop() {
+        const dz = document.getElementById('dropZone');
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+        dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('dragover'); });
+        dz.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dz.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+    }
+
+    function handleFileSelect(input) { if (input.files.length) handleFile(input.files[0]); }
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) return alert("Please drop an image file.");
+        log("Processing logo...", "text-yellow-400");
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                // Resize to max 192x192 for performance
+                const MAX_SIZE = 192;
+                let width = img.width;
+                let height = img.height;
+                if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                document.getElementById('logoUrl').value = dataUrl; // Set hidden input
+                saveInput(document.getElementById('logoUrl')); // Persist
+                updatePreview();
+                log(`Logo processed! (${width}x${height})`, "text-green-400");
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
     }
 
     async function copyBackendCode() {
         if (!TEMPLATES.backend) return alert("Backend template not loaded yet.");
-        
         const key = document.getElementById('masterKey').value;
         if (key.length < 8) return alert("Please enter a secure Master Key first.");
-
-        // Generate a random Worker Key for this build
         const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
-        
-        // Inject Keys into Backend Code
         let code = TEMPLATES.backend;
         code = code.replace("%%SECRET_KEY%%", key);
         code = code.replace("%%WORKER_KEY%%", workerKey);
-        // Inject other config placeholders if they exist in the backend template
         const org = document.getElementById('orgName').value || "My Org";
         code = code.replace("%%ORGANISATION_NAME%%", org);
-        code = code.replace("%%ESCALATION_MINUTES%%", "15"); // Default
+        code = code.replace("%%ESCALATION_MINUTES%%", "15"); 
 
         try {
             await navigator.clipboard.writeText(code);
@@ -211,43 +249,30 @@
             const oldText = btn.innerText;
             btn.innerText = "✅ COPIED!";
             btn.classList.replace('btn-blue', 'btn-green');
-            setTimeout(() => {
-                btn.innerText = oldText;
-                btn.classList.replace('btn-green', 'btn-blue');
-            }, 2000);
-            log("Backend code copied to clipboard (Keys Injected).");
+            setTimeout(() => { btn.innerText = oldText; btn.classList.replace('btn-green', 'btn-blue'); }, 2000);
+            log("Backend code copied to clipboard.");
             log(`Generated Worker Key: ${workerKey}`, "text-yellow-400");
-        } catch (err) {
-            alert("Clipboard access failed. Please copy manually from the file.");
-        }
+        } catch (err) { alert("Clipboard access failed. Please copy manually."); }
     }
 
     function testConnection() {
         const url = document.getElementById('sheetUrl').value;
         const key = document.getElementById('masterKey').value;
         const status = document.getElementById('connStatus');
-        
         if (!url.includes('/exec')) { status.innerHTML = "❌ Invalid URL"; return; }
-        
         status.innerHTML = "⏳ Testing...";
         status.className = "text-center text-sm font-bold mt-2 text-yellow-400";
-
-        fetch(`${url}?test=1&key=${encodeURIComponent(key)}`)
-            .then(r => r.json())
-            .then(d => {
-                if(d.status === 'success') {
-                    status.innerHTML = `✅ Connection Successful! (${d.version})`;
-                    status.className = "text-center text-sm font-bold mt-2 text-green-400";
-                    log("Connection Test Passed.");
-                } else {
-                    throw new Error(d.message || "Unknown Error");
-                }
-            })
-            .catch(e => {
-                status.innerHTML = "❌ Failed: " + e.message;
-                status.className = "text-center text-sm font-bold mt-2 text-red-400";
-                log("Connection Test Failed: " + e.message, 'text-red-500');
-            });
+        fetch(`${url}?test=1&key=${encodeURIComponent(key)}`).then(r => r.json()).then(d => {
+            if(d.status === 'success') {
+                status.innerHTML = `✅ Connection Successful! (${d.version})`;
+                status.className = "text-center text-sm font-bold mt-2 text-green-400";
+                log("Connection Test Passed.");
+            } else { throw new Error(d.message || "Unknown Error"); }
+        }).catch(e => {
+            status.innerHTML = "❌ Failed: " + e.message;
+            status.className = "text-center text-sm font-bold mt-2 text-red-400";
+            log("Connection Test Failed: " + e.message, 'text-red-500');
+        });
     }
 
     function generateZip() {
@@ -255,30 +280,30 @@
         const logo = document.getElementById('logoUrl').value;
         const key = document.getElementById('masterKey').value;
         const url = document.getElementById('sheetUrl').value;
-
         if (!org || !key || !url) return alert("Please fill in all fields.");
 
         const zip = new JSZip();
-        
-        // 1. Generate Keys
-        // We use the same worker key we generated for the backend copy (if possible), 
-        // but since we can't persist that easily without complexity, we generate a NEW one.
-        // NOTE: This means the user MUST copy the backend code AFTER clicking Download if they haven't already, 
-        // OR we just generate a fresh one now and tell them to re-copy.
-        // BETTER APPROACH: Generate one now, inject into everything.
-        
         const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
-        log(`Building with Master Key: ${key.substr(0,3)}***`, "text-blue-300");
         log(`Building with Worker Key: ${workerKey}`, "text-blue-300");
-        log("⚠️ IMPORTANT: You must COPY the Backend Code AGAIN to match this Worker Key.", "text-red-400 font-bold");
+        log("⚠️ IMPORTANT: Copy the Backend Code AGAIN to match this key.", "text-red-400 font-bold");
 
-        // 2. Prepare Worker App
+        // Prepare Manifest
+        const manifest = {
+            "name": org,
+            "short_name": org.substring(0, 12),
+            "start_url": "./index.html",
+            "display": "standalone",
+            "background_color": "#111827",
+            "theme_color": "#111827",
+            "icons": [{ "src": logo || "icon.png", "sizes": "192x192", "type": "image/png" }]
+        };
+
+        // Prepare Worker App
         let wHtml = TEMPLATES.worker;
         wHtml = wHtml.replace(/%%ORG_NAME%%/g, org);
         wHtml = wHtml.replace(/%%LOGO_DATA%%/g, logo);
         wHtml = wHtml.replace(/%%GOOGLE_SHEET_URL%%/g, url);
-        wHtml = wHtml.replace(/%%SECRET_KEY%%/g, workerKey); // Worker gets Worker Key
-        wHtml = wHtml.replace(/%%ORS_API_KEY%%/g, ""); // Optional
+        wHtml = wHtml.replace(/%%SECRET_KEY%%/g, workerKey);
         wHtml = wHtml.replace(/%%IS_ADVANCED%%/g, "true");
         wHtml = wHtml.replace(/%%ENABLE_MILEAGE%%/g, "true");
         wHtml = wHtml.replace(/%%CHECKIN_ENABLED%%/g, "true");
@@ -287,26 +312,25 @@
         wHtml = wHtml.replace(/%%VEHICLE_ENABLED%%/g, "true");
         wHtml = wHtml.replace(/%%VEHICLE_INTERVAL%%/g, "7");
 
-        // 3. Prepare Monitor App
+        // Prepare Monitor App
         let mHtml = TEMPLATES.monitor;
         mHtml = mHtml.replace(/%%ORG_NAME%%/g, org);
         mHtml = mHtml.replace(/%%LOGO_URL%%/g, logo);
         mHtml = mHtml.replace(/%%SHEET_URL%%/g, url);
-        // We do NOT inject the Master Key into the Monitor HTML source for security.
-        // The user must enter it manually to login.
 
-        // 4. Prepare Backend (for reference in zip)
+        // Prepare Backend Reference
         let bJs = TEMPLATES.backend;
         bJs = bJs.replace("%%SECRET_KEY%%", key);
         bJs = bJs.replace("%%WORKER_KEY%%", workerKey);
         bJs = bJs.replace("%%ORGANISATION_NAME%%", org);
         bJs = bJs.replace("%%ESCALATION_MINUTES%%", "15");
 
-        // 5. Build Zip
+        // Build Zip
         zip.file("WorkerApp/index.html", wHtml);
+        zip.file("WorkerApp/manifest.json", JSON.stringify(manifest));
         zip.file("MonitorApp/index.html", mHtml);
         zip.file("Backend/Code.gs", bJs);
-        zip.file("README.txt", `OTG Safety System for ${org}\n\n1. Deploy the code in Backend/Code.gs to Google Apps Script.\n2. Host the 'WorkerApp' and 'MonitorApp' folders on Netlify or GitHub Pages.\n\nWorker Key: ${workerKey}\nMaster Key: ${key}`);
+        zip.file("README.txt", `OTG Safety System for ${org}\n\n1. Deploy Backend/Code.gs to Google Apps Script.\n2. Host WorkerApp/MonitorApp on Netlify/GitHub.\n\nWorker Key: ${workerKey}\nMaster Key: ${key}`);
 
         zip.generateAsync({type:"blob"}).then(function(content) {
             const a = document.createElement("a");
