@@ -42,12 +42,81 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .gps-bar.active-green { background-color: #22c55e; }
 .menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
 .menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
+.wizard-step { display: none; height: 100%; flex-direction: column; }
+.wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 </style>
 </head>
 <body class="bg-gray-900 text-white">
 <div id="app-container" class="relative h-full w-full">
 <div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
 <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
+
+<div id="setupWizard" class="hidden fixed inset-0 bg-gray-900 z-[60] flex flex-col overflow-hidden">
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
+        <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
+        <div class="flex gap-1"><div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div><div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div><div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div></div>
+    </div>
+    
+    <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
+        <p class="text-gray-400 mb-8 text-sm">We need your details to match you with your safety profile in the database.</p>
+        
+        <label class="setting-label lbl-blue">Full Name</label>
+        <input id="wiz_name" class="form-input mb-4" placeholder="e.g. John Doe">
+        
+        <label class="setting-label lbl-blue">Mobile Number</label>
+        <input id="wiz_phone" type="tel" class="form-input mb-4" placeholder="+64...">
+        
+        <label class="setting-label lbl-blue">Work Email</label>
+        <input id="wiz_email" type="email" class="form-input mb-8" placeholder="name@org.co.nz">
+        
+        <div class="mt-auto">
+            <button onclick="wizNext(1)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
+        </div>
+    </div>
+
+    <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
+        <p class="text-gray-400 mb-6 text-sm">These 4-digit codes are stored privately on this phone. Only you will see them.</p>
+        
+        <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
+            <h3 class="text-green-400 font-bold mb-1">1. Standard PIN</h3>
+            <p class="text-xs text-gray-300 mb-3">Used to declare "I AM SAFE" or cancel an accidental alarm.</p>
+            <input id="wiz_pin" type="tel" maxlength="4" class="w-full bg-gray-900 border border-green-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-green-500" placeholder="0000">
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
+            <h3 class="text-purple-400 font-bold mb-1">2. Duress PIN (Silent)</h3>
+            <p class="text-xs text-gray-300 mb-3">Enter this if you are forced to cancel an alarm under threat. It <strong>looks</strong> like it cancelled the alarm, but secretly sends a high-priority "DURESS" alert to HQ.</p>
+            <input id="wiz_duress" type="tel" maxlength="4" class="w-full bg-gray-900 border border-purple-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-purple-500" placeholder="9999">
+        </div>
+        
+        <div class="mt-auto">
+            <button onclick="wizNext(2)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Next: Contacts →</button>
+            <button onclick="wizBack(2)" class="w-full py-3 text-gray-400 font-bold mt-2">Back</button>
+        </div>
+    </div>
+
+    <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Emergency Contacts</h2>
+        <p class="text-gray-400 mb-6 text-sm">These people will receive SMS/Email alerts. <br><strong class="text-yellow-400">Important:</strong> If HQ is not live monitoring, these are the only people who will know you need help.</p>
+        
+        <label class="setting-label lbl-red">Primary Emergency Contact</label>
+        <input id="wiz_emg_name" class="form-input-card" placeholder="Name (e.g. Spouse/Manager)">
+        <input id="wiz_emg_phone" type="tel" class="form-input-card" placeholder="Mobile Number">
+        <input id="wiz_emg_email" type="email" class="form-input mb-6" placeholder="Email Address">
+        
+        <label class="setting-label lbl-gray">Escalation Contact (Optional)</label>
+        <input id="wiz_esc_name" class="form-input-card" placeholder="Name">
+        <input id="wiz_esc_phone" type="tel" class="form-input mb-8" placeholder="Mobile Number">
+
+        <div class="mt-auto">
+            <button onclick="wizSave()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">✅ Save & Launch App</button>
+            <button onclick="wizBack(3)" class="w-full py-3 text-gray-400 font-bold mt-2">Back</button>
+        </div>
+    </div>
+</div>
 
 <div id="wofBlockModal" class="hidden fixed inset-0 bg-gray-900 z-[100] flex flex-col p-6 items-center justify-center text-center">
     <div class="text-6xl mb-4">🛑</div>
@@ -72,7 +141,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <button onclick="closeWofWarn(); startVehicleCheck();" class="text-blue-400 text-sm font-bold underline p-2">I have a new WOF (Update Now)</button>
 </div>
 
-<div id="settingsPage" class="page active z-50 bg-gray-800"><div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button id="btnCloseSettings" onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2 hidden">×</button></div><div class="content-area pb-24"><div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Enter your name EXACTLY as shown in the system to sync your sites.</p></div><div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div><div class="setting-card"><label class="setting-label lbl-blue">Your Details</label><input id="set_name" class="form-input-card" placeholder="Full Name (Exact Match)"><input id="set_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_email" type="email" class="form-input-card" placeholder="Your Email (For Note to Self)"></div><div class="setting-card"><label class="setting-label lbl-green">Emergency Contact (Required)</label><input id="set_emg_name" class="form-input-card" placeholder="Name"><input id="set_emg_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_emg_email" type="email" class="form-input-card" placeholder="Email"></div><div class="setting-card"><label class="setting-label lbl-purple">Escalation Contact (Optional)</label><input id="set_esc_name" class="form-input-card" placeholder="Name"><input id="set_esc_phone" type="tel" class="form-input-card" placeholder="Phone (+64...)"><input id="set_esc_email" type="email" class="form-input-card" placeholder="Email"></div><div class="setting-card"><label class="setting-label lbl-red">Security (4 Digits)</label><div class="flex gap-2"><input id="set_pin" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="PIN"><input id="set_duress" type="tel" maxlength="4" class="form-input text-center tracking-widest" placeholder="Duress"></div></div><div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div></div><div class="footer-bar"><button onclick="saveSettings()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Save & Sync</button></div></div>
+<div id="settingsPage" class="page z-50 bg-gray-800">
+    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
+    <div class="content-area pb-24">
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Re-run the setup wizard to change details?</p><button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button></div>
+        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
+        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
+    </div>
+</div>
+
 <div id="mainPage" class="page">
     <div class="header-bar">
         <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
@@ -116,7 +193,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="space-y-3 w-full">
             <div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-lg shadow-lg">Notes</button></div>
             <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-lg shadow-lg">HOLD TO END</button>
-            <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">I AM SAFE</button>
+            <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg animate-pulse">I AM SAFE</button>
         </div>
     </div>
     <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
@@ -137,10 +214,19 @@ function showModal(id){document.getElementById('modalBackdrop').classList.remove
 function closeModal(id){document.getElementById('modalBackdrop').classList.add('hidden');document.getElementById('modalBackdrop').classList.remove('flex');document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));document.getElementById('locationModal').classList.add('hidden');}
 window.addEventListener('online',updateNetworkStatus);window.addEventListener('offline',updateNetworkStatus);function updateNetworkStatus(){const b=document.getElementById('offlineBanner');if(navigator.onLine){b.classList.add('hidden');if(state.pendingUploads&&state.pendingUploads.length>0)processUploadQueue();}else{b.classList.remove('hidden');}}
 function getDeviceID(){let id=localStorage.getItem('device_uuid');if(!id){id='dev_'+Math.random().toString(36).substr(2,9)+'_'+Date.now();localStorage.setItem('device_uuid',id);}return id;}
-function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active');if(p==='main')startReminderTimer();else clearTimeout(mainScreenReminderTimer);if(p==='settings'){document.getElementById('set_name').value=state.settings.workerName||"";document.getElementById('set_phone').value=state.settings.workerPhone||"";document.getElementById('set_email').value=state.settings.workerEmail||"";document.getElementById('set_emg_name').value=state.settings.emergencyName||"";document.getElementById('set_emg_phone').value=state.settings.emergencyPhone||"";document.getElementById('set_emg_email').value=state.settings.emergencyEmail||"";document.getElementById('set_esc_name').value=state.settings.escalationName||"";document.getElementById('set_esc_phone').value=state.settings.escalationPhone||"";document.getElementById('set_esc_email').value=state.settings.escalationEmail||"";document.getElementById('set_pin').value=state.settings.pinCode||"";document.getElementById('set_duress').value=state.settings.duressPin||"";if(!document.getElementById('set_url').value||document.getElementById('set_url').value.includes("%%"))document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;if(state.settings.workerName&&state.settings.pinCode)document.getElementById('btnCloseSettings').classList.remove('hidden');else document.getElementById('btnCloseSettings').classList.add('hidden');}}
-function saveSettings(){state.settings.workerName=document.getElementById('set_name').value;state.settings.workerPhone=document.getElementById('set_phone').value;state.settings.workerEmail=document.getElementById('set_email').value;state.settings.emergencyName=document.getElementById('set_emg_name').value;state.settings.emergencyPhone=document.getElementById('set_emg_phone').value;state.settings.emergencyEmail=document.getElementById('set_emg_email').value;state.settings.escalationName=document.getElementById('set_esc_name').value;state.settings.escalationPhone=document.getElementById('set_esc_phone').value;state.settings.escalationEmail=document.getElementById('set_esc_email').value;state.settings.pinCode=document.getElementById('set_pin').value;state.settings.duressPin=document.getElementById('set_duress').value;state.settings.googleSheetUrl=CONFIG.url;if(!state.settings.workerName||!state.settings.pinCode)return alert("Name and PIN required.");saveState();navigate('main');forceSync();}
+function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active');if(p==='main')startReminderTimer();else clearTimeout(mainScreenReminderTimer);if(p==='settings'){populateSettingsForm();}}
+
+// WIZARD FUNCTIONS
+function startWizard(){document.getElementById('setupWizard').classList.remove('hidden');wizGoTo(1);if(state.settings.workerName)populateWizard();}
+function wizGoTo(step){document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active'));document.getElementById('wizStep'+step).classList.add('active');for(let i=1;i<=3;i++){const d=document.getElementById('dot'+i);d.classList.toggle('bg-blue-500',i===step);d.classList.toggle('bg-gray-700',i!==step);}}
+function wizNext(current){if(current===1){if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name.");wizGoTo(2);}else if(current===2){if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN.");if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN.");if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different.");wizGoTo(3);}}
+function wizBack(current){wizGoTo(current-1);}
+function wizSave(){state.settings.workerName=document.getElementById('wiz_name').value;state.settings.workerPhone=document.getElementById('wiz_phone').value;state.settings.workerEmail=document.getElementById('wiz_email').value;state.settings.emergencyName=document.getElementById('wiz_emg_name').value;state.settings.emergencyPhone=document.getElementById('wiz_emg_phone').value;state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value;state.settings.escalationName=document.getElementById('wiz_esc_name').value;state.settings.escalationPhone=document.getElementById('wiz_esc_phone').value;state.settings.pinCode=document.getElementById('wiz_pin').value;state.settings.duressPin=document.getElementById('wiz_duress').value;state.settings.googleSheetUrl=CONFIG.url;saveState();document.getElementById('setupWizard').classList.add('hidden');navigate('main');forceSync();}
+function populateWizard(){document.getElementById('wiz_name').value=state.settings.workerName||"";document.getElementById('wiz_phone').value=state.settings.workerPhone||"";document.getElementById('wiz_email').value=state.settings.workerEmail||"";document.getElementById('wiz_emg_name').value=state.settings.emergencyName||"";document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||"";document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||"";document.getElementById('wiz_esc_name').value=state.settings.escalationName||"";document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||"";document.getElementById('wiz_pin').value=state.settings.pinCode||"";document.getElementById('wiz_duress').value=state.settings.duressPin||"";}
+function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;}
+
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
-function forceSync(){if(!state.settings.workerName)return alert("Please enter your name in Settings first.");document.getElementById('uploadBanner').classList.remove('hidden');const dId=getDeviceID();fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`).then(r=>r.text()).then(txt=>{if(txt.includes("OTG Online")||!txt.startsWith("{"))throw new Error("SERVER UPDATE REQUIRED.");return JSON.parse(txt);}).then(data=>{if(data.status==="error"&&data.message.includes("ACCESS DENIED")){alert("⛔ ACCESS DENIED\n\n"+data.message);navigate('settings');document.getElementById('uploadBanner').classList.add('hidden');return;}const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));const ms=data.sites.map(s=>({id:'site_'+s.siteName.replace(/\s/g,''),name:s.siteName,address:s.address,companyName:s.company,templateName:s.template,noReport:false,contactName:s.contactName,contactPhone:s.contactPhone,contactEmail:s.contactEmail,notes:s.notes}));if(CONFIG.mileage)ms.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:false,companyName:'Internal',templateName:'Travel Report'});state.locations=ms.concat(existingManual);state.globalForms=data.forms||[];state.cachedForms=data.cachedTemplates||{};state.meta=data.meta||{};if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];saveState();renderLocations();checkVehicleStatus();document.getElementById('uploadBanner').classList.add('hidden');alert("Sync Complete!");}).catch(e=>{document.getElementById('uploadBanner').classList.add('hidden');alert("Sync Failed: "+e.message);});}
+function forceSync(){if(!state.settings.workerName)return alert("Please enter your name in Settings first.");document.getElementById('uploadBanner').classList.remove('hidden');const dId=getDeviceID();fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`).then(r=>r.text()).then(txt=>{if(txt.includes("OTG Online")||!txt.startsWith("{"))throw new Error("SERVER UPDATE REQUIRED.");return JSON.parse(txt);}).then(data=>{if(data.status==="error"&&data.message.includes("ACCESS DENIED")){alert("⛔ ACCESS DENIED\n\n"+data.message);startWizard();document.getElementById('uploadBanner').classList.add('hidden');return;}const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));const ms=data.sites.map(s=>({id:'site_'+s.siteName.replace(/\s/g,''),name:s.siteName,address:s.address,companyName:s.company,templateName:s.template,noReport:false,contactName:s.contactName,contactPhone:s.contactPhone,contactEmail:s.contactEmail,notes:s.notes}));if(CONFIG.mileage)ms.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:false,companyName:'Internal',templateName:'Travel Report'});state.locations=ms.concat(existingManual);state.globalForms=data.forms||[];state.cachedForms=data.cachedTemplates||{};state.meta=data.meta||{};if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];saveState();renderLocations();checkVehicleStatus();document.getElementById('uploadBanner').classList.add('hidden');alert("Sync Complete!");}).catch(e=>{document.getElementById('uploadBanner').classList.add('hidden');alert("Sync Failed: "+e.message);});}
 function checkVehicleStatus(){if(!CONFIG.vehEnabled)return;const b=document.getElementById('vehNagBar');let s=false;if(state.meta.lastVehCheck){const l=new Date(state.meta.lastVehCheck);const d=(Date.now()-l.getTime())/(1000*60*60*24);if(d>CONFIG.vehInterval){s=true;b.innerText="⚠️ Vehicle Check Overdue - Tap to Complete";}}else{s=true;b.innerText="⚠️ Vehicle Check Required";}if(state.meta.wofExpiry){const w=new Date(state.meta.wofExpiry);const du=(w.getTime()-Date.now())/(1000*60*60*24);if(du<0){s=true;b.innerText="⛔ WOF EXPIRED - Vehicle Use Prohibited";}else if(du<14){s=true;b.innerText=`⚠️ Vehicle Check: WOF Due in ${Math.ceil(du)} Days`;}}if(s)b.classList.remove('hidden');else b.classList.add('hidden');}
 function startVehicleCheck(){loadFormAndShow('Vehicle Safety Check');}
 function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
@@ -149,7 +235,6 @@ function renderIconGrid(forms, loc) {const l=document.getElementById('templateLi
 function createTemplateBtn(l,v){return null;}
 function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
 function renderLocations(){const l=document.getElementById('locationList');l.innerHTML='';state.locations.forEach(loc=>{const d=document.createElement('div');let c=state.selectedLocationId===loc.id?'border-blue-500 bg-blue-900':'border-transparent bg-gray-900';if(loc.id==='travel')c=state.selectedLocationId===loc.id?'border-purple-500 bg-purple-900':'border-purple-900/30 bg-gray-900';d.className=`p-4 rounded-lg border-2 ${c} cursor-pointer flex justify-between items-center mb-2`;let ib=loc.notes||loc.contactName||loc.id==='travel'?`<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>`:'';d.innerHTML=`<div><div class="text-lg font-bold text-white uppercase">${loc.companyName||''}</div><div class="text-sm text-gray-400">${loc.name}</div></div><div class="flex gap-2">${ib}</div>`;d.onclick=(e)=>{if(e.target.tagName!=='BUTTON'){
-    // NEW: WOF INTERCEPTORS
     if(state.meta.wofExpiry && loc.id === 'travel'){
         const w=new Date(state.meta.wofExpiry);
         const days = (w.getTime()-Date.now())/(1000*60*60*24);
@@ -159,7 +244,6 @@ function renderLocations(){const l=document.getElementById('locationList');l.inn
         } else if (days < 14) {
             document.getElementById('wofWarnModal').classList.remove('hidden');
             document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days (${w.toLocaleDateString()})`;
-            // Allow clicking Continue, but show warning first
             state.selectedLocationId=loc.id; renderLocations(); updateArrivedButtonState();
             return;
         }
@@ -214,29 +298,11 @@ function quickSetTime(m){const s=document.getElementById('durationSlider');const
 function closeWofBlocker(){document.getElementById('wofBlockModal').classList.add('hidden');}
 function closeWofWarn(){document.getElementById('wofWarnModal').classList.add('hidden');}
 function toggleWofContinue(){const chk=document.getElementById('chkWofAck');document.getElementById('btnWofContinue').disabled=!chk.checked;if(chk.checked)document.getElementById('btnWofContinue').classList.replace('text-gray-500','text-white');else document.getElementById('btnWofContinue').classList.replace('text-white','text-gray-500');}
-// NEW: GPS CONFIDENCE MONITOR
-function updateGpsConfidence(pos) {
-    const acc = pos.coords.accuracy;
-    const b1 = document.getElementById('gps1');
-    const b2 = document.getElementById('gps2');
-    const b3 = document.getElementById('gps3');
-    // Reset
-    [b1,b2,b3].forEach(b => b.className = "gps-bar bg-gray-600");
-    
-    if (acc < 20) {
-        b1.classList.add('active-green'); b2.classList.add('active-green'); b3.classList.add('active-green');
-    } else if (acc < 100) {
-        b1.classList.add('active-amber'); b2.classList.add('active-amber');
-    } else {
-        b1.classList.add('active-red');
-    }
-}
-window.addEventListener('load',()=>{const s=localStorage.getItem('loneWorkerState');if(s){try{state={...state,...JSON.parse(s)};}catch(e){console.error("State Error",e);}}if(!state.photoStore)state.photoStore={};if(!state.globalForms)state.globalForms=[];if(!state.cachedForms)state.cachedForms={};state.settings.googleSheetUrl=CONFIG.url;if(navigator.getBattery){navigator.getBattery().then(b=>{const u=()=>{currentBatteryLevel=Math.round(b.level*100)+"%";if(b.level<0.10&&!state.lowBatSent&&state.activeVisit){state.lowBatSent=true;saveState();processUploadQueue(buildPayload({"Alarm Status":"BATTERY CRITICAL (10%)","Notes":"Automated Low Battery Alert"}));}};u();b.addEventListener('levelchange',u);});}
-// INIT GPS WATCHER
-if(navigator.geolocation) {
-    navigator.geolocation.watchPosition(updateGpsConfidence, ()=>{}, {enableHighAccuracy:true, maximumAge:30000});
-}
-if(!state.settings.pinCode||!state.settings.workerName){navigate('settings');document.getElementById('btnCloseSettings').classList.add('hidden');}else if(state.activeVisit){enterLockedScreen();showCurrentSiteInfo();}else{navigate('main');renderLocations();checkVehicleStatus();}if(state.activeVisit&&state.activeVisit.locationId==='travel')startTravellingPulse();initLocations();if(CONFIG.isAdv)syncForms();updateArrivedButtonState();processUploadQueue();document.body.addEventListener('click',initAudio,{once:true});startReminderTimer();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));});
+function updateGpsConfidence(pos) {const acc = pos.coords.accuracy;const b1 = document.getElementById('gps1');const b2 = document.getElementById('gps2');const b3 = document.getElementById('gps3');[b1,b2,b3].forEach(b => b.className = "gps-bar bg-gray-600");if (acc < 20) {b1.classList.add('active-green'); b2.classList.add('active-green'); b3.classList.add('active-green');} else if (acc < 100) {b1.classList.add('active-amber'); b2.classList.add('active-amber');} else {b1.classList.add('active-red');}}
+window.addEventListener('load',()=>{const s=localStorage.getItem('loneWorkerState');if(s){try{state={...state,...JSON.parse(s)};}catch(e){console.error("State Error",e);}}if(!state.photoStore)state.photoStore={};if(!state.globalForms)state.globalForms=[];if(!state.cachedForms)state.cachedForms={};state.settings.googleSheetUrl=CONFIG.url;if(navigator.getBattery){navigator.getBattery().then(b=>{const u=()=>{currentBatteryLevel=Math.round(b.level*100)+"%";if(b.level<0.10&&!state.lowBatSent&&state.activeVisit){state.lowBatSent=true;saveState();processUploadQueue(buildPayload({"Alarm Status":"BATTERY CRITICAL (10%)","Notes":"Automated Low Battery Alert"}));}};u();b.addEventListener('levelchange',u);});}if(navigator.geolocation) {navigator.geolocation.watchPosition(updateGpsConfidence, ()=>{}, {enableHighAccuracy:true, maximumAge:30000});}
+// INIT CHECK
+if(!state.settings.workerName) {startWizard();} else if(!state.settings.pinCode) {startWizard();} else {if(state.activeVisit){enterLockedScreen();showCurrentSiteInfo();}else{navigate('main');renderLocations();checkVehicleStatus();}}
+if(state.activeVisit&&state.activeVisit.locationId==='travel')startTravellingPulse();initLocations();if(CONFIG.isAdv)syncForms();updateArrivedButtonState();processUploadQueue();document.body.addEventListener('click',initAudio,{once:true});startReminderTimer();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));});
 </script>
 </body>
 </html>
