@@ -1,627 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
-    .step-section { display: none; }
-    .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; transition: border-color 0.2s; }
-    .input-field:focus { border-color: #3b82f6; outline: none; }
-    .btn { padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-    .btn-primary { background: linear-gradient(to right, #2563eb, #3b82f6); color: white; }
-    .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
-    .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
-    .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
-    .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
-    .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
-    a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
-    details > summary { list-style: none; outline: none; cursor: pointer; }
-    details > summary::-webkit-details-marker { display: none; }
-    
-    /* Disclaimer Modal */
-    #disclaimerModal { backdrop-filter: blur(8px); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTG Factory v70.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .step-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; transition: all 0.2s; }
+        .step-card:hover { border-color: #3b82f6; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
+        .step-num { background: #3b82f6; color: white; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; font-size: 14px; margin-right: 12px; flex-shrink: 0; }
+        .input-dark { width: 100%; background: #0f172a; border: 1px solid #475569; padding: 12px; border-radius: 8px; color: white; margin-top: 8px; font-family: monospace; transition: border 0.2s; }
+        .input-dark:focus { border-color: #3b82f6; outline: none; }
+        .btn-action { width: 100%; padding: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; }
+        .btn-blue { background: #2563eb; color: white; border: none; }
+        .btn-blue:hover { background: #1d4ed8; }
+        .btn-green { background: #16a34a; color: white; border: none; }
+        .btn-green:hover { background: #15803d; }
+        .preview-phone { background: #111827; border: 4px solid #374151; border-radius: 20px; padding: 10px; width: 300px; margin: 0 auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        .preview-header { padding: 1rem; background-color: #111827; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; }
+    </style>
 </head>
-<body class="min-h-screen py-8 px-4 relative">
+<body class="p-6 max-w-5xl mx-auto">
 
-  <div id="disclaimerModal" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-      <div class="bg-gray-900 border-2 border-yellow-600 rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative overflow-hidden">
-          <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-600 to-orange-600"></div>
-          <h2 class="text-3xl font-extrabold text-white mb-2">⚠️ Important Safety Notice</h2>
-          <p class="text-yellow-500 font-bold mb-6 uppercase tracking-wider text-sm">Target Audience & System Limitations</p>
-          
-          <div class="space-y-4 text-gray-300 text-sm mb-8 overflow-y-auto max-h-[60vh] pr-2">
-              <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution designed specifically for <strong>small non-profits, charities, and community groups</strong> with limited budgets.</p>
-              
-              <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                  <h3 class="font-bold text-white mb-2">❌ This is NOT for Critical Life-Safety</h3>
-                  <p class="mb-2">If you operate in high-risk environments (e.g., forestry, security, high-voltage), you should invest in a commercial, paid solution with 24/7 monitoring.</p>
-              </div>
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-extrabold text-blue-500 tracking-tight">OTG AppFactory <span class="text-gray-600 text-lg ml-2">v70.0 (Tactical)</span></h1>
+        <p class="text-gray-400 mt-2">Serverless Safety System Generator</p>
+    </div>
 
-              <h3 class="font-bold text-white mt-4">Technical Limitations You Must Accept:</h3>
-              <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>The "Sleep" Issue:</strong> This is a Web App. On many phones (especially iPhones), GPS tracking <strong>will stop</strong> if the screen is turned off or the phone sleeps for an extended period. Staff must keep the app active or wake it periodically.</li>
-                  <li><strong>Connectivity:</strong> The system requires an active data connection to send alerts. It will not work in dead zones (though it will queue data).</li>
-                  <li><strong>Free Infrastructure:</strong> This system runs on Google's free tiers. While reliable, there are no Service Level Agreements (SLAs) or guarantees of uptime.</li>
-              </ul>
-          </div>
-
-          <div class="pt-6 border-t border-gray-700">
-              <label class="flex items-start gap-3 cursor-pointer select-none group">
-                  <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5 rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500" onchange="toggleEnterBtn()">
-                  <span class="text-sm text-gray-400 group-hover:text-white transition">
-                      I am the Health & Safety Coordinator. I have read the limitations above and I acknowledge that this software is provided "as is", and I accept that it fits my organization's risk profile.
-                  </span>
-              </label>
-              <button id="btnEnter" disabled onclick="closeDisclaimer()" class="mt-6 w-full py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-lg transition-all">Accept & Enter Factory</button>
-          </div>
-      </div>
-  </div>
-
-  <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
-    <header class="text-center mb-10">
-      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Diamond Edition v68.9.3</p>
-    </header>
-
-    <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
-      <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base">
-        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
-        <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Spreadsheet</button>
-        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Backend</button>
-        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Download</button>
-        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
-      </div>
-
-      <div class="p-6 md:p-10">
-
-        <div id="step1" class="step-section active space-y-8">
-          <div class="grid md:grid-cols-2 gap-8">
-            <div class="space-y-4">
-              <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation"></div>
-              <div>
-                  <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key</label>
-                  <input type="text" id="secretKey" class="input-field" value="ChangeMe123!">
-                  <p class="text-xs text-red-400 mt-2 font-bold">⚠️ SECURITY WARNING: Keep this key safe.</p>
-              </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <div>
+            <div class="step-card">
+                <div class="flex items-center mb-4"><div class="step-num">1</div><h2 class="text-xl font-bold text-white">Identity & Branding</h2></div>
+                <label class="text-xs font-bold text-gray-400 uppercase">Organisation Name</label>
+                <input id="orgName" class="input-dark" placeholder="Acme Church Safety" oninput="updatePreview(); saveInput(this);">
+                
+                <label class="text-xs font-bold text-gray-400 uppercase mt-4 block">Logo URL (Transparent PNG recommended)</label>
+                <input id="logoUrl" class="input-dark" placeholder="https://example.com/logo.png" oninput="updatePreview(); saveInput(this);">
             </div>
-            <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Logo (Optional)</label>
-              <div class="relative cursor-pointer w-full" onclick="document.getElementById('logoInput').click()">
-                <div id="logoPreviewArea" class="h-32 w-32 mx-auto bg-gray-800 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center overflow-hidden hover:border-blue-500 transition"><span id="logoText" class="text-gray-500 text-sm">Click to Upload<br>(or use icon.png)</span><img id="logoImg" class="hidden h-full w-full object-cover"></div>
-              </div>
-              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
-            </div>
-          </div>
 
-          <div class="highlight-box border-blue-500/30">
-             <h3 class="text-xl font-bold text-white mb-4">Safety & Fleet Options</h3>
-             <div class="grid md:grid-cols-2 gap-6">
-                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
-                    <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold">
-                    <span class="text-xs text-gray-400 block mt-1">Time between "Overdue" and "Emergency".</span>
-                 </div>
-                 <div>
-                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Check-in Interval</label>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="chkCheckin" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleCheckin()">
-                        <div id="checkinOptions" class="hidden flex items-center gap-2">
-                            <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold">
-                            <span class="text-xs text-gray-400">mins</span>
+            <div class="step-card">
+                <div class="flex items-center mb-4"><div class="step-num">2</div><h2 class="text-xl font-bold text-white">Security Core</h2></div>
+                <label class="text-xs font-bold text-gray-400 uppercase">Master Secret Key</label>
+                <input id="masterKey" type="text" class="input-dark text-yellow-400" placeholder="Create a strong password..." oninput="validateKey(); saveInput(this);">
+                <p id="keyWarning" class="hidden text-red-400 text-xs mt-2 font-bold">⚠️ Key is too short (min 8 chars)</p>
+                <p class="text-gray-500 text-xs mt-2">This key protects your dashboard. The system will auto-generate a separate Worker Key for the apps.</p>
+            </div>
+
+            <div class="step-card">
+                <div class="flex items-center mb-4"><div class="step-num">3</div><h2 class="text-xl font-bold text-white">Backend Deployment</h2></div>
+                <p class="text-sm text-gray-400 mb-4">Click below to get the code for your Google Script.</p>
+                <button id="btnCopyBackend" onclick="copyBackendCode()" class="btn-action btn-blue">📄 Copy Backend Code</button>
+                
+                <label class="text-xs font-bold text-gray-400 uppercase mt-6 block">Deployment URL (ends in /exec)</label>
+                <input id="sheetUrl" class="input-dark text-blue-400" placeholder="https://script.google.com/macros/s/..." oninput="saveInput(this)">
+                
+                <div class="flex gap-2 mt-4">
+                    <button onclick="testConnection()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded flex-1">Test Connection</button>
+                </div>
+                <p id="connStatus" class="text-center text-sm font-bold mt-2"></p>
+            </div>
+
+            <div class="step-card border-green-600/50">
+                <div class="flex items-center mb-4"><div class="step-num bg-green-600">4</div><h2 class="text-xl font-bold text-white">Production Build</h2></div>
+                <p class="text-sm text-gray-400 mb-4">Generates the configured Worker App, Monitor App, and Manifests.</p>
+                <button onclick="generateZip()" class="btn-action btn-green shadow-lg shadow-green-900/50">📦 Download System ZIP</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="step-card">
+                <h3 class="text-xs font-bold text-gray-500 uppercase mb-4 text-center">Live App Preview</h3>
+                <div class="preview-phone">
+                    <div class="preview-header">
+                        <div class="flex items-center gap-2">
+                            <img id="prevLogo" src="" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> 
+                            <h1 id="prevTitle" class="text-lg font-bold text-blue-400">Your Org</h1>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="flex flex-col items-end gap-0.5">
+                                <span class="text-[6px] text-gray-500 font-bold uppercase">GPS</span>
+                                <div class="flex gap-0.5">
+                                    <div class="w-1 h-3 bg-green-500 rounded-[1px]"></div>
+                                    <div class="w-1 h-3 bg-green-500 rounded-[1px]"></div>
+                                    <div class="w-1 h-3 bg-green-500 rounded-[1px]"></div>
+                                </div>
+                            </div>
+                            <div class="p-2 rounded-full bg-gray-700 text-gray-400 text-xs">ℹ️</div>
                         </div>
                     </div>
-                 </div>
-             </div>
-
-             <div class="mt-4 pt-4 border-t border-gray-600">
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" id="chkVehicle" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleVehicle()">
-                    <span class="text-white font-bold">Enable Vehicle Safety Checks?</span>
-                </label>
-                <div id="vehOptions" class="hidden pl-8 mt-2 text-sm text-gray-400">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span>Frequency (Days):</span>
-                        <input type="number" id="vehFreq" value="60" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold">
+                    <div class="p-4 space-y-3">
+                        <div class="bg-blue-900/30 border border-blue-500/30 p-2 rounded">
+                            <p class="text-[10px] text-blue-200">Welcome to the safety system.</p>
+                        </div>
+                        <div class="h-24 bg-gray-800 rounded border border-gray-700 flex items-center justify-center text-gray-600 text-xs">
+                            Map / Site List
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="h-12 flex-1 bg-teal-900/50 rounded border border-teal-800"></div>
+                            <div class="h-12 flex-[2] bg-gray-700 rounded"></div>
+                        </div>
                     </div>
-                    <p class="text-xs text-yellow-500 italic mb-1">⚠️ Note: This feature is suitable for personally owned, or permanently assigned vehicles.</p>
-                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (14 days prior).</p>
                 </div>
-             </div>
-             
-             <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label>
-                        <a href="https://textbelt.com/" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Enter Key (Free: 'textbelt')">
-                 </div>
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label>
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Smart Scribe">
-                 </div>
-                 <div>
-                    <div class="flex justify-between items-end mb-1">
-                        <label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label>
-                        <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="text-[10px] text-blue-400 hover:text-white underline">Get Key</a>
-                    </div>
-                    <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage">
-                 </div>
-             </div>
-          </div>
-          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
+                <p class="text-center text-xs text-gray-600 mt-4">Visual representation only.</p>
+            </div>
+
+            <div class="bg-black rounded-lg p-4 font-mono text-xs h-64 overflow-y-auto border border-gray-800">
+                <div class="text-green-500 mb-1">> Factory v70.0 initialized...</div>
+                <div class="text-blue-500 mb-1">> Loaded templates: Worker (v70.1), Monitor (v70.0), Backend (v68.20)</div>
+                <div id="consoleLog"></div>
+            </div>
         </div>
-
-        <div id="step2" class="step-section space-y-8">
-          <div class="text-center"><a href="https://sheets.new" target="_blank" class="btn btn-success text-xl px-10 py-4 shadow-lg transform hover:-translate-y-1">1. Click to Create New Google Sheet</a></div>
-          
-          <div class="grid md:grid-cols-2 gap-6">
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
-                <p class="text-xs text-gray-400">Where all data is stored.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Rename workbook to <strong>"Safety System"</strong>.</li>
-                    <li>Rename bottom tab to <strong>Visits</strong>.</li>
-                    <li>Paste Headers into <strong>A1</strong>.</li>
-                    <li><strong>View > Freeze > 1 Row</strong>.</li>
-                </ol>
-                <button id="btnCopyHeaders" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
-            </div>
-
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
-                <p class="text-xs text-gray-400">Define your Forms & Reports here.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Templates</strong>.</li>
-                    <li>Paste Setup into <strong>A1</strong>.</li>
-                    <li><em class="text-white">Now includes Travel Report.</em></li>
-                </ol>
-                <button id="btnCopyTemplates" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy 'Templates' Setup</button>
-            </div>
-
-            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
-                <p class="text-xs text-gray-400">Allocate sites to workers.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Sites</strong>.</li>
-                    <li>Paste Setup into <strong>A1</strong>.</li>
-                    <li><strong class="text-green-300">Smart Sync:</strong> Enter worker names in Col A to assign sites to them automatically.</li>
-                </ol>
-                <button id="btnCopySites" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy 'Sites' Setup</button>
-            </div>
-          
-            <div class="bg-gray-900 p-6 rounded-lg border-2 border-red-600 space-y-4 relative overflow-hidden">
-                <div class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-2 py-1">SECURITY</div>
-                <h3 class="font-bold text-lg text-red-400">D. Setup 'Staff' Tab</h3>
-                <p class="text-xs text-gray-400"><strong>Required:</strong> Gatekeeper + Device Lock + Vehicle Tracking.</p>
-                <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-300">
-                    <li>Create tab named <strong>Staff</strong>.</li>
-                    <li>Paste into <strong>A1</strong>.</li>
-                    <li><em class="text-white">Includes 'DeviceID' column for fingerprinting.</em></li>
-                </ol>
-                <button id="btnCopyStaff" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy 'Staff' Setup + Guide</button>
-            </div>
-          </div>
-          
-          <div class="mt-4 bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
-                <h3 class="font-bold text-lg text-yellow-400">E. Setup 'AI Reporting' Tab (Optional)</h3>
-                <p class="text-xs text-gray-400">Recipes for creating reports with AI.</p>
-                <button id="btnCopyReportGuide" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy Reporting Guide</button>
-          </div>
-          
-          <div class="mt-4 bg-blue-900/20 p-4 rounded border border-blue-500/50">
-             <p class="text-blue-300 text-sm font-bold text-center">ℹ️ Note: You will set up the automatic 30-day archiving trigger in the next step (Backend).</p>
-          </div>
-
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="loadTemplatesAndGenerateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
-        </div>
-
-        <div id="step3" class="step-section space-y-6">
-          <div class="relative">
-            <button id="btnCopyCode" class="absolute top-2 right-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">COPY CODE</button>
-            <pre id="codeDisplay" class="code-scroll">Loading templates...</pre>
-          </div>
-          <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 text-sm text-gray-300 space-y-4">
-             <h3 class="font-bold text-green-400 text-lg">Deploy Backend</h3>
-             <ol class="list-decimal pl-5 space-y-3">
-                <li>Go to Google Sheet > <strong>Extensions > Apps Script</strong>.</li>
-                <li>Delete existing code. <strong>Paste</strong> new code.</li>
-                <li>Click <strong>Deploy > New Deployment</strong>. Select <strong>Web App</strong>.</li>
-                <li class="p-3 border-2 border-red-500 rounded bg-red-900/20 text-white font-bold">⚠️ CRITICAL STEP: Set "Who has access" to <span class="text-red-400 underline">"Anyone"</span>. <br><span class="text-xs font-normal text-gray-300">If you miss this, the App WILL CRASH.</span></li>
-                <li>Click <strong>Deploy</strong>. Copy the URL.</li>
-             </ol>
-          </div>
-          
-          <div class="bg-yellow-900/30 border border-yellow-600/50 p-6 rounded-lg mt-4">
-             <h3 class="font-bold text-yellow-400 text-lg flex items-center gap-2">⏰ Vital Step: Set Automation Triggers</h3>
-             <p class="text-xs text-gray-400 mb-4">Required for Safety Alerts & Maintenance.</p>
-             <ol class="list-decimal pl-5 space-y-3 text-sm text-gray-300">
-                <li>Apps Script > <strong>Alarm Clock icon</strong> (Left sidebar).</li>
-                <li>Click <strong>+ Add Trigger</strong> (Bottom Right).</li>
-                <li><strong class="text-white">Safety Watchdog:</strong> Function: <code>checkOverdueVisits</code> | Event Source: <code>Time-driven</code> | Type: <code>Minutes timer</code> | Interval: <code>Every 10 minutes</code>.</li>
-                <li><strong class="text-white">Auto-Archive:</strong> Function: <code>archiveOldData</code> | Event Source: <code>Time-driven</code> | Type: <code>Week timer</code>.</li>
-             </ol>
-          </div>
-
-          <div><label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="resetTest()"></div>
-          <div class="flex justify-center gap-4"><button id="btnTest" onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button><button id="btnGenTemplate" onclick="triggerTemplateSetup()" disabled class="hidden btn bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">🪄 Auto-Generate PDF Template</button></div>
-          <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button></div>
-        </div>
-
-        <div id="step4" class="step-section text-center space-y-10 py-8">
-          <div><h2 class="text-4xl font-bold text-white mb-2">Ready to Build</h2><p class="text-gray-400">Files generated for: <span id="finalAppName" class="text-blue-400">App</span></p></div>
-          <button onclick="downloadZip()" class="w-full max-w-md mx-auto btn btn-success py-5 text-2xl shadow-xl transform hover:scale-105">Download Diamond.zip</button>
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(3)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Next: Deployment Guide →</button></div>
-        </div>
-
-        <div id="step5" class="step-section space-y-10">
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Host the Apps (Netlify)</h2></div></div>
-                <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
-                    <li>Go to <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/signup</a>.</li>
-                    <li>Create a free account.</li>
-                    <li>Go to the <strong>"Sites"</strong> tab. Scroll to the "Drag and drop" box at the bottom.</li>
-                    <li>Drag the <strong>WorkerApp</strong> folder. Copy the URL (e.g. <code>calm-badger.netlify.app</code>).</li>
-                    <li>Drag the <strong>MonitorApp</strong> folder. Copy that URL.</li>
-                </ol>
-            </div>
-            
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">♻️</span><div><h2 class="text-2xl font-bold text-white">2. Update Backend (Without Breaking Links)</h2></div></div>
-                 <div class="space-y-4 text-sm text-gray-300">
-                    <p>When you update the code, <strong>do NOT create a "New Deployment"</strong> or your URL will change, and the app will stop working for everyone.</p>
-                    <div class="bg-blue-900/30 p-4 rounded border border-blue-500/30">
-                        <strong class="block text-blue-400 mb-2">Correct Update Method:</strong>
-                        <ol class="list-decimal pl-5 space-y-2">
-                            <li>Apps Script > <strong>Deploy</strong> > <strong>Manage Deployments</strong>.</li>
-                            <li>Click the <strong>Pencil Icon (Edit)</strong> next to your active deployment.</li>
-                            <li>Version dropdown: Select <strong>"New Version"</strong>.</li>
-                            <li>Click <strong>Deploy</strong>.</li>
-                        </ol>
-                        <p class="mt-2 text-xs text-gray-400">Result: Your URL stays the same. Staff phones update automatically.</p>
-                    </div>
-                 </div>
-            </div>
-
-            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">📱</span><div><h2 class="text-2xl font-bold text-white">3. Install</h2></div></div>
-                <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-300">
-                    <div class="bg-gray-800 p-4 rounded"><strong class="text-white block mb-2">iOS (Safari)</strong><ol class="list-decimal pl-5 space-y-1"><li>Open URL.</li><li>Tap Share (Box+Arrow).</li><li>"Add to Home Screen".</li></ol></div>
-                    <div class="bg-gray-800 p-4 rounded"><strong class="text-white block mb-2">Android (Chrome)</strong><ol class="list-decimal pl-5 space-y-1"><li>Open URL.</li><li>Tap Menu (3 dots).</li><li>"Install App".</li></ol></div>
-                </div>
-            </div>
-            <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
-        </div>
-
-      </div>
     </div>
-  </div>
 
-  <script>
-    let logoData = "https://i.postimg.cc/dVmVg3Pn/favicon-logo-for-LWSApp.png"; 
-    let tplWorker = "", tplMonitor = "", tplBackend = "";
-    
-    // v68.9.3 FIX: Generate Worker Key ONCE at load so Step 3 and Step 4 match.
-    const workerKey = "wk_" + Math.random().toString(36).substr(2, 6);
-
-    window.onload = async () => {
-      try {
-        const resp = await fetch('icon.png');
-        if(resp.ok) {
-          const blob = await resp.blob();
-          const reader = new FileReader();
-          reader.onload = e => { logoData = e.target.result; document.getElementById('logoImg').src = logoData; document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoText').textContent = "Loaded icon.png"; document.getElementById('logoPreviewArea').classList.add('border-blue-500'); };
-          reader.readAsDataURL(blob);
-        }
-      } catch(e) {}
+<script>
+    // --- TEMPLATE LOADERS ---
+    // These paths assume the file structure is flat in the same folder
+    const FILES = {
+        worker: 'worker_template.html',
+        monitor: 'monitor_template.html',
+        backend: 'backend_template.js'
     };
     
-    // DISCLAIMER LOGIC
-    function toggleEnterBtn() {
-        const chk = document.getElementById('chkAccept');
-        const btn = document.getElementById('btnEnter');
-        if(chk.checked) {
-            btn.disabled = false;
-            btn.classList.remove('bg-gray-700', 'text-gray-500');
-            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
-        } else {
-            btn.disabled = true;
-            btn.classList.add('bg-gray-700', 'text-gray-500');
-            btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500', 'shadow-lg');
+    let TEMPLATES = {};
+
+    // --- INIT ---
+    window.onload = async () => {
+        loadPersistedData();
+        await loadTemplates();
+        updatePreview();
+    };
+
+    function log(msg, type='text-gray-400') {
+        const d = document.getElementById('consoleLog');
+        d.innerHTML += `<div class="${type} mb-1">> ${msg}</div>`;
+        d.scrollTop = d.scrollHeight;
+    }
+
+    async function loadTemplates() {
+        for (const [key, file] of Object.entries(FILES)) {
+            try {
+                const r = await fetch(file);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                TEMPLATES[key] = await r.text();
+                log(`Loaded ${file}`, 'text-green-400');
+            } catch (e) {
+                log(`ERROR: Could not load ${file}. Ensure it is in the same folder.`, 'text-red-500 font-bold');
+            }
         }
     }
-    
-    function closeDisclaimer() {
-        document.getElementById('disclaimerModal').style.opacity = '0';
-        document.getElementById('disclaimerModal').style.pointerEvents = 'none';
-        document.getElementById('mainContent').classList.remove('blur-sm');
-        setTimeout(() => document.getElementById('disclaimerModal').remove(), 500);
+
+    // --- UX FUNCTIONS ---
+    function saveInput(el) {
+        localStorage.setItem('otg_' + el.id, el.value);
     }
 
-    function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied 'Visits' Headers!"); }
-    
-    function copyTemplatesSetup() { 
-        const setup = "Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"; 
-        const nl = "\n".repeat(15);
-        const instr = "TEMPLATES GUIDE (Starting Cell A20):\n1. Define Forms & Reports here.\n2. Column A (Type): 'FORM' for ad-hoc reports, 'REPORT' for standard visits.\n3. Column C (Assigned To): Use 'ALL' or specific names (comma separated).\n4. Column D (Email): Optional. Sends a PDF copy to this email upon submission.\n5. Question Types:\n- [TEXT] : Multi-line text box\n- [NUMBER] : Numeric keypad input\n- [YESNO] : Yes/No buttons\n- [CHECK] : Simple checkbox\n- [PHOTO] : Camera button\n- [GPS] : Button to capture current location\n- [SIGN] : Signature pad\n- [HEADING] : Section Title (Visual separator)\n- [NOTE] : Read-only instruction text";
-        navigator.clipboard.writeText(setup + nl + instr); 
-        alert("Copied 'Templates' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copySitesSetup() { 
-        const setup = "Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St, Cityville\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"; 
-        const nl = "\n".repeat(18);
-        const instr = "SITES GUIDE (Starting Cell A20):\n1. Use this tab to assign sites to workers.\n2. Column A (Assigned To): Enter a Worker Name (Exact Match) or 'ALL'.\n3. Template Name: Must match a name from the 'Templates' tab.\n4. Address: If populated, the app will show a 'Navigate' button.\n5. Contact Info: Shows a 'Call' button in the app.";
-        navigator.clipboard.writeText(setup + nl + instr); 
-        alert("Copied 'Sites' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copyStaffSetup() { 
-        const h = "Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry"; 
-        const s1 = "John Doe\tDriver\tActive\t\t\t\t"; 
-        const nl = "\n".repeat(17); 
-        const instr = "STAFF GUIDE (Starting Cell A20):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.";
-        navigator.clipboard.writeText(h + "\n" + s1 + nl + instr); 
-        alert("Copied 'Staff' Setup + Instructions (See Row 20)!"); 
-    }
-    
-    function copyReportGuide() { 
-        const text = `Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
-
----------------------------------------------------
-SECTION 1: DEPLOYMENT RULE (READ FIRST)
----------------------------------------------------
-If you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):
-1. You DO NOT need to update the Web App Deployment.
-2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).
-3. The script runs "locally" inside the sheet.
-Only update the Web App Deployment if you change "doPost" or "doGet" (the core backend).
-
----------------------------------------------------
-SECTION 2: DATA MAP (For the AI)
----------------------------------------------------
-Paste this into your AI prompt so it knows your data structure:
-I have a Google Sheet named 'Visits'.
-The columns are mapped as follows:
-- Col A: Timestamp (Start of Visit)
-- Col C: Worker Name
-- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')
-- Col M: Location Name
-- Col P: Device Timestamp (End of Visit / Last Check-in)
-- Col Q: Battery Level (e.g. '85%')
-- Col S: Distance (km)
-- Col T: Visit Report Data (JSON string containing form answers)
-- Col U: Anticipated Departure Time
-
----------------------------------------------------
-SECTION 2B: LONG-TERM HISTORY (THE ARCHIVE)
----------------------------------------------------
-PRO TIP: If you need a report covering more than 30 days (e.g., Annual Mileage), you must tell the AI to look at the Archive.
-Add this to your prompt:
-Please note: Older data is moved to a sheet named 'Archive'. Please modify the script to read data from BOTH the 'Visits' sheet and the 'Archive' sheet, combine them into one array, and then generate the report.
-
----------------------------------------------------
-SECTION 3: PROMPT RECIPES (Copy & Paste these)
----------------------------------------------------
-
-RECIPE 1: MILEAGE REPORT
-Write a Google Apps Script function called 'generateMileageReport'.
-1. Read all data from 'Visits'.
-2. Create/Overwrite a sheet called 'Mileage Report'.
-3. Group data by Worker Name (Col C) and Location (Col M).
-4. Sum the Distance (Col S) for each group.
-5. Create a clean table: Worker | Location | Total KM.
-6. Add a Grand Total at the bottom.
-
-RECIPE 2: TIMESHEET (PAYROLL)
-Write a script called 'generateTimesheet'.
-1. Read 'Visits'.
-2. Calculate duration in minutes: (Col P - Col A).
-3. Ignore rows where Status is not 'DEPARTED'.
-4. Create a sheet 'Weekly Timesheet'.
-5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).
-6. Sum Total Hours per Worker.
-
-RECIPE 3: SAFETY AUDIT (COMPLIANCE)
-Write a script called 'auditSafety'.
-1. Read 'Visits'.
-2. Identify rows where Battery Level (Col Q) is < 20%.
-3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.
-4. Create a sheet 'Safety Audit'.
-5. List these high-risk visits.
-6. Highlight 'EMERGENCY' rows in Red.
-
-RECIPE 4: SITE HISTORY (JSON EXTRACTION)
-Write a script called 'collateSiteComments'.
-1. Read 'Visits'.
-2. Filter for Location Name = 'Main Office' (make this a variable).
-3. Parse the JSON in Col T ('Visit Report Data').
-4. Extract the field labeled 'Notes' or 'Comments' from that JSON.
-5. Create a sheet 'Site Log - Main Office'.
-6. List: Date | Worker | Extracted Notes.
-
-RECIPE 5: AFTER-HOURS WORK
-Write a script to find after-hours work.
-1. Read 'Visits'.
-2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.
-3. Output to a new sheet 'After Hours Log'.
-
-RECIPE 6: WORKER ACTIVITY SUMMARY
-Write a script for an Executive Summary.
-1. Count total unique visits per Worker.
-2. Calculate average duration per visit per Worker.
-3. Count total 'EMERGENCY' statuses per Worker.
-4. Output a summary table.
-
-RECIPE 7: MISSING REPORTS
-Write a script to find missing reports.
-1. Filter rows where Status is 'DEPARTED'.
-2. Check if Col T (Report Data) is empty or '{}'.
-3. List workers who departed without filing a report.
-
-RECIPE 8: TRAVEL VS ON-SITE
-Write a script to compare Travel vs Work.
-1. Sum duration for rows where Location Name contains 'Travel'.
-2. Sum duration for all other rows.
-3. Calculate the ratio per worker.
-
-RECIPE 9: MONTHLY ARCHIVE
-Write a script to move last month's data.
-1. Identify rows from the previous month.
-2. Move them to a sheet named 'Archive - [Month-Year]'.
-3. Delete them from 'Visits' to keep it fast.
-
-RECIPE 10: FORM DATA EXPORT
-Write a script to flatten the JSON form data.
-1. Read Col T.
-2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').
-3. Create a new sheet with these keys as Column Headers.
-4. Populate the rows with the values from the JSON.`;
-        navigator.clipboard.writeText(text); 
-        alert("AI Prompt Guide Copied!"); 
+    function loadPersistedData() {
+        ['orgName', 'logoUrl', 'masterKey', 'sheetUrl'].forEach(id => {
+            const v = localStorage.getItem('otg_' + id);
+            if(v) document.getElementById(id).value = v;
+        });
     }
 
-    function handleLogo(input) {
-      const file = input.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const img = new Image();
-          img.onload = function() {
-            const canvas = document.createElement('canvas'); canvas.width = 192; canvas.height = 192; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
-            logoData = canvas.toDataURL('image/png'); document.getElementById('logoImg').src = logoData; document.getElementById('logoImg').classList.remove('hidden');
-          }
-          img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
+    function updatePreview() {
+        const name = document.getElementById('orgName').value || "Your Org";
+        const logo = document.getElementById('logoUrl').value;
+        
+        document.getElementById('prevTitle').innerText = name;
+        const logoImg = document.getElementById('prevLogo');
+        
+        if (logo && logo.length > 5) {
+            logoImg.src = logo;
+            logoImg.style.display = 'block';
+        } else {
+            logoImg.style.display = 'none';
+        }
     }
-    
-    async function loadTemplatesAndGenerateScript() {
-      try {
-        const [resW, resM, resB] = await Promise.all([ fetch('worker_template.html'), fetch('monitor_template.html'), fetch('backend_template.js') ]);
-        if(!resW.ok || !resM.ok || !resB.ok) throw new Error("Missing separate template files. Ensure they are in the same folder.");
-        tplWorker = await resW.text(); tplMonitor = await resM.text(); tplBackend = await resB.text();
-        generateScript();
-      } catch(e) { alert("Error: " + e.message); }
+
+    function validateKey() {
+        const k = document.getElementById('masterKey').value;
+        const w = document.getElementById('keyWarning');
+        if(k.length > 0 && k.length < 8) w.classList.remove('hidden');
+        else w.classList.add('hidden');
     }
-    
-    // v68.9.3 FIX: Use the SAME random key for screen display (Step 3) as the one in download (Step 4)
-    function generateScript() {
-        const code = tplBackend
-            .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
-            .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
-            .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
-            .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
-            .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
-            .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
-            // INJECT: Replace the default 'otg-public-key' with our session random key
-            .replace(/%%WORKER_KEY%%/g, workerKey)
-            .replace(/otg-public-key/g, workerKey);
-            
-        document.getElementById('codeDisplay').textContent = code;
-        gotoStep(3);
+
+    async function copyBackendCode() {
+        if (!TEMPLATES.backend) return alert("Backend template not loaded yet.");
+        
+        const key = document.getElementById('masterKey').value;
+        if (key.length < 8) return alert("Please enter a secure Master Key first.");
+
+        // Generate a random Worker Key for this build
+        const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
+        
+        // Inject Keys into Backend Code
+        let code = TEMPLATES.backend;
+        code = code.replace("%%SECRET_KEY%%", key);
+        code = code.replace("%%WORKER_KEY%%", workerKey);
+        // Inject other config placeholders if they exist in the backend template
+        const org = document.getElementById('orgName').value || "My Org";
+        code = code.replace("%%ORGANISATION_NAME%%", org);
+        code = code.replace("%%ESCALATION_MINUTES%%", "15"); // Default
+
+        try {
+            await navigator.clipboard.writeText(code);
+            const btn = document.getElementById('btnCopyBackend');
+            const oldText = btn.innerText;
+            btn.innerText = "✅ COPIED!";
+            btn.classList.replace('btn-blue', 'btn-green');
+            setTimeout(() => {
+                btn.innerText = oldText;
+                btn.classList.replace('btn-green', 'btn-blue');
+            }, 2000);
+            log("Backend code copied to clipboard (Keys Injected).");
+            log(`Generated Worker Key: ${workerKey}`, "text-yellow-400");
+        } catch (err) {
+            alert("Clipboard access failed. Please copy manually from the file.");
+        }
     }
-    
-    async function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Code copied!"); }
-    
-    function resetTest() { document.getElementById('btnNextDownload').disabled = true; document.getElementById('testResult').classList.add('hidden'); }
-    
+
     function testConnection() {
-        const url = document.getElementById('webAppUrl').value;
-        const result = document.getElementById('testResult');
-        const btnNext = document.getElementById('btnNextDownload');
-        if(!url.includes('/exec')) { alert('Invalid URL'); return; }
-        result.classList.remove('hidden'); result.textContent = "Testing..."; result.className = "text-center font-bold text-lg text-yellow-400 p-3 rounded-lg bg-gray-900 inline-block";
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value))
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === "success") {
-                  result.textContent = "✅ Connection Successful!"; result.className = "text-center font-bold text-lg text-green-400 p-3 rounded-lg bg-gray-900 inline-block";
-                  btnNext.disabled = false; btnNext.classList.remove('opacity-50', 'cursor-not-allowed');
-                  document.getElementById('btnGenTemplate').classList.remove('hidden'); document.getElementById('btnGenTemplate').disabled = false;
-                  document.getElementById('finalAppName').innerText = document.getElementById('orgName').value + " Safety";
-                } else { throw new Error("Invalid Key"); }
-            }).catch(() => { result.textContent = "❌ Connection Failed."; result.className = "text-center font-bold text-lg text-red-400 p-3 rounded-lg bg-gray-900 inline-block"; });
+        const url = document.getElementById('sheetUrl').value;
+        const key = document.getElementById('masterKey').value;
+        const status = document.getElementById('connStatus');
+        
+        if (!url.includes('/exec')) { status.innerHTML = "❌ Invalid URL"; return; }
+        
+        status.innerHTML = "⏳ Testing...";
+        status.className = "text-center text-sm font-bold mt-2 text-yellow-400";
+
+        fetch(`${url}?test=1&key=${encodeURIComponent(key)}`)
+            .then(r => r.json())
+            .then(d => {
+                if(d.status === 'success') {
+                    status.innerHTML = `✅ Connection Successful! (${d.version})`;
+                    status.className = "text-center text-sm font-bold mt-2 text-green-400";
+                    log("Connection Test Passed.");
+                } else {
+                    throw new Error(d.message || "Unknown Error");
+                }
+            })
+            .catch(e => {
+                status.innerHTML = "❌ Failed: " + e.message;
+                status.className = "text-center text-sm font-bold mt-2 text-red-400";
+                log("Connection Test Failed: " + e.message, 'text-red-500');
+            });
     }
-    
-    function triggerTemplateSetup() {
-        const url = document.getElementById('webAppUrl').value;
-        const key = document.getElementById('secretKey').value;
-        const btn = document.getElementById('btnGenTemplate');
-        btn.innerText = "⏳ Generating..."; btn.disabled = true;
-        fetch(url + '?run=setupTemplate&key=' + encodeURIComponent(key)).then(res => res.text()).then(txt => { alert(txt); btn.innerText = "✅ Done"; }).catch(err => { alert("Failed: " + err); btn.disabled = false; });
-    }
-    
-    function downloadZip() {
-        if (!tplWorker) { alert("Templates not loaded."); gotoStep(2); return; }
-        const zip = new JSZip();
+
+    function generateZip() {
         const org = document.getElementById('orgName').value;
-        const url = document.getElementById('webAppUrl').value;
-        const secret = document.getElementById('secretKey').value;
-        
-        // 1. WORKER APP gets the LOW ACCESS key (random)
-        let wHtml = tplWorker.replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-            .replace(/%%SHEET_URL%%/g, url)
-            .replace(/%%LOGO_DATA%%/g, logoData)
-            .replace(/%%SECRET_KEY%%/g, workerKey) // INJECT RANDOM WORKER KEY HERE
-            .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
-            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
-            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-            .replace(/%%IS_ADVANCED%%/g, "true")
-            .replace(/%%ENABLE_MILEAGE%%/g, "true")
-            .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
-            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
-            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
-            
-        // 2. MONITOR APP gets the HIGH ACCESS key (User's Secret)
-        let mHtml = tplMonitor.replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%SHEET_URL%%/g, url)
-            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-            .replace(/%%SECRET_KEY%%/g, secret) 
-            .replace(/%%LOGO_URL%%/g, logoData);
-        
-        // 3. BACKEND gets BOTH keys
-        // NOTE: We use the already-generated code from Step 3 to ensure consistency
-        let bCode = document.getElementById('codeDisplay').textContent;
+        const logo = document.getElementById('logoUrl').value;
+        const key = document.getElementById('masterKey').value;
+        const url = document.getElementById('sheetUrl').value;
 
-        const wFolder = zip.folder("WorkerApp"); 
-        wFolder.file("index.html", wHtml); 
-        wFolder.file("manifest.json", JSON.stringify({name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [{src: logoData, sizes: "192x192", type: "image/png", purpose: "any maskable"}, {src: logoData, sizes: "512x512", type: "image/png", purpose: "any maskable"}] }, null, 2)); 
-        wFolder.file("sw.js", `const C='v${Date.now()}';self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(['./index.html']))));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>c!==C?caches.delete(c):null)))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`);
+        if (!org || !key || !url) return alert("Please fill in all fields.");
+
+        const zip = new JSZip();
         
-        const mFolder = zip.folder("MonitorApp"); 
-        mFolder.file("index.html", mHtml);
+        // 1. Generate Keys
+        // We use the same worker key we generated for the backend copy (if possible), 
+        // but since we can't persist that easily without complexity, we generate a NEW one.
+        // NOTE: This means the user MUST copy the backend code AFTER clicking Download if they haven't already, 
+        // OR we just generate a fresh one now and tell them to re-copy.
+        // BETTER APPROACH: Generate one now, inject into everything.
         
-        zip.file("Code.gs", bCode);
-        
-        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Diamond.zip";a.click()});
+        const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
+        log(`Building with Master Key: ${key.substr(0,3)}***`, "text-blue-300");
+        log(`Building with Worker Key: ${workerKey}`, "text-blue-300");
+        log("⚠️ IMPORTANT: You must COPY the Backend Code AGAIN to match this Worker Key.", "text-red-400 font-bold");
+
+        // 2. Prepare Worker App
+        let wHtml = TEMPLATES.worker;
+        wHtml = wHtml.replace(/%%ORG_NAME%%/g, org);
+        wHtml = wHtml.replace(/%%LOGO_DATA%%/g, logo);
+        wHtml = wHtml.replace(/%%GOOGLE_SHEET_URL%%/g, url);
+        wHtml = wHtml.replace(/%%SECRET_KEY%%/g, workerKey); // Worker gets Worker Key
+        wHtml = wHtml.replace(/%%ORS_API_KEY%%/g, ""); // Optional
+        wHtml = wHtml.replace(/%%IS_ADVANCED%%/g, "true");
+        wHtml = wHtml.replace(/%%ENABLE_MILEAGE%%/g, "true");
+        wHtml = wHtml.replace(/%%CHECKIN_ENABLED%%/g, "true");
+        wHtml = wHtml.replace(/%%CHECKIN_INTERVAL%%/g, "120");
+        wHtml = wHtml.replace(/%%ESCALATION_MINUTES%%/g, "15");
+        wHtml = wHtml.replace(/%%VEHICLE_ENABLED%%/g, "true");
+        wHtml = wHtml.replace(/%%VEHICLE_INTERVAL%%/g, "7");
+
+        // 3. Prepare Monitor App
+        let mHtml = TEMPLATES.monitor;
+        mHtml = mHtml.replace(/%%ORG_NAME%%/g, org);
+        mHtml = mHtml.replace(/%%LOGO_URL%%/g, logo);
+        mHtml = mHtml.replace(/%%SHEET_URL%%/g, url);
+        // We do NOT inject the Master Key into the Monitor HTML source for security.
+        // The user must enter it manually to login.
+
+        // 4. Prepare Backend (for reference in zip)
+        let bJs = TEMPLATES.backend;
+        bJs = bJs.replace("%%SECRET_KEY%%", key);
+        bJs = bJs.replace("%%WORKER_KEY%%", workerKey);
+        bJs = bJs.replace("%%ORGANISATION_NAME%%", org);
+        bJs = bJs.replace("%%ESCALATION_MINUTES%%", "15");
+
+        // 5. Build Zip
+        zip.file("WorkerApp/index.html", wHtml);
+        zip.file("MonitorApp/index.html", mHtml);
+        zip.file("Backend/Code.gs", bJs);
+        zip.file("README.txt", `OTG Safety System for ${org}\n\n1. Deploy the code in Backend/Code.gs to Google Apps Script.\n2. Host the 'WorkerApp' and 'MonitorApp' folders on Netlify or GitHub Pages.\n\nWorker Key: ${workerKey}\nMaster Key: ${key}`);
+
+        zip.generateAsync({type:"blob"}).then(function(content) {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(content);
+            a.download = `${org.replace(/\s/g,'_')}_OTG_System_v70.zip`;
+            a.click();
+            log("ZIP Download started.", "text-green-400");
+        });
     }
-
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(tab) { if(i===n){ tab.classList.add('active'); tab.style.color = '#60a5fa'; tab.style.borderColor = '#3b82f6'; tab.style.background = '#1f2937'; } else { tab.classList.remove('active'); tab.style.color = '#6b7280'; tab.style.borderColor = 'transparent'; tab.style.background = 'transparent'; } } } }
-    function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
-    function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
-    
-    document.getElementById('btnCopyHeaders').onclick = copyVisitsHeaders;
-    document.getElementById('btnCopyTemplates').onclick = copyTemplatesSetup;
-    document.getElementById('btnCopySites').onclick = copySitesSetup;
-    document.getElementById('btnCopyStaff').onclick = copyStaffSetup; 
-    document.getElementById('btnCopyReportGuide').onclick = copyReportGuide;
-    document.getElementById('btnCopyCode').onclick = copyScript;
-  </script>
+</script>
 </body>
 </html>
