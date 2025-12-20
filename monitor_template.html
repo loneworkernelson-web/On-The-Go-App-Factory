@@ -97,7 +97,7 @@
 
     <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
         <div class="flex justify-between items-center mb-2">
-            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v70.0</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
+            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v74.3</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
@@ -121,9 +121,28 @@ let lastHeartbeat = Date.now();
 let watchdogTimer = null;
 
 async function startApp() {
-    await Tone.start(); synth = new Tone.Synth().toDestination();
+    // 1. Clear UI Immediately (Fixes freeze)
     document.getElementById('startOverlay').classList.add('hidden');
-    if(!API_KEY) { document.getElementById('authModal').classList.remove('hidden'); } else { startPolling(); }
+    
+    // 2. Try Audio Safe-Start
+    try {
+        if(typeof Tone !== 'undefined') {
+            await Tone.start(); 
+            synth = new Tone.Synth().toDestination();
+        }
+    } catch(e) {
+        console.warn("Audio Context Failed:", e);
+        audioEnabled = false;
+        document.getElementById('btnAudio').innerText = "🔇 Audio Error";
+        document.getElementById('btnAudio').classList.replace('bg-green-600', 'bg-red-900');
+    }
+
+    // 3. Logic Flow
+    if(!API_KEY) { 
+        document.getElementById('authModal').classList.remove('hidden'); 
+    } else { 
+        startPolling(); 
+    }
 }
 
 function startPolling() {
