@@ -97,7 +97,7 @@
 
     <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
         <div class="flex justify-between items-center mb-2">
-            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v74.3</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
+            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v74.4</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
@@ -230,7 +230,6 @@ function handleData(response) {
     } 
 }
 
-// UPGRADED: BREADCRUMB BUILDER
 function processWorkers(rows) { 
     const workers = {}; 
     const history = {};
@@ -326,41 +325,17 @@ function renderGrid() {
     if(currentView === 'GRID') document.getElementById('emptyState').classList.toggle('hidden', visibleCount > 0); 
 }
 
-function escapeHtml(text) { if (text === null || text === undefined || text === false) return ""; return String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'"); }
-function initMap() { if(mapInstance) { mapInstance.invalidateSize(); return; } mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); markersLayer = L.layerGroup().addTo(mapInstance); }
-
-// UPGRADED: MAP RENDERER WITH BREADCRUMBS
-function renderMap() { 
-    if(!mapInstance) return; 
-    markersLayer.clearLayers(); 
-    const bounds = L.latLngBounds(); 
-    let hasMarkers = false; 
-    const now = Date.now(); 
-    
-    workerData.forEach(w => { 
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
-        if (currentFilter === 'ACTIVE' && isSafe && !w.status.includes('EMERGENCY')) return; 
-        
-        if(!w.gps || w.gps.length < 5) return; 
-        const [lat, lng] = w.gps.split(',').map(Number); 
-        if(isNaN(lat)) return; 
-        
-        let colorClass = 'grey'; 
-        const urgency = getUrgencyScore(w, now); 
-        if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; 
-        
-        // DRAW TAIL (Breadcrumbs)
-        if(w.history && w.history.length > 1) {
-            const path = w.history.map(h => h.split(',').map(Number));
-            L.polyline(path, {color: '#3b82f6', weight: 3, opacity: 0.5, dashArray: '5, 10'}).addTo(markersLayer);
-        }
-
-        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); 
-        L.marker([lat, lng], {icon: icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); 
-        bounds.extend([lat, lng]); hasMarkers = true; 
-    }); 
-    if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); 
+function escapeHtml(text) { 
+    if (!text) return ""; 
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;"); 
 }
+
+function initMap() { if(mapInstance) { mapInstance.invalidateSize(); return; } mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); markersLayer = L.layerGroup().addTo(mapInstance); }
 
 function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const [lat, lng] = gps.split(',').map(Number); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
 function toggleView(view) { currentView = view; const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); document.getElementById('emptyState').classList.add('hidden'); btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } }
@@ -369,7 +344,33 @@ function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000;
 function setFilter(f) { currentFilter = f; const btnAct = document.getElementById('btnFilterActive'); const btnAll = document.getElementById('btnFilterAll'); if(f === 'ACTIVE') { btnAct.classList.replace('text-gray-400', 'bg-blue-600'); btnAct.classList.replace('hover:text-white', 'text-white'); btnAll.classList.replace('bg-blue-600', 'text-gray-400'); btnAll.classList.replace('text-white', 'hover:text-white'); btnAll.classList.remove('shadow'); btnAct.classList.add('shadow'); } else { btnAll.classList.replace('text-gray-400', 'bg-blue-600'); btnAll.classList.replace('hover:text-white', 'text-white'); btnAct.classList.replace('bg-blue-600', 'text-gray-400'); btnAct.classList.replace('text-white', 'hover:text-white'); btnAct.classList.remove('shadow'); btnAll.classList.add('shadow'); } renderGrid(); if(currentView === 'MAP') renderMap(); }
 function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; document.getElementById('resNameInput').value = ""; document.getElementById('resNoteInput').value = ""; }
 function closeResolve() { document.getElementById('resolveModal').classList.add('hidden'); }
-function submitResolution() { const targetName = document.getElementById('resWorkerNameDisplay').innerText; const typedName = document.getElementById('resNameInput').value.trim(); const note = document.getElementById('resNoteInput').value.trim(); if(targetName !== typedName) { alert("Error: Name does not match exactly."); return; } if(note.length < 5) { alert("Error: Please enter a resolution note."); return; } const formData = new FormData(); formData.append('action', 'resolve'); formData.append('key', API_KEY); formData.append('Worker Name', targetName); formData.append('Alarm Status', 'SAFE - MANUALLY CLEARED'); formData.append('Notes', `[HQ RESOLVED]: ${note}`); formData.append('Battery Level', 'N/A'); formData.append('Location Name', 'HQ Manual Resolution'); fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData }).then(() => { alert("Resolution Sent."); closeResolve(); acknowledgedAlerts.add(targetName); renderGrid(); }).catch(e => alert("Connection Error: " + e)); }
+
+function submitResolution() { 
+    const targetName = document.getElementById('resWorkerNameDisplay').innerText; 
+    const typedName = document.getElementById('resNameInput').value.trim(); 
+    const note = document.getElementById('resNoteInput').value.trim(); 
+    if(targetName !== typedName) { alert("Error: Name does not match exactly."); return; } 
+    if(note.length < 5) { alert("Error: Please enter a resolution note."); return; } 
+    
+    const formData = new FormData(); 
+    formData.append('action', 'resolve'); 
+    formData.append('key', API_KEY); 
+    formData.append('Worker Name', targetName); 
+    formData.append('Alarm Status', 'SAFE - MANUALLY CLEARED'); 
+    formData.append('Notes', `[HQ RESOLVED]: ${note}`); 
+    formData.append('Battery Level', 'N/A'); 
+    formData.append('Location Name', 'HQ Manual Resolution'); 
+    
+    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData })
+    .then(() => { 
+        alert("Resolution Sent."); 
+        closeResolve(); 
+        acknowledgedAlerts.add(targetName); 
+        renderGrid(); 
+    })
+    .catch(e => alert("Connection Error: " + e)); 
+}
+
 function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return isNaN(d) ? "--:--" : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
 </script>
 </body>
