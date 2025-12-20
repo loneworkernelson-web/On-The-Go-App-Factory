@@ -1,15 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v68.20 (COMPLETE)
- * - Feature: Resolution Alerts (Green "All Clear" emails).
- * - Feature: Smart GPS Linking in Reports.
- * - Feature: Server-side Geocoding Proxy.
- * - Security: Dual-Key (Master/Worker) Authentication.
+ * OTG APPSUITE - MASTER BACKEND v74.2 (UNIFIED)
+ * Merges v68 Logic (Reports/Monitor) with v74 Logic (Sync/Forms/Resolution).
  */
 
 const CONFIG = {
   // --- SECURITY KEYS ---
-  // If pasting manually, replace these with your actual keys.
-  // If using Factory App, these are injected automatically.
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
 
@@ -31,9 +26,7 @@ const CONFIG = {
 // Initialize Dynamic Properties
 const sp = PropertiesService.getScriptProperties();
 const tid = sp.getProperty('REPORT_TEMPLATE_ID');
-const pid = sp.getProperty('PDF_FOLDER_ID');
 if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
-if(pid) CONFIG.PDF_FOLDER_ID = pid;
 
 // ==========================================
 // 1. GET HANDLER (Read/Sync Operations)
@@ -41,81 +34,35 @@ if(pid) CONFIG.PDF_FOLDER_ID = pid;
 function doGet(e) {
   try {
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
+      const p = e.parameter;
 
-      // A. Connection Test (Accepts EITHER Key)
-      if(e.parameter.test) {
-         const k = e.parameter.key;
-         if(k === CONFIG.MASTER_KEY || k === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v68.20"});
+      // A. Connection Test (Factory App)
+      if(p.test) {
+         if(p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v74.2"});
          return sendJSON({status:"error", message:"Invalid Key"});
       }
 
-      // B. Geocode Proxy (Server-side to avoid CORS)
-      if(e.parameter.action === 'geocode') {
-          if(!e.parameter.lat || !e.parameter.lon) return sendJSON({address: "Invalid Coords"});
-          try {
-              const geo = Maps.newGeocoder().reverseGeocode(e.parameter.lat, e.parameter.lon);
-              if (geo.status === 'OK' && geo.results.length > 0) {
-                  return sendJSON({address: geo.results[0].formatted_address});
-              }
-              return sendJSON({address: "Unknown Location"});
-          } catch(err) { return sendJSON({address: "Geocode Failed"}); }
-      }
-
-      // C. Worker App Sync (Accepts EITHER Key)
-      if(e.parameter.action === 'sync') {
-          const k = e.parameter.key;
-          if(k !== CONFIG.MASTER_KEY && k !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"Auth Failed"});
-          
-          const worker = e.parameter.worker;
-          const deviceId = e.parameter.deviceId; 
-          const auth = checkAccess(worker, deviceId, true);
-          if (!auth.allowed) return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
-
-          const ss = SpreadsheetApp.getActiveSpreadsheet();
-          
-          // Load Templates
-          const tSheet = ss.getSheetByName('Templates');
-          const tData = tSheet ? tSheet.getDataRange().getValues() : [];
-          const forms = [];
-          const cachedTemplates = {};
-          
-          for(let i=1; i<tData.length; i++) {
-              const row = tData[i];
-              if(row.length < 3) continue;
-              const type = row[0]; const name = row[1]; const assign = row[2]; 
-              if(type === 'FORM' && (assign.includes(worker) || assign === 'ALL')) { 
-                  forms.push({ name: name, questions: parseQuestions(row) }); 
-              }
-              cachedTemplates[name] = parseQuestions(row);
-          }
-          
-          // Load Sites
-          const sSheet = ss.getSheetByName('Sites');
-          const sData = sSheet ? sSheet.getDataRange().getValues() : [];
-          const sites = [];
-          for(let i=1; i<sData.length; i++) {
-              const row = sData[i];
-              if(row.length < 1) continue;
-              const assign = row[0]; 
-              if(assign.includes(worker) || assign === 'ALL') {
-                  sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
-              }
-          }
-          return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
-      }
-
-      // D. Monitor App Poll (MASTER KEY ONLY)
-      if(e.parameter.callback){
-        if (e.parameter.key !== CONFIG.MASTER_KEY) {
-             return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+      // B. Monitor Poll (Monitor App - Master Key Only)
+      if(p.callback){
+        if (p.key !== CONFIG.MASTER_KEY) {
+             return ContentService.createTextOutput(p.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
         }
-        return handleMonitorPoll(e.parameter.callback);
+        return handleMonitorPoll(p.callback);
       }
 
-      // E. Setup Utility
-      if(e.parameter.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
+      // C. Geocode Proxy (Worker App)
+      if(p.action === 'geocode') return handleGeocode(p);
+
+      // D. Global Forms (Worker App v74)
+      if(p.action === 'getGlobalForms') return handleGetForms();
+
+      // E. Sync (Worker App)
+      if(p.action === 'sync') return handleSync(p);
+
+      // F. Setup Utility (Factory App)
+      if(p.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
       
-      return sendJSON({status: "online"});
+      return sendJSON({status: "online", version: "v74.2"});
 
   } catch(err) { return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()}); }
 }
@@ -130,16 +77,21 @@ function doPost(e) {
     if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
     
-    // Check keys (Either is valid for Posting)
+    // Check keys
     if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
     
-    // Check Authorization (unless resolving an alert)
-    if (p.action !== 'resolve') {
-        const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
-        if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized"});
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 1. RESOLUTION (Green Alert)
+    if (p.action === 'resolve') {
+       return handleResolution(p, ss);
     }
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // 2. STANDARD VISIT LOGGING
+    // Check Authorization
+    const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
+    if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized: " + auth.msg});
+
     const sheet = ss.getSheetByName('Visits') || ss.insertSheet('Visits');
     
     // Ensure Headers
@@ -171,7 +123,6 @@ function doPost(e) {
     
     // --- ROW UPDATE LOGIC ---
     if (lastRow > 1) {
-      // Look back 200 rows for active visits
       const searchDepth = Math.min(lastRow - 1, 200);
       const startRow = lastRow - searchDepth + 1;
       const data = sheet.getRange(startRow, 1, searchDepth, 25).getValues(); 
@@ -180,21 +131,16 @@ function doPost(e) {
         const rowWorker = data[i][2];
         const rowStatus = data[i][10];
         
-        // If worker matches and visit is NOT closed
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED'].includes(rowStatus))) {
              const rIdx = startRow + i;
-             
-             // Retrieve existing contacts if missing from current payload
              if(!emergencyEmail) emergencyEmail = data[i][6];
              if(!emergencyPhone) emergencyPhone = data[i][5];
 
-             // Update Fields
              if (newStatus !== 'DATA_ENTRY_ONLY' || rowStatus === 'DATA_ENTRY_ONLY') sheet.getRange(rIdx, 11).setValue(newStatus);
              if (p['Last Known GPS']) sheet.getRange(rIdx, 15).setValue(p['Last Known GPS']);
              if (p['Battery Level']) sheet.getRange(rIdx, 17).setValue(p['Battery Level']);
              if (p['Anticipated Departure Time']) sheet.getRange(rIdx, 21).setValue(p['Anticipated Departure Time']);
              
-             // Append Notes
              if (p['Notes'] && !p['Notes'].includes("Locating")) {
                 const oldNotes = data[i][11];
                 if (!oldNotes.includes(p['Notes'])) sheet.getRange(rIdx, 12).setValue(oldNotes ? oldNotes + " | " + p['Notes'] : p['Notes']);
@@ -206,7 +152,6 @@ function doPost(e) {
                  sheet.getRange(rIdx, 20).setValue(oldData ? oldData + " | " + p['Visit Report Data'] : p['Visit Report Data']);
              }
              
-             // Explicitly Save Photos on Update
              if(assets['Photo 1']) sheet.getRange(rIdx, 18).setValue(assets['Photo 1']);
              if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']);
              if(assets['Photo 2']) sheet.getRange(rIdx, 23).setValue(assets['Photo 2']);
@@ -219,7 +164,7 @@ function doPost(e) {
       }
     }
 
-    // --- ROW APPEND LOGIC (New Visit) ---
+    // --- ROW APPEND LOGIC ---
     if (!rowUpdated) {
         const row = [
             new Date(), 
@@ -252,22 +197,16 @@ function doPost(e) {
     }
     
     // --- ACTIONS & NOTIFICATIONS ---
-    
-    // 1. Vehicle Check (Updates Staff Sheet)
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
-    
-    // 2. Standard Report Email
     if (p['Template Name']) processFormEmail(p, assetIds);
     
-    // 3. RED ALERT (Emergency)
-    if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p);
+    // RED ALERT
+    if(newStatus.match(/EMERGENCY|DURESS|MISSED|ESCALATION/)) sendAlert(p, false);
     
-    // 4. GREEN ALERT (Resolution) - NEW v68.20
+    // GREEN ALERT (Safe/Cleared)
     if(newStatus.match(/SAFE|RESOLVED/)) {
-        const resolveData = {...p};
-        resolveData['Emergency Contact Email'] = emergencyEmail;
-        resolveData['Emergency Contact Number'] = emergencyPhone;
-        sendAlert(resolveData, true); // true = resolution mode
+        const resolveData = {...p, 'Emergency Contact Email': emergencyEmail, 'Emergency Contact Number': emergencyPhone};
+        sendAlert(resolveData, true);
     }
 
     return sendJSON({status:"ok"});
@@ -278,6 +217,97 @@ function doPost(e) {
 // ==========================================
 // 3. HELPER FUNCTIONS
 // ==========================================
+
+function handleSync(p) {
+  if(p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"Auth Failed"});
+  
+  const worker = p.worker;
+  const deviceId = p.deviceId; 
+  const auth = checkAccess(worker, deviceId, true);
+  if (!auth.allowed) return sendJSON({ status: "error", message: "ACCESS DENIED: " + auth.msg });
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Get Templates/Forms
+  const forms = getFormsFromSheet(ss);
+  const cachedTemplates = {};
+  forms.forEach(f => cachedTemplates[f.name] = f.questions);
+  
+  // 2. Get Sites
+  const sSheet = ss.getSheetByName('Sites');
+  const sData = sSheet ? sSheet.getDataRange().getValues() : [];
+  const sites = [];
+  for(let i=1; i<sData.length; i++) {
+      const row = sData[i];
+      if(row.length < 1) continue;
+      const assign = row[0]; 
+      if(assign.includes(worker) || assign === 'ALL') {
+          sites.push({ template: row[1], company: row[2], siteName: row[3], address: row[4], contactName: row[5], contactPhone: row[6], contactEmail: row[7], notes: row[8] });
+      }
+  }
+  return sendJSON({ sites: sites, forms: forms, cachedTemplates: cachedTemplates, meta: auth.meta });
+}
+
+function handleGetForms() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const forms = getFormsFromSheet(ss);
+  return sendJSON(forms);
+}
+
+function getFormsFromSheet(ss) {
+  const sheet = ss.getSheetByName('Templates');
+  if(!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const forms = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if(row[0] === "") continue;
+    const questions = parseQuestions(row);
+    forms.push({ type: row[0], name: row[1], questions: questions });
+  }
+  return forms;
+}
+
+function handleGeocode(p) {
+  if(!CONFIG.ORS_API_KEY) return sendJSON({address: "No API Key"});
+  try {
+      const url = `https://api.openrouteservice.org/geocode/reverse?api_key=${CONFIG.ORS_API_KEY}&point.lat=${p.lat}&point.lon=${p.lon}&size=1`;
+      const r = UrlFetchApp.fetch(url);
+      const j = JSON.parse(r.getContentText());
+      const addr = j.features[0].properties.label;
+      return sendJSON({address: addr});
+  } catch(e) { return sendJSON({address: "Location lookup failed"}); }
+}
+
+function handleResolution(p, ss) {
+  const sheet = ss.getSheetByName('Visits');
+  const data = sheet.getDataRange().getValues();
+  const targetWorker = p['Worker Name'];
+  let email = "", phone = "";
+  
+  // Find last contact info for this worker
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][2] === targetWorker) {
+      email = data[i][6];
+      phone = data[i][5];
+      break;
+    }
+  }
+
+  // Log the Resolution
+  const row = [
+    new Date(), Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"), 
+    targetWorker, "", "", "", email, "", "", "", 
+    "SAFE - MANUALLY CLEARED", p['Notes'], "HQ Resolution", "", "", new Date().toISOString()
+  ];
+  sheet.appendRow(row);
+
+  // Send Notifications
+  const resolveData = {...p, 'Emergency Contact Email': email, 'Emergency Contact Number': phone};
+  sendAlert(resolveData, true);
+
+  return sendJSON({status: "resolved"});
+}
 
 function checkAccess(workerName, deviceId, isReadOnly) {
   if (!workerName) return { allowed: false, msg: "Name missing" };
@@ -335,7 +365,6 @@ function processFormEmail(p, assetIds) {
         
         let reportData = {}; 
         try { reportData = JSON.parse(p['Visit Report Data']); } catch(e) {} 
-        
         const worker = p['Worker Name']; 
         const loc = p['Location Name'] || "Unknown"; 
         
@@ -355,10 +384,7 @@ function processFormEmail(p, assetIds) {
         } 
         
         html += `</table><br>`; 
-        if (assetIds['Photo 1']) html += `<h3>Photo 1</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 1']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
-        if (assetIds['Photo 2']) html += `<h3>Photo 2</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 2']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
-        if (assetIds['Photo 3']) html += `<h3>Photo 3</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 3']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
-        if (assetIds['Photo 4']) html += `<h3>Photo 4</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Photo 4']}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; 
+        ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4'].forEach((k, i) => { if (assetIds[k]) html += `<h3>${k}</h3><img src="https://drive.google.com/thumbnail?id=${assetIds[k]}&sz=w600" style="max-width:100%; border:1px solid #ccc; border-radius:8px; margin-bottom:10px;"><br>`; });
         if (assetIds['Signature']) html += `<h3>Authorized Signature</h3><img src="https://drive.google.com/thumbnail?id=${assetIds['Signature']}&sz=w400" style="max-width:300px; border-bottom:2px solid #000;"><br>`; 
         html += `</div>`; 
         
@@ -368,7 +394,7 @@ function processFormEmail(p, assetIds) {
 
 function saveImageToDrive(base64String, filename) { try { const base64Clean = base64String.split(',').pop(); const data = Utilities.base64Decode(base64Clean); const blob = Utilities.newBlob(data, 'image/jpeg', filename); let folder; if (CONFIG.PHOTOS_FOLDER_ID && CONFIG.PHOTOS_FOLDER_ID.length > 5) { try { folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID); } catch(e){ folder = DriveApp.getRootFolder(); } } else { folder = DriveApp.getRootFolder(); } const file = folder.createFile(blob); file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); return { url: file.getUrl(), id: file.getId() }; } catch(e) { return { url: "", id: "" }; } }
 
-function checkOverdueVisits() { PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString()); const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return; const lastRow = sheet.getLastRow(); if (lastRow <= 1) return; const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000; for (let i = 0; i < data.length; i++) { const row = data[i]; const status = row[10]; const dueTimeStr = row[20]; if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue; const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue; const timeOverdue = now - dueTime; if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) { const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(i + 2, 11).setValue(newStatus); sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] }); } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(i + 2, 11).setValue("OVERDUE"); } } }
+function checkOverdueVisits() { PropertiesService.getScriptProperties().setProperty('LAST_WATCHDOG_RUN', new Date().toISOString()); const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Visits'); if(!sheet) return; const lastRow = sheet.getLastRow(); if (lastRow <= 1) return; const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); const now = new Date().getTime(); const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000; for (let i = 0; i < data.length; i++) { const row = data[i]; const status = row[10]; const dueTimeStr = row[20]; if (['DEPARTED', 'COMPLETED', 'SAFE - MONITOR CLEARED', 'SAFE - MANUALLY CLEARED'].includes(status) || !dueTimeStr) continue; const dueTime = new Date(dueTimeStr).getTime(); if (isNaN(dueTime)) continue; const timeOverdue = now - dueTime; if (timeOverdue > escalationMs && !status.includes('EMERGENCY')) { const newStatus = "EMERGENCY - OVERDUE (Server Watchdog)"; sheet.getRange(i + 2, 11).setValue(newStatus); sendAlert({ 'Worker Name': row[2], 'Worker Phone Number': row[3], 'Alarm Status': newStatus, 'Location Name': row[12], 'Last Known GPS': row[14], 'Notes': "Worker failed to check in.", 'Emergency Contact Email': row[6], 'Emergency Contact Number': row[5], 'Escalation Contact Email': row[9], 'Escalation Contact Number': row[8], 'Battery Level': row[16] }, false); } else if (timeOverdue > 0 && status === 'ON SITE') { sheet.getRange(i + 2, 11).setValue("OVERDUE"); } } }
 
 function parseQuestions(row) { const questions = []; for(let i=4; i<row.length; i++) { const val = row[i]; if(val && val !== "") { let type='check', text=val; if(val.includes('[TEXT]')) { type='text'; text=val.replace('[TEXT]','').trim(); } else if(val.includes('[PHOTO]')) { type='photo'; text=val.replace('[PHOTO]','').trim(); } else if(val.includes('[YESNO]')) { type='yesno'; text=val.replace('[YESNO]','').trim(); } else if(val.includes('[NUMBER]')) { type='number'; text=val.replace('[NUMBER]','').trim(); } else if(val.includes('$')) { type='number'; text=val.replace('$','').trim(); } else if(val.includes('[GPS]')) { type='gps'; text=val.replace('[GPS]','').trim(); } else if(val.includes('[HEADING]')) { type='header'; text=val.replace('[HEADING]','').trim(); } else if(val.includes('[NOTE]')) { type='note'; text=val.replace('[NOTE]','').trim(); } else if(val.includes('[SIGN]')) { type='signature'; text=val.replace('[SIGN]','').trim(); } else if(val.includes('[DATE]')) { type='date'; text=val.replace('[DATE]','').trim(); } questions.push({type, text}); } } return questions; }
 
@@ -377,15 +403,11 @@ function setupReportTemplate() { try { const doc = DocumentApp.create(`${CONFIG.
 function sendAlert(data, isResolution) { 
     let recipients = [Session.getEffectiveUser().getEmail()]; 
     let smsNumbers = []; 
-    
-    // Add Emergency Contacts
     if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); 
     if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']); 
-    
     recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); 
     
     let subject, body, smsMsg;
-
     if (isResolution) {
         subject = "✅ SAFETY ALERT RESOLVED: " + data['Worker Name'];
         body = `<h1 style="color:green;">ALL CLEAR</h1><p>The safety alert for <strong>${data['Worker Name']}</strong> has been resolved.</p><p><strong>Status:</strong> ${data['Alarm Status']}</p><p><strong>Note:</strong> ${data['Notes']}</p>`;
@@ -395,9 +417,7 @@ function sendAlert(data, isResolution) {
         body = `<h1 style="color:red;">${data['Alarm Status']}</h1><p><strong>Worker:</strong> ${data['Worker Name']}</p><p><strong>Location:</strong> ${data['Location Name'] || 'Unknown'}</p><p><strong>Battery:</strong> ${data['Battery Level'] || 'Unknown'}</p><p><strong>Map:</strong> <a href="https://www.google.com/maps/search/?api=1&query=${data['Last Known GPS']}">${data['Last Known GPS']}</a></p>`; 
         smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`;
     }
-
     if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); 
-    
     const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; 
     smsNumbers.forEach(phone => { 
         const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
