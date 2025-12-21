@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory v74.1</title>
+  <title>OTG AppSuite Factory v75.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -75,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Tactical Edition v74.1</p>
+      <p class="text-gray-400">Tactical Edition v75.0</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -467,9 +467,13 @@ Write a script to flatten the JSON form data.
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
         const logo = document.getElementById('logoUrl').value;
+        const orsKey = document.getElementById('orsKey').value;
+        const checkinEnabled = document.getElementById('chkCheckin').checked;
+        const vehEnabled = document.getElementById('chkVehicle').checked;
+        const escalationMins = document.getElementById('escalationMins').value;
 
         // INJECT KEYS & CONFIGS
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value).replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
+        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo);
         let bCode = document.getElementById('codeDisplay').textContent;
 
@@ -506,6 +510,72 @@ self.addEventListener('fetch', event => {
         zip.folder("MonitorApp").file("index.html", mHtml);
         zip.file("Code.gs", bCode);
         
+        // --- WORKER USER GUIDE (DYNAMIC) ---
+        let guideHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${org} User Guide</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:1.5rem}h1{color:#2563eb;border-bottom:2px solid #e5e7eb;padding-bottom:0.5rem}h2{color:#1f2937;margin-top:2rem;background:#f3f4f6;padding:0.5rem;border-radius:0.5rem;font-size:1.2rem}h3{color:#4b5563;margin-top:1.5rem;font-size:1rem}code{background:#eee;padding:0.2rem 0.4rem;border-radius:0.25rem;font-family:monospace}.box{background:#eff6ff;border:1px solid #bfdbfe;padding:1rem;border-radius:0.5rem;margin:1rem 0}.warning{background:#fef2f2;border:1px solid #fecaca;padding:1rem;border-radius:0.5rem;margin:1rem 0;color:#991b1b}.img-ph{background:#eee;height:150px;display:flex;align-items:center;justify-content:center;color:#888;border-radius:0.5rem;margin:1rem 0}</style></head><body>
+        <h1>${org} Safety App Guide</h1>
+        <p>Welcome to your personal safety tool. This guide covers how to use the app in your daily work.</p>
+
+        <div class="box">
+            <h3>🚀 Installation</h3>
+            <p><strong>iPhone:</strong> Open in Safari → Tap 'Share' (Square arrow) → Tap 'Add to Home Screen'.</p>
+            <p><strong>Android:</strong> Open in Chrome → Tap Menu (3 dots) → Tap 'Install App' or 'Add to Home Screen'.</p>
+        </div>
+
+        <h2>1. Getting Started</h2>
+        <p>When you first open the app, you will see a <strong>Setup Wizard</strong>.</p>
+        <ol>
+            <li><strong>Identity:</strong> Enter your full name and contact details.</li>
+            <li><strong>PIN:</strong> Create a 4-digit PIN (e.g. 1234). You need this to turn off alarms.</li>
+            <li><strong>Duress PIN:</strong> Create a <em>secret</em> code (e.g. 9999). If forced to unlock your phone by an attacker, enter this code. It looks like it turns off the alarm, but actually sends a silent "Duress" alert to HQ.</li>
+        </ol>
+
+        <h2>2. Starting a Visit</h2>
+        <ul>
+            <li>Select a location from the list or add a new one manually.</li>
+            <li>Use the slider to set your expected duration (e.g. 1 hour).</li>
+            <li><strong>Hold the Green Button</strong> to start your timer.</li>
+        </ul>
+        <div class="warning">
+            <strong>The Golden Rule:</strong> Always start your timer <em>before</em> you enter a hazard zone or client's home.
+        </div>
+
+        ${vehEnabled ? `
+        <h2>3. Vehicle Safety</h2>
+        <p>This system tracks your vehicle's <strong>WOF Expiry</strong>.</p>
+        <ul>
+            <li>If your WOF is expired, the app will <strong>block you</strong> from starting a travel timer.</li>
+            <li>You must complete a <strong>Vehicle Check</strong> form regularly (every ${document.getElementById('vehFreq').value} days).</li>
+            <li>To do a check manually, tap the "Note to Self" button and select "Vehicle Safety Check".</li>
+        </ul>` : ''}
+
+        ${checkinEnabled ? `
+        <h2>4. Safety Check-ins</h2>
+        <p>For high-risk work, the app will sound a chime every <strong>${document.getElementById('checkinMins').value} minutes</strong>.</p>
+        <ul>
+            <li>When you hear the chime, unlock your phone.</li>
+            <li><strong>Hold the Green Button</strong> to confirm you are OK.</li>
+            <li>If you miss a check-in, an alert will be sent to HQ.</li>
+        </ul>` : ''}
+
+        <h2>5. In An Emergency</h2>
+        <p>If you need help, tap the big Red <strong>SOS</strong> button <strong>3 times</strong>.</p>
+        <ul>
+            <li>The screen will turn Red.</li>
+            <li>Your GPS location is broadcast to HQ and your emergency contacts immediately.</li>
+            <li>To cancel, hold the "I AM SAFE" button and enter your PIN.</li>
+        </ul>
+
+        <h2>6. Ending a Visit</h2>
+        <p>When you are safe, open the app and hold the <strong>Red "Hold to End" Button</strong>.</p>
+        ${orsKey ? `<p>The app will automatically calculate your mileage from your starting point.</p>` : `<p>The app will estimate your "crow flies" mileage.</p>`}
+        
+        <h2>7. What if my battery dies?</h2>
+        <p>If your phone dies or loses signal, the Server Watchdog will notice you haven't checked out. It will raise a <strong>"Server Watchdog"</strong> alarm after ${escalationMins} minutes.</p>
+
+        </body></html>`;
+
+        zip.folder("WorkerApp").file("USER_GUIDE.html", guideHtml);
+
         // --- OPERATIONS MANUAL (HTML) ---
         const manualHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Operations Manual - ${org}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:2rem}h1{color:#2563eb;border-bottom:2px solid #e5e7eb;padding-bottom:0.5rem}h2{color:#1f2937;margin-top:2rem;background:#f3f4f6;padding:0.5rem;border-radius:0.5rem}code{background:#eee;padding:0.2rem 0.4rem;border-radius:0.25rem;font-family:monospace}.box{background:#eff6ff;border:1px solid #bfdbfe;padding:1rem;border-radius:0.5rem;margin:1rem 0}.warning{background:#fef2f2;border:1px solid #fecaca;padding:1rem;border-radius:0.5rem;margin:1rem 0;color:#991b1b}</style></head><body>
         <h1>${org} Safety System - Operations Manual</h1>
