@@ -146,7 +146,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
     <div class="content-area pb-24">
         <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Re-run the setup wizard to change details?</p><button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button></div>
-        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg">📲 Install App to Home Screen</button></div>
+        
+        <div id="installAppContainer" class="hidden mb-4">
+            <button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2">
+                <span class="text-xl">📲</span> Install App to Home Screen
+            </button>
+        </div>
+
         <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
     </div>
 </div>
@@ -327,7 +333,23 @@ function updateGpsConfidence(pos) {const acc = pos.coords.accuracy;const b1 = do
 window.addEventListener('load',()=>{const s=localStorage.getItem('loneWorkerState');if(s){try{state={...state,...JSON.parse(s)};}catch(e){console.error("State Error",e);}}if(!state.photoStore)state.photoStore={};if(!state.globalForms)state.globalForms=[];if(!state.cachedForms)state.cachedForms={};state.settings.googleSheetUrl=CONFIG.url;if(navigator.getBattery){navigator.getBattery().then(b=>{const u=()=>{currentBatteryLevel=Math.round(b.level*100)+"%";if(b.level<0.10&&!state.lowBatSent&&state.activeVisit){state.lowBatSent=true;saveState();processUploadQueue(buildPayload({"Alarm Status":"BATTERY CRITICAL (10%)","Notes":"Automated Low Battery Alert"}));}};u();b.addEventListener('levelchange',u);});}if(navigator.geolocation) {navigator.geolocation.watchPosition(updateGpsConfidence, ()=>{}, {enableHighAccuracy:true, maximumAge:30000});}
 // INIT CHECK
 if(!state.settings.workerName) {startWizard();} else if(!state.settings.pinCode) {startWizard();} else {if(state.activeVisit){enterLockedScreen();showCurrentSiteInfo();}else{navigate('main');renderLocations();checkVehicleStatus();}}
-if(state.activeVisit&&state.activeVisit.locationId==='travel')startTravellingPulse();initLocations();if(CONFIG.isAdv)syncForms();updateArrivedButtonState();processUploadQueue();document.body.addEventListener('click',initAudio,{once:true});startReminderTimer();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));});
+if(state.activeVisit&&state.activeVisit.locationId==='travel')startTravellingPulse();initLocations();if(CONFIG.isAdv)syncForms();updateArrivedButtonState();processUploadQueue();document.body.addEventListener('click',initAudio,{once:true});startReminderTimer();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
+
+// PWA INSTALL LISTENER
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installAppContainer').classList.remove('hidden');
+  document.getElementById('btnInstallApp').addEventListener('click', () => {
+    document.getElementById('installAppContainer').classList.add('hidden');
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      console.log('User response:', choiceResult.outcome);
+      deferredPrompt = null;
+    });
+  });
+});
+});
 </script>
 </body>
 </html>
