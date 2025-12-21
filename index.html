@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG AppSuite Factory v75.1</title>
+  <title>OTG Factory v75.4 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -75,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Tactical Edition v75.1</p>
+      <p class="text-gray-400">Beta v75.4 (Global Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -97,6 +97,18 @@
                   <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key</label>
                   <input type="text" id="secretKey" class="input-field text-yellow-400" placeholder="ChangeMe123!" oninput="saveInput(this)">
                   <p class="text-xs text-red-400 mt-2 font-bold">⚠️ SECURITY WARNING: This is the Admin Key. Keep it safe.</p>
+              </div>
+              <div>
+                  <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Region / Country</label>
+                  <select id="countrySelect" class="input-field cursor-pointer" onchange="updateRegionInfo()">
+                      <option value="+64">New Zealand (+64)</option>
+                      <option value="+61">Australia (+61)</option>
+                      <option value="+44">United Kingdom (+44)</option>
+                      <option value="+1">USA / Canada (+1)</option>
+                      <option value="">Other (No Auto-Format)</option>
+                  </select>
+                  <p id="regionInfo" class="text-xs text-gray-400 mt-2">Detected Timezone: <span id="detectedTz" class="text-blue-400 font-mono">Loading...</span></p>
+                  <input type="hidden" id="timezoneVal">
               </div>
             </div>
             
@@ -149,8 +161,16 @@
                 </div>
              </div>
              
+             <div class="mt-4 pt-4 border-t border-gray-600">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="chkTravelReport" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="saveInput(this)" checked>
+                    <span class="text-white font-bold">Default: Require Form on Travel Finish?</span>
+                </label>
+                <p class="pl-8 mt-1 text-xs text-gray-500">Sets the default. Workers can still toggle this per-trip in the app settings.</p>
+             </div>
+             
              <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label><a href="https://textbelt.com/" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (Free: 'textbelt')" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (Buy key for Non-US/Global)" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For AI Reporting" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Photos" oninput="saveInput(this)"></div>
@@ -376,6 +396,7 @@ Write a script to flatten the JSON form data.
 
     window.onload = async () => { 
         loadPersistedData(); 
+        updateRegionInfo(); // Detect TZ on load
         setupDragDrop(); 
         for (const [k, f] of Object.entries(FILES)) {
             try { const r = await fetch(f); if (r.ok) TEMPLATES[k] = await r.text(); } catch(e){}
@@ -383,7 +404,14 @@ Write a script to flatten the JSON form data.
     };
 
     function saveInput(el) { localStorage.setItem('otg_' + el.id, el.value); }
-    function loadPersistedData() { const ids = ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq']; ids.forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); }
+    function loadPersistedData() { const ids = ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect']; ids.forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); if(localStorage.getItem('otg_chkTravelReport') !== null) document.getElementById('chkTravelReport').checked = localStorage.getItem('otg_chkTravelReport') === 'true'; }
+
+    function updateRegionInfo() {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById('detectedTz').textContent = tz;
+        document.getElementById('timezoneVal').value = tz;
+        saveInput(document.getElementById('countrySelect'));
+    }
 
     function toggleEnterBtn() { document.getElementById('btnEnter').disabled = !document.getElementById('chkAccept').checked; }
     function closeModal(id) { document.getElementById(id).style.display='none'; if(id==='disclaimerModal') document.getElementById('mainContent').classList.remove('blur-sm'); }
@@ -440,6 +468,7 @@ Write a script to flatten the JSON form data.
             .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
             .replace('%%PHOTOS_FOLDER_ID%%', document.getElementById('folderId').value)
             .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
+            .replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland")
             .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value);
         document.getElementById('codeDisplay').textContent = code;
         gotoStep(3); // Fixes the button issue
@@ -471,9 +500,12 @@ Write a script to flatten the JSON form data.
         const checkinEnabled = document.getElementById('chkCheckin').checked;
         const vehEnabled = document.getElementById('chkVehicle').checked;
         const escalationMins = document.getElementById('escalationMins').value;
+        const countryPrefix = document.getElementById('countrySelect').value;
+        const reqTravelReport = document.getElementById('chkTravelReport').checked;
+        localStorage.setItem('otg_chkTravelReport', reqTravelReport);
 
         // INJECT KEYS & CONFIGS
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
+        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value).replace(/%%COUNTRY_PREFIX%%/g, countryPrefix).replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport);
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo);
         let bCode = document.getElementById('codeDisplay').textContent;
 
@@ -559,7 +591,7 @@ self.addEventListener('fetch', event => {
         <ul>
             <li>If your WOF is expired, the app will <strong>block you</strong> from starting a travel timer.</li>
             <li>You must complete a <strong>Vehicle Check</strong> form regularly (every ${document.getElementById('vehFreq').value} days).</li>
-            <li>To do a check manually, tap the "Note to Self" button and select "Vehicle Safety Check".</li>
+            <li>To do a check manually, tap the "Quick Notes" button and select "Vehicle Safety Check".</li>
         </ul>` : ''}
 
         ${checkinEnabled ? `
