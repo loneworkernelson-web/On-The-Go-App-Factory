@@ -1,6 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v75.1 (GOLDEN)
- * Features: Staged Escalation, Timezones, Global Forms, Resolution Alerts, Email Debugging.
+ * OTG APPSUITE - MASTER BACKEND v75.2 (GOLDEN)
+ * Features: Staged Escalation, Timezones, Global Forms, Smart Resolution Logic.
  */
 
 const CONFIG = {
@@ -30,13 +30,13 @@ function doGet(e) {
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
       const p = e.parameter;
 
-      // A. Connection Test (Factory App)
+      // A. Connection Test
       if(p.test) {
-         if(p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v75.1"});
+         if(p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) return sendJSON({status:"success", version: "v75.2"});
          return sendJSON({status:"error", message:"Invalid Key"});
       }
 
-      // B. Monitor Poll (Monitor App - Master Key Only)
+      // B. Monitor Poll
       if(p.callback){
         if (p.key !== CONFIG.MASTER_KEY) {
              return ContentService.createTextOutput(p.callback + "(" + JSON.stringify({error: "Auth Required"}) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -44,19 +44,13 @@ function doGet(e) {
         return handleMonitorPoll(p.callback);
       }
 
-      // C. Geocode Proxy (Worker App)
+      // C. Actions
       if(p.action === 'geocode') return handleGeocode(p);
-
-      // D. Global Forms (Worker App)
       if(p.action === 'getGlobalForms') return handleGetForms();
-
-      // E. Sync (Worker App)
       if(p.action === 'sync') return handleSync(p);
-
-      // F. Setup Utility (Factory App)
       if(p.run === 'setupTemplate') return ContentService.createTextOutput(setupReportTemplate()); 
       
-      return sendJSON({status: "online", version: "v75.1"});
+      return sendJSON({status: "online", version: "v75.2"});
 
   } catch(err) { return sendJSON({status: "error", message: "SERVER ERROR: " + err.toString()}); }
 }
@@ -71,18 +65,17 @@ function doPost(e) {
     if (!e || !e.parameter) return sendJSON({status:"error"});
     const p = e.parameter;
     
-    // Check keys
+    // Auth Check
     if (p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status: "error", message: "Invalid Key"});
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 1. RESOLUTION (Green Alert)
+    // Resolution Handler
     if (p.action === 'resolve') {
        return handleResolution(p, ss);
     }
 
-    // 2. STANDARD VISIT LOGGING
-    // Check Authorization
+    // Standard Visit Logging
     const auth = checkAccess(p['Worker Name'], p.deviceId, false); 
     if (!auth.allowed) return sendJSON({status: "error", message: "Unauthorized: " + auth.msg});
 
@@ -112,6 +105,7 @@ function doPost(e) {
     let rowUpdated = false;
     let emergencyEmail = p['Emergency Contact Email'] || "";
     let emergencyPhone = p['Emergency Contact Number'] || "";
+    let previousStatus = ""; 
 
     const lastRow = sheet.getLastRow();
     
@@ -125,9 +119,11 @@ function doPost(e) {
         const rowWorker = data[i][2];
         const rowStatus = data[i][10];
         
-        // Find active visit to update
+        // Find active visit
         if (rowWorker === worker && (!['DEPARTED', 'COMPLETED', 'SAFE - MANUALLY CLEARED'].includes(rowStatus))) {
              const rIdx = startRow + i;
+             previousStatus = rowStatus; // Capture old status for Alert Logic
+             
              if(!emergencyEmail) emergencyEmail = data[i][6];
              if(!emergencyPhone) emergencyPhone = data[i][5];
 
@@ -147,11 +143,11 @@ function doPost(e) {
                  sheet.getRange(rIdx, 20).setValue(oldData ? oldData + " | " + p['Visit Report Data'] : p['Visit Report Data']);
              }
              
-             if(assets['Photo 1']) sheet.getRange(rIdx, 18).setValue(assets['Photo 1']);
-             if(assets['Signature']) sheet.getRange(rIdx, 22).setValue(assets['Signature']);
-             if(assets['Photo 2']) sheet.getRange(rIdx, 23).setValue(assets['Photo 2']);
-             if(assets['Photo 3']) sheet.getRange(rIdx, 24).setValue(assets['Photo 3']);
-             if(assets['Photo 4']) sheet.getRange(rIdx, 25).setValue(assets['Photo 4']);
+             // Update Images
+             ['Photo 1', 'Signature', 'Photo 2', 'Photo 3', 'Photo 4'].forEach((k, idx) => {
+                 const col = [18, 22, 23, 24, 25][idx];
+                 if(assets[k]) sheet.getRange(rIdx, col).setValue(assets[k]);
+             });
              
              rowUpdated = true;
              break;
@@ -164,29 +160,15 @@ function doPost(e) {
         const row = [
             new Date(), 
             Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd"), 
-            p['Worker Name'], 
-            "'" + (p['Worker Phone Number'] || ""), 
-            p['Emergency Contact Name'], 
-            "'" + (p['Emergency Contact Number'] || ""), 
+            p['Worker Name'], "'" + (p['Worker Phone Number'] || ""), 
+            p['Emergency Contact Name'], "'" + (p['Emergency Contact Number'] || ""), 
             p['Emergency Contact Email'], 
-            p['Escalation Contact Name'], 
-            "'" + (p['Escalation Contact Number'] || ""), 
+            p['Escalation Contact Name'], "'" + (p['Escalation Contact Number'] || ""), 
             p['Escalation Contact Email'], 
-            newStatus, 
-            p['Notes'], 
-            p['Location Name'], 
-            p['Location Address'], 
-            p['Last Known GPS'], 
-            p['Timestamp'] || new Date().toISOString(), 
-            p['Battery Level'], 
-            assets['Photo 1'], 
-            p['Distance'], 
-            p['Visit Report Data'], 
-            p['Anticipated Departure Time'], 
-            assets['Signature'], 
-            assets['Photo 2'], 
-            assets['Photo 3'], 
-            assets['Photo 4']
+            newStatus, p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], 
+            p['Timestamp'] || new Date().toISOString(), p['Battery Level'], assets['Photo 1'], 
+            p['Distance'], p['Visit Report Data'], p['Anticipated Departure Time'], 
+            assets['Signature'], assets['Photo 2'], assets['Photo 3'], assets['Photo 4']
         ];
         sheet.appendRow(row);
     }
@@ -195,13 +177,18 @@ function doPost(e) {
     if (p['Template Name'] === 'Vehicle Safety Check') { updateStaffVehCheck(worker, p['Visit Report Data']); }
     if (p['Template Name']) processFormEmail(p, assetIds);
     
-    // IMMEDIATE ALERTS (Panic/Duress)
+    // 1. Immediate Danger (Always Send)
     if(newStatus.match(/PANIC|DURESS/)) sendAlert(p, false, 'all'); 
     
-    // RESOLUTION (Green Alert)
+    // 2. Resolution (Conditional Send)
+    // FIX: Only send "Green Alert" if the previous status was actually an Emergency
     if(newStatus.match(/SAFE|RESOLVED/)) {
-        const resolveData = {...p, 'Emergency Contact Email': emergencyEmail, 'Emergency Contact Number': emergencyPhone};
-        sendAlert(resolveData, true, 'all');
+        if (previousStatus && previousStatus.match(/EMERGENCY|PANIC|DURESS/)) {
+            const resolveData = {...p, 'Emergency Contact Email': emergencyEmail, 'Emergency Contact Number': emergencyPhone};
+            sendAlert(resolveData, true, 'all');
+        } else {
+            console.log("Skipping Green Alert email: Previous status was " + previousStatus);
+        }
     }
 
     return sendJSON({status:"ok"});
@@ -218,8 +205,10 @@ function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet(); 
     const sheet = ss.getSheetByName('Visits'); 
     if(!sheet) return; 
+    
     const lastRow = sheet.getLastRow(); 
     if (lastRow <= 1) return; 
+    
     const data = sheet.getRange(2, 1, lastRow - 1, 21).getValues(); 
     const now = new Date().getTime(); 
     const escalationMs = (CONFIG.ESCALATION_MINUTES || 15) * 60 * 1000; 
@@ -237,7 +226,6 @@ function checkOverdueVisits() {
         if (isNaN(dueTime)) continue; 
         const timeOverdue = now - dueTime; 
         
-        // Construct Alert Data Object
         const alertData = { 
             'Worker Name': row[2], 'Worker Phone Number': row[3], 
             'Location Name': row[12], 'Last Known GPS': row[14], 'Battery Level': row[16],
@@ -275,7 +263,6 @@ function sendAlert(data, isResolution, target) {
     
     // DETERMINE RECIPIENTS BASED ON TARGET GROUP
     if (target === 'all' || target === 'stage2') {
-        // Everyone gets it
         if(data['Emergency Contact Email']) recipients.push(data['Emergency Contact Email']); 
         if(data['Escalation Contact Email']) recipients.push(data['Escalation Contact Email']);
         if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
@@ -286,6 +273,7 @@ function sendAlert(data, isResolution, target) {
         if(data['Emergency Contact Number']) smsNumbers.push(data['Emergency Contact Number']);
     }
 
+    // Deduplicate
     recipients = [...new Set(recipients)].filter(e => e && e.includes('@')); 
     smsNumbers = [...new Set(smsNumbers)];
 
@@ -300,12 +288,22 @@ function sendAlert(data, isResolution, target) {
         smsMsg = `SOS: ${data['Worker Name']} - ${data['Alarm Status']} at ${data['Location Name']}`;
     }
     
-    if(recipients.length > 0) MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); 
+    if(recipients.length > 0) {
+        MailApp.sendEmail({to: recipients.join(','), subject: subject, htmlBody: body}); 
+    }
     
+    // SMS Logic (Textbelt)
     const key = CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5 ? CONFIG.TEXTBELT_API_KEY : 'textbelt'; 
     smsNumbers.forEach(phone => { 
         const clean = phone.replace(/^'/, '').replace(/[^0-9+]/g, ''); 
-        try { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), muteHttpExceptions: true }); } catch(e) {} 
+        try { 
+            UrlFetchApp.fetch('https://textbelt.com/text', { 
+                method: 'post', 
+                contentType: 'application/json', 
+                payload: JSON.stringify({ phone: clean, message: smsMsg, key: key }), 
+                muteHttpExceptions: true 
+            }); 
+        } catch(e) { console.log("SMS Failed: " + e); } 
     }); 
 }
 
@@ -379,12 +377,14 @@ function handleResolution(p, ss) {
   const data = sheet.getDataRange().getValues();
   const targetWorker = p['Worker Name'];
   let email = "", phone = "";
+  let prevStatus = "";
   
-  // Find last contact info for this worker
+  // Find last contact info and status for this worker
   for (let i = data.length - 1; i >= 1; i--) {
     if (data[i][2] === targetWorker) {
       email = data[i][6];
       phone = data[i][5];
+      prevStatus = data[i][10];
       break;
     }
   }
@@ -397,9 +397,13 @@ function handleResolution(p, ss) {
   ];
   sheet.appendRow(row);
 
-  // Send Notifications (Green Alert)
-  const resolveData = {...p, 'Emergency Contact Email': email, 'Emergency Contact Number': phone};
-  sendAlert(resolveData, true, 'all');
+  // Send Notifications (Green Alert) IF there was an emergency
+  if (prevStatus && prevStatus.match(/EMERGENCY|PANIC|DURESS/)) {
+      const resolveData = {...p, 'Emergency Contact Email': email, 'Emergency Contact Number': phone};
+      sendAlert(resolveData, true, 'all');
+  } else {
+      console.log("Resolution logged silently. Prev status: " + prevStatus);
+  }
 
   return sendJSON({status: "resolved"});
 }
@@ -441,7 +445,27 @@ function handleMonitorPoll(callback) {
 
 function getRowMeta(row) { return { lastVehCheck: row[5] || "", wofExpiry: row[6] || "" }; }
 
-function updateStaffVehCheck(worker, jsonString) { try { const ss = SpreadsheetApp.getActiveSpreadsheet(); const sheet = ss.getSheetByName('Staff'); if(!sheet) return; const data = sheet.getDataRange().getValues(); let wofDate = ""; const now = new Date().toISOString(); try { const j = JSON.parse(jsonString); for (const key in j) { if (key.includes("Expiry") || key.includes("Due")) { wofDate = j[key]; break; } } } catch(e) {} for (let i = 1; i < data.length; i++) { if (String(data[i][0]).toLowerCase() === String(worker).toLowerCase()) { sheet.getRange(i + 1, 6).setValue(now); if (wofDate) sheet.getRange(i + 1, 7).setValue(wofDate); break; } } } catch(e) {} }
+function updateStaffVehCheck(worker, jsonString) { 
+    try { 
+        const ss = SpreadsheetApp.getActiveSpreadsheet(); 
+        const sheet = ss.getSheetByName('Staff'); 
+        if(!sheet) return; 
+        const data = sheet.getDataRange().getValues(); 
+        let wofDate = ""; 
+        const now = new Date().toISOString(); 
+        try { 
+            const j = JSON.parse(jsonString); 
+            for (const key in j) { if (key.includes("Expiry") || key.includes("Due")) { wofDate = j[key]; break; } } 
+        } catch(e) {} 
+        for (let i = 1; i < data.length; i++) { 
+            if (String(data[i][0]).toLowerCase() === String(worker).toLowerCase()) { 
+                sheet.getRange(i + 1, 6).setValue(now); 
+                if (wofDate) sheet.getRange(i + 1, 7).setValue(wofDate); 
+                break; 
+            } 
+        } 
+    } catch(e) {} 
+}
 
 function processFormEmail(p, assetIds) { 
     try { 
@@ -450,7 +474,6 @@ function processFormEmail(p, assetIds) {
         // 1. Determine Recipient
         if (String(p['Template Name']).trim() === "Note to Self") { 
             recipient = p['Worker Email']; 
-            // Fallback: If no email provided, log it.
             if (!recipient || !recipient.includes('@')) {
                 console.log(`[Email Skipped] 'Note to Self' for ${p['Worker Name']} has no valid email.`);
                 return; 
