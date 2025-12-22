@@ -3,201 +3,326 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v77.4 (Stats Config)</title>
+  <title>OTG Factory v77.5 (User Friendly)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #334155; }
+    
+    /* Card Styling */
+    .card { background: white; border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); overflow: hidden; transition: all 0.3s ease; }
+    
+    /* Step Animation */
     .step-section { display: none; }
-    .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; transition: border-color 0.2s; }
-    .input-field:focus { border-color: #3b82f6; outline: none; }
-    .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 600; transition: transform 0.1s; width: 100%; text-align: center; }
-    .btn-primary:active { transform: scale(0.98); }
-    .file-drop { border: 2px dashed #475569; padding: 2rem; text-align: center; border-radius: 0.75rem; cursor: pointer; transition: background 0.2s; }
-    .file-drop:hover { background: #1e293b; border-color: #3b82f6; }
+    .step-section.active { display: block; animation: slideIn 0.4s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Inputs */
+    .input-label { display: block; font-weight: 600; color: #475569; margin-bottom: 0.5rem; font-size: 0.95rem; }
+    .input-desc { font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; }
+    .input-field { width: 100%; border: 1px solid #cbd5e1; padding: 0.75rem 1rem; border-radius: 0.5rem; color: #1e293b; font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s; }
+    .input-field:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    
+    /* Buttons */
+    .btn-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem 2rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; transition: transform 0.1s; cursor: pointer; border: none; }
+    .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); }
+    .btn-secondary { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 1rem 2rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; cursor: pointer; transition: background 0.1s; }
+    .btn-secondary:hover { background: #f8fafc; }
+
+    /* File Drop */
+    .file-drop { border: 2px dashed #cbd5e1; background: #f8fafc; padding: 2rem; text-align: center; border-radius: 0.75rem; cursor: pointer; transition: all 0.2s; position: relative; }
+    .file-drop:hover { border-color: #3b82f6; background: #eff6ff; }
+    .file-drop.loaded { border-color: #10b981; background: #ecfdf5; }
+    .file-icon { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
+    
+    /* Progress Bar */
+    .progress-dot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #e2e8f0; transition: background 0.3s; }
+    .progress-dot.active { background: #3b82f6; transform: scale(1.2); }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex flex-col items-center py-10 px-4">
 
-<div class="max-w-2xl w-full bg-gray-900/50 backdrop-blur-lg rounded-2xl border border-gray-800 p-8 shadow-2xl">
-  
   <div class="text-center mb-8">
-    <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-    <p class="text-gray-400 mt-2">v77.4 | Global + Scheduled Reporting</p>
+    <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">OTG AppSuite <span class="text-blue-600">Factory</span></h1>
+    <p class="text-slate-500 mt-2 text-lg">v77.5 | Global Serverless Generator</p>
   </div>
 
-  <form id="factoryForm" onsubmit="return false;">
+  <div class="card max-w-3xl w-full p-8 md:p-10 relative">
     
-    <div id="step1" class="step-section active">
-      <h2 class="text-xl font-bold mb-4 text-blue-400">1. Organisation & Region</h2>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Organisation Name</label>
-          <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Global" required>
-        </div>
+    <div class="flex justify-center gap-4 mb-8">
+      <div id="dot1" class="progress-dot active"></div>
+      <div id="dot2" class="progress-dot"></div>
+      <div id="dot3" class="progress-dot"></div>
+      <div id="dot4" class="progress-dot"></div>
+      <div id="dot5" class="progress-dot"></div>
+    </div>
 
-        <div class="grid grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Country Code (Phone)</label>
+    <form id="factoryForm" onsubmit="return false;">
+
+      <div id="step1" class="step-section active">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">1</span>
+          Organisation & Branding
+        </h2>
+
+        <div class="space-y-6">
+          <div>
+            <label class="input-label">Organisation Name</label>
+            <p class="input-desc">This name will appear on the top of the App and in all Reports.</p>
+            <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Community Services" required>
+          </div>
+
+          <div>
+            <label class="input-label">App Logo (Icon)</label>
+            <p class="input-desc">Upload a square image (JPG/PNG). This will be the app icon on phones.</p>
+            <div class="flex items-center gap-6 mt-3">
+              <div class="file-drop w-1/2" onclick="document.getElementById('fLogo').click()" id="dropLogo">
+                <span class="file-icon">🖼️</span>
+                <span class="font-semibold text-slate-600">Click to Upload Logo</span>
+                <input type="file" id="fLogo" hidden onchange="handleLogo(this)">
+              </div>
+              <div class="w-1/2 flex flex-col items-center justify-center">
+                <div class="w-24 h-24 bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 shadow-inner overflow-hidden">
+                  <img id="logoPreview" class="hidden w-full h-full object-cover" alt="Preview">
+                  <span id="logoPlaceholder" class="text-slate-400 text-xs">No Logo</span>
+                </div>
+                <span class="text-xs text-slate-400 mt-2">Preview</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+            <h3 class="font-bold text-slate-700 mb-3">Regional Settings</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="input-label">Country Code</label>
                 <input type="number" id="countryCode" class="input-field" placeholder="64" value="64">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">Timezone (Google)</label>
+                <p class="text-xs text-slate-500 mt-1">e.g. 64 (NZ), 1 (US), 44 (UK). No '+' needed.</p>
+              </div>
+              <div>
+                <label class="input-label">Timezone</label>
                 <input type="text" id="timezone" class="input-field" placeholder="Pacific/Auckland" value="Pacific/Auckland">
+                <p class="text-xs text-slate-500 mt-1">Required for accurate timestamping.</p>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="nextStep(2)" class="btn-primary mt-4">Next: Features & Intelligence &rarr;</button>
+        </div>
+      </div>
+
+      <div id="step2" class="step-section">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">2</span>
+          Reporting & AI
+        </h2>
+
+        <div class="space-y-8">
+          
+          <div>
+            <label class="input-label text-lg">📊 Automated Statistics</label>
+            <p class="input-desc text-base">How often should the system calculate mileage and visit counts for your accounting team?</p>
+            <div class="bg-white p-1 border border-slate-300 rounded-lg inline-block w-full">
+              <select id="statsFreq" class="input-field border-none bg-transparent">
+                  <option value="MONTHLY" selected>Monthly (1st of Month)</option>
+                  <option value="WEEKLY">Weekly (Monday Morning)</option>
+                  <option value="DAILY">Daily (Midnight)</option>
+              </select>
+            </div>
+            <div class="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded border border-blue-100">
+              <strong>ℹ️ Note:</strong> This auto-populates the <em>'Travel Stats'</em> and <em>'Activity Stats'</em> tabs in your database.
+            </div>
+          </div>
+
+          <hr class="border-slate-200">
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="input-label text-lg mb-0">🤖 AI Smart Scribe</label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="enableAi" class="sr-only peer" onchange="toggleAiUI()">
+                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            <p class="input-desc text-base">Automatically corrects spelling and grammar in worker notes using Google Gemini.</p>
+            
+            <div id="aiConfigBox" class="hidden mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <label class="input-label text-yellow-800">Gemini API Key</label>
+                <input type="text" id="geminiKey" class="input-field border-yellow-300 focus:border-yellow-500 mb-2" placeholder="Paste your AI key here...">
+                
+                <div class="flex gap-3 items-start mt-2 text-sm text-yellow-800">
+                   <span class="text-xl">⚠️</span>
+                   <div>
+                     <strong>Privacy Notice (Free Tier):</strong><br>
+                     We automatically redact PII (Names, Phones, Emails) before sending data to the AI. <br>
+                     However, strictly sensitive medical/legal data should not be processed via free keys.
+                   </div>
+                </div>
+            </div>
+          </div>
+
+          <div class="flex gap-4 mt-8">
+            <button onclick="nextStep(1)" class="btn-secondary">Back</button>
+            <button onclick="nextStep(3)" class="btn-primary">Next: External Services &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="step3" class="step-section">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">3</span>
+          External Services
+        </h2>
+        <p class="text-slate-500 mb-6">Connect optional 3rd party services. Leave blank if not used.</p>
+
+        <div class="space-y-5">
+          <div>
+            <label class="input-label">Master Secret Key (Required)</label>
+            <div class="flex gap-2">
+                <input type="text" id="secretKey" class="input-field bg-slate-100" placeholder="Generated automatically..." readonly required>
+                <button type="button" onclick="generateKey()" class="bg-slate-200 px-4 rounded font-bold text-slate-600 hover:bg-slate-300">↻</button>
+            </div>
+            <p class="input-desc mt-1">Used to secure communications between App and Database.</p>
+          </div>
+
+          <div>
+            <label class="input-label">OpenRouteService API Key (Maps)</label>
+            <input type="text" id="orsKey" class="input-field" placeholder="5b3ce...">
+            <p class="input-desc">Required if you want address lookup (Reverse Geocoding).</p>
+          </div>
+
+          <div>
+            <label class="input-label">TextBelt API Key (SMS)</label>
+            <input type="text" id="textbeltKey" class="input-field" placeholder="textbelt_...">
+            <p class="input-desc">Required if you want the app to send real SMS alerts for Overdue/SOS events.</p>
+          </div>
+
+          <div>
+            <label class="input-label">Google Drive Folder ID</label>
+            <input type="text" id="folderId" class="input-field" placeholder="1vKz...">
+            <p class="input-desc">Copy the ID from the URL of a Drive folder to enable Photo Uploads.</p>
+          </div>
+
+          <div class="flex gap-4 mt-8">
+            <button onclick="nextStep(2)" class="btn-secondary">Back</button>
+            <button onclick="nextStep(4)" class="btn-primary">Next: Upload Templates &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="step4" class="step-section">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">4</span>
+          Upload Templates
+        </h2>
+        <p class="text-slate-500 mb-6">Please upload the 4 core files provided in your developer kit.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="file-drop" onclick="document.getElementById('fWorker').click()" id="dropWorker">
+            <span class="file-icon">👷</span>
+            <div class="font-bold text-slate-700">Worker App</div>
+            <div class="text-xs text-slate-400">worker_template.html</div>
+            <input type="file" id="fWorker" hidden onchange="handleFile(this, 'dropWorker')">
+          </div>
+          
+          <div class="file-drop" onclick="document.getElementById('fMonitor').click()" id="dropMonitor">
+            <span class="file-icon">🖥️</span>
+            <div class="font-bold text-slate-700">Monitor App</div>
+            <div class="text-xs text-slate-400">monitor_template.html</div>
+            <input type="file" id="fMonitor" hidden onchange="handleFile(this, 'dropMonitor')">
+          </div>
+          
+          <div class="file-drop" onclick="document.getElementById('fBackend').click()" id="dropBackend">
+            <span class="file-icon">⚙️</span>
+            <div class="font-bold text-slate-700">Backend System</div>
+            <div class="text-xs text-slate-400">backend_template.js</div>
+            <input type="file" id="fBackend" hidden onchange="handleFile(this, 'dropBackend')">
+          </div>
+          
+          <div class="file-drop" onclick="document.getElementById('fGuide').click()" id="dropGuide">
+            <span class="file-icon">📖</span>
+            <div class="font-bold text-slate-700">User Guide</div>
+            <div class="text-xs text-slate-400">guide_template.html</div>
+            <input type="file" id="fGuide" hidden onchange="handleFile(this, 'dropGuide')">
+          </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="file-drop p-4 border-dashed border-2 border-slate-300" onclick="document.getElementById('fManual').click()" id="dropManual">
+                <span class="text-xl">📘</span> <span class="font-bold text-slate-600">Ops Manual (Admin)</span>
+                <input type="file" id="fManual" hidden onchange="handleFile(this, 'dropManual')">
             </div>
         </div>
 
-        <div>
-            <label class="block text-sm text-gray-400 mb-1">Statistics Frequency</label>
-            <select id="statsFreq" class="input-field">
-                <option value="MONTHLY" selected>Monthly (1st of Month)</option>
-                <option value="WEEKLY">Weekly (Monday)</option>
-                <option value="DAILY">Daily (Midnight)</option>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">When to regenerate the 'Activity' and 'Travel' stats tabs.</p>
+        <div class="flex gap-4 mt-8">
+            <button onclick="nextStep(3)" class="btn-secondary">Back</button>
+            <button onclick="generateApp()" class="btn-primary bg-emerald-600 hover:bg-emerald-700">🚀 BUILD SYSTEM</button>
         </div>
+      </div>
 
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Master Secret Key (Random String)</label>
-          <input type="text" id="secretKey" class="input-field" placeholder="Generate random string..." required>
-          <button type="button" onclick="generateKey()" class="text-xs text-blue-400 mt-1 hover:underline">Generate Random Key</button>
-        </div>
+      <div id="step5" class="step-section text-center py-10">
+        <div class="text-6xl mb-6">✅</div>
+        <h2 class="text-3xl font-bold text-slate-800 mb-3">System Generated!</h2>
+        <p class="text-slate-600 mb-8 text-lg">Your customized "OTG AppSuite" ZIP file is downloading.</p>
         
-        <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <div class="flex items-center justify-between mb-2">
-            <label class="flex items-center space-x-3 cursor-pointer">
-              <input type="checkbox" id="enableAi" class="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700">
-              <span class="font-bold text-gray-200">Enable AI "Smart Scribe"</span>
-            </label>
+        <div class="bg-slate-800 text-slate-200 p-6 rounded-xl text-left font-mono text-sm overflow-x-auto shadow-lg">
+          <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+            <span class="text-emerald-400 text-xl">➜</span> 
+            <span class="font-bold text-white">Next Steps:</span>
           </div>
-          <p class="text-xs text-gray-400">Uses free Google Gemini keys to correct grammar/spelling in reports.</p>
-          <div id="aiWarning" class="hidden mt-2 p-2 bg-yellow-900/30 border border-yellow-700/50 rounded text-xs text-yellow-200">
-             <strong>⚠️ Privacy Notice:</strong> Data is processed by the Free Tier API. We automatically redact Names, Emails, and Phone Numbers (using Country Code +%%CODE%%) before sending, but strictly sensitive data should not be processed via free AI.
-          </div>
+          <ol class="list-decimal pl-5 space-y-2 text-slate-300">
+            <li>Extract the downloaded ZIP file.</li>
+            <li>Create a new Google Sheet & Apps Script project.</li>
+            <li>Paste the contents of <strong>backend.js</strong> into the Script editor.</li>
+            <li>Deploy as Web App (Execute as: Me, Access: Anyone).</li>
+            <li>Copy your new <strong>Deployment URL</strong>.</li>
+            <li>Open your local <strong>WorkerApp/index.html</strong> (or host it) and enter the URL in the Wizard.</li>
+          </ol>
         </div>
 
-        <button onclick="nextStep(2)" class="btn-primary mt-4">Next: API Keys &rarr;</button>
-      </div>
-    </div>
-
-    <div id="step2" class="step-section">
-      <h2 class="text-xl font-bold mb-4 text-emerald-400">2. External Services</h2>
-      <p class="text-sm text-gray-400 mb-4">Leave blank if you don't want to use a specific service.</p>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">OpenRouteService API Key (Maps)</label>
-          <input type="text" id="orsKey" class="input-field" placeholder="5b3ce...">
-        </div>
-        
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Gemini API Key (AI Grammar)</label>
-          <input type="text" id="geminiKey" class="input-field" placeholder="AIzaSy...">
-        </div>
-
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">TextBelt API Key (SMS Alerts)</label>
-          <input type="text" id="textbeltKey" class="input-field" placeholder="textbelt_...">
-        </div>
-
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Google Drive Folder ID (Photos)</label>
-          <input type="text" id="folderId" class="input-field" placeholder="1vKz...">
-        </div>
-
-        <div class="flex gap-4 mt-6">
-          <button onclick="nextStep(1)" class="w-1/3 py-3 rounded-lg border border-gray-600 hover:bg-gray-800">Back</button>
-          <button onclick="nextStep(3)" class="btn-primary w-2/3">Next: Upload Templates &rarr;</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="step3" class="step-section">
-      <h2 class="text-xl font-bold mb-4 text-purple-400">3. Template Upload</h2>
-      <p class="text-sm text-gray-400 mb-4">Upload the 4 core template files provided in the kit.</p>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div class="file-drop" onclick="document.getElementById('fWorker').click()">
-          <span class="text-2xl">👷</span><br>Worker App
-          <input type="file" id="fWorker" hidden onchange="fileCheck(this)">
-        </div>
-        <div class="file-drop" onclick="document.getElementById('fMonitor').click()">
-          <span class="text-2xl">🖥️</span><br>Monitor App
-          <input type="file" id="fMonitor" hidden onchange="fileCheck(this)">
-        </div>
-        <div class="file-drop" onclick="document.getElementById('fBackend').click()">
-          <span class="text-2xl">⚙️</span><br>Backend JS
-          <input type="file" id="fBackend" hidden onchange="fileCheck(this)">
-        </div>
-        <div class="file-drop" onclick="document.getElementById('fGuide').click()">
-          <span class="text-2xl">📖</span><br>User Guide
-          <input type="file" id="fGuide" hidden onchange="fileCheck(this)">
-        </div>
-        <div class="file-drop col-span-2" onclick="document.getElementById('fManual').click()">
-           <span class="text-2xl">📘</span><br>Ops Manual (Admin)
-           <input type="file" id="fManual" hidden onchange="fileCheck(this)">
-        </div>
-        <div class="file-drop col-span-2" onclick="document.getElementById('fLogo').click()">
-           <span class="text-2xl">🖼️</span><br>App Icon (Logo)
-           <input type="file" id="fLogo" hidden onchange="fileCheck(this)">
-        </div>
+        <button onclick="location.reload()" class="mt-8 text-slate-400 hover:text-slate-600 underline">Create Another System</button>
       </div>
 
-      <div class="flex gap-4 mt-6">
-          <button onclick="nextStep(2)" class="w-1/3 py-3 rounded-lg border border-gray-600 hover:bg-gray-800">Back</button>
-          <button onclick="generateApp()" class="btn-primary w-2/3 bg-gradient-to-r from-emerald-500 to-teal-500">🚀 BUILD SYSTEM</button>
-      </div>
-    </div>
-
-    <div id="step4" class="step-section text-center">
-      <div class="text-6xl mb-4">✅</div>
-      <h2 class="text-2xl font-bold text-white mb-2">System Generated!</h2>
-      <p class="text-gray-400 mb-6">Your customized "OTG AppSuite" is ready.</p>
-      
-      <div class="bg-gray-800 p-4 rounded text-left text-sm font-mono text-green-400 overflow-x-auto mb-6">
-        1. Extract the ZIP file.<br>
-        2. Create a new Google Sheet & Script.<br>
-        3. Paste the contents of 'backend.js' into the Script.<br>
-        4. Deploy as Web App -> Access: Anyone.<br>
-        5. Copy the Deployment URL.<br>
-        6. Edit 'worker/index.html' & 'monitor/index.html' to paste the URL.
-      </div>
-
-      <button onclick="location.reload()" class="text-gray-400 hover:text-white underline">Start Over</button>
-    </div>
-
-  </form>
-</div>
+    </form>
+  </div>
 
 <script>
   let TEMPLATES = {};
-  
-  // AI Toggle Logic & UI Updates
-  document.getElementById('enableAi').addEventListener('change', updateUi);
-  document.getElementById('countryCode').addEventListener('input', updateUi);
 
-  function updateUi() {
-      const isAi = document.getElementById('enableAi').checked;
-      const cc = document.getElementById('countryCode').value || "64";
-      const warning = document.getElementById('aiWarning');
-      
-      if(isAi) {
-          warning.innerHTML = `<strong>⚠️ Privacy Notice:</strong> Data is processed by the Free Tier API. We automatically redact Names, Emails, and Phone Numbers (using Country Code +${cc}) before sending, but strictly sensitive data should not be processed via free AI.`;
-          warning.classList.remove('hidden');
-          document.getElementById('geminiKey').setAttribute('required', 'true');
-      } else {
-          warning.classList.add('hidden');
-          document.getElementById('geminiKey').removeAttribute('required');
-      }
-  }
+  // Initialize
+  window.onload = function() {
+      generateKey();
+  };
 
   function nextStep(n) {
+    // Basic validation
+    if(n === 2) {
+       if(!document.getElementById('orgName').value) return alert("Please enter an Organisation Name.");
+    }
+    
     document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
     document.getElementById('step' + n).classList.add('active');
+    
+    // Update Dots
+    document.querySelectorAll('.progress-dot').forEach((d, i) => {
+        if(i < n) d.classList.add('active');
+        else d.classList.remove('active');
+    });
+  }
+
+  function toggleAiUI() {
+      const isChecked = document.getElementById('enableAi').checked;
+      const box = document.getElementById('aiConfigBox');
+      const keyInput = document.getElementById('geminiKey');
+      
+      if(isChecked) {
+          box.classList.remove('hidden');
+          keyInput.setAttribute('required', 'true');
+      } else {
+          box.classList.add('hidden');
+          keyInput.removeAttribute('required');
+      }
   }
 
   function generateKey() {
@@ -207,31 +332,50 @@
     document.getElementById('secretKey').value = result;
   }
 
-  function fileCheck(input) {
-    const file = input.files[0];
-    if(file) {
-        input.parentElement.style.borderColor = '#10b981';
-        input.parentElement.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
-        
-        const reader = new FileReader();
-        if(file.name.endsWith('.jpg') || file.name.endsWith('.png')) {
-           reader.readAsDataURL(file);
-           reader.onload = e => TEMPLATES[input.id] = e.target.result;
-        } else {
-           reader.readAsText(file);
-           reader.onload = e => TEMPLATES[input.id] = e.target.result;
-        }
-    }
+  function handleLogo(input) {
+      const file = input.files[0];
+      if(file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+              TEMPLATES.fLogo = e.target.result; // Base64
+              
+              // Update UI
+              const preview = document.getElementById('logoPreview');
+              preview.src = e.target.result;
+              preview.classList.remove('hidden');
+              document.getElementById('logoPlaceholder').classList.add('hidden');
+              
+              document.getElementById('dropLogo').classList.add('loaded');
+              document.getElementById('dropLogo').querySelector('span.font-semibold').innerText = file.name;
+          };
+          reader.readAsDataURL(file);
+      }
+  }
+
+  function handleFile(input, dropId) {
+      const file = input.files[0];
+      if(file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+              TEMPLATES[input.id] = e.target.result; // Text content
+              
+              // Visual Feedback
+              const dropZone = document.getElementById(dropId);
+              dropZone.classList.add('loaded');
+              dropZone.querySelector('div.font-bold').innerText = "✅ " + file.name;
+              dropZone.querySelector('div.font-bold').classList.add('text-emerald-600');
+          };
+          reader.readAsText(file);
+      }
   }
 
   async function generateApp() {
     // Validation
     const org = document.getElementById('orgName').value;
     const secret = document.getElementById('secretKey').value;
-    if(!org || !secret || !TEMPLATES.fWorker || !TEMPLATES.fBackend) {
-        alert("Please complete all fields and upload required templates.");
-        return;
-    }
+    
+    if(!org || !secret) return alert("Missing Organisation Name or Secret Key.");
+    if(!TEMPLATES.fWorker || !TEMPLATES.fBackend) return alert("Please upload the required templates (Worker & Backend).");
 
     const zip = new JSZip();
     const workerKey = "W_" + Math.random().toString(36).substr(2, 9);
@@ -293,7 +437,7 @@
 
     // Service Worker & Manifest
     const swCode = `
-const CACHE_NAME = 'otg-cache-v77.4';
+const CACHE_NAME = 'otg-cache-v77.5';
 const urlsToCache = [
   './',
   './index.html',
@@ -338,7 +482,7 @@ self.addEventListener('fetch', event => { event.respondWith(caches.match(event.r
         link.href = URL.createObjectURL(content);
         link.download = `OTG_AppSuite_${C.ORG.replace(/\s+/g,'_')}.zip`;
         link.click();
-        nextStep(4);
+        nextStep(5);
     });
   }
 </script>
