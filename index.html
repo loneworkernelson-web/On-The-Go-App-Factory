@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v77.2 (Smart Format)</title>
+  <title>OTG Factory v77.4 (Stats Config)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -26,7 +26,7 @@
   
   <div class="text-center mb-8">
     <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-    <p class="text-gray-400 mt-2">v77.2 | Global + Smart Format</p>
+    <p class="text-gray-400 mt-2">v77.4 | Global + Scheduled Reporting</p>
   </div>
 
   <form id="factoryForm" onsubmit="return false;">
@@ -44,13 +44,21 @@
             <div>
                 <label class="block text-sm text-gray-400 mb-1">Country Code (Phone)</label>
                 <input type="number" id="countryCode" class="input-field" placeholder="64" value="64">
-                <p class="text-xs text-gray-500 mt-1">e.g. 64 (NZ), 1 (US), 44 (UK)</p>
             </div>
             <div>
                 <label class="block text-sm text-gray-400 mb-1">Timezone (Google)</label>
                 <input type="text" id="timezone" class="input-field" placeholder="Pacific/Auckland" value="Pacific/Auckland">
-                <p class="text-xs text-gray-500 mt-1">TZ Database Name</p>
             </div>
+        </div>
+
+        <div>
+            <label class="block text-sm text-gray-400 mb-1">Statistics Frequency</label>
+            <select id="statsFreq" class="input-field">
+                <option value="MONTHLY" selected>Monthly (1st of Month)</option>
+                <option value="WEEKLY">Weekly (Monday)</option>
+                <option value="DAILY">Daily (Midnight)</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">When to regenerate the 'Activity' and 'Travel' stats tabs.</p>
         </div>
 
         <div>
@@ -240,6 +248,7 @@
         ENABLE_AI: document.getElementById('enableAi').checked ? "true" : "false",
         COUNTRY: document.getElementById('countryCode').value || "64",
         TIMEZONE: document.getElementById('timezone').value || "Pacific/Auckland",
+        STATS_FREQ: document.getElementById('statsFreq').value || "MONTHLY",
         LOGO: TEMPLATES.fLogo || "" // Base64
     };
 
@@ -254,13 +263,13 @@
         .replace(/%%ORGANISATION_NAME%%/g, C.ORG)
         .replace(/%%TIMEZONE%%/g, C.TIMEZONE)
         .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY)
+        .replace(/%%STATS_FREQ%%/g, C.STATS_FREQ)
         .replace(/%%ESCALATION_MINUTES%%/g, "60")
         .replace(/%%ENABLE_AI%%/g, C.ENABLE_AI);
 
     zip.file("backend.js", backendCode);
 
     // 2. Process Worker App
-    // CHANGE: Now Injects COUNTRY_CODE
     let wHtml = TEMPLATES.fWorker
         .replace(/%%ORG_NAME%%/g, C.ORG)
         .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY) 
@@ -284,7 +293,7 @@
 
     // Service Worker & Manifest
     const swCode = `
-const CACHE_NAME = 'otg-cache-v77.2';
+const CACHE_NAME = 'otg-cache-v77.4';
 const urlsToCache = [
   './',
   './index.html',
