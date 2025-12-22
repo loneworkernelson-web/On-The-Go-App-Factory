@@ -54,12 +54,32 @@ The backend relies on a Google Sheet with specific tab names and column orders.
     * `[HEADING]`: H3 divider.
 
 ### B. Worker App State Object
-The client-side `localStorage` key `loneWorkerState` persists a JSON structure containing:
-* `settings`: User profile (Name, Phone, PINs).
-* `locations`: Array of site objects (ID, Name, Address, Report settings).
-* `activeVisit`: Current timer state (Start Time, Due Time, GPS).
-* `pendingUploads`: Queue of offline payloads waiting for sync.
-* `meta`: Vehicle WOF expiry and last check dates.
+The client-side `localStorage` key `loneWorkerState` persists this JSON structure:
+
+    {
+      "settings": {
+        "workerName": "John Doe",
+        "workerPhone": "+6421...",
+        "pinCode": "1234",
+        "duressPin": "9999",
+        "googleSheetUrl": "https://..."
+      },
+      "locations": [
+        { "id": "loc_123", "name": "Office", "address": "...", "noReport": false, "templateName": "Visit Report" },
+        { "id": "travel", "name": "Travelling", "noReport": true, "templateName": "Travel Report" }
+      ],
+      "activeVisit": {
+        "locationId": "loc_123",
+        "startTime": "ISO_STRING",
+        "anticipatedDepartureTime": "ISO_STRING",
+        "startGPS": "-41.2,174.7",
+        "fiveMinWarned": false,
+        "criticalSent": false,
+        "isPanic": false
+      },
+      "pendingUploads": [ { "payload": "..." } ],
+      "meta": { "wofExpiry": "2025-12-01", "lastVehCheck": "..." }
+    }
 
 ---
 
@@ -76,13 +96,13 @@ The client-side `localStorage` key `loneWorkerState` persists a JSON structure c
     * Browser API detects Timezone (e.g., `Australia/Sydney`).
     * Both are injected into the final build.
 3.  **Template Injection:**
-    * **User Guide:** Loads `guide_template.html`. Performs Regex replacement on conditional blocks based on user checkboxes.
+    * **User Guide:** Loads `guide_template.html`. Performs Regex replacement on `` blocks.
     * **Ops Manual:** Loads `ops_manual_template.html`. Injects Keys and URLs.
 4.  **Zip Construction:**
     * Bundles `WorkerApp` (index.html, sw.js, manifest.json, USER_GUIDE.html).
     * Bundles `MonitorApp` (index.html).
     * Bundles `Code.gs` and `OPERATIONS_MANUAL.html`.
-    * Naming Convention: `OrgName_AppSuite.zip`.
+    * Naming Convention: `OrgName_AppSuite.zip` (No "Diamond").
 
 ### B. Worker App (`worker_template.html`)
 **Role:** Primary User Interface.
