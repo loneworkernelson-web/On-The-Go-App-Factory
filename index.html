@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v76.0 (Global)</title>
+  <title>OTG Factory v76.2 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -55,10 +55,27 @@
       </div>
   </div>
 
+  <div id="driveHelpModal" class="modal-backdrop">
+      <div class="modal-content border-blue-500">
+          <h2 class="text-xl font-bold text-white mb-4">📂 How to get a Drive Folder ID</h2>
+          <ol class="list-decimal pl-5 space-y-3 text-gray-300 text-sm mb-6">
+              <li>Open Google Drive in your browser.</li>
+              <li>Create a new folder (e.g., "Safety Photos").</li>
+              <li>Double-click to open the folder.</li>
+              <li>Look at the URL bar at the top of your browser.</li>
+              <li>Copy the random string of letters/numbers AFTER <code>folders/</code>.</li>
+          </ol>
+          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">
+              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
+          </div>
+          <button onclick="closeModal('driveHelpModal')" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
+      </div>
+  </div>
+
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">Beta v76.0 (Global Edition)</p>
+      <p class="text-gray-400">Beta v76.2 (Global Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -297,7 +314,20 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
         saveInput(document.getElementById('countrySelect'));
     }
 
-    function toggleEnterBtn() { document.getElementById('btnEnter').disabled = !document.getElementById('chkAccept').checked; }
+    // FIX: Updated logic to visually toggle button style
+    function toggleEnterBtn() { 
+        const btn = document.getElementById('btnEnter');
+        const chk = document.getElementById('chkAccept');
+        btn.disabled = !chk.checked;
+        if(chk.checked) {
+            btn.classList.remove('bg-gray-700', 'text-gray-500');
+            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+        } else {
+            btn.classList.add('bg-gray-700', 'text-gray-500');
+            btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+        }
+    }
+    
     function closeModal(id) { document.getElementById(id).style.display='none'; if(id==='disclaimerModal') document.getElementById('mainContent').classList.remove('blur-sm'); }
 
     function setupDragDrop() {
