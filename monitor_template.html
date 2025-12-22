@@ -97,7 +97,7 @@
 
     <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
         <div class="flex justify-between items-center mb-2">
-            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v74.4</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
+            <div class="flex items-center gap-4"><img src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1"><div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v75.8</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div></div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
@@ -118,13 +118,9 @@ const SCRIPT_URL = "%%SHEET_URL%%";
 let API_KEY = localStorage.getItem('otg_monitor_key'); 
 let workerData = []; let allRows = []; let escalationLimit = 15; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null;
 let lastHeartbeat = Date.now(); 
-let watchdogTimer = null;
 
 async function startApp() {
-    // 1. Clear UI Immediately (Fixes freeze)
     document.getElementById('startOverlay').classList.add('hidden');
-    
-    // 2. Try Audio Safe-Start
     try {
         if(typeof Tone !== 'undefined') {
             await Tone.start(); 
@@ -136,8 +132,6 @@ async function startApp() {
         document.getElementById('btnAudio').innerText = "🔇 Audio Error";
         document.getElementById('btnAudio').classList.replace('bg-green-600', 'bg-red-900');
     }
-
-    // 3. Logic Flow
     if(!API_KEY) { 
         document.getElementById('authModal').classList.remove('hidden'); 
     } else { 
@@ -149,7 +143,6 @@ function startPolling() {
     fetchData(); 
     setInterval(fetchData, 10000); 
     setInterval(renderGrid, 1000);
-    // Connection Watchdog
     setInterval(() => {
         if (Date.now() - lastHeartbeat > 45000) document.getElementById('connectionOverlay').classList.remove('hidden');
         else document.getElementById('connectionOverlay').classList.add('hidden');
@@ -233,21 +226,14 @@ function handleData(response) {
 function processWorkers(rows) { 
     const workers = {}; 
     const history = {};
-    
-    // Sort chronological to build paths
     rows.sort((a,b) => new Date(a.Timestamp) - new Date(b.Timestamp));
-
     rows.forEach(r => { 
         const name = r['Worker Name']; if (!name) return; 
         const timestamp = new Date(r['Timestamp']).getTime(); 
-        
-        // Build History
         if(!history[name]) history[name] = [];
         if(r['Last Known GPS'] && r['Last Known GPS'].includes(',')) {
             history[name].push(r['Last Known GPS']);
         }
-
-        // Keep Latest Status
         if (!workers[name] || timestamp > workers[name].timestamp) { 
             workers[name] = { 
                 name: name, status: r['Alarm Status'], phone: r['Worker Phone Number'], 
@@ -258,12 +244,7 @@ function processWorkers(rows) {
             }; 
         } 
     }); 
-    
-    // Attach recent history (last 10 points)
-    Object.keys(workers).forEach(k => {
-        workers[k].history = history[k] ? history[k].slice(-10) : [];
-    });
-
+    Object.keys(workers).forEach(k => { workers[k].history = history[k] ? history[k].slice(-10) : []; });
     return Object.values(workers); 
 }
 
@@ -327,17 +308,62 @@ function renderGrid() {
 
 function escapeHtml(text) { 
     if (!text) return ""; 
-    return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;"); 
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); 
 }
 
-function initMap() { if(mapInstance) { mapInstance.invalidateSize(); return; } mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); markersLayer = L.layerGroup().addTo(mapInstance); }
+function initMap() { 
+    if(mapInstance) { mapInstance.invalidateSize(); return; } 
+    mapInstance = L.map('mapView').setView([-40.9006, 174.8860], 5); 
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(mapInstance); 
+    markersLayer = L.layerGroup().addTo(mapInstance); 
+}
 
-function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const [lat, lng] = gps.split(',').map(Number); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
+function renderMap() { 
+    if(!mapInstance) return; 
+    
+    // Safety check: ensure layer exists
+    if (!markersLayer) markersLayer = L.layerGroup().addTo(mapInstance);
+    
+    markersLayer.clearLayers(); 
+    const bounds = L.latLngBounds(); 
+    let hasMarkers = false; 
+    const now = Date.now(); 
+    
+    workerData.forEach(w => { 
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
+        if (currentFilter === 'ACTIVE' && isSafe && !w.status.includes('EMERGENCY')) return; 
+        
+        // ROBUST GPS PARSING
+        if(!w.gps || w.gps.length < 5) return; 
+        const cleanGps = w.gps.replace(/[^0-9.,-]/g, ''); // Remove unexpected chars like quotes
+        const parts = cleanGps.split(',');
+        if(parts.length !== 2) return;
+        
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        
+        if(isNaN(lat) || isNaN(lng)) return; 
+        
+        let colorClass = 'grey'; 
+        const urgency = getUrgencyScore(w, now); 
+        if(urgency >= 2000) colorClass = 'purple'; else if(urgency >= 1000) colorClass = 'red'; else if(urgency >= 500) colorClass = 'amber'; else if(urgency >= 100) colorClass = 'green'; 
+        
+        if(w.history && w.history.length > 1) {
+            const path = w.history.map(h => {
+                const c = h.replace(/[^0-9.,-]/g, '').split(',');
+                return [parseFloat(c[0]), parseFloat(c[1])];
+            }).filter(p => !isNaN(p[0]));
+            if(path.length > 0) L.polyline(path, {color: '#3b82f6', weight: 3, opacity: 0.5, dashArray: '5, 10'}).addTo(markersLayer);
+        }
+
+        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${colorClass}"></div>`, iconSize: [24, 24] }); 
+        L.marker([lat, lng], {icon: icon, zIndexOffset: 1000}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}<br>${escapeHtml(w.location)}`).addTo(markersLayer); 
+        bounds.extend([lat, lng]); hasMarkers = true; 
+    }); 
+    if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50], maxZoom:15}); 
+}
+
+function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const clean = gps.replace(/[^0-9.,-]/g, '').split(','); const lat = parseFloat(clean[0]); const lng = parseFloat(clean[1]); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
 function toggleView(view) { currentView = view; const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); document.getElementById('emptyState').classList.add('hidden'); btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } }
 function renderLog() { const list = document.getElementById('eventLogList'); const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)); const top = sorted.slice(0, 50); let html = ''; top.forEach(r => { const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); let color = "text-gray-300"; if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold"; else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold"; else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold"; html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`; }); list.innerHTML = html; }
 function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000; if (w.status.includes('EMERGENCY')) return 1000; const due = new Date(w.dueTime).getTime(); if (!isNaN(due) && due < now && w.status !== 'DEPARTED') return 500 + (now - due); if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100; return 0; }
