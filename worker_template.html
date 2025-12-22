@@ -356,39 +356,38 @@ function startVisit(){
     if(s.id==='travel')startTravellingPulse();
     const n=new Date();
     
-    // UI FEEDBACK
-    const btn = document.getElementById('btnStart');
-    btn.innerText = "Locating...";
-    
-    // DEFINITION: Start the actual logic (called after GPS success or fail)
-    const runStart = (pos) => {
-        const gps = pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "";
-        state.activeVisit={
-            locationId:s.id,
-            startTime:n,
-            anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000),
-            fiveMinWarned:false,
-            startGPS: gps
-        };
-        state.lowBatSent=false;
-        saveState();
-        enterLockedScreen();
-        const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":"Started"};
-        if(gps) payload["Last Known GPS"] = gps;
-        else payload["Notes"] += " (GPS Timeout)";
-        processUploadQueue(buildPayload(payload));
-        setTimeout(()=>{if(state.pendingUploads.length>0)processUploadQueue();},5000);
+    // INSTANT START: Do not change text to "Locating". Transition immediately.
+    // The GPS logic will run in background or on next screen load if needed.
+    state.activeVisit={
+        locationId:s.id,
+        startTime:n,
+        anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000),
+        fiveMinWarned:false,
+        startGPS: "" // Will be filled by background process
     };
-
-    // TACTICAL GPS: Fast, cached, with strict timeout
-    // Pre-warming makes this cache hit much more likely
+    state.lowBatSent=false;
+    saveState();
+    enterLockedScreen(); // Immediate transition
+    
+    // Background GPS Capture
     navigator.geolocation.getCurrentPosition(
-        runStart, 
-        (err) => { 
-            console.warn("Start GPS Failed", err); 
-            runStart(null); // Proceed anyway
+        (pos) => {
+            if(state.activeVisit) {
+                state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
+                saveState();
+                // Send the "Started" payload now that we have GPS
+                const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":"Started", "Last Known GPS": state.activeVisit.startGPS};
+                processUploadQueue(buildPayload(payload));
+            }
         }, 
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 } // 5s timeout, 60s cache
+        (err) => { 
+            // Failed GPS? Send payload anyway without it.
+            if(state.activeVisit) {
+                const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":"Started (GPS Timeout)"};
+                processUploadQueue(buildPayload(payload));
+            }
+        }, 
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
 }
 function warmUpGps() {
@@ -522,7 +521,8 @@ function loadFormAndShow(t){
         fields.insertBefore(warning, fields.firstChild);
     }
 
-    if(calculatedDist){let di=document.querySelector('[data-key*="Distance"]');if(!di)di=document.querySelector('[data-key*="KM"]');if(!di)di=document.querySelector('[data-key*="Mileage"]');if(di){di.value=calculatedDist.km;di.style.border="2px solid #4ade80";}if(calculatedDist.type==='crow'){const ni=document.getElementById('rep_notes')||document.querySelector('[data-key="Notes"]');if(ni)ni.value=(ni.value+" [Warning: As the crow flies calculation only]").trim();}}const b=document.getElementById('btnSubmitRep');const nb=b.cloneNode(true);b.parentNode.replaceChild(nb,b);if(!state.activeVisit){nb.innerText="SUBMIT REPORT";nb.classList.remove('long-press-btn');nb.classList.add('bg-blue-600','hover:bg-blue-500');nb.onclick=submitReport;}else if(isMidVisitUpdate){nb.innerText="Send Update";nb.classList.remove('long-press-btn');nb.onclick=submitReport;}else{nb.innerText="HOLD TO SUBMIT & END";nb.classList.add('long-press-btn');setupLongPress(nb,submitReport);}}
+    if(calculatedDist){let di=document.querySelector('[data-key*="Distance"]');if(!di)di=document.querySelector('[data-key*="KM"]');if(!di)di=document.querySelector('[data-key*="Mileage"]');if(di){di.value=calculatedDist.km;di.style.border="2px solid #4ade80";}if(calculatedDist.type==='crow'){const ni=document.getElementById('rep_notes')||document.querySelector('[data-key="Notes"]');if(ni)ni.value=(ni.value+" [Warning: As the crow flies calculation only]").trim();}}const b=document.getElementById('btnSubmitRep');const nb=b.cloneNode(true);b.parentNode.replaceChild(nb,b);if(!state.activeVisit){nb.innerText="SUBMIT REPORT";nb.classList.remove('long-press-btn');nb.classList.add('bg-blue-600','hover:bg-blue-500');nb.onclick=submitReport;}else if(isMidVisitUpdate){nb.innerText="Send Update";nb.classList.remove('long-press-btn');nb.onclick=submitReport;}else{nb.innerText="HOLD TO SUBMIT & END";nb.classList.add('long-press-btn');setupLongPress(nb,submitReport);}
+}
 function submitReport(){
     // BLOCKER: Verify Email for Personal Notes
     if(currentActiveTemplate === 'Note to Self' && !state.settings.workerEmail) {
