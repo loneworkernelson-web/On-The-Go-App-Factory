@@ -299,13 +299,14 @@ function initLocations(){if(!state.locations)state.locations=[];if(!state.cached
 function renderLocations(){
     const l=document.getElementById('locationList');
     l.innerHTML='';
+    if (!state.locations) state.locations = [];
     state.locations.forEach(loc=>{
+        if (!loc || !loc.id) return;
         const d=document.createElement('div');
         let c=state.selectedLocationId===loc.id?'border-blue-500 bg-blue-900':'border-transparent bg-gray-900';
         if(loc.id==='travel') c=state.selectedLocationId===loc.id?'border-purple-500 bg-purple-900':'border-purple-900/30 bg-gray-900';
         d.className=`p-4 rounded-lg border-2 ${c} cursor-pointer flex justify-between items-center mb-2`;
         
-        // Show Info/Edit button for Manually Added Tiles AND 'Travelling'
         let isMan = loc.id.startsWith('loc_') || loc.id === 'travel';
         let ib = (loc.notes || loc.contactName || isMan) ? `<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : '';
         
@@ -567,7 +568,7 @@ function saveLoc(){
     const a=document.getElementById('locAddr').value;
     const t=document.getElementById('locTemplate').value;
     if(!n)return alert("Site Name Required");
-    const l={id:id,name:n,companyName:b,address:a,templateName:t,noReport:document.getElementById('radRepNo').checked};
+    const l={id:id,name:n,companyName:b,address:a,templateName:t,noReport:false};
     
     if(document.getElementById('locId').value){const idx=state.locations.findIndex(x=>x.id===id);if(idx>=0)state.locations[idx]=l;}else{state.locations.push(l);}saveState();renderLocations();closeModal('location');}
 function deleteLoc(){const id=document.getElementById('locId').value;if(!id)return;if(confirm("Delete this location?")){state.locations=state.locations.filter(x=>x.id!==id);saveState();renderLocations();closeModal('location');}}
