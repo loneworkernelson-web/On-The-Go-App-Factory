@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v78.22 (Golden Fix)</title>
+  <title>OTG Factory v78.24 (Stable)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .step-section { display: none; }
@@ -23,14 +23,16 @@
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-    .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
-    .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; }
+    .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; background: #0f172a; transition: 0.2s; }
+    .drop-zone:hover { border-color: #3b82f6; background: #1e293b; }
     .file-status { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
     .status-badge { padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.7rem; }
     .status-pending { background: #334155; color: #94a3b8; }
     .status-ok { background: #064e3b; color: #34d399; }
     .status-err { background: #450a0a; color: #fca5a5; }
+    .step-badge { background: #3b82f6; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 8px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+    .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -41,7 +43,7 @@
           <div class="space-y-4 text-gray-300 text-sm mb-6">
               <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution.</p>
               <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps.</li>
+                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps. Staff must keep the app active.</li>
                   <li><strong>Connectivity:</strong> Alerts require data. They will not send in dead zones.</li>
                   <li><strong>No SLA:</strong> This relies on free Google services. No uptime guarantees.</li>
               </ul>
@@ -59,7 +61,9 @@
   <div id="driveHelpModal" class="modal-backdrop">
       <div class="modal-content border-blue-500">
           <h2 class="text-xl font-bold text-white mb-4">📂 Finding Drive Folder ID</h2>
-          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong></div>
+          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">
+              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
+          </div>
           <button onclick="closeModal('driveHelpModal')" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
       </div>
   </div>
@@ -67,7 +71,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v78.22 | Golden Master</p>
+      <p class="text-gray-400">v78.24 | Golden Master (Stable)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -99,6 +103,7 @@
                           <option value="Europe/London">Europe/London (UK)</option>
                           <option value="America/New_York">America/New_York (EST)</option>
                           <option value="America/Chicago">America/Chicago (CST)</option>
+                          <option value="America/Denver">America/Denver (MST)</option>
                           <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
                           <option value="UTC">UTC (Universal)</option>
                       </select>
@@ -161,7 +166,7 @@
 
         <div id="step4" class="step-section text-center space-y-10 py-8">
           <div class="bg-gray-900 p-6 rounded-lg border border-gray-700 text-left">
-              <p class="text-gray-400 text-sm mb-2">Scanning assets...</p>
+              <h2 class="text-xl font-bold text-white mb-4">4. Load Templates</h2>
               <div class="space-y-1" id="fileStatusArea">
                   <div id="st_worker" class="file-status"><span>Worker App</span><span class="status-badge status-pending">...</span></div>
                   <div id="st_monitor" class="file-status"><span>Monitor App</span><span class="status-badge status-pending">...</span></div>
@@ -169,7 +174,13 @@
                   <div id="st_guide" class="file-status"><span>Guide</span><span class="status-badge status-pending">...</span></div>
                   <div id="st_manual" class="file-status"><span>Manual</span><span class="status-badge status-pending">...</span></div>
               </div>
-              <div id="manUpload" class="hidden mt-4 pt-4 border-t border-gray-600"><p class="text-red-400 text-xs font-bold">⚠️ Auto-load failed. Upload files manually:</p><input type="file" multiple onchange="handleFiles(this)" class="text-xs text-gray-500 mt-2"></div>
+              <div id="manUpload" class="mt-6 pt-4 border-t border-gray-600">
+                  <p class="text-gray-400 text-sm mb-2"><strong>Manual Load (Required if offline):</strong> Drag & Drop the 5 template files here:</p>
+                  <div id="fileDrop" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                      <span class="text-gray-400 font-bold">📂 Drag Files Here</span>
+                  </div>
+                  <input type="file" id="fileInput" multiple onchange="handleFiles(this)" class="hidden">
+              </div>
           </div>
           <button id="btnDlZip" onclick="downloadZip()" disabled class="w-full btn btn-success py-4 text-xl shadow-xl opacity-50">Download .ZIP</button>
           <div class="flex justify-between"><button onclick="gotoStep(3)" class="text-gray-400">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Deployment Guide →</button></div>
@@ -213,13 +224,15 @@ window.onload = async () => {
     setupDragDrop(); 
     toggleAiInput(); 
     genKey();
-    for (const [f, id] of Object.entries(FILES)) { // FIX: Use filenames correctly
+    
+    // Auto-Load Attempt
+    for (const [f, id] of Object.entries(FILES)) {
         try { 
             const r = await fetch(f); 
             if (r.ok) {
-                TEMPLATES[f] = await r.text(); // Store by filename
-                const badge = document.querySelector(`#${id} .status-badge`);
-                if(badge) { badge.className="status-badge status-ok"; badge.innerText="LOADED"; }
+                TEMPLATES[f] = await r.text();
+                document.querySelector(`#${id} .status-badge`).className="status-badge status-ok";
+                document.querySelector(`#${id} .status-badge`).innerText="LOADED";
             }
         } catch(e){} 
     }
@@ -251,12 +264,19 @@ function detectTimezoneOnLoad() {
 
 function toggleEnterBtn(){const b=document.getElementById('btnEnter'),c=document.getElementById('chkAccept');b.disabled=!c.checked;if(c.checked){b.classList.remove('bg-gray-700','text-gray-500');b.classList.add('bg-blue-600','text-white','hover:bg-blue-500');}else{b.classList.add('bg-gray-700','text-gray-500');b.classList.remove('bg-blue-600','text-white','hover:bg-blue-500');}}
 function closeModal(id){document.getElementById(id).style.display='none';if(id==='disclaimerModal')document.getElementById('mainContent').classList.remove('blur-sm');}
-function setupDragDrop(){const d=document.getElementById('dropZone');d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('border-blue-500')});d.addEventListener('dragleave',e=>{e.preventDefault();d.classList.remove('border-blue-500')});d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('border-blue-500');if(e.dataTransfer.files.length)handleLogo({files:e.dataTransfer.files})});}
-function handleLogo(i){if(i.files[0]){const r=new FileReader();r.onload=e=>{TEMPLATES.logo=e.target.result;document.getElementById('logoImg').src=e.target.result;document.getElementById('logoImg').classList.remove('hidden');document.getElementById('logoText').innerText="✅ Ready";document.getElementById('logoUrl').value=e.target.result;saveInput(document.getElementById('logoUrl'));};r.readAsDataURL(i.files[0]);}}
-function gotoStep(n){
-    if(n===4) checkAssets(Object.keys(TEMPLATES).length === 5);
-    document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active'));document.getElementById('step'+n).classList.add('active');for(let i=1;i<=5;i++){const t=document.getElementById('tab'+i);if(i===n)t.classList.add('active');else t.classList.remove('active');}
+function setupDragDrop(){
+    const d=document.getElementById('dropZone');
+    d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('border-blue-500')});
+    d.addEventListener('dragleave',e=>{e.preventDefault();d.classList.remove('border-blue-500')});
+    d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('border-blue-500');if(e.dataTransfer.files.length)handleLogo({files:e.dataTransfer.files})});
+    
+    const f=document.getElementById('fileDrop');
+    f.addEventListener('dragover',e=>{e.preventDefault();f.classList.add('border-blue-500')});
+    f.addEventListener('dragleave',e=>{e.preventDefault();f.classList.remove('border-blue-500')});
+    f.addEventListener('drop',e=>{e.preventDefault();f.classList.remove('border-blue-500');if(e.dataTransfer.files.length)handleFiles({files:e.dataTransfer.files})});
 }
+function handleLogo(i){if(i.files[0]){const r=new FileReader();r.onload=e=>{TEMPLATES.logo=e.target.result;document.getElementById('logoImg').src=e.target.result;document.getElementById('logoImg').classList.remove('hidden');document.getElementById('logoText').innerText="✅ Ready";document.getElementById('logoUrl').value=e.target.result;saveInput(document.getElementById('logoUrl'));};r.readAsDataURL(i.files[0]);}}
+function gotoStep(n){if(n===4)checkAssets(Object.keys(TEMPLATES).length===5);document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active'));document.getElementById('step'+n).classList.add('active');for(let i=1;i<=5;i++){const t=document.getElementById('tab'+i);if(i===n)t.classList.add('active');else t.classList.remove('active');}}
 function toggleVehicle(){document.getElementById('vehOptions').style.display=document.getElementById('chkVehicle').checked?'flex':'none';}
 function toggleAiInput(){const c=document.getElementById('enableAi'),i=document.getElementById('geminiKey');i.disabled=!c.checked;i.style.opacity=c.checked?'1':'0.5';}
 function genKey(){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let r='';for(let i=0;i<32;i++)r+=c.charAt(Math.floor(Math.random()*c.length));document.getElementById('secretKey').value=r;}
@@ -264,19 +284,7 @@ function copyData(k){navigator.clipboard.writeText(BLUEPRINTS[k]);alert(k+" Copi
 
 function generateScript(){
     if(!TEMPLATES['backend_template.js']){setTimeout(generateScript,500);return;}
-    const code=TEMPLATES['backend_template.js']
-        .replace('%%SECRET_KEY%%',document.getElementById('secretKey').value)
-        .replace(/%%WORKER_KEY%%/g,workerKey)
-        .replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value)
-        .replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value)
-        .replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value)
-        .replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value)
-        .replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value)
-        .replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland")
-        .replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+',''))
-        .replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value)
-        .replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked)
-        .replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
+    const code=TEMPLATES['backend_template.js'].replace('%%SECRET_KEY%%',document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey).replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value).replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland").replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+','')).replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value).replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked).replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
     document.getElementById('codeDisplay').textContent=code;gotoStep(3);
 }
 function copyScript(){navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent);alert("Copied!");}
@@ -292,7 +300,7 @@ function handleFiles(inp){
         if(FILES.hasOwnProperty(f.name)){
             const r=new FileReader();
             r.onload=e=>{
-                TEMPLATES[f.name]=e.target.result; // Key by FILENAME
+                TEMPLATES[f.name]=e.target.result;
                 const id = FILES[f.name];
                 document.querySelector(`#${id} .status-badge`).className="status-badge status-ok";
                 document.querySelector(`#${id} .status-badge`).innerText="UPLOADED";
@@ -305,44 +313,19 @@ function handleFiles(inp){
 function checkAssets(r){const b=document.getElementById('btnDlZip');if(r){b.disabled=false;b.classList.remove('opacity-50');document.getElementById('manUpload').classList.add('hidden');}else{document.getElementById('manUpload').classList.remove('hidden');}}
 
 function downloadZip(){
-    if(!TEMPLATES['worker_template.html']) { alert("Missing templates!"); return; }
-    
-    const zip=new JSZip(),org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
-    
-    // WORKER APP INJECTION (FIXED)
-    let wHtml = TEMPLATES['worker_template.html']
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%SHEET_URL%%/g, url)
-        .replace(/%%LOGO_DATA%%/g, TEMPLATES.logo||"")
-        .replace(/%%WORKER_KEY%%/g, workerKey)
-        .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
-        .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-        .replace(/%%VEH_ENABLED%%/g, document.getElementById('chkVehicle').checked)
-        .replace(/%%VEH_INTERVAL%%/g, document.getElementById('vehFreq').value)
-        .replace(/%%MILEAGE_ENABLED%%/g, "true")
-        .replace(/%%COUNTRY_CODE%%/g, document.getElementById('countrySelect').value.replace('+',''))
-        .replace(/%%REQ_TRAVEL_REPORT%%/g, document.getElementById('chkTravelReport').checked);
-
-    // MONITOR APP INJECTION (FIXED)
-    let mHtml = TEMPLATES['monitor_template.html']
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%LOGO_URL%%/g, TEMPLATES.logo||"")
-        .replace(/%%SHEET_URL%%/g, url);
-
-    let gHtml = TEMPLATES['guide_template.html']
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value);
-
-    const swCode = `const CACHE_NAME='otg-v78.22';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
-    
-    const manifest = { name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [ {src: "icon.png", sizes: "192x192", type: "image/png"}, {src: "icon.png", sizes: "512x512", type: "image/png"} ] };
-
-    zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
-    if(TEMPLATES.logo) zip.folder("WorkerApp").file("icon.png", TEMPLATES.logo.split(',')[1], {base64:true});
-    zip.folder("MonitorApp").file("index.html", mHtml);
-    zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
-    zip.file("ADMIN_MANUAL.html", TEMPLATES['ops_manual_template.html'].replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, workerKey));
-    
+    const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
+    if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
+    const zip=new JSZip();
+    let wHtml=TEMPLATES['worker_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SHEET_URL%%/g,url).replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"").replace(/%%WORKER_KEY%%/g,workerKey).replace(/%%ORS_API_KEY%%/g,document.getElementById('orsKey').value).replace(/%%ESCALATION_MINUTES%%/g,document.getElementById('escalationMins').value).replace(/%%VEH_ENABLED%%/g,document.getElementById('chkVehicle').checked).replace(/%%VEH_INTERVAL%%/g,document.getElementById('vehFreq').value).replace(/%%MILEAGE_ENABLED%%/g,"true").replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+','')).replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
+    let mHtml=TEMPLATES['monitor_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"").replace(/%%SHEET_URL%%/g,url);
+    let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
+    const swCode=`const CACHE_NAME='otg-v78.24';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
+    const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
+    zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",swCode).file("manifest.json",JSON.stringify(manifest)).file("USER_GUIDE.html",gHtml);
+    if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
+    zip.folder("MonitorApp").file("index.html",mHtml);
+    zip.file("Code.gs",document.getElementById('codeDisplay').textContent);
+    zip.file("ADMIN_MANUAL.html",TEMPLATES['ops_manual_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SECRET_KEY%%/g,document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey));
     zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi,'_')+"_OTG_Apps.zip";a.click();});
 }
 </script>
