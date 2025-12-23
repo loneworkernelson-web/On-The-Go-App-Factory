@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v78.29 (Stable)</title>
+  <title>OTG Factory v78.30 (Diagnostic)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -29,9 +29,9 @@
     .status-badge { padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.7rem; }
     .status-pending { background: #334155; color: #94a3b8; }
     .status-ok { background: #064e3b; color: #34d399; }
+    .step-badge { background: #3b82f6; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 8px; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
-    .step-badge { background: #3b82f6; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 8px; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -68,7 +68,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v78.29 | Golden Master</p>
+      <p class="text-gray-400">v78.30 | Golden Master (Diagnostic)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -180,8 +180,8 @@ const FILES = {
 let TEMPLATES = {}; 
 const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
 
-// CORRECTLY ESCAPED SCRIPT TAG (Parsable in Browser)
-const QUIET_SCRIPT = "\x3Cscript>const _o=console.warn;console.warn=function(m){if(m.includes('Tailwind')||m.includes('AudioContext')||m.includes('Deprecation'))return;_o.apply(console,arguments)};\x3C/script>";
+// ADDED: DEBUG SCRIPT FOR APPS (Shows errors on screen if they happen)
+const DEBUG_SCRIPT = `<script>window.onerror=function(m,s,l,c,e){var d=document.createElement('div');d.style.cssText="position:fixed;bottom:0;left:0;background:red;color:white;font-size:10px;padding:5px;z-index:9999;width:100%";d.innerText="ERR: "+m;document.body.appendChild(d);};<\/script>`;
 
 const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
 
@@ -263,13 +263,9 @@ function downloadZip(){
     const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
     if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
     
-    // NUCLEAR OPTION: INJECT URL DIRECTLY INTO STORAGE LOGIC TO BYPASS SETUP WIZARD
-    const INJECT_SETUP = `\x3Cscript>localStorage.setItem('otg_settings_url', '${url}');localStorage.setItem('otg_settings_org', '${org}');\x3C/script>`;
-
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
-        .replace('</head>', QUIET_SCRIPT + '</head>') // Silence warnings
-        .replace('</body>', INJECT_SETUP + '</body>') // Force URL injection
+        .replace('</body>', DEBUG_SCRIPT + '</body>') // Inject Debugger
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -282,16 +278,20 @@ function downloadZip(){
         .replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+',''))
         .replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
 
-    if(wHtml.includes("%%SHEET_URL%%")) { alert("CRITICAL ERROR: URL Injection Failed. Please check the template file."); return; }
+    // CRITICAL: VERIFY INJECTION BEFORE DOWNLOAD
+    if(wHtml.includes("%%SHEET_URL%%")) { 
+        alert("CRITICAL ERROR: The Factory failed to inject your URL.\n\nPlease refresh the page and try again."); 
+        return; 
+    }
 
     let mHtml=TEMPLATES['monitor_template.html']
-        .replace('</head>', QUIET_SCRIPT + '</head>')
+        .replace('</body>', DEBUG_SCRIPT + '</body>') // Inject Debugger
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
-    const swCode=`const CACHE_NAME='otg-v78.29';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
+    const swCode=`const CACHE_NAME='otg-v78.30';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
     zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",swCode).file("manifest.json",JSON.stringify(manifest)).file("USER_GUIDE.html",gHtml);
     if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
