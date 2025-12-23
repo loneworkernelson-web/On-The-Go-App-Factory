@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v78.31 (Final Fix)</title>
+  <title>OTG Factory v78.32 (Cache Buster)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -68,7 +68,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v78.31 | Golden Master (Stable)</p>
+      <p class="text-gray-400">v78.32 | Golden Master (Cache Buster)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -124,11 +124,10 @@
                 <div id="vehOptions" class="flex items-center gap-2 text-sm"><input type="number" id="vehFreq" value="90" class="bg-gray-700 rounded p-1 w-16 text-center text-white" oninput="saveInput(this)"><span>Days</span></div>
              </div>
              <div class="flex items-center gap-2"><input type="checkbox" id="chkTravelReport" class="w-4 h-4" onchange="saveInput(this)" checked><span class="text-sm font-bold">Req. Form on Travel End?</span></div>
-             
              <div class="grid md:grid-cols-2 gap-4 pt-2">
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Textbelt Key (SMS)</label><a href="https://textbelt.com/" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><div class="flex items-center gap-2"><input type="checkbox" id="enableAi" class="w-4 h-4" onchange="saveInput(this); toggleAiInput()"><label class="block text-gray-500 text-xs uppercase cursor-pointer" for="enableAi">Enable AI Grammar</label></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field text-sm opacity-50" disabled placeholder="Optional: Paste Gemini API Key..." oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key (Maps)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
              </div>
           </div>
@@ -193,7 +192,7 @@ const FILES = {
 let TEMPLATES = {}; 
 const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
 
-// SYNTAX FIX: Break the string so parser doesn't see it
+// SAFE SCRIPT TAG SPLIT (Safe for Parser)
 const QUIET_SCRIPT = "<" + "script>const _o=console.warn;console.warn=function(m){if(m.includes('Tailwind')||m.includes('AudioContext')||m.includes('Deprecation'))return;_o.apply(console,arguments)};<" + "/script>";
 
 const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
@@ -282,6 +281,7 @@ function downloadZip(){
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
         .replace('</head>', QUIET_SCRIPT + '</head>')
+        .replace('', 'v78.32') // Stamp version
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -298,12 +298,17 @@ function downloadZip(){
 
     let mHtml=TEMPLATES['monitor_template.html']
         .replace('</head>', QUIET_SCRIPT + '</head>')
+        .replace('', 'v78.32') // Stamp version
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
-    const swCode=`const CACHE_NAME='otg-v78.31';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
+    
+    // DYNAMIC CACHE BUSTING
+    const timeHash = "v78.32_" + Date.now();
+    const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
+    
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
     zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",swCode).file("manifest.json",JSON.stringify(manifest)).file("USER_GUIDE.html",gHtml);
     if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
