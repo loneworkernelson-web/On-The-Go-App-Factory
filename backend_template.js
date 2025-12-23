@@ -1,6 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v77.4 (Global + Privacy + Scheduled Stats)
- * Features: Dynamic Region, PII Redaction, Configurable Stats Schedule.
+ * OTG APPSUITE - MASTER BACKEND v78.0 (High Risk Mode)
+ * Features: Global Privacy, Dynamic Stats, Zero-Tolerance Watchdog.
  */
 
 const CONFIG = {
@@ -15,7 +15,7 @@ const CONFIG = {
   COUNTRY_CODE: "%%COUNTRY_CODE%%", 
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%,
   ENABLE_AI: %%ENABLE_AI%%,
-  STATS_FREQ: "%%STATS_FREQ%%" // DAILY, WEEKLY, MONTHLY
+  STATS_FREQ: "%%STATS_FREQ%%"
 };
 
 // ==========================================
@@ -28,10 +28,9 @@ function doGet(e) {
 
       if(p.action === 'ping') return sendJSON({status: "success", message: "Connected"});
 
-      // AUTH REQUIRED ACTIONS
       if(p.key === CONFIG.MASTER_KEY) {
          if(p.action === 'fetch') return fetchData();
-         if(p.action === 'stats') return generateStats(); // Manual Trigger
+         if(p.action === 'stats') return generateStats();
       }
 
       if(p.key === CONFIG.WORKER_KEY) {
@@ -62,7 +61,6 @@ function doPost(e) {
 
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       
-      // Routing
       if(p.action === 'checkin') return handleCheckin(p, ss);
       if(p.action === 'sos') return handleSOS(p, ss);
       if(p.action === 'resolve') return handleResolve(p, ss);
@@ -82,14 +80,12 @@ function doPost(e) {
 // ==========================================
 
 function handleCheckin(p, ss) {
-  // PII & AI Scrubbing
   let finalNote = p.Notes || "";
   if(CONFIG.ENABLE_AI && CONFIG.GEMINI_API_KEY && finalNote.length > 5) {
      const cleanNote = smartScribe(finalNote);
      if(cleanNote) finalNote = cleanNote; 
   }
 
-  // Photo
   let photoUrl = "";
   if(p.PhotoData && p.PhotoData.length > 100) photoUrl = saveImage(p.PhotoData, p['Worker Name']);
 
@@ -103,7 +99,6 @@ function handleSOS(p, ss) {
   const row = buildRow(p, "USER TRIGGERED ALARM: " + (p.Notes||""), "", "EMERGENCY - SOS TRIGGERED");
   ss.getSheetByName('Visits').appendRow(row);
   
-  // Escalation
   if(CONFIG.TEXTBELT_API_KEY) {
      sendSMS(p['Emerg Phone'], `SOS ALERT: ${p['Worker Name']} at ${p['Location Name']}. GPS: ${p['GPS Coords']}`);
      if(p['Escal Phone']) sendSMS(p['Escal Phone'], `SOS ALERT (Escalation): ${p['Worker Name']}`);
@@ -112,9 +107,8 @@ function handleSOS(p, ss) {
 }
 
 function handleResolve(p, ss) {
-  // Log the resolution as a new line event
-  const row = buildRow(p, p.Notes, "", p['Alarm Status']); // Alarm Status should be SAFE
-  row[12] = "HQ Dashboard"; // Location Name override
+  const row = buildRow(p, p.Notes, "", p['Alarm Status']); 
+  row[12] = "HQ Dashboard"; 
   ss.getSheetByName('Visits').appendRow(row);
   return sendJSON({status:"success"});
 }
@@ -138,16 +132,13 @@ function handleDeviceReg(p, ss) {
 function generateStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const visits = ss.getSheetByName('Visits').getDataRange().getValues();
-  
-  // Containers
-  const workerStats = {}; // { name: { trips: 0, distance: 0, alerts: 0, visits: 0 } }
+  const workerStats = {};
 
-  // Skip Header (Row 0)
   for(let i=1; i<visits.length; i++) {
       const row = visits[i];
-      const name = row[2]; // Worker Name
-      const status = row[10]; // Alarm Status
-      const dist = parseFloat(row[18]) || 0; // Trip Distance
+      const name = row[2]; 
+      const status = row[10]; 
+      const dist = parseFloat(row[18]) || 0; 
 
       if(!workerStats[name]) workerStats[name] = { trips: 0, distance: 0, alerts: 0, visits: 0 };
       
@@ -161,36 +152,26 @@ function generateStats() {
       }
   }
 
-  // 1. Write Activity Stats
   let sAct = ss.getSheetByName('Activity Stats');
   if(!sAct) sAct = ss.insertSheet('Activity Stats');
   sAct.clear();
   sAct.appendRow(["Worker Name", "Total Visits", "Alerts Triggered", "Last Updated"]);
-  sAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#e0f2fe"); // Blue header
+  sAct.getRange(1,1,1,4).setFontWeight("bold").setBackground("#e0f2fe");
   
-  const actRows = Object.keys(workerStats).map(w => [
-      w, workerStats[w].visits, workerStats[w].alerts, new Date()
-  ]);
+  const actRows = Object.keys(workerStats).map(w => [w, workerStats[w].visits, workerStats[w].alerts, new Date()]);
   if(actRows.length > 0) sAct.getRange(2,1,actRows.length, 4).setValues(actRows);
 
-  // 2. Write Travel Stats
   let sTrav = ss.getSheetByName('Travel Stats');
   if(!sTrav) sTrav = ss.insertSheet('Travel Stats');
   sTrav.clear();
   sTrav.appendRow(["Worker Name", "Trips Recorded", "Total Distance (km)", "Last Updated"]);
-  sTrav.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dcfce7"); // Green header
+  sTrav.getRange(1,1,1,4).setFontWeight("bold").setBackground("#dcfce7");
   
-  const travRows = Object.keys(workerStats).map(w => [
-      w, workerStats[w].trips, workerStats[w].distance.toFixed(2), new Date()
-  ]);
+  const travRows = Object.keys(workerStats).map(w => [w, workerStats[w].trips, workerStats[w].distance.toFixed(2), new Date()]);
   if(travRows.length > 0) sTrav.getRange(2,1,travRows.length, 4).setValues(travRows);
 
   return sendJSON({status:"success", message:"Stats Regenerated"});
 }
-
-// ==========================================
-// 5. DATA FETCHERS
-// ==========================================
 
 function fetchData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -209,10 +190,6 @@ function getManifest() {
     .map(r => ({id: r[0], name: r[1], fields: r[2]})); 
   return sendJSON({status:"success", staff: staff, sites: sites, templates: templates});
 }
-
-// ==========================================
-// 6. UTILITIES
-// ==========================================
 
 function buildRow(p, notes, photo, status) {
   const now = new Date();
@@ -251,10 +228,6 @@ function sendSMS(phone, message) {
   } catch(e) { console.error("SMS Failed", e); }
 }
 
-// ==========================================
-// 7. PRIVACY & AI 
-// ==========================================
-
 function redactPII(text) {
     if (!text) return "";
     let safeText = text.replace(/[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}/g, "[EMAIL]");
@@ -280,7 +253,7 @@ function smartScribe(rawText) {
 }
 
 // ==========================================
-// 8. WATCHDOG (Triggers every 5-10 mins)
+// 8. WATCHDOG (ZERO TOLERANCE UPDATE)
 // ==========================================
 function checkOverdueVisits() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -293,34 +266,53 @@ function checkOverdueVisits() {
   for(let i=1; i<data.length; i++) {
      const w = data[i][2];
      const t = new Date(data[i][0]);
+     // We look for the latest row for each worker
      if(!lastSeen[w] || t > lastSeen[w].time) {
-       lastSeen[w] = { row: i+1, time: t, status: data[i][10], name: w, emerg: data[i][5] };
+       lastSeen[w] = { 
+         row: i+1, 
+         time: t, 
+         status: data[i][10].toString(), 
+         name: w, 
+         emerg: data[i][5] 
+       };
      }
   }
   
-  const limit = CONFIG.ESCALATION_MINUTES * 60 * 1000;
+  // Standard Escalation (Default Grace Period)
+  const standardLimit = CONFIG.ESCALATION_MINUTES * 60 * 1000;
   
   for(const w in lastSeen) {
      const e = lastSeen[w];
-     if(e.status !== "SAFE - MANUALLY CLEARED" && e.status !== "DEPARTED" && !e.status.includes("EMERGENCY")) {
+     const isSafe = e.status === "SAFE - MANUALLY CLEARED" || e.status === "DEPARTED";
+     const isAlreadyEmergency = e.status.includes("EMERGENCY");
+     
+     if(!isSafe && !isAlreadyEmergency) {
+        
+        // ZERO TOLERANCE CHECK
+        // If the worker flagged this visit as [HIGH RISK], we give 0 grace period.
+        let limit = standardLimit;
+        if(e.status.includes("HIGH RISK")) {
+            limit = 60 * 1000; // 1 Minute buffer only (for upload lag)
+        }
+
         const diff = now - e.time;
         if(diff > limit) {
            sheet.getRange(e.row, 11).setValue("EMERGENCY - OVERDUE (Watchdog)");
-           if(CONFIG.TEXTBELT_API_KEY) sendSMS(e.emerg, `URGENT: ${e.name} is OVERDUE. Checked in ${(diff/60000).toFixed(0)} mins ago.`);
+           if(CONFIG.TEXTBELT_API_KEY) {
+              const type = e.status.includes("HIGH RISK") ? "ZERO TOLERANCE" : "Standard";
+              sendSMS(e.emerg, `URGENT (${type}): ${e.name} is OVERDUE. Last check-in: ${(diff/60000).toFixed(0)} mins ago.`);
+           }
         }
      }
   }
   
   // B. Scheduled Stats Generation
-  // Check if it is Midnight (00:00 - 00:15)
   if(now.getHours() === 0 && now.getMinutes() < 15) {
       let shouldRun = false;
       const freq = CONFIG.STATS_FREQ || "MONTHLY";
-
       if(freq === "DAILY") shouldRun = true;
-      else if(freq === "WEEKLY" && now.getDay() === 1) shouldRun = true; // Monday
-      else if(freq === "MONTHLY" && now.getDate() === 1) shouldRun = true; // 1st of Month
-      
+      else if(freq === "WEEKLY" && now.getDay() === 1) shouldRun = true; 
+      else if(freq === "MONTHLY" && now.getDate() === 1) shouldRun = true; 
       if(shouldRun) generateStats();
   }
 }
