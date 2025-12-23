@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v78.10 (Stable)</title>
+  <title>OTG Factory v78.12 (Golden Fixed)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .step-section { display: none; }
@@ -23,15 +23,13 @@
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
+    
     .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 20px; text-align: center; background: #0f172a; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
     .drop-zone:hover { border-color: #3b82f6; background: #1e293b; }
+    .drop-zone.dragover { border-color: #3b82f6; background: #1e293b; }
+    
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
-    .file-status { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
-    .status-badge { padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.7rem; }
-    .status-pending { background: #334155; color: #94a3b8; }
-    .status-ok { background: #064e3b; color: #34d399; }
-    .status-err { background: #450a0a; color: #fca5a5; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -77,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v78.10 | Golden Master (Global)</p>
+      <p class="text-gray-400">v78.12 | Golden Master + Global</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -135,7 +133,6 @@
                     <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold" oninput="saveInput(this)">
                     <span class="text-xs text-gray-400 block mt-1">Time allowed after "Overdue" before RED ALERT.</span>
                  </div>
-                 
                  <div>
                     <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Statistics Frequency</label>
                     <select id="statsFreq" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-full font-bold" onchange="saveInput(this)">
@@ -157,7 +154,7 @@
                         <span>Check Frequency (Days):</span>
                         <input type="number" id="vehFreq" value="90" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold" oninput="saveInput(this)">
                     </div>
-                    <p class="text-xs text-gray-500">Default: 90 Days. Includes WOF Expiry Reminders.</p>
+                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (starts 14 days prior).</p>
                 </div>
              </div>
              
@@ -166,6 +163,7 @@
                     <input type="checkbox" id="chkTravelReport" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="saveInput(this)" checked>
                     <span class="text-white font-bold">Default: Require Form on Travel Finish?</span>
                 </label>
+                <p class="pl-8 mt-1 text-xs text-gray-500">Sets the default. Workers can still toggle this per-trip in the app settings.</p>
              </div>
              
              <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
@@ -199,25 +197,25 @@
           <div class="grid md:grid-cols-2 gap-6">
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
-                <button onclick="copyData('Visits')" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy Blueprints (A1)</button>
+                <button onclick="copyData('Visits')" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy Blueprints</button>
             </div>
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
-                <button onclick="copyData('Templates')" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy Blueprints (A1)</button>
+                <button onclick="copyData('Templates')" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy Blueprints</button>
             </div>
             <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
-                <button onclick="copyData('Sites')" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy Blueprints (A1)</button>
+                <button onclick="copyData('Sites')" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy Blueprints</button>
             </div>
             <div class="bg-gray-900 p-6 rounded-lg border-2 border-red-600 space-y-4">
                 <h3 class="font-bold text-lg text-red-400">D. Setup 'Staff' Tab</h3>
-                <button onclick="copyData('Staff')" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy Blueprints (A1)</button>
+                <button onclick="copyData('Staff')" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy Blueprints</button>
             </div>
           </div>
           <div class="mt-4 bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
                 <h3 class="font-bold text-lg text-yellow-400">E. AI Reporting Tab</h3>
                 <p class="text-sm text-gray-400">Create a tab named <code>Admin_Help</code>. This contains prompts to help you write reports later.</p>
-                <button onclick="copyData('AdminHelp')" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy AI Prompts (A1)</button>
+                <button onclick="copyData('AdminHelp')" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy AI Prompts</button>
           </div>
           <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="generateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
@@ -273,73 +271,183 @@
     </div>
   </div>
 
-<script>
-const FILES={worker:'worker_template.html',monitor:'monitor_template.html',backend:'backend_template.js',guide:'guide_template.html',manual:'ops_manual_template.html'};
-let TEMPLATES={}; const workerKey="wk_"+Math.random().toString(36).substr(2,9);
+  <script>
+    const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
+    let TEMPLATES = {};
+    const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
 
-// SYNTAX ERROR FIXED: Correctly escaped JSON strings for the JS variable
-const BLUEPRINTS = {
-    Visits: "Timestamp\tDate\tWorker Name\tWorker Phone\tEmerg Name\tEmerg Phone\tEmerg Email\tEscal Name\tEscal Phone\tEscal Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tGPS Coords\tGPS Timestamp\tBattery Level\tPhoto\tTrip Distance\n2024-01-01T08:00:00.000Z\t2024-01-01\tJohn Doe\t+6421123456\tJane Doe\t+6421999888\tjane@test.com\t\t\t\t\"ON SITE\"\t\"Arrived safely\"\t\"Head Office\"\t\"123 Queen St\"\t\"-36.8,174.7\"\t2024-01-01T08:00:00.000Z\t95%\t\t0",
-    Staff: "Worker Name\tPhone\tEmail\tPIN\tRole\tEmg Name\tEmg Phone\tDeviceID\nJohn Doe\t+6421123456\tjohn@test.com\t1234\tWorker\tJane Doe\t+6421999888\t",
-    Sites: "SiteID\tSite Name\tLatitude\tLongitude\tAddress\tContact Name\tContact Phone\tContact Email\tNotes\tTemplate Name\nsite_hq\tHead Office\t-36.8485\t174.7633\t123 Queen St\tReception\t093000000\treception@hq.com\tParking at rear\tStandard Visit Note",
-    Templates: "Template Name\tDescription\tJSON Fields\nVehicle Safety Check\tStandard vehicle inspection\t[{\"label\":\"Rego Valid?\",\"type\":\"yesno\"},{\"label\":\"Tyres OK?\",\"type\":\"yesno\"},{\"label\":\"Fuel Level\",\"type\":\"select\",\"options\":[\"Full\",\"3/4\",\"1/2\",\"1/4\",\"Empty\"]},{\"label\":\"Damage Report\",\"type\":\"text\"},{\"label\":\"Photo of Odometer\",\"type\":\"photo\"}]",
-    AdminHelp: "Task\tAI Prompt Suggestion\nCreate PDF Report\t\"I have a Google Sheet with a tab 'Visits'. Columns are: A=Timestamp, C=Worker Name, K=Status, S=Distance. Please write a Google Apps Script function to email me a PDF summary of total distance per worker for the last 7 days.\"\nData Clean Up\t\"Write a script to archive rows from 'Visits' that are older than 30 days to a new tab called 'Archive' inside the same spreadsheet.\""
-};
+    // FIXED BLUEPRINTS (Escaped Backticks)
+    const BLUEPRINTS = {
+        Visits: `Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4\n2024-01-01T08:00:00.000Z\t2024-01-01\tJohn Doe\t+6421123456\tJane Doe\t+6421999888\tjane@test.com\t\t\t\t"ON SITE"\t"Arrived safely"\t"Head Office"\t"123 Queen St"\t"-36.8,174.7"\t2024-01-01T08:00:00.000Z\t95%\t\t0`,
+        Staff: `Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry\nJohn Doe\tDriver\tActive\t\t\t\t`,
+        Sites: `Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455`,
+        Templates: `Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo`,
+        AdminHelp: `Task\tAI Prompt Suggestion\nCreate PDF Report\t"I have a Google Sheet with a tab 'Visits'. Columns are: A=Timestamp, C=Worker Name, K=Status, S=Distance. Please write a Google Apps Script function to email me a PDF summary of total distance per worker for the last 7 days."\nData Clean Up\t"Write a script to archive rows from 'Visits' that are older than 30 days to a new tab called 'Archive' inside the same spreadsheet."`
+    };
 
-window.onload=async()=>{
-    loadPersistedData(); updateRegionInfo(); setupDragDrop(); toggleAiInput(); genKey();
-    for(const[k,f]of Object.entries(FILES)){try{const r=await fetch(f);if(r.ok)TEMPLATES[k]=await r.text();}catch(e){}}
-};
+    window.onload = async () => { 
+        loadPersistedData(); 
+        updateRegionInfo(); 
+        setupDragDrop(); 
+        toggleAiInput();
+        for (const [k, f] of Object.entries(FILES)) { try { const r = await fetch(f); if (r.ok) TEMPLATES[k] = await r.text(); } catch(e){} }
+    };
 
-function saveInput(el){localStorage.setItem('otg_'+el.id,el.type==='checkbox'?el.checked:el.value);}
-function loadPersistedData(){
-    const ids=['orgName','secretKey','webAppUrl','geminiKey','orsKey','textbeltKey','folderId','escalationMins','vehFreq','countrySelect','statsFreq'];
-    ids.forEach(id=>{const v=localStorage.getItem('otg_'+id);if(v)document.getElementById(id).value=v;});
-    if(localStorage.getItem('otg_chkTravelReport')!==null)document.getElementById('chkTravelReport').checked=localStorage.getItem('otg_chkTravelReport')==='true';
-    if(localStorage.getItem('otg_enableAi')!==null)document.getElementById('enableAi').checked=localStorage.getItem('otg_enableAi')==='true';
-}
-function updateRegionInfo(){const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.getElementById('detectedTz').textContent=tz;document.getElementById('timezoneVal').value=tz;saveInput(document.getElementById('countrySelect'));}
-function toggleEnterBtn(){const b=document.getElementById('btnEnter'),c=document.getElementById('chkAccept');b.disabled=!c.checked;if(c.checked){b.classList.remove('bg-gray-700','text-gray-500');b.classList.add('bg-blue-600','text-white','hover:bg-blue-500');}else{b.classList.add('bg-gray-700','text-gray-500');b.classList.remove('bg-blue-600','text-white','hover:bg-blue-500');}}
-function closeModal(id){document.getElementById(id).style.display='none';if(id==='disclaimerModal')document.getElementById('mainContent').classList.remove('blur-sm');}
-function setupDragDrop(){const d=document.getElementById('dropZone');d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('border-blue-500')});d.addEventListener('dragleave',e=>{e.preventDefault();d.classList.remove('border-blue-500')});d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('border-blue-500');if(e.dataTransfer.files.length)handleLogo({files:e.dataTransfer.files})});}
-function handleLogo(i){if(i.files[0]){const r=new FileReader();r.onload=e=>{TEMPLATES.logo=e.target.result;document.getElementById('logoImg').src=e.target.result;document.getElementById('logoImg').classList.remove('hidden');document.getElementById('logoText').innerText="✅ Ready";document.getElementById('logoUrl').value=e.target.result;saveInput(document.getElementById('logoUrl'));};r.readAsDataURL(i.files[0]);}}
-function gotoStep(n){if(n===4)attemptAutoLoad();document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active'));document.getElementById('step'+n).classList.add('active');for(let i=1;i<=5;i++){const t=document.getElementById('tab'+i);if(i===n)t.classList.add('active');else t.classList.remove('active');}}
-function toggleVehicle(){document.getElementById('vehOptions').style.display=document.getElementById('chkVehicle').checked?'flex':'none';}
-function toggleAiInput(){const c=document.getElementById('enableAi'),i=document.getElementById('geminiKey');i.disabled=!c.checked;i.style.opacity=c.checked?'1':'0.5';}
-function genKey(){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let r='';for(let i=0;i<32;i++)r+=c.charAt(Math.floor(Math.random()*c.length));document.getElementById('secretKey').value=r;}
-function copyData(k){navigator.clipboard.writeText(BLUEPRINTS[k]);alert(k+" Copied! Paste in A1.");}
+    function saveInput(el) { localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value); }
+    function loadPersistedData() { const ids = ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'vehFreq', 'countrySelect', 'statsFreq']; ids.forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
+        if(localStorage.getItem('otg_chkTravelReport') !== null) document.getElementById('chkTravelReport').checked = localStorage.getItem('otg_chkTravelReport') === 'true'; 
+        if(localStorage.getItem('otg_enableAi') !== null) document.getElementById('enableAi').checked = localStorage.getItem('otg_enableAi') === 'true';
+    }
 
-function generateScript(){
-    if(!TEMPLATES.backend){setTimeout(generateScript,500);return;}
-    const code=TEMPLATES.backend.replace('%%SECRET_KEY%%',document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey).replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value).replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland").replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+','')).replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value).replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked).replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
-    document.getElementById('codeDisplay').textContent=code;gotoStep(3);
-}
-function copyScript(){navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent);alert("Copied!");}
-function testConnection(){
-    const u=document.getElementById('webAppUrl').value,r=document.getElementById('testResult');
-    if(!u.includes('/exec')){alert('Invalid URL');return;}
-    r.classList.remove('hidden');r.textContent="Testing...";r.className="text-center font-bold text-yellow-400";
-    fetch(u+'?action=ping').then(res=>res.json()).then(d=>{if(d.status==="success"){r.textContent="✅ Success!";r.className="text-center font-bold text-green-400";document.getElementById('btnNextDownload').disabled=false;document.getElementById('btnNextDownload').classList.remove('opacity-50','cursor-not-allowed');}else throw new Error();}).catch(()=>{r.textContent="❌ Failed";r.className="text-center font-bold text-red-400";});
-}
-async function attemptAutoLoad(){
-    const m=[{id:'st_worker',f:'worker_template.html'},{id:'st_monitor',f:'monitor_template.html'},{id:'st_backend',f:'backend_template.js'},{id:'st_guide',f:'guide_template.html'},{id:'st_manual',f:'ops_manual_template.html'}];
-    let ok=0;for(let x of m){try{const r=await fetch(x.f);if(r.ok){TEMPLATES[x.f]=await r.text();document.querySelector(`#${x.id} .status-badge`).className="status-badge status-ok";document.querySelector(`#${x.id} .status-badge`).innerText="LOADED";ok++;}}catch(e){document.querySelector(`#${x.id} .status-badge`).className="status-badge status-err";document.querySelector(`#${x.id} .status-badge`).innerText="MISSING";}}
-    checkAssets(ok===5);
-}
-function handleFiles(inp){Array.from(inp.files).forEach(f=>{if(TEMPLATES.hasOwnProperty(f.name)){const r=new FileReader();r.onload=e=>{TEMPLATES[f.name]=e.target.result;let id="";if(f.name.includes('worker'))id='st_worker';else if(f.name.includes('monitor'))id='st_monitor';else if(f.name.includes('backend'))id='st_backend';else if(f.name.includes('guide'))id='st_guide';else if(f.name.includes('manual'))id='st_manual';if(id){document.querySelector(`#${id} .status-badge`).className="status-badge status-ok";document.querySelector(`#${id} .status-badge`).innerText="UPLOADED";}if(Object.values(TEMPLATES).every(v=>v!==null))checkAssets(true);};r.readAsText(f);}});}
-function checkAssets(r){const b=document.getElementById('btnDlZip');if(r){b.disabled=false;b.classList.remove('opacity-50');document.getElementById('manUpload').classList.add('hidden');}else{document.getElementById('manUpload').classList.remove('hidden');}}
-function downloadZip(){
-    const zip=new JSZip(),org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
-    let wHtml=TEMPLATES['worker_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SHEET_URL%%/g,url).replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"").replace(/%%WORKER_KEY%%/g,workerKey).replace(/%%ORS_API_KEY%%/g,document.getElementById('orsKey').value).replace(/%%ESCALATION_MINUTES%%/g,document.getElementById('escalationMins').value).replace(/%%VEH_ENABLED%%/g,document.getElementById('chkVehicle').checked).replace(/%%VEH_INTERVAL%%/g,document.getElementById('vehFreq').value).replace(/%%MILEAGE_ENABLED%%/g,"true").replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+','')).replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
-    let mHtml=TEMPLATES['monitor_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"");
-    let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
-    zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",`const CACHE_NAME='otg-v78.10';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`).file("manifest.json",JSON.stringify({name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"}]})).file("USER_GUIDE.html",gHtml);
-    if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
-    zip.folder("MonitorApp").file("index.html",mHtml);
-    zip.file("Code.gs",document.getElementById('codeDisplay').textContent);
-    zip.file("ADMIN_MANUAL.html",TEMPLATES['ops_manual_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SECRET_KEY%%/g,document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey));
-    zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi,'_')+"_OTG_Apps.zip";a.click();});
-}
-</script>
+    function updateRegionInfo() {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById('detectedTz').textContent = tz;
+        document.getElementById('timezoneVal').value = tz;
+        saveInput(document.getElementById('countrySelect'));
+    }
+
+    function toggleEnterBtn() { 
+        const btn = document.getElementById('btnEnter');
+        const chk = document.getElementById('chkAccept');
+        btn.disabled = !chk.checked;
+        if(chk.checked) { btn.classList.remove('bg-gray-700', 'text-gray-500'); btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500'); } 
+        else { btn.classList.add('bg-gray-700', 'text-gray-500'); btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500'); }
+    }
+    
+    function closeModal(id) { document.getElementById(id).style.display='none'; if(id==='disclaimerModal') document.getElementById('mainContent').classList.remove('blur-sm'); }
+
+    function setupDragDrop() {
+        const dz = document.getElementById('dropZone');
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); });
+        dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); });
+        dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); });
+    }
+    function handleLogo(input) {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas'); canvas.width = 192; canvas.height = 192; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
+                    const data = canvas.toDataURL('image/png');
+                    document.getElementById('logoImg').src = data; document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoText').textContent = "✅ Logo Ready";
+                    document.getElementById('logoUrl').value = data; saveInput(document.getElementById('logoUrl'));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function gotoStep(n) { 
+        document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); 
+        document.getElementById('step'+n).classList.add('active'); 
+        for(let i=1; i<=5; i++){ const tab = document.getElementById('tab'+i); if(i===n){ tab.classList.add('active'); } else { tab.classList.remove('active'); } } 
+    }
+    
+    function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
+    function toggleAiInput() { const chk = document.getElementById('enableAi'); const input = document.getElementById('geminiKey'); input.disabled = !chk.checked; input.style.opacity = chk.checked ? '1' : '0.5'; }
+    
+    function copyData(key) { navigator.clipboard.writeText(BLUEPRINTS[key]); alert(key + " Data Copied! Paste into Cell A1."); }
+
+    function generateScript() {
+        if(!TEMPLATES.backend) { setTimeout(generateScript, 500); return; } 
+        const code = TEMPLATES.backend
+            .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
+            .replace(/%%WORKER_KEY%%/g, workerKey)
+            .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
+            .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
+            .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
+            .replace('%%PHOTOS_FOLDER_ID%%', document.getElementById('folderId').value)
+            .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
+            .replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland")
+            .replace('%%COUNTRY_CODE%%', document.getElementById('countrySelect').value.replace('+',''))
+            .replace('%%STATS_FREQ%%', document.getElementById('statsFreq').value)
+            .replace('%%ENABLE_AI%%', document.getElementById('enableAi').checked)
+            .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value);
+        document.getElementById('codeDisplay').textContent = code;
+        gotoStep(3); 
+    }
+    function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Backend Code Copied!"); }
+
+    function testConnection() {
+        const url = document.getElementById('webAppUrl').value;
+        if(!url.includes('/exec')) { alert('Invalid URL'); return; }
+        const r = document.getElementById('testResult'); r.classList.remove('hidden'); r.textContent = "Testing..."; r.className = "text-center font-bold text-lg text-yellow-400 p-3 bg-gray-900 inline-block";
+        fetch(url + '?action=ping')
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "success") {
+                  r.textContent = "✅ Success!"; r.className = "text-center font-bold text-lg text-green-400 p-3 bg-gray-900 inline-block";
+                  document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed');
+                  document.getElementById('finalAppName').innerText = document.getElementById('orgName').value;
+                } else throw new Error();
+            }).catch(() => { r.textContent = "❌ Failed."; r.className = "text-center font-bold text-lg text-red-400 p-3 bg-gray-900 inline-block"; });
+    }
+
+    function processGuideTemplate(html) {
+        if(!html) return "";
+        let out = html;
+        const org = document.getElementById('orgName').value;
+        const vehInt = document.getElementById('vehFreq').value;
+        // Replace Vars
+        out = out.replace(/%%ORG_NAME%%/g, org).replace(/%%VEHICLE_INTERVAL%%/g, vehInt);
+        return out;
+    }
+
+    function downloadZip() {
+        const zip = new JSZip();
+        const org = document.getElementById('orgName').value;
+        const url = document.getElementById('webAppUrl').value;
+        const secret = document.getElementById('secretKey').value;
+        const logo = document.getElementById('logoUrl').value;
+        const orsKey = document.getElementById('orsKey').value;
+        const vehEnabled = document.getElementById('chkVehicle').checked;
+        const escalationMins = document.getElementById('escalationMins').value;
+        const countryPrefix = document.getElementById('countrySelect').value;
+        const reqTravelReport = document.getElementById('chkTravelReport').checked;
+        localStorage.setItem('otg_chkTravelReport', reqTravelReport);
+
+        // INJECT KEYS & CONFIGS
+        let wHtml = TEMPLATES.worker
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%SHEET_URL%%/g, url)
+            .replace(/%%LOGO_DATA%%/g, logo)
+            .replace(/%%WORKER_KEY%%/g, workerKey)
+            .replace(/%%ORS_API_KEY%%/g, orsKey)
+            .replace(/%%ESCALATION_MINUTES%%/g, escalationMins)
+            .replace(/%%VEH_ENABLED%%/g, vehEnabled)
+            .replace(/%%VEH_INTERVAL%%/g, document.getElementById('vehFreq').value)
+            .replace(/%%MILEAGE_ENABLED%%/g, document.getElementById('mileageEnabled').value)
+            .replace(/%%COUNTRY_CODE%%/g, countryPrefix.replace('+',''))
+            .replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport);
+            
+        let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%LOGO_URL%%/g, logo);
+        let bCode = document.getElementById('codeDisplay').textContent;
+        let gHtml = processGuideTemplate(TEMPLATES.guide);
+        
+        let opHtml = TEMPLATES.manual
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%SECRET_KEY%%/g, secret)
+            .replace(/%%WORKER_KEY%%/g, workerKey);
+
+        const swCode = `
+const CACHE_NAME = 'otg-cache-v78.12';
+const urlsToCache = ['./', './index.html', './manifest.json'];
+self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });
+self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });
+`;
+
+        const manifest = { name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
+
+        zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
+        zip.folder("MonitorApp").file("index.html", mHtml);
+        zip.file("Code.gs", bCode);
+        zip.file("ADMIN_MANUAL.html", opHtml);
+
+        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_OTG_Suite.zip";a.click()});
+    }
+  </script>
 </body>
 </html>
