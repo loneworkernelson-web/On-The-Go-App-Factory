@@ -3,52 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v77.5 (User Friendly)</title>
+  <title>OTG Factory v78.0 (Guided)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #334155; }
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #334155; }
+    .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); transition: all 0.3s ease; }
+    .step-section { display: none; animation: fadeIn 0.4s ease-out; }
+    .step-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* Card Styling */
-    .card { background: white; border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); overflow: hidden; transition: all 0.3s ease; }
+    .input-label { display: block; font-weight: 600; color: #475569; margin-bottom: 0.25rem; font-size: 0.95rem; }
+    .input-field { width: 100%; border: 1px solid #cbd5e1; padding: 0.6rem 1rem; border-radius: 0.5rem; color: #1e293b; transition: border-color 0.2s; }
+    .input-field:focus { border-color: #3b82f6; outline: none; ring: 2px solid rgba(59, 130, 246, 0.2); }
     
-    /* Step Animation */
-    .step-section { display: none; }
-    .step-section.active { display: block; animation: slideIn 0.4s ease-out; }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .btn-primary { background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; width: 100%; transition: background 0.2s; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; width: 100%; transition: background 0.1s; }
+    .btn-secondary:hover { background: #f1f5f9; }
 
-    /* Inputs */
-    .input-label { display: block; font-weight: 600; color: #475569; margin-bottom: 0.5rem; font-size: 0.95rem; }
-    .input-desc { font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; }
-    .input-field { width: 100%; border: 1px solid #cbd5e1; padding: 0.75rem 1rem; border-radius: 0.5rem; color: #1e293b; font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s; }
-    .input-field:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .help-link { color: #3b82f6; font-size: 0.85rem; text-decoration: underline; cursor: pointer; margin-top: 0.25rem; display: inline-block; }
+    .help-box { display: none; background: #eff6ff; padding: 1rem; border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid #dbeafe; font-size: 0.9rem; color: #1e40af; }
     
-    /* Buttons */
-    .btn-primary { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 1rem 2rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; transition: transform 0.1s; cursor: pointer; border: none; }
-    .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); }
-    .btn-secondary { background: white; border: 1px solid #cbd5e1; color: #475569; padding: 1rem 2rem; border-radius: 0.5rem; font-weight: 600; width: 100%; text-align: center; cursor: pointer; transition: background 0.1s; }
-    .btn-secondary:hover { background: #f8fafc; }
-
-    /* File Drop */
-    .file-drop { border: 2px dashed #cbd5e1; background: #f8fafc; padding: 2rem; text-align: center; border-radius: 0.75rem; cursor: pointer; transition: all 0.2s; position: relative; }
-    .file-drop:hover { border-color: #3b82f6; background: #eff6ff; }
-    .file-drop.loaded { border-color: #10b981; background: #ecfdf5; }
-    .file-icon { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
-    
-    /* Progress Bar */
-    .progress-dot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #e2e8f0; transition: background 0.3s; }
+    .progress-dot { width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #cbd5e1; transition: all 0.3s; }
     .progress-dot.active { background: #3b82f6; transform: scale(1.2); }
+    
+    .file-status { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 0.5rem; }
+    .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+    .status-pending { background: #f1f5f9; color: #64748b; }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-err { background: #fee2e2; color: #991b1b; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-10 px-4">
 
   <div class="text-center mb-8">
-    <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">OTG AppSuite <span class="text-blue-600">Factory</span></h1>
-    <p class="text-slate-500 mt-2 text-lg">v77.5 | Global Serverless Generator</p>
+    <h1 class="text-3xl font-extrabold text-slate-800">OTG AppSuite Factory</h1>
+    <p class="text-slate-500">v78.0 | Zero-Config Deployment</p>
   </div>
 
-  <div class="card max-w-3xl w-full p-8 md:p-10 relative">
+  <div class="card max-w-3xl w-full p-8 relative">
     
     <div class="flex justify-center gap-4 mb-8">
       <div id="dot1" class="progress-dot active"></div>
@@ -61,431 +56,433 @@
     <form id="factoryForm" onsubmit="return false;">
 
       <div id="step1" class="step-section active">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">1</span>
-          Organisation & Branding
+        <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span class="bg-blue-100 text-blue-600 w-8 h-8 flex items-center justify-center rounded-full text-sm">1</span> Organisation Setup
         </h2>
 
-        <div class="space-y-6">
+        <div class="space-y-5">
           <div>
             <label class="input-label">Organisation Name</label>
-            <p class="input-desc">This name will appear on the top of the App and in all Reports.</p>
-            <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Community Services" required>
+            <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Care Trust" required>
           </div>
 
           <div>
-            <label class="input-label">App Logo (Icon)</label>
-            <p class="input-desc">Upload a square image (JPG/PNG). This will be the app icon on phones.</p>
-            <div class="flex items-center gap-6 mt-3">
-              <div class="file-drop w-1/2" onclick="document.getElementById('fLogo').click()" id="dropLogo">
-                <span class="file-icon">🖼️</span>
-                <span class="font-semibold text-slate-600">Click to Upload Logo</span>
-                <input type="file" id="fLogo" hidden onchange="handleLogo(this)">
+            <label class="input-label">App Icon / Logo</label>
+            <div class="flex items-center gap-4">
+              <div class="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center border overflow-hidden">
+                <img id="logoPreview" class="w-full h-full object-cover hidden">
+                <span id="logoPlaceholder" class="text-2xl">🖼️</span>
               </div>
-              <div class="w-1/2 flex flex-col items-center justify-center">
-                <div class="w-24 h-24 bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 shadow-inner overflow-hidden">
-                  <img id="logoPreview" class="hidden w-full h-full object-cover" alt="Preview">
-                  <span id="logoPlaceholder" class="text-slate-400 text-xs">No Logo</span>
-                </div>
-                <span class="text-xs text-slate-400 mt-2">Preview</span>
+              <div>
+                <input type="file" id="fLogo" class="text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="handleLogo(this)">
+                <p class="text-xs text-slate-400 mt-1">Recommended: Square JPG/PNG, 512x512px.</p>
               </div>
             </div>
           </div>
 
-          <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
-            <h3 class="font-bold text-slate-700 mb-3">Regional Settings</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+          <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg">
+             <div>
                 <label class="input-label">Country Code</label>
-                <input type="number" id="countryCode" class="input-field" placeholder="64" value="64">
-                <p class="text-xs text-slate-500 mt-1">e.g. 64 (NZ), 1 (US), 44 (UK). No '+' needed.</p>
-              </div>
-              <div>
+                <input type="number" id="countryCode" class="input-field" value="64" placeholder="64">
+                <p class="text-xs text-slate-400 mt-1">For phone formatting (e.g. 64 for NZ).</p>
+             </div>
+             <div>
                 <label class="input-label">Timezone</label>
-                <input type="text" id="timezone" class="input-field" placeholder="Pacific/Auckland" value="Pacific/Auckland">
-                <p class="text-xs text-slate-500 mt-1">Required for accurate timestamping.</p>
-              </div>
-            </div>
+                <input type="text" id="timezone" class="input-field" value="Pacific/Auckland">
+             </div>
           </div>
 
-          <button onclick="nextStep(2)" class="btn-primary mt-4">Next: Features & Intelligence &rarr;</button>
+          <button onclick="nextStep(2)" class="btn-primary mt-2">Next: AI & Reporting &rarr;</button>
         </div>
       </div>
 
       <div id="step2" class="step-section">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">2</span>
-          Reporting & AI
+        <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span class="bg-blue-100 text-blue-600 w-8 h-8 flex items-center justify-center rounded-full text-sm">2</span> Intelligence
         </h2>
 
-        <div class="space-y-8">
-          
+        <div class="space-y-6">
           <div>
-            <label class="input-label text-lg">📊 Automated Statistics</label>
-            <p class="input-desc text-base">How often should the system calculate mileage and visit counts for your accounting team?</p>
-            <div class="bg-white p-1 border border-slate-300 rounded-lg inline-block w-full">
-              <select id="statsFreq" class="input-field border-none bg-transparent">
-                  <option value="MONTHLY" selected>Monthly (1st of Month)</option>
-                  <option value="WEEKLY">Weekly (Monday Morning)</option>
-                  <option value="DAILY">Daily (Midnight)</option>
-              </select>
-            </div>
-            <div class="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded border border-blue-100">
-              <strong>ℹ️ Note:</strong> This auto-populates the <em>'Travel Stats'</em> and <em>'Activity Stats'</em> tabs in your database.
-            </div>
+            <label class="input-label">Automated Reporting Frequency</label>
+            <select id="statsFreq" class="input-field">
+                <option value="MONTHLY" selected>Monthly (1st of Month)</option>
+                <option value="WEEKLY">Weekly (Monday)</option>
+                <option value="DAILY">Daily (Midnight)</option>
+            </select>
+            <p class="text-xs text-slate-500 mt-1">Determines when the 'Activity' and 'Travel' stats tabs are regenerated.</p>
           </div>
 
-          <hr class="border-slate-200">
+          <hr class="border-slate-100">
 
           <div>
-            <div class="flex justify-between items-center mb-2">
-              <label class="input-label text-lg mb-0">🤖 AI Smart Scribe</label>
-              <label class="inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="enableAi" class="sr-only peer" onchange="toggleAiUI()">
-                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+            <div class="flex justify-between items-center">
+              <label class="input-label">Enable "Smart Scribe" (AI Grammar)</label>
+              <input type="checkbox" id="enableAi" class="w-5 h-5 text-blue-600" onchange="toggleAiUI()">
             </div>
-            <p class="input-desc text-base">Automatically corrects spelling and grammar in worker notes using Google Gemini.</p>
             
-            <div id="aiConfigBox" class="hidden mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <label class="input-label text-yellow-800">Gemini API Key</label>
-                <input type="text" id="geminiKey" class="input-field border-yellow-300 focus:border-yellow-500 mb-2" placeholder="Paste your AI key here...">
-                
-                <div class="flex gap-3 items-start mt-2 text-sm text-yellow-800">
-                   <span class="text-xl">⚠️</span>
-                   <div>
-                     <strong>Privacy Notice (Free Tier):</strong><br>
-                     We automatically redact PII (Names, Phones, Emails) before sending data to the AI. <br>
-                     However, strictly sensitive medical/legal data should not be processed via free keys.
-                   </div>
-                </div>
+            <div id="aiConfigBox" class="hidden mt-4 pl-4 border-l-2 border-blue-200">
+               <label class="input-label">Google Gemini API Key</label>
+               <input type="text" id="geminiKey" class="input-field mb-2" placeholder="AIzaSy...">
+               
+               <div onclick="toggleHelp('helpGemini')" class="help-link">Where do I get a free key?</div>
+               <div id="helpGemini" class="help-box">
+                  <strong>How to get a Free Gemini Key:</strong>
+                  <ol class="list-decimal pl-5 mt-2 space-y-1">
+                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" class="underline font-bold">Google AI Studio</a>.</li>
+                    <li>Sign in with your Google Account.</li>
+                    <li>Click <strong>"Create API Key"</strong>.</li>
+                    <li>Copy the string starting with <code>AIza...</code> and paste it above.</li>
+                  </ol>
+                  <p class="mt-2 text-xs">Note: The free tier is sufficient for thousands of reports per day.</p>
+               </div>
+
+               <div class="bg-yellow-50 text-yellow-800 text-xs p-3 rounded mt-3 border border-yellow-100">
+                 <strong>Privacy Note:</strong> We automatically redact Names, Emails, and Phone Numbers before sending notes to Google for grammar checking.
+               </div>
             </div>
           </div>
 
-          <div class="flex gap-4 mt-8">
+          <div class="flex gap-3">
             <button onclick="nextStep(1)" class="btn-secondary">Back</button>
-            <button onclick="nextStep(3)" class="btn-primary">Next: External Services &rarr;</button>
+            <button onclick="nextStep(3)" class="btn-primary">Next: Services &rarr;</button>
           </div>
         </div>
       </div>
 
       <div id="step3" class="step-section">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">3</span>
-          External Services
+        <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span class="bg-blue-100 text-blue-600 w-8 h-8 flex items-center justify-center rounded-full text-sm">3</span> External Services
         </h2>
-        <p class="text-slate-500 mb-6">Connect optional 3rd party services. Leave blank if not used.</p>
+        <p class="text-sm text-slate-500 mb-4">All keys are optional but recommended for full functionality.</p>
 
         <div class="space-y-5">
+          
           <div>
-            <label class="input-label">Master Secret Key (Required)</label>
+            <label class="input-label">Master Secret Key (Auto-Generated)</label>
             <div class="flex gap-2">
-                <input type="text" id="secretKey" class="input-field bg-slate-100" placeholder="Generated automatically..." readonly required>
-                <button type="button" onclick="generateKey()" class="bg-slate-200 px-4 rounded font-bold text-slate-600 hover:bg-slate-300">↻</button>
+               <input type="text" id="secretKey" class="input-field bg-slate-50" readonly>
+               <button onclick="generateKey()" class="px-3 bg-slate-200 rounded hover:bg-slate-300">↻</button>
             </div>
-            <p class="input-desc mt-1">Used to secure communications between App and Database.</p>
           </div>
 
           <div>
-            <label class="input-label">OpenRouteService API Key (Maps)</label>
+            <label class="input-label">OpenRouteService Key (For Maps/Mileage)</label>
             <input type="text" id="orsKey" class="input-field" placeholder="5b3ce...">
-            <p class="input-desc">Required if you want address lookup (Reverse Geocoding).</p>
+            <div onclick="toggleHelp('helpOrs')" class="help-link">How to get a Free Map Key</div>
+            <div id="helpOrs" class="help-box">
+                <ol class="list-decimal pl-5 space-y-1">
+                    <li>Visit <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="underline font-bold">OpenRouteService.org</a>.</li>
+                    <li>Sign up (Standard Free Plan).</li>
+                    <li>Go to Dashboard -> <strong>Request Token</strong>.</li>
+                    <li>Select "Standard" and give it a name. Copy the long Key.</li>
+                </ol>
+            </div>
           </div>
 
           <div>
-            <label class="input-label">TextBelt API Key (SMS)</label>
+            <label class="input-label">TextBelt Key (For SMS Alerts)</label>
             <input type="text" id="textbeltKey" class="input-field" placeholder="textbelt_...">
-            <p class="input-desc">Required if you want the app to send real SMS alerts for Overdue/SOS events.</p>
+            <div onclick="toggleHelp('helpSms')" class="help-link">SMS options</div>
+            <div id="helpSms" class="help-box">
+                <p><strong>Free Mode:</strong> Leave blank. The system will use the public 'textbelt' key (1 SMS per day only).</p>
+                <p class="mt-2"><strong>Reliable Mode:</strong> Buy a key at <a href="https://textbelt.com/" target="_blank" class="underline font-bold">TextBelt.com</a> ($5 for ~70 texts). Recommended for live safety use.</p>
+            </div>
           </div>
 
           <div>
-            <label class="input-label">Google Drive Folder ID</label>
+            <label class="input-label">Google Drive Folder ID (For Photos)</label>
             <input type="text" id="folderId" class="input-field" placeholder="1vKz...">
-            <p class="input-desc">Copy the ID from the URL of a Drive folder to enable Photo Uploads.</p>
+            <div onclick="toggleHelp('helpDrive')" class="help-link">How to find your Folder ID</div>
+            <div id="helpDrive" class="help-box">
+                <ol class="list-decimal pl-5 space-y-1">
+                    <li>Go to Google Drive and create a folder (e.g. "Safety Photos").</li>
+                    <li><strong>Double-click</strong> to open the folder so it is empty on screen.</li>
+                    <li>Look at the URL bar at the top of Chrome/Edge.</li>
+                    <li>It will look like: <code>drive.google.com/drive/folders/<strong>1ABC-xyz...123</strong></code></li>
+                    <li>Copy ONLY the code part after the last slash.</li>
+                </ol>
+            </div>
           </div>
 
-          <div class="flex gap-4 mt-8">
+          <div class="flex gap-3 mt-6">
             <button onclick="nextStep(2)" class="btn-secondary">Back</button>
-            <button onclick="nextStep(4)" class="btn-primary">Next: Upload Templates &rarr;</button>
+            <button onclick="nextStep(4)" class="btn-primary">Next: Build &rarr;</button>
           </div>
         </div>
       </div>
 
       <div id="step4" class="step-section">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
-          <span class="bg-blue-100 text-blue-600 w-10 h-10 flex items-center justify-center rounded-full text-lg">4</span>
-          Upload Templates
+        <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span class="bg-blue-100 text-blue-600 w-8 h-8 flex items-center justify-center rounded-full text-sm">4</span> System Assets
         </h2>
-        <p class="text-slate-500 mb-6">Please upload the 4 core files provided in your developer kit.</p>
+        
+        <div id="autoLoadSection" class="text-center py-6">
+            <div class="mb-4 text-slate-600">Scanning local directory for templates...</div>
+            
+            <div class="space-y-2 text-left max-w-md mx-auto">
+                <div id="status_worker" class="file-status"><span>Worker App</span> <span class="status-badge status-pending">Searching...</span></div>
+                <div id="status_monitor" class="file-status"><span>Monitor App</span> <span class="status-badge status-pending">Searching...</span></div>
+                <div id="status_backend" class="file-status"><span>Backend Script</span> <span class="status-badge status-pending">Searching...</span></div>
+                <div id="status_guide" class="file-status"><span>User Guide</span> <span class="status-badge status-pending">Searching...</span></div>
+                <div id="status_manual" class="file-status"><span>Admin Manual</span> <span class="status-badge status-pending">Searching...</span></div>
+            </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="file-drop" onclick="document.getElementById('fWorker').click()" id="dropWorker">
-            <span class="file-icon">👷</span>
-            <div class="font-bold text-slate-700">Worker App</div>
-            <div class="text-xs text-slate-400">worker_template.html</div>
-            <input type="file" id="fWorker" hidden onchange="handleFile(this, 'dropWorker')">
-          </div>
-          
-          <div class="file-drop" onclick="document.getElementById('fMonitor').click()" id="dropMonitor">
-            <span class="file-icon">🖥️</span>
-            <div class="font-bold text-slate-700">Monitor App</div>
-            <div class="text-xs text-slate-400">monitor_template.html</div>
-            <input type="file" id="fMonitor" hidden onchange="handleFile(this, 'dropMonitor')">
-          </div>
-          
-          <div class="file-drop" onclick="document.getElementById('fBackend').click()" id="dropBackend">
-            <span class="file-icon">⚙️</span>
-            <div class="font-bold text-slate-700">Backend System</div>
-            <div class="text-xs text-slate-400">backend_template.js</div>
-            <input type="file" id="fBackend" hidden onchange="handleFile(this, 'dropBackend')">
-          </div>
-          
-          <div class="file-drop" onclick="document.getElementById('fGuide').click()" id="dropGuide">
-            <span class="file-icon">📖</span>
-            <div class="font-bold text-slate-700">User Guide</div>
-            <div class="text-xs text-slate-400">guide_template.html</div>
-            <input type="file" id="fGuide" hidden onchange="handleFile(this, 'dropGuide')">
-          </div>
-        </div>
-
-        <div class="mt-4">
-            <div class="file-drop p-4 border-dashed border-2 border-slate-300" onclick="document.getElementById('fManual').click()" id="dropManual">
-                <span class="text-xl">📘</span> <span class="font-bold text-slate-600">Ops Manual (Admin)</span>
-                <input type="file" id="fManual" hidden onchange="handleFile(this, 'dropManual')">
+            <div id="manualUpload" class="hidden mt-6 pt-6 border-t border-slate-200">
+                <p class="text-red-500 text-sm mb-2 font-bold">⚠️ Auto-load failed (Browser Security Restriction)</p>
+                <p class="text-slate-500 text-xs mb-4">If running from a local file, please drag and drop the files here manually.</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="file" id="fManualUpload" multiple class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="handleManualUpload(this)">
+                </div>
             </div>
         </div>
 
-        <div class="flex gap-4 mt-8">
+        <div class="flex gap-3 mt-6">
             <button onclick="nextStep(3)" class="btn-secondary">Back</button>
-            <button onclick="generateApp()" class="btn-primary bg-emerald-600 hover:bg-emerald-700">🚀 BUILD SYSTEM</button>
+            <button id="btnGenerate" onclick="generateApp()" class="btn-primary opacity-50 cursor-not-allowed" disabled>🚀 DOWNLOAD SYSTEM</button>
         </div>
       </div>
 
       <div id="step5" class="step-section text-center py-10">
-        <div class="text-6xl mb-6">✅</div>
-        <h2 class="text-3xl font-bold text-slate-800 mb-3">System Generated!</h2>
-        <p class="text-slate-600 mb-8 text-lg">Your customized "OTG AppSuite" ZIP file is downloading.</p>
+        <div class="text-6xl mb-4">✅</div>
+        <h2 class="text-2xl font-bold text-slate-800">System Ready</h2>
+        <p class="text-slate-500 mb-6">Your AppSuite ZIP has been generated.</p>
         
-        <div class="bg-slate-800 text-slate-200 p-6 rounded-xl text-left font-mono text-sm overflow-x-auto shadow-lg">
-          <div class="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
-            <span class="text-emerald-400 text-xl">➜</span> 
-            <span class="font-bold text-white">Next Steps:</span>
-          </div>
-          <ol class="list-decimal pl-5 space-y-2 text-slate-300">
-            <li>Extract the downloaded ZIP file.</li>
-            <li>Create a new Google Sheet & Apps Script project.</li>
-            <li>Paste the contents of <strong>backend.js</strong> into the Script editor.</li>
-            <li>Deploy as Web App (Execute as: Me, Access: Anyone).</li>
-            <li>Copy your new <strong>Deployment URL</strong>.</li>
-            <li>Open your local <strong>WorkerApp/index.html</strong> (or host it) and enter the URL in the Wizard.</li>
-          </ol>
+        <div class="bg-slate-800 text-slate-300 p-6 rounded text-left font-mono text-sm overflow-x-auto">
+            1. Extract ZIP.<br>
+            2. Create Google Sheet + Script.<br>
+            3. Paste 'backend.js' code.<br>
+            4. Deploy Web App (Exec: Me, Access: Anyone).<br>
+            5. Copy URL -> Paste into Worker App Wizard.
         </div>
-
-        <button onclick="location.reload()" class="mt-8 text-slate-400 hover:text-slate-600 underline">Create Another System</button>
+        <button onclick="location.reload()" class="mt-6 text-slate-400 underline hover:text-slate-600">Start Over</button>
       </div>
 
     </form>
   </div>
 
 <script>
-  let TEMPLATES = {};
-
-  // Initialize
-  window.onload = function() {
-      generateKey();
+  let TEMPLATES = {
+      'worker_template.html': null,
+      'monitor_template.html': null,
+      'backend_template.js': null,
+      'guide_template.html': null,
+      'ops_manual_template.html': null
   };
+  
+  window.onload = function() { generateKey(); };
 
-  function nextStep(n) {
-    // Basic validation
-    if(n === 2) {
-       if(!document.getElementById('orgName').value) return alert("Please enter an Organisation Name.");
-    }
-    
-    document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
-    document.getElementById('step' + n).classList.add('active');
-    
-    // Update Dots
-    document.querySelectorAll('.progress-dot').forEach((d, i) => {
-        if(i < n) d.classList.add('active');
-        else d.classList.remove('active');
-    });
+  function toggleHelp(id) {
+      const el = document.getElementById(id);
+      el.style.display = el.style.display === 'block' ? 'none' : 'block';
   }
 
   function toggleAiUI() {
-      const isChecked = document.getElementById('enableAi').checked;
+      const chk = document.getElementById('enableAi');
       const box = document.getElementById('aiConfigBox');
-      const keyInput = document.getElementById('geminiKey');
-      
-      if(isChecked) {
+      if(chk.checked) {
           box.classList.remove('hidden');
-          keyInput.setAttribute('required', 'true');
+          document.getElementById('geminiKey').setAttribute('required','true');
       } else {
           box.classList.add('hidden');
-          keyInput.removeAttribute('required');
+          document.getElementById('geminiKey').removeAttribute('required');
       }
   }
 
   function generateKey() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 32; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    document.getElementById('secretKey').value = result;
+    const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let r = ''; for(let i=0;i<32;i++) r += c.charAt(Math.floor(Math.random()*c.length));
+    document.getElementById('secretKey').value = r;
+  }
+
+  function nextStep(n) {
+      document.querySelectorAll('.step-section').forEach(e => e.classList.remove('active'));
+      document.getElementById('step'+n).classList.add('active');
+      document.querySelectorAll('.progress-dot').forEach((d,i) => {
+          if(i<n) d.classList.add('active'); else d.classList.remove('active');
+      });
+      
+      if(n === 4) {
+          attemptAutoLoad();
+      }
   }
 
   function handleLogo(input) {
-      const file = input.files[0];
-      if(file) {
+      if(input.files && input.files[0]) {
           const reader = new FileReader();
           reader.onload = function(e) {
-              TEMPLATES.fLogo = e.target.result; // Base64
-              
-              // Update UI
-              const preview = document.getElementById('logoPreview');
-              preview.src = e.target.result;
-              preview.classList.remove('hidden');
+              TEMPLATES.logo = e.target.result;
+              document.getElementById('logoPreview').src = e.target.result;
+              document.getElementById('logoPreview').classList.remove('hidden');
               document.getElementById('logoPlaceholder').classList.add('hidden');
-              
-              document.getElementById('dropLogo').classList.add('loaded');
-              document.getElementById('dropLogo').querySelector('span.font-semibold').innerText = file.name;
-          };
-          reader.readAsDataURL(file);
+          }
+          reader.readAsDataURL(input.files[0]);
       }
   }
 
-  function handleFile(input, dropId) {
-      const file = input.files[0];
-      if(file) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
-              TEMPLATES[input.id] = e.target.result; // Text content
+  // AUTO-LOAD LOGIC
+  async function attemptAutoLoad() {
+      const files = [
+          {id: 'worker', file: 'worker_template.html'},
+          {id: 'monitor', file: 'monitor_template.html'},
+          {id: 'backend', file: 'backend_template.js'},
+          {id: 'guide', file: 'guide_template.html'},
+          {id: 'manual', file: 'ops_manual_template.html'}
+      ];
+
+      let successCount = 0;
+
+      for (let item of files) {
+          const badge = document.querySelector(`#status_${item.id} .status-badge`);
+          try {
+              const response = await fetch('./' + item.file);
+              if (!response.ok) throw new Error("404");
+              const text = await response.text();
+              TEMPLATES[item.file] = text;
               
-              // Visual Feedback
-              const dropZone = document.getElementById(dropId);
-              dropZone.classList.add('loaded');
-              dropZone.querySelector('div.font-bold').innerText = "✅ " + file.name;
-              dropZone.querySelector('div.font-bold').classList.add('text-emerald-600');
-          };
-          reader.readAsText(file);
+              badge.className = "status-badge status-ok";
+              badge.innerText = "LOADED";
+              successCount++;
+          } catch (e) {
+              console.warn("Fetch failed for " + item.file, e);
+              badge.className = "status-badge status-err";
+              badge.innerText = "NOT FOUND";
+          }
       }
+
+      checkReady(successCount === 5);
+  }
+
+  function checkReady(isAutoSuccess) {
+      const btn = document.getElementById('btnGenerate');
+      if (isAutoSuccess) {
+          btn.disabled = false;
+          btn.classList.remove('opacity-50', 'cursor-not-allowed');
+          document.getElementById('manualUpload').classList.add('hidden');
+      } else {
+          // Show fallback if any failed
+          document.getElementById('manualUpload').classList.remove('hidden');
+          
+          // Check if manual upload has filled the gaps
+          const allLoaded = Object.values(TEMPLATES).every(v => v !== null);
+          if(allLoaded) {
+              btn.disabled = false;
+              btn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+      }
+  }
+
+  function handleManualUpload(input) {
+      // Allow user to drag all files at once
+      Array.from(input.files).forEach(file => {
+          const name = file.name;
+          if(TEMPLATES.hasOwnProperty(name)) {
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                  TEMPLATES[name] = e.target.result;
+                  // Visual Update
+                  let id = "";
+                  if(name.includes('worker')) id = 'worker';
+                  else if(name.includes('monitor')) id = 'monitor';
+                  else if(name.includes('backend')) id = 'backend';
+                  else if(name.includes('guide')) id = 'guide';
+                  else if(name.includes('manual')) id = 'manual';
+                  
+                  const badge = document.querySelector(`#status_${id} .status-badge`);
+                  if(badge) {
+                      badge.className = "status-badge status-ok";
+                      badge.innerText = "UPLOADED";
+                  }
+                  
+                  // Re-check readiness
+                  const allLoaded = Object.values(TEMPLATES).every(v => v !== null);
+                  if(allLoaded) checkReady(true);
+              };
+              reader.readAsText(file);
+          }
+      });
   }
 
   async function generateApp() {
-    // Validation
-    const org = document.getElementById('orgName').value;
-    const secret = document.getElementById('secretKey').value;
-    
-    if(!org || !secret) return alert("Missing Organisation Name or Secret Key.");
-    if(!TEMPLATES.fWorker || !TEMPLATES.fBackend) return alert("Please upload the required templates (Worker & Backend).");
+      const zip = new JSZip();
+      const workerKey = "W_" + Math.random().toString(36).substr(2, 9);
+      
+      const C = {
+          ORG: document.getElementById('orgName').value,
+          SECRET: document.getElementById('secretKey').value,
+          WORKER_KEY: workerKey,
+          ORS: document.getElementById('orsKey').value || "",
+          GEMINI: document.getElementById('geminiKey').value || "",
+          TEXTBELT: document.getElementById('textbeltKey').value || "",
+          FOLDER: document.getElementById('folderId').value || "",
+          ENABLE_AI: document.getElementById('enableAi').checked ? "true" : "false",
+          COUNTRY: document.getElementById('countryCode').value || "64",
+          TIMEZONE: document.getElementById('timezone').value || "Pacific/Auckland",
+          STATS_FREQ: document.getElementById('statsFreq').value || "MONTHLY",
+          LOGO: TEMPLATES.logo || "" 
+      };
 
-    const zip = new JSZip();
-    const workerKey = "W_" + Math.random().toString(36).substr(2, 9);
-    
-    // Config Values
-    const C = {
-        ORG: org,
-        SECRET: secret,
-        WORKER_KEY: workerKey,
-        ORS: document.getElementById('orsKey').value || "",
-        GEMINI: document.getElementById('geminiKey').value || "",
-        TEXTBELT: document.getElementById('textbeltKey').value || "",
-        FOLDER: document.getElementById('folderId').value || "",
-        ENABLE_AI: document.getElementById('enableAi').checked ? "true" : "false",
-        COUNTRY: document.getElementById('countryCode').value || "64",
-        TIMEZONE: document.getElementById('timezone').value || "Pacific/Auckland",
-        STATS_FREQ: document.getElementById('statsFreq').value || "MONTHLY",
-        LOGO: TEMPLATES.fLogo || "" // Base64
-    };
+      // Backend
+      let backendCode = TEMPLATES['backend_template.js']
+          .replace(/%%SECRET_KEY%%/g, C.SECRET)
+          .replace(/%%WORKER_KEY%%/g, C.WORKER_KEY)
+          .replace(/%%ORS_API_KEY%%/g, C.ORS)
+          .replace(/%%GEMINI_API_KEY%%/g, C.GEMINI)
+          .replace(/%%TEXTBELT_API_KEY%%/g, C.TEXTBELT)
+          .replace(/%%PHOTOS_FOLDER_ID%%/g, C.FOLDER)
+          .replace(/%%ORGANISATION_NAME%%/g, C.ORG)
+          .replace(/%%TIMEZONE%%/g, C.TIMEZONE)
+          .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY)
+          .replace(/%%STATS_FREQ%%/g, C.STATS_FREQ)
+          .replace(/%%ESCALATION_MINUTES%%/g, "60")
+          .replace(/%%ENABLE_AI%%/g, C.ENABLE_AI);
+      zip.file("backend.js", backendCode);
 
-    // 1. Process Backend
-    let backendCode = TEMPLATES.fBackend
-        .replace(/%%SECRET_KEY%%/g, C.SECRET)
-        .replace(/%%WORKER_KEY%%/g, C.WORKER_KEY)
-        .replace(/%%ORS_API_KEY%%/g, C.ORS)
-        .replace(/%%GEMINI_API_KEY%%/g, C.GEMINI)
-        .replace(/%%TEXTBELT_API_KEY%%/g, C.TEXTBELT)
-        .replace(/%%PHOTOS_FOLDER_ID%%/g, C.FOLDER)
-        .replace(/%%ORGANISATION_NAME%%/g, C.ORG)
-        .replace(/%%TIMEZONE%%/g, C.TIMEZONE)
-        .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY)
-        .replace(/%%STATS_FREQ%%/g, C.STATS_FREQ)
-        .replace(/%%ESCALATION_MINUTES%%/g, "60")
-        .replace(/%%ENABLE_AI%%/g, C.ENABLE_AI);
+      // Worker
+      let wHtml = TEMPLATES['worker_template.html']
+          .replace(/%%ORG_NAME%%/g, C.ORG)
+          .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY)
+          .replace(/%%LOGO_DATA%%/g, C.LOGO);
+          
+      // Monitor
+      let mHtml = TEMPLATES['monitor_template.html']
+          .replace(/%%ORG_NAME%%/g, C.ORG)
+          .replace(/%%LOGO_URL%%/g, C.LOGO);
 
-    zip.file("backend.js", backendCode);
+      // Docs
+      let gHtml = TEMPLATES['guide_template.html']
+          .replace(/%%ORG_NAME%%/g, C.ORG)
+          .replace(/%%CHECKIN_INTERVAL%%/g, "60");
+      let opHtml = TEMPLATES['ops_manual_template.html']
+          .replace(/%%ORG_NAME%%/g, C.ORG)
+          .replace(/%%SECRET_KEY%%/g, C.SECRET)
+          .replace(/%%WORKER_KEY%%/g, C.WORKER_KEY);
 
-    // 2. Process Worker App
-    let wHtml = TEMPLATES.fWorker
-        .replace(/%%ORG_NAME%%/g, C.ORG)
-        .replace(/%%COUNTRY_CODE%%/g, C.COUNTRY) 
-        .replace(/%%LOGO_DATA%%/g, C.LOGO);
-    
-    // 3. Process Monitor App
-    let mHtml = TEMPLATES.fMonitor
-        .replace(/%%ORG_NAME%%/g, C.ORG)
-        .replace(/%%LOGO_URL%%/g, C.LOGO);
-    
-    // 4. Process Guide
-    let gHtml = TEMPLATES.fGuide
-        .replace(/%%ORG_NAME%%/g, C.ORG)
-        .replace(/%%CHECKIN_INTERVAL%%/g, "60");
-        
-    // 5. Process Manual
-    let opHtml = TEMPLATES.fManual
-        .replace(/%%ORG_NAME%%/g, C.ORG)
-        .replace(/%%SECRET_KEY%%/g, C.SECRET)
-        .replace(/%%WORKER_KEY%%/g, C.WORKER_KEY);
+      // SW
+      const swCode = `const CACHE_NAME='otg-v78';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
 
-    // Service Worker & Manifest
-    const swCode = `
-const CACHE_NAME = 'otg-cache-v77.5';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });
-self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });
-`;
+      const manifest = {
+          name: C.ORG, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af",
+          icons: [{src: "icon.png", sizes: "192x192", type: "image/png"}, {src: "icon.png", sizes: "512x512", type: "image/png"}]
+      };
 
-    const manifest = { 
-        name: C.ORG, 
-        short_name: "Safety", 
-        start_url: "./index.html", 
-        display: "standalone", 
-        background_color: "#111827", 
-        theme_color: "#1e40af", 
-        icons: [ 
-            {src: "icon.png", sizes: "192x192", type: "image/png"}, 
-            {src: "icon.png", sizes: "512x512", type: "image/png"} 
-        ] 
-    };
+      const wf = zip.folder("WorkerApp");
+      wf.file("index.html", wHtml);
+      wf.file("sw.js", swCode);
+      wf.file("manifest.json", JSON.stringify(manifest));
+      wf.file("USER_GUIDE.html", gHtml);
+      if(C.LOGO) wf.file("icon.png", C.LOGO.split(',')[1], {base64: true});
 
-    // FOLDER STRUCTURE
-    // Worker App
-    const workerFolder = zip.folder("WorkerApp");
-    workerFolder.file("index.html", wHtml);
-    workerFolder.file("sw.js", swCode);
-    workerFolder.file("manifest.json", JSON.stringify(manifest));
-    workerFolder.file("USER_GUIDE.html", gHtml);
-    if(C.LOGO) workerFolder.file("icon.png", C.LOGO.split(',')[1], {base64: true});
+      zip.folder("MonitorApp").file("index.html", mHtml);
+      zip.file("ADMIN_MANUAL.html", opHtml);
 
-    // Monitor App
-    const monitorFolder = zip.folder("MonitorApp");
-    monitorFolder.file("index.html", mHtml);
-    
-    // Admin Docs
-    zip.file("ADMIN_MANUAL.html", opHtml);
-
-    // Generate
-    zip.generateAsync({type:"blob"}).then(function(content) {
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(content);
-        link.download = `OTG_AppSuite_${C.ORG.replace(/\s+/g,'_')}.zip`;
-        link.click();
-        nextStep(5);
-    });
+      zip.generateAsync({type:"blob"}).then(c => {
+          const l = document.createElement("a");
+          l.href = URL.createObjectURL(c);
+          l.download = `OTG_AppSuite_${C.ORG.replace(/\s+/g,'_')}.zip`;
+          l.click();
+          nextStep(5);
+      });
   }
 </script>
-
 </body>
 </html>
