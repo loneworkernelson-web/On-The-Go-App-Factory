@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v78.13 (Golden Instructions)</title>
+  <title>OTG Factory v78.15 (Golden Stable)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@
           <div class="space-y-4 text-gray-300 text-sm mb-6">
               <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution.</p>
               <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps.</li>
+                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps. Staff must keep the app active.</li>
                   <li><strong>Connectivity:</strong> Alerts require data. They will not send in dead zones.</li>
                   <li><strong>No SLA:</strong> This relies on free Google services. No uptime guarantees.</li>
               </ul>
@@ -71,7 +71,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v78.13 | Golden Master</p>
+      <p class="text-gray-400">v78.15 | Golden Master (Global)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -91,8 +91,23 @@
               <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
               <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Secret Key</label><input type="text" id="secretKey" class="input-field text-yellow-400" placeholder="Generating..." oninput="saveInput(this)"></div>
               <div class="grid grid-cols-2 gap-4">
-                  <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Country</label><select id="countrySelect" class="input-field" onchange="updateRegionInfo()"><option value="+64">NZ (+64)</option><option value="+61">AU (+61)</option><option value="+44">UK (+44)</option><option value="+1">US (+1)</option></select></div>
-                  <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Timezone</label><input type="text" id="timezoneVal" class="input-field text-gray-400" readonly></div>
+                  <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Country</label><select id="countrySelect" class="input-field" onchange="saveInput(this)"><option value="+64">NZ (+64)</option><option value="+61">AU (+61)</option><option value="+44">UK (+44)</option><option value="+1">US (+1)</option></select></div>
+                  <div>
+                      <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Timezone</label>
+                      <select id="timezoneVal" class="input-field" onchange="saveInput(this)">
+                          <option value="Pacific/Auckland">Pacific/Auckland (NZ)</option>
+                          <option value="Australia/Sydney">Australia/Sydney</option>
+                          <option value="Australia/Melbourne">Australia/Melbourne</option>
+                          <option value="Australia/Brisbane">Australia/Brisbane</option>
+                          <option value="Australia/Perth">Australia/Perth</option>
+                          <option value="Europe/London">Europe/London (UK)</option>
+                          <option value="America/New_York">America/New_York (EST)</option>
+                          <option value="America/Chicago">America/Chicago (CST)</option>
+                          <option value="America/Denver">America/Denver (MST)</option>
+                          <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                          <option value="UTC">UTC (Universal)</option>
+                      </select>
+                  </div>
               </div>
             </div>
             <div class="highlight-box flex flex-col items-center justify-center text-center">
@@ -125,7 +140,7 @@
                  <div><div class="flex justify-between"><label class="block text-gray-500 text-xs uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="text-xs text-blue-400 cursor-pointer underline">Help</span></div><input type="text" id="folderId" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
              </div>
           </div>
-          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
+          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary">Next: Spreadsheet →</button></div>
         </div>
 
         <div id="step2" class="step-section space-y-6">
@@ -180,7 +195,6 @@
 const FILES={worker:'worker_template.html',monitor:'monitor_template.html',backend:'backend_template.js',guide:'guide_template.html',manual:'ops_manual_template.html'};
 let TEMPLATES={}; const workerKey="wk_"+Math.random().toString(36).substr(2,9);
 
-// SPACER for A20 logic
 const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
 
 const BLUEPRINTS = {
@@ -192,18 +206,38 @@ const BLUEPRINTS = {
 };
 
 window.onload=async()=>{
-    loadPersistedData(); updateRegionInfo(); setupDragDrop(); toggleAiInput(); genKey();
+    loadPersistedData(); 
+    detectTimezoneOnLoad(); 
+    setupDragDrop(); 
+    toggleAiInput(); 
+    genKey();
     for(const[k,f]of Object.entries(FILES)){try{const r=await fetch(f);if(r.ok)TEMPLATES[k]=await r.text();}catch(e){}}
 };
 
 function saveInput(el){localStorage.setItem('otg_'+el.id,el.type==='checkbox'?el.checked:el.value);}
 function loadPersistedData(){
-    const ids=['orgName','secretKey','webAppUrl','geminiKey','orsKey','textbeltKey','folderId','escalationMins','vehFreq','countrySelect','statsFreq'];
+    const ids=['orgName','secretKey','webAppUrl','geminiKey','orsKey','textbeltKey','folderId','escalationMins','vehFreq','countrySelect','statsFreq','timezoneVal'];
     ids.forEach(id=>{const v=localStorage.getItem('otg_'+id);if(v)document.getElementById(id).value=v;});
     if(localStorage.getItem('otg_chkTravelReport')!==null)document.getElementById('chkTravelReport').checked=localStorage.getItem('otg_chkTravelReport')==='true';
     if(localStorage.getItem('otg_enableAi')!==null)document.getElementById('enableAi').checked=localStorage.getItem('otg_enableAi')==='true';
 }
-function updateRegionInfo(){const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;document.getElementById('detectedTz').textContent=tz;document.getElementById('timezoneVal').value=tz;saveInput(document.getElementById('countrySelect'));}
+
+// SMART AUTO-SELECT TIMEZONE
+function detectTimezoneOnLoad() {
+    const saved = localStorage.getItem('otg_timezoneVal');
+    if(saved) return;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const drop = document.getElementById('timezoneVal');
+    for(let i=0; i<drop.options.length; i++) {
+        if(drop.options[i].value === tz) { drop.selectedIndex = i; saveInput(drop); return; }
+    }
+    if(tz.includes("Auckland")) drop.value = "Pacific/Auckland";
+    else if(tz.includes("Sydney")) drop.value = "Australia/Sydney";
+    else if(tz.includes("London")) drop.value = "Europe/London";
+    else if(tz.includes("New_York")) drop.value = "America/New_York";
+    saveInput(drop);
+}
+
 function toggleEnterBtn(){const b=document.getElementById('btnEnter'),c=document.getElementById('chkAccept');b.disabled=!c.checked;if(c.checked){b.classList.remove('bg-gray-700','text-gray-500');b.classList.add('bg-blue-600','text-white','hover:bg-blue-500');}else{b.classList.add('bg-gray-700','text-gray-500');b.classList.remove('bg-blue-600','text-white','hover:bg-blue-500');}}
 function closeModal(id){document.getElementById(id).style.display='none';if(id==='disclaimerModal')document.getElementById('mainContent').classList.remove('blur-sm');}
 function setupDragDrop(){const d=document.getElementById('dropZone');d.addEventListener('dragover',e=>{e.preventDefault();d.classList.add('border-blue-500')});d.addEventListener('dragleave',e=>{e.preventDefault();d.classList.remove('border-blue-500')});d.addEventListener('drop',e=>{e.preventDefault();d.classList.remove('border-blue-500');if(e.dataTransfer.files.length)handleLogo({files:e.dataTransfer.files})});}
@@ -238,7 +272,7 @@ function downloadZip(){
     let wHtml=TEMPLATES['worker_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SHEET_URL%%/g,url).replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"").replace(/%%WORKER_KEY%%/g,workerKey).replace(/%%ORS_API_KEY%%/g,document.getElementById('orsKey').value).replace(/%%ESCALATION_MINUTES%%/g,document.getElementById('escalationMins').value).replace(/%%VEH_ENABLED%%/g,document.getElementById('chkVehicle').checked).replace(/%%VEH_INTERVAL%%/g,document.getElementById('vehFreq').value).replace(/%%MILEAGE_ENABLED%%/g,"true").replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+','')).replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
     let mHtml=TEMPLATES['monitor_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"");
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
-    zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",`const CACHE_NAME='otg-v78.12';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`).file("manifest.json",JSON.stringify({name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"}]})).file("USER_GUIDE.html",gHtml);
+    zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",`const CACHE_NAME='otg-v78.15';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`).file("manifest.json",JSON.stringify({name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"}]})).file("USER_GUIDE.html",gHtml);
     if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
     zip.folder("MonitorApp").file("index.html",mHtml);
     zip.file("Code.gs",document.getElementById('codeDisplay').textContent);
