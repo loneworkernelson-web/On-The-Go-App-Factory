@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v79.6 (Hardcoded)</title>
+  <title>OTG Factory v79.7 (Syntax Fix)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -68,7 +68,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v79.6 | Golden Master (Hardcoded)</p>
+      <p class="text-gray-400">v79.7 | Golden Master (Syntax Fix)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -191,6 +191,21 @@ const FILES = {
 let TEMPLATES = {}; 
 const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
 
+// SAFE SCRIPT TAG SPLIT (Safe for Parser)
+const QUIET_SCRIPT = "<" + "script>const _o=console.warn;console.warn=function(m){if(m.includes('Tailwind')||m.includes('AudioContext')||m.includes('Deprecation'))return;_o.apply(console,arguments)};<" + "/script>";
+// DEBUG SCRIPT
+const DEBUG_SCRIPT = "<" + "script>setTimeout(function(){ var u = localStorage.getItem('otg_settings_url'); if(u) { console.log('DEBUG: Found URL: ' + u); } else { console.log('CRITICAL: Settings not loaded!'); } }, 1000);<" + "/script>";
+
+// RAW RESPONSE VIEWER FOR MONITOR
+const MONITOR_DEBUG = "<" + "script>" +
+    "window.fetch = (function(f){ return function() { return f.apply(this, arguments).then(async r => { " +
+    "  if(!r.ok) { alert('HTTP Error: ' + r.status); return r; } " +
+    "  const clone = r.clone(); const txt = await clone.text(); " +
+    "  if(txt.trim().startsWith('<!DOCTYPE')) { alert('CRITICAL: Google Permissions Error! You are receiving a Login Page, not JSON.\\n\\nResponse Start:\\n' + txt.substring(0, 100)); } " +
+    "  return r; " +
+    "}); }; })(window.fetch);" +
+    "<" + "/script>";
+
 const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
 
 const BLUEPRINTS = {
@@ -207,6 +222,8 @@ window.onload = async () => {
     handleLogo({files:[]});
     toggleAiInput(); 
     genKey();
+    
+    // CACHE BUSTER: Force fetch new templates
     for (const [f, id] of Object.entries(FILES)) {
         try { 
             const r = await fetch(f + "?v=" + Date.now()); 
@@ -267,35 +284,15 @@ function testConnection(){
 
 function checkAssets(r){const b=document.getElementById('btnDlZip');if(r){b.disabled=false;b.classList.remove('opacity-50');}}
 
-// SAFE INJECTION GENERATOR
-function getHeadInject(url, org) {
-    return "<" + "script>" +
-           "window.OTG_CONFIG = { url: '" + url + "', org: '" + org + "' };" +
-           "try { localStorage.setItem('otg_settings_url', '" + url + "'); localStorage.setItem('otg_settings_org', '" + org + "'); } catch(e){}" +
-           "<" + "/script>";
-}
-
-// PWA BUTTON INJECTOR
-const PWA_SCRIPT = "<" + "script>" +
-                   "let deferredPrompt; window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; " +
-                   "const btn = document.createElement('button'); btn.innerText = '📲 Install App'; " +
-                   "btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:15px 30px;background:#2563eb;color:white;border:none;border-radius:50px;font-weight:bold;box-shadow:0 10px 25px rgba(0,0,0,0.5);font-size:16px;cursor:pointer;animation:bounce 2s infinite;';" +
-                   "document.body.appendChild(btn); " +
-                   "btn.addEventListener('click', () => { btn.style.display = 'none'; deferredPrompt.prompt(); deferredPrompt.userChoice.then((r) => { if(r.outcome === 'accepted') console.log('Installed'); deferredPrompt = null; }); }); " +
-                   "});" +
-                   "<" + "/script>";
-
 function downloadZip(){
     const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
     if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
     
-    // GENERATE INJECTION STRING
-    const HEAD_INJECT = getHeadInject(url, org);
-
+    // INJECT SAFE SCRIPT
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
-        .replace('<head>', '<head>' + HEAD_INJECT + PWA_SCRIPT) // Inject Config + PWA Logic at TOP
-        .replace('', 'v79.6') 
+        .replace('</head>', QUIET_SCRIPT + '</head>')
+        .replace('', 'v79.7') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -311,15 +308,17 @@ function downloadZip(){
     if(wHtml.includes("%%SHEET_URL%%")) { alert("CRITICAL ERROR: URL Injection Failed."); return; }
 
     let mHtml=TEMPLATES['monitor_template.html']
-        .replace('<head>', '<head>' + HEAD_INJECT)
-        .replace('', 'v79.6')
+        .replace('</head>', QUIET_SCRIPT + '</head>')
+        .replace('</body>', MONITOR_DEBUG + '</body>') // Inject Response Viewer
+        .replace('', 'v79.7')
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
     
-    const timeHash = "v79.6_" + Date.now();
+    // DYNAMIC CACHE BUSTING
+    const timeHash = "v79.7_" + Date.now();
     const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
