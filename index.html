@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v79.7 (Syntax Fix)</title>
+  <title>OTG Factory v79.8 (Key Fixed)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -68,7 +68,7 @@
   <div class="max-w-5xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v79.7 | Golden Master (Syntax Fix)</p>
+      <p class="text-gray-400">v79.8 | Golden Master (Key Sync)</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -86,7 +86,8 @@
           <div class="grid md:grid-cols-2 gap-6">
             <div class="space-y-4">
               <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
-              <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Secret Key</label><input type="text" id="secretKey" class="input-field text-yellow-400" placeholder="Generating..." oninput="saveInput(this)"></div>
+              <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Secret Key (App Password)</label><input type="text" id="secretKey" class="input-field text-yellow-400" placeholder="Generating..." oninput="saveInput(this)"></div>
+              <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Worker Key (System ID)</label><input type="text" id="workerKeyDisplay" class="input-field text-green-400 font-mono" disabled></div>
               <div class="grid grid-cols-2 gap-4">
                   <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Country</label><select id="countrySelect" class="input-field" onchange="saveInput(this)"><option value="+64">NZ (+64)</option><option value="+61">AU (+61)</option><option value="+44">UK (+44)</option><option value="+1">US (+1)</option></select></div>
                   <div>
@@ -189,22 +190,16 @@ const FILES = {
     'ops_manual_template.html': 'st_manual'
 };
 let TEMPLATES = {}; 
-const workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
+// FIX: Persist Worker Key so it doesn't rotate on refresh
+let workerKey = localStorage.getItem('otg_worker_key');
+if (!workerKey) {
+    workerKey = "wk_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('otg_worker_key', workerKey);
+}
 
 // SAFE SCRIPT TAG SPLIT (Safe for Parser)
 const QUIET_SCRIPT = "<" + "script>const _o=console.warn;console.warn=function(m){if(m.includes('Tailwind')||m.includes('AudioContext')||m.includes('Deprecation'))return;_o.apply(console,arguments)};<" + "/script>";
-// DEBUG SCRIPT
 const DEBUG_SCRIPT = "<" + "script>setTimeout(function(){ var u = localStorage.getItem('otg_settings_url'); if(u) { console.log('DEBUG: Found URL: ' + u); } else { console.log('CRITICAL: Settings not loaded!'); } }, 1000);<" + "/script>";
-
-// RAW RESPONSE VIEWER FOR MONITOR
-const MONITOR_DEBUG = "<" + "script>" +
-    "window.fetch = (function(f){ return function() { return f.apply(this, arguments).then(async r => { " +
-    "  if(!r.ok) { alert('HTTP Error: ' + r.status); return r; } " +
-    "  const clone = r.clone(); const txt = await clone.text(); " +
-    "  if(txt.trim().startsWith('<!DOCTYPE')) { alert('CRITICAL: Google Permissions Error! You are receiving a Login Page, not JSON.\\n\\nResponse Start:\\n' + txt.substring(0, 100)); } " +
-    "  return r; " +
-    "}); }; })(window.fetch);" +
-    "<" + "/script>";
 
 const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
 
@@ -217,6 +212,7 @@ const BLUEPRINTS = {
 };
 
 window.onload = async () => { 
+    document.getElementById('workerKeyDisplay').value = workerKey;
     loadPersistedData(); 
     detectTimezoneOnLoad(); 
     handleLogo({files:[]});
@@ -288,11 +284,13 @@ function downloadZip(){
     const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
     if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
     
-    // INJECT SAFE SCRIPT
+    // FALLBACK INJECTION (Safe for Parser)
+    const FALLBACK_INJECT = "<" + "script>if(!localStorage.getItem('otg_settings_url')) { localStorage.setItem('otg_settings_url', '" + url + "'); localStorage.setItem('otg_settings_org', '" + org + "'); }<" + "/script>";
+
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
         .replace('</head>', QUIET_SCRIPT + '</head>')
-        .replace('', 'v79.7') 
+        .replace('', 'v79.8') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -305,20 +303,27 @@ function downloadZip(){
         .replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+',''))
         .replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
 
-    if(wHtml.includes("%%SHEET_URL%%")) { alert("CRITICAL ERROR: URL Injection Failed."); return; }
+    if(wHtml.includes("%%SHEET_URL%%")) { 
+        wHtml = wHtml.replace(/%%SHEET_URL%%/g, url);
+    }
+    if(!wHtml.includes(url)) {
+        wHtml = FALLBACK_INJECT + wHtml;
+    }
 
     let mHtml=TEMPLATES['monitor_template.html']
         .replace('</head>', QUIET_SCRIPT + '</head>')
-        .replace('</body>', MONITOR_DEBUG + '</body>') // Inject Response Viewer
-        .replace('', 'v79.7')
+        .replace('', 'v79.8')
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
+    
+    if(!mHtml.includes(url)) {
+        mHtml = FALLBACK_INJECT + mHtml;
+    }
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
     
-    // DYNAMIC CACHE BUSTING
-    const timeHash = "v79.7_" + Date.now();
+    const timeHash = "v79.8_" + Date.now();
     const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
