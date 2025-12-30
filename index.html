@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v80.4 (Brute Force)</title>
+  <title>OTG Factory v80.6 (Gatekeeper Removed)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -47,7 +47,7 @@
   <div class="max-w-5xl mx-auto" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v80.4 | Brute Force Edition</p>
+      <p class="text-gray-400">v80.6 | Gatekeeper Removed</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -68,20 +68,13 @@
               
               <div class="p-4 bg-purple-900/20 border border-purple-600/50 rounded-xl space-y-4">
                   <div>
-                      <div class="flex justify-between">
-                          <label class="block text-purple-400 text-xs font-bold uppercase mb-1">Secret Key (Admin)</label>
-                          <span class="text-xs text-gray-500 cursor-pointer hover:text-white" onclick="regenKey('secretKey')">🔄 New</span>
-                      </div>
-                      <input type="text" id="secretKey" class="input-field text-purple-300 font-bold border-purple-600" oninput="saveInput(this)">
+                      <label class="block text-purple-400 text-xs font-bold uppercase mb-1">Secret Key (For Monitor)</label>
+                      <input type="text" id="secretKey" class="input-field text-purple-300 font-bold border-purple-600" placeholder="Paste SECRET_KEY from Script..." oninput="saveInput(this)">
                   </div>
                   <div>
-                      <div class="flex justify-between">
-                          <label class="block text-yellow-400 text-xs font-bold uppercase mb-1">Worker Key (System)</label>
-                          <span class="text-xs text-gray-500 cursor-pointer hover:text-white" onclick="regenKey('workerKeyInput', 'wk_')">🔄 New</span>
-                      </div>
-                      <input type="text" id="workerKeyInput" class="input-field text-yellow-300 font-bold border-yellow-600" oninput="saveInput(this)">
+                      <label class="block text-yellow-400 text-xs font-bold uppercase mb-1">Worker Key (For App)</label>
+                      <input type="text" id="workerKeyInput" class="input-field text-yellow-300 font-bold border-yellow-600" placeholder="Paste WORKER_KEY from Script..." oninput="saveInput(this)">
                   </div>
-                  <p class="text-xs text-gray-400">Keys are auto-generated. Edit them ONLY if updating an existing system.</p>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
@@ -123,7 +116,7 @@
              <div class="grid md:grid-cols-2 gap-4 pt-2">
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Textbelt Key (SMS)</label><a href="https://textbelt.com/" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><div class="flex items-center gap-2"><input type="checkbox" id="enableAi" class="w-4 h-4" onchange="saveInput(this); toggleAiInput()"><label class="block text-gray-500 text-xs uppercase cursor-pointer" for="enableAi">Enable AI Grammar</label></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field text-sm opacity-50" disabled placeholder="Optional..." oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key (Maps)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
              </div>
           </div>
@@ -266,10 +259,11 @@ function generateScript(){
         workerKey = document.getElementById('workerKeyInput').value;
     }
     
-    // VERSION SYNC: Force backend min version to 80.4
+    // VERSION SYNC: Force backend min version to 80.6 (MATCHES APP)
     let code=TEMPLATES['backend_template.js'];
-    code = code.replace(/(const|var) MIN_CLIENT_VERSION = ".*?";/g, 'const MIN_CLIENT_VERSION = "80.4";');
-    code = code.replace(/(const|var) MIN_APP_VERSION = ".*?";/g, 'const MIN_CLIENT_VERSION = "80.4";'); 
+    
+    // DISABLE VERSION CHECK: Set MIN_CLIENT_VERSION to 0.0
+    code = code.replace(/MIN_CLIENT_VERSION\s*=\s*['"].*?['"]/, 'MIN_CLIENT_VERSION = "0.0"');
 
     code = code.replace('%%SECRET_KEY%%',document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey).replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value).replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland").replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+','')).replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value).replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked).replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
     
@@ -309,7 +303,7 @@ function downloadZip(){
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT) 
-        .replace('', 'v80.4') 
+        .replace('', 'v80.6') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -327,23 +321,22 @@ function downloadZip(){
     }
     
     // BRUTE FORCE CLEANER
-    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.4";');
-    wHtml = wHtml.replace(/v75\.9/g, "v80.4"); // Remove old string if hardcoded
+    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.6";');
+    wHtml = wHtml.replace(/v75\.9/g, "v80.6"); 
 
     let mHtml=TEMPLATES['monitor_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT)
-        .replace('', 'v80.4')
+        .replace('', 'v80.6')
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
     
-    // BRUTE FORCE MONITOR
-    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.4";');
-    mHtml = mHtml.replace(/v75\.9/g, "v80.4"); // Remove old string if hardcoded
+    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.6";');
+    mHtml = mHtml.replace(/v75\.9/g, "v80.6");
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
     
-    const timeHash = "v80.4_" + Date.now();
+    const timeHash = "v80.6_" + Date.now();
     const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
