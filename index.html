@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v80.6 (Gatekeeper Removed)</title>
+  <title>OTG Factory v82.0 (Clean Slate)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -29,7 +29,6 @@
     .status-badge { padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.7rem; }
     .status-pending { background: #334155; color: #94a3b8; }
     .status-ok { background: #064e3b; color: #34d399; }
-    .step-badge { background: #3b82f6; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 8px; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
   </style>
@@ -47,7 +46,7 @@
   <div class="max-w-5xl mx-auto" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v80.6 | Gatekeeper Removed</p>
+      <p class="text-gray-400">v82.0 | Clean Slate Edition</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -68,12 +67,16 @@
               
               <div class="p-4 bg-purple-900/20 border border-purple-600/50 rounded-xl space-y-4">
                   <div>
-                      <label class="block text-purple-400 text-xs font-bold uppercase mb-1">Secret Key (For Monitor)</label>
-                      <input type="text" id="secretKey" class="input-field text-purple-300 font-bold border-purple-600" placeholder="Paste SECRET_KEY from Script..." oninput="saveInput(this)">
+                      <label class="block text-purple-400 text-xs font-bold uppercase mb-1">Secret Key (Admin)</label>
+                      <input type="text" id="secretKey" class="input-field text-purple-300 font-bold border-purple-600" placeholder="Paste from Google Script..." oninput="saveInput(this)">
                   </div>
                   <div>
-                      <label class="block text-yellow-400 text-xs font-bold uppercase mb-1">Worker Key (For App)</label>
-                      <input type="text" id="workerKeyInput" class="input-field text-yellow-300 font-bold border-yellow-600" placeholder="Paste WORKER_KEY from Script..." oninput="saveInput(this)">
+                      <label class="block text-yellow-400 text-xs font-bold uppercase mb-1">Worker Key (System)</label>
+                      <input type="text" id="workerKeyInput" class="input-field text-yellow-300 font-bold border-yellow-600" placeholder="Paste from Google Script..." oninput="saveInput(this)">
+                  </div>
+                  <div class="flex gap-2">
+                      <button onclick="regenKey('secretKey')" class="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">Gen New Secret</button>
+                      <button onclick="regenKey('workerKeyInput', 'wk_')" class="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">Gen New Worker</button>
                   </div>
               </div>
 
@@ -116,7 +119,7 @@
              <div class="grid md:grid-cols-2 gap-4 pt-2">
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Textbelt Key (SMS)</label><a href="https://textbelt.com/" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><div class="flex items-center gap-2"><input type="checkbox" id="enableAi" class="w-4 h-4" onchange="saveInput(this); toggleAiInput()"><label class="block text-gray-500 text-xs uppercase cursor-pointer" for="enableAi">Enable AI Grammar</label></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field text-sm opacity-50" disabled placeholder="Optional..." oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key (Maps)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
              </div>
           </div>
@@ -137,7 +140,7 @@
         </div>
 
         <div id="step3" class="step-section space-y-8">
-          <div class="relative"><div class="flex justify-between items-end mb-2"><label class="text-sm font-bold text-gray-400">YOUR CUSTOM BACKEND CODE</label><button onclick="copyScript()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded">COPY ALL</button></div><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
+          <div class="relative"><div class="flex justify-between items-end mb-2"><label class="text-sm font-bold text-gray-400">YOUR CUSTOM BACKEND CODE (Fixed)</label><button onclick="copyScript()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded">COPY ALL</button></div><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
           <div class="bg-gray-900 p-5 rounded-xl border border-blue-500/30"><h3 class="text-blue-400 font-bold text-lg mb-3">Part A: Deploy the Web App</h3><ol class="space-y-3 text-sm text-gray-300"><li class="flex gap-2"><span class="step-badge">1</span> Open Spreadsheet > <strong>Extensions</strong> > <strong>Apps Script</strong>.</li><li class="flex gap-2"><span class="step-badge">2</span> Delete any code there. <strong>Paste</strong> your code.</li><li class="flex gap-2"><span class="step-badge">3</span> Click the blue <strong>Deploy</strong> button (top right) > <strong>New Deployment</strong>.</li><li class="flex gap-2"><span class="step-badge">4</span> Click the <strong>Gear Icon (⚙️)</strong> next to "Select type" > Choose <strong>Web App</strong>.</li><li class="flex gap-2 bg-blue-900/40 p-2 rounded border border-blue-800"><span class="step-badge bg-blue-500">5</span> <strong>IMPORTANT:</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong> (Critical)</li><li class="flex gap-2"><span class="step-badge">6</span> Click <strong>Deploy</strong>. Copy the <strong>Web App URL</strong> provided.</li></ol></div>
           <div class="bg-gray-900 p-5 rounded-xl border border-yellow-500/30"><h3 class="text-yellow-400 font-bold text-lg mb-3">Part B: Set up Automation Triggers</h3><p class="text-xs text-gray-400 mb-4">In Apps Script, click the <strong>Alarm Clock Icon</strong> (Left Sidebar) to open Triggers.</p><div class="grid md:grid-cols-3 gap-4"><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-red-400 block mb-2">1. SAFETY (Critical)</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>checkOverdueVisits</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Minutes timer</strong></li><li>Interval: <strong>Every 10 minutes</strong></li></ul></div><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-green-400 block mb-2">2. STATISTICS</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>generateStatistics</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Week timer</strong></li><li>Interval: <strong>Every Monday</strong></li></ul></div><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-purple-400 block mb-2">3. MAINTENANCE</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>archiveOldVisits</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Day timer</strong></li><li>Interval: <strong>Midnight to 1am</strong></li></ul></div></div></div>
           <div class="pt-4 border-t border-gray-700"><label class="block text-green-400 font-bold text-center mb-2">Paste Web App URL to Verify</label><div class="flex gap-2 max-w-xl mx-auto"><input type="url" id="webAppUrl" class="input-field text-center text-yellow-300 font-mono text-sm" placeholder="https://script.google.com/macros/s/..." oninput="saveInput(this)"><button onclick="testConnection()" class="btn bg-green-600 hover:bg-green-500 text-white shadow-lg whitespace-nowrap">Test 📡</button></div><div id="testResult" class="text-center font-bold text-sm hidden mt-3"></div></div>
@@ -259,11 +262,20 @@ function generateScript(){
         workerKey = document.getElementById('workerKeyInput').value;
     }
     
-    // VERSION SYNC: Force backend min version to 80.6 (MATCHES APP)
+    // TEMPLATE PURIFIER - VERSION CHECKS (Safe Removal)
     let code=TEMPLATES['backend_template.js'];
     
-    // DISABLE VERSION CHECK: Set MIN_CLIENT_VERSION to 0.0
-    code = code.replace(/MIN_CLIENT_VERSION\s*=\s*['"].*?['"]/, 'MIN_CLIENT_VERSION = "0.0"');
+    // 1. Remove MIN_CLIENT_VERSION if it exists
+    code = code.replace(/MIN_CLIENT_VERSION\s*=\s*['"].*?['"]/g, '');
+    code = code.replace(/MIN_APP_VERSION\s*=\s*['"].*?['"]/g, '');
+
+    // 2. Remove "SERVER UPDATE REQUIRED" block entirely if regex fails (Brute Force)
+    code = code.replace(/if\s*\(.*?MIN_CLIENT_VERSION.*?\)\s*\{[\s\S]*?SERVER UPDATE REQUIRED[\s\S]*?\}/g, '// Version Check Removed by Factory');
+
+    // 3. Ensure JSON MimeType on Output
+    if(!code.includes("setMimeType(ContentService.MimeType.JSON)")) {
+       code = code.replace(/return\s+ContentService\.createTextOutput\(JSON\.stringify\(response\)\)/g, 'return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON)');
+    }
 
     code = code.replace('%%SECRET_KEY%%',document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey).replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value).replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland").replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+','')).replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value).replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked).replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
     
@@ -288,22 +300,34 @@ function getHeadInject(url, org) {
            "<" + "/script>";
 }
 
+// MONITOR ERROR OVERRIDE
+const MONITOR_DEBUG = "<" + "script>" +
+    "window.fetch = (function(f){ return function() { return f.apply(this, arguments).then(async r => { " +
+    "  if(!r.ok) { alert('HTTP Error: ' + r.status + ' (' + r.statusText + ')'); return r; } " +
+    "  const clone = r.clone(); const txt = await clone.text(); " +
+    "  if(txt.trim().startsWith('<!DOCTYPE')) { alert('CRITICAL PERMISSIONS ERROR:\\n\\nGoogle returned a Login Page instead of data.\\n\\nFix: In Google Script > Deploy > Manage Deployments > Edit > Who has access: ANYONE.'); } " +
+    "  try { const j = JSON.parse(txt); if(j.status === 'error') { alert('SERVER REJECTED CONNECTION:\\n\\n' + j.message); } } catch(e) {} " +
+    "  return r; " +
+    "}); }; })(window.fetch);" +
+    "<" + "/script>";
+
 function downloadZip(){
     const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
     let workerKey=document.getElementById('workerKeyInput').value;
+    let secretKey=document.getElementById('secretKey').value;
     
     if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
-    if(!workerKey){alert("⚠️ MISSING KEY!\n\nPaste the Worker Key from your script in Step 1.");gotoStep(1);return;}
+    if(!workerKey || !secretKey){alert("⚠️ MISSING KEYS!\n\nPaste BOTH keys from your script in Step 1.");gotoStep(1);return;}
     
-    // Auto-trim keys to prevent invisible space errors
     workerKey = workerKey.trim();
+    secretKey = secretKey.trim();
     
     const HEAD_INJECT = getHeadInject(url, org);
 
     const zip=new JSZip();
     let wHtml=TEMPLATES['worker_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT) 
-        .replace('', 'v80.6') 
+        .replace('', 'v82.0') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g,TEMPLATES.logo||"")
@@ -320,23 +344,24 @@ function downloadZip(){
         wHtml = wHtml.replace(/%%SHEET_URL%%/g, url);
     }
     
-    // BRUTE FORCE CLEANER
-    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.6";');
-    wHtml = wHtml.replace(/v75\.9/g, "v80.6"); 
+    // CLEAN OLD VERSION STRINGS
+    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "82.0";');
+    wHtml = wHtml.replace(/v75\.9/g, "v82.0"); 
 
     let mHtml=TEMPLATES['monitor_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT)
-        .replace('', 'v80.6')
+        .replace('</body>', MONITOR_DEBUG + '</body>')
+        .replace('', 'v82.0')
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g,TEMPLATES.logo||"")
         .replace(/%%SHEET_URL%%/g,url);
     
-    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "80.6";');
-    mHtml = mHtml.replace(/v75\.9/g, "v80.6");
+    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "82.0";');
+    mHtml = mHtml.replace(/v75\.9/g, "v82.0");
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
     
-    const timeHash = "v80.6_" + Date.now();
+    const timeHash = "v82.0_" + Date.now();
     const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
