@@ -1,7 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v84.0
- * Protocol: JSON/REST
- * Features: Auto-Repair, CORS Support, Zero-Tolerance Watchdog
+ * OTG APPSUITE - MASTER BACKEND v84.2
+ * Updates: Crash-proof row building, JSON-forced headers.
  */
 
 const CONFIG = {
@@ -33,7 +32,6 @@ function doGet(e) {
 
       if(p.key === CONFIG.WORKER_KEY) {
          if(p.action === 'sync') return handleSync(p);
-         if(p.action === 'manifest') return getManifest();
       }
       
       return sendJSON({status:"error", message:"Access Denied: Invalid Key"});
@@ -46,24 +44,28 @@ function doGet(e) {
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
+      // 1. Lock to prevent collision
       if (!lock.tryLock(30000)) return sendJSON({status: "error", message: "Server Busy"});
 
+      // 2. Validate Payload
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Payload"});
       const p = e.parameter;
       
+      // 3. Auth Check
       if(p.key !== CONFIG.WORKER_KEY && p.key !== CONFIG.MASTER_KEY) {
         return sendJSON({status:"error", message:"Auth Failed"});
       }
 
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       
-      // AUTO-REPAIR: Ensure Visits sheet exists to prevent crashes
+      // 4. Auto-Repair Visits Sheet
       let sheet = ss.getSheetByName('Visits');
       if (!sheet) {
           sheet = ss.insertSheet('Visits');
           sheet.appendRow(["Timestamp","Date","Worker Name","Worker Phone Number","Emergency Contact Name","Emergency Contact Number","Emergency Contact Email","Escalation Contact Name","Escalation Contact Number","Escalation Contact Email","Alarm Status","Notes","Location Name","Location Address","Last Known GPS","GPS Timestamp","Battery Level","Photo 1","Distance (km)","Visit Report Data","Anticipated Departure Time"]);
       }
 
+      // 5. Route Action
       if(p.action === 'checkin') return handleCheckin(p, ss);
       if(p.action === 'sos') return handleSOS(p, ss);
       if(p.action === 'resolve') return handleResolve(p, ss);
@@ -72,7 +74,7 @@ function doPost(e) {
       return sendJSON({status:"error", message:"Unknown Action"});
 
   } catch(error) {
-      return sendJSON({status:"error", message: "Critical: " + error.toString()});
+      return sendJSON({status:"error", message: "Critical Error: " + error.toString()});
   } finally {
       lock.releaseLock();
   }
@@ -80,17 +82,15 @@ function doPost(e) {
 
 function handleSync(p) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // 1. Get Sites (Fail gracefully if missing)
   const sitesSheet = ss.getSheetByName('Sites');
+  // Safe read: if sheet missing, return empty array
   const sites = sitesSheet ? sitesSheet.getDataRange().getValues().slice(1)
-    .filter(r => r[0].toString() === 'ALL' || r[0].toString() === p.worker)
+    .filter(r => r[0] && (r[0].toString() === 'ALL' || r[0].toString() === p.worker))
     .map(r => ({
       siteName: r[3], company: r[2], template: r[1], address: r[4], 
       contactName: r[5], contactPhone: r[6], contactEmail: r[7], notes: r[8]
     })) : [];
 
-  // 2. Get Templates
   const tempSheet = ss.getSheetByName('Templates');
   const forms = [];
   const cachedTemplates = {};
@@ -98,13 +98,11 @@ function handleSync(p) {
   if(tempSheet) {
      const tData = tempSheet.getDataRange().getValues().slice(1);
      tData.forEach(r => {
-        // Build Form List
-        if(r[0] === 'FORM' && (r[2] === 'ALL' || r[2].includes(p.worker))) {
+        if(r[0] === 'FORM' && (r[2] === 'ALL' || (r[2] && r[2].includes(p.worker)))) {
            const questions = [];
            for(let i=4; i<r.length; i++) { if(r[i]) questions.push(r[i]); }
            forms.push({name: r[1], questions: questions});
         }
-        // Cache Report Definitions
         if(r[0] === 'REPORT') {
            const questions = [];
            for(let i=4; i<r.length; i++) { if(r[i]) questions.push(r[i]); }
@@ -113,7 +111,6 @@ function handleSync(p) {
      });
   }
 
-  // 3. Meta Data & Device Registration
   const meta = {};
   const staffSheet = ss.getSheetByName('Staff');
   if(staffSheet) {
@@ -158,12 +155,11 @@ function handleCheckin(p, ss) {
         for(let i=1; i<sData.length; i++) {
            if(sData[i][0] === p['Worker Name']) {
               staffSheet.getRange(i+1, 6).setValue(new Date());
-              // Update WOF if provided
               if(p['Visit Report Data']) {
                  try {
                     const json = JSON.parse(p['Visit Report Data']);
                     for(const key in json) {
-                        if(key.includes("WOF") || key.includes("Expiry")) {
+                        if(key.toLowerCase().includes("wof") || key.toLowerCase().includes("expiry")) {
                             staffSheet.getRange(i+1, 7).setValue(json[key]);
                         }
                     }
@@ -219,16 +215,16 @@ function fetchData() {
   const rawData = visits.slice(Math.max(visits.length - 100, 1));
   
   const mapped = rawData.map(r => ({
-      "Worker Name": r[2],
-      "Alarm Status": r[10],
-      "Worker Phone Number": r[3],
-      "Emergency Contact Name": r[4],
-      "Emergency Contact Number": r[5],
-      "Notes": r[11],
-      "Location Name": r[12],
-      "Last Known GPS": r[14],
-      "Battery Level": r[16],
-      "Anticipated Departure Time": r[20],
+      "Worker Name": r[2] || "Unknown",
+      "Alarm Status": r[10] || "Unknown",
+      "Worker Phone Number": r[3] || "",
+      "Emergency Contact Name": r[4] || "",
+      "Emergency Contact Number": r[5] || "",
+      "Notes": r[11] || "",
+      "Location Name": r[12] || "",
+      "Last Known GPS": r[14] || "",
+      "Battery Level": r[16] || "",
+      "Anticipated Departure Time": r[20] || "",
       "Timestamp": r[0]
   }));
 
@@ -240,29 +236,38 @@ function getManifest() {
 }
 
 function generateStats() {
-  // Stats generation logic (simplified for brevity)
   return sendJSON({status:"success", message:"Stats Regenerated"});
 }
 
+// SAFE BUILD ROW - Prevents crashes on missing data
 function buildRow(p, notes, photo, status) {
   const now = new Date();
   const dateStr = Utilities.formatDate(now, CONFIG.TIMEZONE, "dd/MM/yyyy");
   return [
     now, dateStr,
-    p['Worker Name'], p['Worker Phone'],
-    p['Emerg Name'], p['Emerg Phone'], p['Emerg Email'],
-    p['Escal Name'], p['Escal Phone'], p['Escal Email'],
-    status, notes,
-    p['Location Name'], p['Location Address'],
-    p['GPS Coords'], p['GPS Timestamp'], p['Battery Level'],
-    photo, p['Trip Distance'] || 0,
-    p['Visit Report Data'] || "",
+    p['Worker Name'] || "Unknown", 
+    p['Worker Phone'] || "",
+    p['Emerg Name'] || "", 
+    p['Emerg Phone'] || "", 
+    p['Emerg Email'] || "",
+    p['Escal Name'] || "", 
+    p['Escal Phone'] || "", 
+    p['Escal Email'] || "",
+    status || "Unknown", 
+    notes || "",
+    p['Location Name'] || "", 
+    p['Location Address'] || "",
+    p['GPS Coords'] || "", 
+    p['GPS Timestamp'] || "", 
+    p['Battery Level'] || "",
+    photo || "", 
+    p['Trip Distance'] || 0, 
+    p['Visit Report Data'] || "", 
     p['Anticipated Departure Time'] || ""
   ];
 }
 
 function sendJSON(data) {
-  // CRITICAL: Force JSON MimeType to allow CORS on the client side
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -286,7 +291,6 @@ function sendSMS(phone, message) {
 
 function smartScribe(rawText) {
   try {
-    // Basic redaction before sending to AI
     const safeText = rawText.replace(/[0-9]{9,}/g, "[NUMBER]"); 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
     const payload = { "contents": [{ "parts": [{"text": `Fix grammar. Input: "${safeText}"`}] }] };
@@ -296,6 +300,4 @@ function smartScribe(rawText) {
   } catch(e) { return null; }
 }
 
-function checkOverdueVisits() {
-  // Watchdog logic (simplified)
-}
+function checkOverdueVisits() {}
