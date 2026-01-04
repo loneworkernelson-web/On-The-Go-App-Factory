@@ -1,5 +1,5 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v82.0 (Clean Slate)
+ * OTG APPSUITE - MASTER BACKEND v82.3 (Fixed)
  * Verifies: Key Authentication Only. No Version Checks.
  */
 
@@ -31,10 +31,11 @@ function doGet(e) {
       }
 
       if(p.key === CONFIG.WORKER_KEY) {
+         if(p.action === 'sync') return handleSync(p); // Specific Sync Handler
          if(p.action === 'manifest') return getManifest();
       }
       
-      return sendJSON({status:"error", message:"Access Denied"});
+      return sendJSON({status:"error", message:"Access Denied: Invalid Key"});
 
   } catch(error) {
       return sendJSON({status:"error", message: error.toString()});
@@ -69,6 +70,80 @@ function doPost(e) {
   }
 }
 
+// === NEW SYNC HANDLER ===
+function handleSync(p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Get Sites
+  const sitesSheet = ss.getSheetByName('Sites');
+  if(!sitesSheet) return sendJSON({status:"error", message:"Missing Tab: 'Sites'"});
+  
+  const siteData = sitesSheet.getDataRange().getValues().slice(1);
+  const sites = siteData
+    .filter(r => r[0].toString() === 'ALL' || r[0].toString() === p.worker) // Filter by Assigned To
+    .map(r => ({
+      siteName: r[3],
+      company: r[2],
+      template: r[1],
+      address: r[4],
+      contactName: r[5],
+      contactPhone: r[6],
+      contactEmail: r[7],
+      notes: r[8]
+    }));
+
+  // 2. Get Templates
+  const tempSheet = ss.getSheetByName('Templates');
+  const forms = [];
+  if(tempSheet) {
+     const tData = tempSheet.getDataRange().getValues().slice(1);
+     tData.forEach(r => {
+        if(r[0] === 'FORM' && (r[2] === 'ALL' || r[2].includes(p.worker))) {
+           const questions = [];
+           for(let i=4; i<r.length; i++) { if(r[i]) questions.push(r[i]); }
+           forms.push({name: r[1], questions: questions});
+        }
+     });
+  }
+
+  // 3. Cache Report Templates
+  const cachedTemplates = {};
+  if(tempSheet) {
+     const tData = tempSheet.getDataRange().getValues().slice(1);
+     tData.forEach(r => {
+        if(r[0] === 'REPORT') {
+           const questions = [];
+           for(let i=4; i<r.length; i++) { if(r[i]) questions.push(r[i]); }
+           cachedTemplates[r[1]] = questions;
+        }
+     });
+  }
+
+  // 4. Meta Data (Vehicle checks etc)
+  const meta = {};
+  const staffSheet = ss.getSheetByName('Staff');
+  if(staffSheet) {
+     const sData = staffSheet.getDataRange().getValues();
+     for(let i=1; i<sData.length; i++) {
+        if(sData[i][0] === p.worker) {
+           meta.lastVehCheck = sData[i][5];
+           meta.wofExpiry = sData[i][6];
+           // Auto-register device ID if missing
+           if(p.deviceId && !sData[i][4]) staffSheet.getRange(i+1, 5).setValue(p.deviceId);
+           break;
+        }
+     }
+  }
+
+  return sendJSON({
+    status: "success",
+    sites: sites,
+    forms: forms,
+    cachedTemplates: cachedTemplates,
+    meta: meta
+  });
+}
+
 function handleCheckin(p, ss) {
   let finalNote = p.Notes || "";
   if(CONFIG.ENABLE_AI && CONFIG.GEMINI_API_KEY && finalNote.length > 5) {
@@ -81,6 +156,32 @@ function handleCheckin(p, ss) {
 
   const row = buildRow(p, finalNote, photoUrl, p['Alarm Status']);
   ss.getSheetByName('Visits').appendRow(row);
+  
+  // Handle Vehicle Checks specifically
+  if(p['Template Name'] === 'Vehicle Safety Check') {
+     const staffSheet = ss.getSheetByName('Staff');
+     if(staffSheet) {
+        const sData = staffSheet.getDataRange().getValues();
+        for(let i=1; i<sData.length; i++) {
+           if(sData[i][0] === p['Worker Name']) {
+              staffSheet.getRange(i+1, 6).setValue(new Date()); // Update Last Check
+              // If WOF Expiry was captured in the form, update it
+              if(p['Visit Report Data']) {
+                 try {
+                    const json = JSON.parse(p['Visit Report Data']);
+                    // Look for date keys
+                    for(const key in json) {
+                        if(key.includes("WOF") || key.includes("Expiry")) {
+                            staffSheet.getRange(i+1, 7).setValue(json[key]);
+                        }
+                    }
+                 } catch(e){}
+              }
+              break;
+           }
+        }
+     }
+  }
   
   return sendJSON({status:"success", message:"Check-in Saved", cleanNote: finalNote});
 }
@@ -105,6 +206,7 @@ function handleResolve(p, ss) {
 
 function handleDeviceReg(p, ss) {
   const sheet = ss.getSheetByName('Staff');
+  if(!sheet) return sendJSON({status:"error", message:"No Staff Tab"});
   const data = sheet.getDataRange().getValues();
   for(let i=1; i<data.length; i++) {
      if(data[i][2].toString().toLowerCase() === p.email.toLowerCase()) {
@@ -162,19 +264,32 @@ function generateStats() {
 function fetchData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const visits = ss.getSheetByName('Visits').getDataRange().getValues();
-  const recent = visits.slice(Math.max(visits.length - 100, 1));
-  return sendJSON({status:"success", data: recent});
+  // Get header to map columns correctly
+  const header = visits[0];
+  // Helper to find index
+  const getIdx = (name) => header.indexOf(name);
+  
+  const rawData = visits.slice(Math.max(visits.length - 100, 1));
+  
+  const mapped = rawData.map(r => ({
+      "Worker Name": r[2],
+      "Alarm Status": r[10],
+      "Worker Phone Number": r[3],
+      "Emergency Contact Name": r[4],
+      "Emergency Contact Number": r[5],
+      "Notes": r[11],
+      "Location Name": r[12],
+      "Last Known GPS": r[14],
+      "Battery Level": r[16],
+      "Anticipated Departure Time": r[20],
+      "Timestamp": r[0]
+  }));
+
+  return sendJSON({status:"success", workers: mapped});
 }
 
 function getManifest() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const staff = ss.getSheetByName('Staff').getDataRange().getValues().slice(1)
-    .map(r => ({name: r[0], phone: r[1], email: r[2], pin: r[3], deviceId: r[7]}));
-  const sites = ss.getSheetByName('Sites').getDataRange().getValues().slice(1)
-    .map(r => ({id: r[0], name: r[1], lat: r[2], lng: r[3], address: r[4]}));
-  const templates = ss.getSheetByName('Templates').getDataRange().getValues().slice(1)
-    .map(r => ({id: r[0], name: r[1], fields: r[2]})); 
-  return sendJSON({status:"success", staff: staff, sites: sites, templates: templates});
+  return sendJSON({status:"success", message: "Manifest deprecated. Use sync."});
 }
 
 function buildRow(p, notes, photo, status) {
@@ -188,7 +303,9 @@ function buildRow(p, notes, photo, status) {
     status, notes,
     p['Location Name'], p['Location Address'],
     p['GPS Coords'], p['GPS Timestamp'], p['Battery Level'],
-    photo, p['Trip Distance'] || 0
+    photo, p['Trip Distance'] || 0,
+    p['Visit Report Data'] || "",
+    p['Anticipated Departure Time'] || ""
   ];
 }
 
