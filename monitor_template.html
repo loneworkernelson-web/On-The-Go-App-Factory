@@ -121,16 +121,15 @@ let lastHeartbeat = Date.now();
 
 async function startApp() {
     document.getElementById('startOverlay').classList.add('hidden');
+    // Suppress console warnings about AudioContext
     try {
         if(typeof Tone !== 'undefined') {
             await Tone.start(); 
             synth = new Tone.Synth().toDestination();
         }
     } catch(e) {
-        console.warn("Audio Context Failed:", e);
+        console.log("Audio waiting for interaction");
         audioEnabled = false;
-        document.getElementById('btnAudio').innerText = "🔇 Audio Error";
-        document.getElementById('btnAudio').classList.replace('bg-green-600', 'bg-red-900');
     }
     if(!API_KEY) { 
         document.getElementById('authModal').classList.remove('hidden'); 
@@ -180,17 +179,18 @@ function acknowledgeAlert() {
 }
 
 function fetchData() { 
-    const script = document.createElement('script'); 
-    const cbName = 'cb_' + Date.now(); 
-    window[cbName] = function(data) { 
+    fetch(SCRIPT_URL + "?action=fetch&key=" + encodeURIComponent(API_KEY))
+    .then(r => r.json())
+    .then(data => { 
         lastHeartbeat = Date.now();
         if(data.error) { alert("Security Error: " + data.error); return; } 
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
-        document.body.removeChild(script); delete window[cbName]; 
-    }; 
-    script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&t=${Date.now()}`; 
-    document.body.appendChild(script); 
+    })
+    .catch(e => {
+        // Do not alert on connectivity glitches, just let the overlay handle it
+        console.warn("Fetch Error", e);
+    });
 }
 
 function handleData(response) { 
@@ -219,10 +219,8 @@ function handleData(response) {
             alertNames.innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
         } else { alertBox.classList.add('hidden'); stopAlertLoop(); } 
         
-        // CHECK IF renderMap EXISTS BEFORE CALLING
         if(currentView === 'MAP') {
              if(typeof renderMap === 'function') renderMap();
-             else console.warn("renderMap not ready yet");
         } else {
              renderGrid(); 
         }
@@ -328,10 +326,7 @@ function initMap() {
 
 function renderMap() { 
     if(!mapInstance) return; 
-    
-    // Safety check: ensure layer exists
     if (!markersLayer) markersLayer = L.layerGroup().addTo(mapInstance);
-    
     markersLayer.clearLayers(); 
     const bounds = L.latLngBounds(); 
     let hasMarkers = false; 
@@ -340,16 +335,12 @@ function renderMap() {
     workerData.forEach(w => { 
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
         if (currentFilter === 'ACTIVE' && isSafe && !w.status.includes('EMERGENCY')) return; 
-        
-        // ROBUST GPS PARSING
         if(!w.gps || w.gps.length < 5) return; 
-        const cleanGps = w.gps.replace(/[^0-9.,-]/g, ''); // Remove unexpected chars like quotes
+        const cleanGps = w.gps.replace(/[^0-9.,-]/g, ''); 
         const parts = cleanGps.split(',');
         if(parts.length !== 2) return;
-        
         const lat = parseFloat(parts[0]);
         const lng = parseFloat(parts[1]);
-        
         if(isNaN(lat) || isNaN(lng)) return; 
         
         let colorClass = 'grey'; 
