@@ -1,6 +1,6 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v78.0 (High Risk Mode)
- * Features: Global Privacy, Dynamic Stats, Zero-Tolerance Watchdog.
+ * OTG APPSUITE - MASTER BACKEND v82.0 (Clean Slate)
+ * Verifies: Key Authentication Only. No Version Checks.
  */
 
 const CONFIG = {
@@ -18,12 +18,9 @@ const CONFIG = {
   STATS_FREQ: "%%STATS_FREQ%%"
 };
 
-// ==========================================
-// 1. GET HANDLER
-// ==========================================
 function doGet(e) {
   try {
-      if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
+      if(!e || !e.parameter) return sendJSON({status:"running", message:"OTG Server Online"});
       const p = e.parameter;
 
       if(p.action === 'ping') return sendJSON({status: "success", message: "Connected"});
@@ -44,9 +41,6 @@ function doGet(e) {
   }
 }
 
-// ==========================================
-// 2. POST HANDLER
-// ==========================================
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
@@ -74,10 +68,6 @@ function doPost(e) {
       lock.releaseLock();
   }
 }
-
-// ==========================================
-// 3. CORE LOGIC
-// ==========================================
 
 function handleCheckin(p, ss) {
   let finalNote = p.Notes || "";
@@ -124,10 +114,6 @@ function handleDeviceReg(p, ss) {
   }
   return sendJSON({status:"error", message:"Email not found"});
 }
-
-// ==========================================
-// 4. STATS & REPORTING
-// ==========================================
 
 function generateStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -252,9 +238,6 @@ function smartScribe(rawText) {
   } catch(e) { return null; }
 }
 
-// ==========================================
-// 8. WATCHDOG (ZERO TOLERANCE UPDATE)
-// ==========================================
 function checkOverdueVisits() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Visits');
@@ -262,11 +245,9 @@ function checkOverdueVisits() {
   const now = new Date();
   const lastSeen = {};
   
-  // A. Scan for Overdue Workers
   for(let i=1; i<data.length; i++) {
      const w = data[i][2];
      const t = new Date(data[i][0]);
-     // We look for the latest row for each worker
      if(!lastSeen[w] || t > lastSeen[w].time) {
        lastSeen[w] = { 
          row: i+1, 
@@ -278,7 +259,6 @@ function checkOverdueVisits() {
      }
   }
   
-  // Standard Escalation (Default Grace Period)
   const standardLimit = CONFIG.ESCALATION_MINUTES * 60 * 1000;
   
   for(const w in lastSeen) {
@@ -287,12 +267,9 @@ function checkOverdueVisits() {
      const isAlreadyEmergency = e.status.includes("EMERGENCY");
      
      if(!isSafe && !isAlreadyEmergency) {
-        
-        // ZERO TOLERANCE CHECK
-        // If the worker flagged this visit as [HIGH RISK], we give 0 grace period.
         let limit = standardLimit;
         if(e.status.includes("HIGH RISK")) {
-            limit = 60 * 1000; // 1 Minute buffer only (for upload lag)
+            limit = 60 * 1000; 
         }
 
         const diff = now - e.time;
@@ -306,7 +283,6 @@ function checkOverdueVisits() {
      }
   }
   
-  // B. Scheduled Stats Generation
   if(now.getHours() === 0 && now.getMinutes() < 15) {
       let shouldRun = false;
       const freq = CONFIG.STATS_FREQ || "MONTHLY";
