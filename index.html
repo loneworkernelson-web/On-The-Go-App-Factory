@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v77.0 (Global)</title>
+  <title>OTG Factory v77.1 (International)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -75,7 +75,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v77.0 (Global Edition)</p>
+      <p class="text-gray-400">v77.1 (International Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -105,9 +105,14 @@
                       <option value="+61">Australia (+61)</option>
                       <option value="+44">United Kingdom (+44)</option>
                       <option value="+1">USA / Canada (+1)</option>
-                      <option value="">Other (No Auto-Format)</option>
+                      <option value="">Other (Universal)</option>
                   </select>
-                  <p id="regionInfo" class="text-xs text-gray-400 mt-2">Detected Timezone: <span id="detectedTz" class="text-blue-400 font-mono">Loading...</span></p>
+                  <div class="mt-2 bg-gray-900 p-3 rounded text-xs text-gray-400 grid grid-cols-2 gap-2">
+                      <p>Timezone: <span id="detectedTz" class="text-blue-400 font-mono">Loading...</span></p>
+                      <p>Term: <span id="vehTermDisplay" class="text-green-400 font-mono">WOF</span></p>
+                      <p>Format: <span id="phoneFmtDisplay" class="text-purple-400 font-mono">+64...</span></p>
+                      <p>Voice: <span id="voiceLocaleDisplay" class="text-yellow-400 font-mono">en-NZ</span></p>
+                  </div>
                   <input type="hidden" id="timezoneVal">
               </div>
             </div>
@@ -157,7 +162,7 @@
                         <span>Check Frequency (Days):</span>
                         <input type="number" id="vehFreq" value="120" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold" oninput="saveInput(this)">
                     </div>
-                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (starts 14 days prior).</p>
+                    <p class="text-xs text-gray-500">Includes Expiry Reminders (starts 14 days prior).</p>
                 </div>
              </div>
              
@@ -277,17 +282,28 @@
   <script>
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
     let TEMPLATES = {};
-    const workerKey = "wk_" + Math.random().toString(36).substr(2, 9); // CONSTANT KEY
+    const workerKey = "wk_" + Math.random().toString(36).substr(2, 9); 
 
     const AI_GUIDE_TEXT = `AI REPORTING GUIDE
 ==================
-Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
+Use this guide to ask Gemini or ChatGPT to write custom report scripts.
 ... (Same as before) ...
 `;
 
+    // REGIONAL CONFIGURATION DATABASE
+    const REGION_DATA = {
+        "+64": { name: "New Zealand", term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" },
+        "+61": { name: "Australia", term: "Rego", locale: "en-AU", tz: "Australia/Sydney" },
+        "+44": { name: "United Kingdom", term: "Inspection", locale: "en-GB", tz: "Europe/London" },
+        "+1":  { name: "USA / Canada", term: "Inspection", locale: "en-US", tz: "America/New_York" },
+        "":    { name: "Universal", term: "Inspection", locale: "en-US", tz: "UTC" }
+    };
+
+    let selectedConfig = REGION_DATA["+64"]; // Default
+
     window.onload = async () => { 
         loadPersistedData(); 
-        updateRegionInfo(); // Detect TZ on load
+        updateRegionInfo(); 
         setupDragDrop(); 
         for (const [k, f] of Object.entries(FILES)) {
             try { const r = await fetch(f); if (r.ok) TEMPLATES[k] = await r.text(); } catch(e){}
@@ -310,9 +326,19 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
     }
 
     function updateRegionInfo() {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        document.getElementById('detectedTz').textContent = tz;
-        document.getElementById('timezoneVal').value = tz;
+        const sel = document.getElementById('countrySelect').value;
+        selectedConfig = REGION_DATA[sel] || REGION_DATA[""];
+        
+        // Auto-detect browser timezone for reference, but use Config for defaults
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        
+        document.getElementById('detectedTz').textContent = selectedConfig.tz || browserTz;
+        document.getElementById('timezoneVal').value = selectedConfig.tz || browserTz;
+        
+        document.getElementById('vehTermDisplay').textContent = selectedConfig.term;
+        document.getElementById('phoneFmtDisplay').textContent = sel + "...";
+        document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale;
+
         saveInput(document.getElementById('countrySelect'));
     }
 
@@ -384,7 +410,8 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
             .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
             .replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland")
             .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
-            .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked);
+            .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked)
+            .replace('%%VEHICLE_TERM%%', selectedConfig.term);
         document.getElementById('codeDisplay').textContent = code;
         gotoStep(3); 
     }
@@ -439,13 +466,32 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
         const checkinEnabled = document.getElementById('chkCheckin').checked;
         const vehEnabled = document.getElementById('chkVehicle').checked;
         const escalationMins = document.getElementById('escalationMins').value;
+        
         const countryPrefix = document.getElementById('countrySelect').value;
         const reqTravelReport = document.getElementById('chkTravelReport').checked;
         localStorage.setItem('otg_chkTravelReport', reqTravelReport);
         localStorage.setItem('otg_chkRedaction', document.getElementById('chkRedaction').checked);
 
         // INJECT KEYS & CONFIGS
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value).replace(/%%COUNTRY_PREFIX%%/g, countryPrefix).replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport);
+        let wHtml = TEMPLATES.worker
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+            .replace(/%%SHEET_URL%%/g, url)
+            .replace(/%%LOGO_DATA%%/g, logo)
+            .replace(/%%SECRET_KEY%%/g, workerKey)
+            .replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled)
+            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
+            .replace(/%%ESCALATION_MINUTES%%/g, escalationMins)
+            .replace(/%%IS_ADVANCED%%/g, "true")
+            .replace(/%%ENABLE_MILEAGE%%/g, "true")
+            .replace(/%%ORS_API_KEY%%/g, orsKey)
+            .replace(/%%VEHICLE_ENABLED%%/g, vehEnabled)
+            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
+            .replace(/%%COUNTRY_PREFIX%%/g, countryPrefix)
+            .replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport)
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
+            .replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale);
+
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo);
         let bCode = document.getElementById('codeDisplay').textContent;
         let gHtml = processGuideTemplate(TEMPLATES.guide);
