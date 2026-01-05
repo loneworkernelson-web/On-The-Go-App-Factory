@@ -15,7 +15,6 @@
 <script src="config.js"></script>
 
 <style>
-/* CSS Styles */
 body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
 .page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
 .page.active { display: flex; z-index: 10; }
@@ -47,28 +46,29 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </head>
 <body class="bg-gray-900 text-white">
 <div id="app-container" class="relative h-full w-full">
-<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE</div>
-<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue</div>
+<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued</div>
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
 
 <div id="setupWizard" class="hidden fixed inset-0 bg-gray-900 z-[60] flex flex-col overflow-hidden">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10"><h1 class="text-xl font-bold text-blue-400">Setup</h1></div>
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10"><h1 class="text-xl font-bold text-blue-400">Setup</h1><div class="flex gap-1"><div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div><div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div><div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div></div></div>
     <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
         <h2 class="text-2xl font-bold text-white mb-4">Your Details</h2>
         <input id="wiz_name" class="form-input mb-4" placeholder="Full Name">
         <input id="wiz_phone" type="tel" class="form-input mb-4" placeholder="Mobile">
-        <input id="wiz_email" type="email" class="form-input mb-8" placeholder="Email">
+        <input id="wiz_email" type="email" class="form-input mb-8" placeholder="Work Email">
         <button onclick="wizNext(1)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg">Next</button>
     </div>
     <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
         <h2 class="text-2xl font-bold text-white mb-4">Security PINs</h2>
         <input id="wiz_pin" type="tel" maxlength="4" class="form-input text-center text-xl tracking-widest" placeholder="Standard PIN">
-        <input id="wiz_duress" type="tel" maxlength="4" class="form-input text-center text-xl tracking-widest mt-4" placeholder="Duress PIN">
+        <input id="wiz_duress" type="tel" maxlength="4" class="form-input text-center text-xl tracking-widest mt-4" placeholder="Duress PIN (Silent Alarm)">
         <div class="mt-8 flex gap-2"><button onclick="wizBack(2)" class="flex-1 py-4 bg-gray-700 text-white font-bold rounded-xl">Back</button><button onclick="wizNext(2)" class="flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl">Next</button></div>
     </div>
     <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
         <h2 class="text-2xl font-bold text-white mb-4">Emergency Contact</h2>
         <input id="wiz_emg_name" class="form-input" placeholder="Contact Name">
         <input id="wiz_emg_phone" type="tel" class="form-input" placeholder="Contact Phone">
+        <input id="wiz_emg_email" type="email" class="form-input" placeholder="Contact Email">
         <div class="mt-8 flex gap-2"><button onclick="wizBack(3)" class="flex-1 py-4 bg-gray-700 text-white font-bold rounded-xl">Back</button><button onclick="wizSave()" class="flex-1 py-4 bg-green-600 text-white font-bold rounded-xl">Save & Start</button></div>
     </div>
 </div>
@@ -97,27 +97,29 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
     <div class="content-area">
+        <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
         <div id="locationList" class="space-y-3 pb-4"></div>
-        <div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl font-bold text-sm">+ Add Manual</button></div>
+        <div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl font-bold text-sm">+ Add Manual</button></div>
     </div>
     <div class="footer-bar">
         <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
             <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
-            <div class="flex gap-2 mb-3"><button onclick="quickSetTime(15)" class="chip-btn">15m</button><button onclick="quickSetTime(30)" class="chip-btn">30m</button><button onclick="quickSetTime(60)" class="chip-btn">1h</button></div>
+            <div class="flex gap-2 mb-3"><button onclick="quickSetTime(15)" class="chip-btn">15m</button><button onclick="quickSetTime(30)" class="chip-btn">30m</button><button onclick="quickSetTime(60)" class="chip-btn">1h</button><button onclick="quickSetTime(120)" class="chip-btn">2h</button></div>
             <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
-        <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl">Notes</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl" disabled>Select Location</button></div>
+        <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl">Quick Notes</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl" disabled>Select Location</button></div>
     </div>
 </div>
 
 <div id="lockedPage" class="page">
     <div class="flex-1 flex flex-col justify-between p-6">
-        <div class="flex justify-between items-start"><button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400">🌙</button><button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center">SOS</button></div>
+        <div class="flex justify-between items-start"><button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400">🌙</button><button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-bold text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none">SOS</button></div>
         <div class="text-center">
             <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px] mx-auto"></h2>
             <div id="countdownTimer" class="text-7xl font-bold font-mono text-white tracking-tighter my-4">00:00</div>
             <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse tracking-widest border-2 border-red-500 inline-block px-4 py-1 rounded uppercase">OVERDUE</div>
+            <p class="text-gray-400 mt-2">Due: <span id="lockedAnticipatedTime" class="text-blue-400 font-bold"></span></p>
         </div>
         <div class="space-y-3 w-full">
             <div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl text-lg" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl text-lg">Notes</button></div>
@@ -172,7 +174,7 @@ function closeModal(id){document.getElementById('modalBackdrop').classList.add('
 window.addEventListener('online',updateNetworkStatus);window.addEventListener('offline',updateNetworkStatus);
 function updateNetworkStatus(){const b=document.getElementById('offlineBanner');if(navigator.onLine){b.classList.add('hidden');if(state.pendingUploads&&state.pendingUploads.length>0)processUploadQueue();}else{b.classList.remove('hidden');}}
 function getDeviceID(){let id=localStorage.getItem('device_uuid');if(!id){id='dev_'+Math.random().toString(36).substr(2,9)+'_'+Date.now();localStorage.setItem('device_uuid',id);}return id;}
-function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active');if(p==='main')startReminderTimer();else clearTimeout(mainScreenReminderTimer);if(p==='settings'){document.getElementById('appVersionDisplay').innerText=CONFIG.version || "v90.0";}}
+function navigate(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p+'Page').classList.add('active');if(p==='main')startReminderTimer();else clearTimeout(mainScreenReminderTimer);if(p==='settings'){document.getElementById('appVersionDisplay').innerText=CONFIG.version || "v91.0";}}
 
 // WIZARD
 function startWizard(){document.getElementById('setupWizard').classList.remove('hidden');wizGoTo(1);if(state.settings.workerName)populateWizard();}
@@ -185,6 +187,9 @@ function wizSave(){
     state.settings.workerEmail=document.getElementById('wiz_email').value;
     state.settings.emergencyName=document.getElementById('wiz_emg_name').value;
     state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value);
+    state.settings.escalationName=document.getElementById('wiz_esc_name').value;
+    state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value);
+    state.settings.escalationEmail=document.getElementById('wiz_esc_email').value;
     state.settings.pinCode=document.getElementById('wiz_pin').value;
     state.settings.duressPin=document.getElementById('wiz_duress').value;
     saveState();document.getElementById('setupWizard').classList.add('hidden');navigate('main');forceSync();
@@ -249,7 +254,6 @@ function buildPayload(d){
     return {'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Alarm Status':"OK",...d,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Last Known GPS':gps};
 }
 
-// ... (Remaining helper functions: checkVehicleStatus, renderLocations, startVisit, tick, etc. kept compact)
 function checkVehicleStatus(){if(!state.meta.lastVehCheck)document.getElementById('vehNagBar').classList.remove('hidden');else document.getElementById('vehNagBar').classList.add('hidden');}
 function startVehicleCheck(){loadFormAndShow('Vehicle Safety Check');}
 function openQuickMenu(){isMidVisitUpdate=false;showModal('template');renderIconGrid(state.globalForms,null);}
@@ -272,16 +276,25 @@ function tick(){
     const rem=new Date(state.activeVisit.anticipatedDepartureTime)-Date.now();
     const m=Math.floor(rem/60000),s=Math.floor((rem%60000)/1000);
     document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`;
+    if(state.activeVisit.anticipatedDepartureTime) document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     if(rem<=0){document.getElementById('overdueLabel').classList.remove('hidden');if(rem<-900000 && !state.activeVisit.criticalSent){state.activeVisit.criticalSent=true;triggerAutoAlert("EMERGENCY - OVERDUE");}}
 }
-function preDepart(){loadFormAndShow('Standard Visit');} // Simplified
+function preDepart(){loadFormAndShow('Standard Visit');}
 function loadFormAndShow(t){showModal('report');document.getElementById('reportTitle').innerText=t;currentActiveTemplate=t;buildReportForm(t);const b=document.getElementById('btnSubmitRep');b.innerText="SUBMIT";b.onclick=submitReport;}
-function buildReportForm(n){const c=document.getElementById('reportFields');c.innerHTML='<label class="block text-gray-400 text-sm">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';}
+function buildReportForm(n,c){state.photoStore={};const sn=n?n.trim():"Standard Visit Note";let t=null;if(state.globalForms)t=state.globalForms.find(f=>f.name.trim()===sn)?.questions;if(!t&&state.cachedForms)t=state.cachedForms[sn];if(!t)t=state.cachedForms["(Standard)"];if(!t){t=[{type:'note',text:'Standard Check-in (Default)'},{type:'text',text:'Notes'}];}const div=document.getElementById('reportFields');div.innerHTML='';t.forEach((f,i)=>{let y=f.type||'check',x=f.text||f;if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('$')){y='number';x=f.replace('$','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}}let h='';if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;else if(y==='text')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><textarea data-key="${x}" class="form-input h-24"></textarea>`;else if(y==='number')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="number" step="any" data-key="${x}" class="form-input">`;else if(y==='check')h=`<label class="flex items-center gap-3 mt-3 p-3 bg-gray-900 rounded"><input type="checkbox" data-key="${x}" class="w-5 h-5"><span class="text-gray-300">${x}</span></label>`;else if(y==='yesno')h=`<div class="mt-3"><span class="text-sm text-gray-300 block mb-1">${x}</span><div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}"> No</label></div></div>`;else if(y==='photo')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><input type="file" accept="image/*" class="w-full text-sm text-gray-500 mt-2" onchange="handlePhoto(this,'${i}')">`;else if(y==='gps')h=`<div class="mt-4"><label class="block text-sm text-gray-300 mb-1">${x}</label><button type="button" onclick="captureGPS(this)" class="bg-blue-900 hover:bg-blue-800 text-blue-200 text-xs px-3 py-2 rounded flex items-center gap-2"><span>📍 Tap to Capture Location</span></button><input type="hidden" data-key="${x}"></div>`;else if(y==='signature')h=`<label class="block text-sm text-gray-300 mt-4">${x}</label><canvas id="sig-canvas" width="300" height="150" class="border border-gray-600 bg-white touch-none"></canvas><button onclick="clearSig()" class="text-xs text-red-400 mt-1">Clear</button>`;else if(y==='date')h=`<label class="block text-sm text-gray-300 mt-2">${x}</label><input type="date" data-key="${x}" class="form-input">`;div.innerHTML+=h;});const cv=document.getElementById('sig-canvas');if(cv)initSigPad(cv);}
 function submitReport(){
-    const n=document.getElementById('rep_notes').value;
-    processUploadQueue(buildPayload({"Alarm Status":state.activeVisit?"DEPARTED":"DATA_ENTRY_ONLY","Notes":n,"Template Name":currentActiveTemplate}));
+    const d=gatherFormData();
+    const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};
+    const im=Object.values(state.photoStore);im.forEach((img,i)=>{fd[`Photo ${i+1}`]=img;});
+    if(d.sig)fd["Signature"]=d.sig;
+    processUploadQueue(buildPayload({"Alarm Status":state.activeVisit?"DEPARTED":"DATA_ENTRY_ONLY","Notes":d.notes,...fd}));
     state.activeVisit=null;saveState();closeModal('report');navigate('main');playSound('depart');
 }
+function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.getElementById('sig-canvas');if(c)d.sig=c.toDataURL('image/png');return d;}
+function handlePhoto(i,k){if(i.files[0]){const b=i.previousElementSibling;b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;b.innerText="Photo Saved ✅";});}}
+function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(600/i.width,600/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.4));};i.src=e.target.result;};rd.readAsDataURL(f);});}
+function initSigPad(c){const ctx=c.getContext('2d');ctx.lineWidth=2;ctx.strokeStyle="#000";let d=false;const g=e=>{const r=c.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};};const s=e=>{d=true;ctx.beginPath();const{x,y}=g(e);ctx.moveTo(x,y);};const m=e=>{if(!d)return;e.preventDefault();const{x,y}=g(e);ctx.lineTo(x,y);ctx.stroke();};const n=()=>{d=false;};c.addEventListener('mousedown',s);c.addEventListener('mousemove',m);c.addEventListener('mouseup',n);c.addEventListener('touchstart',s);c.addEventListener('touchmove',m);c.addEventListener('touchend',n);}
+function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
 function setupLongPress(btn,cb){let t;btn.onmousedown=btn.ontouchstart=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1000);};btn.onmouseup=btn.ontouchend=btn.onmouseleave=()=>{clearTimeout(t);btn.classList.remove('pressing');};}
 function getGpsAddress(){navigator.geolocation.getCurrentPosition(p=>{document.getElementById('locAddr').value=`${p.coords.latitude},${p.coords.longitude}`;});}
 function confirmExtension(m){state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();closeModal('extend');processUploadQueue(buildPayload({"Alarm Status":"EXTENDED","Notes":`+${m}m`}));}
