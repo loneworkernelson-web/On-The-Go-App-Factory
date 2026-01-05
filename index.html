@@ -3,54 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v89.0 (Cache Buster)</title>
+  <title>OTG Factory v77.0 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .step-section { display: none; }
     .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; transition: 0.2s; font-family: monospace; }
+    .input-field { width: 100%; background: #1e293b; border: 2px solid #475569; padding: 1rem; border-radius: 0.75rem; color: white; font-size: 1.1rem; transition: border-color 0.2s; }
     .input-field:focus { border-color: #3b82f6; outline: none; }
-    .btn { padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: 0.2s; }
+    .btn { padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
     .btn-primary { background: linear-gradient(to right, #2563eb, #3b82f6); color: white; }
     .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
     .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
-    .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: 0.2s; }
+    .tab-btn { flex: 1; py-4; font-weight: bold; color: #6b7280; border-bottom: 4px solid transparent; transition: all 0.2s; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; }
-    .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; background: #0f172a; transition: 0.2s; }
+    
+    .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 20px; text-align: center; background: #0f172a; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
     .drop-zone:hover { border-color: #3b82f6; background: #1e293b; }
-    .file-status { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
-    .status-badge { padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.7rem; }
-    .status-pending { background: #334155; color: #94a3b8; }
-    .status-ok { background: #064e3b; color: #34d399; }
+    .drop-zone.dragover { border-color: #3b82f6; background: #1e293b; }
+    
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-    .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+    .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
 
-  <div id="driveHelpModal" class="modal-backdrop">
-      <div class="modal-content border-blue-500">
-          <h2 class="text-xl font-bold text-white mb-4">📂 Finding Drive Folder ID</h2>
-          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong></div>
-          <button onclick="document.getElementById('driveHelpModal').style.display='none'" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
+  <div id="disclaimerModal" class="modal-backdrop" style="display: flex;">
+      <div class="modal-content border-yellow-600">
+          <h2 class="text-2xl font-extrabold text-white mb-2">⚠️ Important Safety Notice</h2>
+          <div class="space-y-4 text-gray-300 text-sm mb-6">
+              <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution.</p>
+              <ul class="list-disc pl-5 space-y-2">
+                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps (especially iOS). Staff must keep the app active.</li>
+                  <li><strong>Connectivity:</strong> Alerts require data. They will not send in dead zones.</li>
+                  <li><strong>No SLA:</strong> This relies on free Google services. No uptime guarantees.</li>
+              </ul>
+          </div>
+          <div class="pt-4 border-t border-gray-700">
+              <label class="flex items-start gap-3 cursor-pointer select-none">
+                  <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5" onchange="toggleEnterBtn()">
+                  <span class="text-sm text-gray-400">I accept these limitations and risks.</span>
+              </label>
+              <button id="btnEnter" disabled onclick="closeModal('disclaimerModal')" class="mt-4 w-full py-3 bg-gray-700 text-gray-500 font-bold rounded-lg transition-all">Enter Factory</button>
+          </div>
       </div>
   </div>
 
-  <div class="max-w-5xl mx-auto" id="mainContent">
-    <header class="text-center mb-8">
-      <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v89.0 | Cache Buster Edition</p>
+  <div id="driveHelpModal" class="modal-backdrop">
+      <div class="modal-content border-blue-500">
+          <h2 class="text-xl font-bold text-white mb-4">📂 How to get a Drive Folder ID</h2>
+          <ol class="list-decimal pl-5 space-y-3 text-gray-300 text-sm mb-6">
+              <li>Open Google Drive in your browser.</li>
+              <li>Create a new folder (e.g., "Safety Photos").</li>
+              <li>Double-click to open the folder.</li>
+              <li>Look at the URL bar at the top of your browser.</li>
+              <li>Copy the random string of letters/numbers AFTER <code>folders/</code>.</li>
+          </ol>
+          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">
+              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
+          </div>
+          <button onclick="closeModal('driveHelpModal')" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
+      </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
+    <header class="text-center mb-10">
+      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
+      <p class="text-gray-400">v77.0 (Global Edition)</p>
     </header>
 
-    <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
-      <div class="flex bg-gray-900 border-b border-gray-700 text-sm">
+    <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
+      <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base">
         <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
         <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Spreadsheet</button>
         <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Backend</button>
@@ -58,414 +87,395 @@
         <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
       </div>
 
-      <div class="p-6 md:p-8">
-        
-        <div id="step1" class="step-section active space-y-6">
-          <div class="grid md:grid-cols-2 gap-6">
-            <div class="space-y-4">
-              <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
-              
-              <div class="p-4 bg-purple-900/20 border border-purple-600/50 rounded-xl space-y-4">
-                  <div>
-                      <label class="block text-purple-400 text-xs font-bold uppercase mb-1">Secret Key (Admin)</label>
-                      <input type="text" id="secretKey" class="input-field text-purple-300 font-bold border-purple-600" placeholder="Paste from Google Script..." oninput="saveInput(this)">
-                  </div>
-                  <div>
-                      <label class="block text-yellow-400 text-xs font-bold uppercase mb-1">Worker Key (System)</label>
-                      <input type="text" id="workerKeyInput" class="input-field text-yellow-300 font-bold border-yellow-600" placeholder="Paste from Google Script..." oninput="saveInput(this)">
-                  </div>
-                  <div class="flex gap-2">
-                      <button onclick="regenKey('secretKey')" class="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600 text-gray-300">Generate New Secret</button>
-                      <button onclick="regenKey('workerKeyInput', 'wk_')" class="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600 text-gray-300">Generate New Worker</button>
-                  </div>
-              </div>
+      <div class="p-6 md:p-10">
 
-              <div class="grid grid-cols-2 gap-4">
-                  <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Country</label><select id="countrySelect" class="input-field" onchange="saveInput(this)"><option value="+64">NZ (+64)</option><option value="+61">AU (+61)</option><option value="+44">UK (+44)</option><option value="+1">US (+1)</option></select></div>
-                  <div>
-                      <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Timezone</label>
-                      <select id="timezoneVal" class="input-field" onchange="saveInput(this)">
-                          <option value="Pacific/Auckland">Pacific/Auckland</option>
-                          <option value="Australia/Sydney">Australia/Sydney</option>
-                          <option value="Europe/London">Europe/London</option>
-                          <option value="America/New_York">America/New_York</option>
-                          <option value="UTC">UTC</option>
-                      </select>
-                  </div>
+        <div id="step1" class="step-section active space-y-8">
+          <div class="grid md:grid-cols-2 gap-8">
+            <div class="space-y-4">
+              <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
+              <div>
+                  <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key</label>
+                  <input type="text" id="secretKey" class="input-field text-yellow-400" placeholder="ChangeMe123!" oninput="saveInput(this)">
+                  <p class="text-xs text-red-400 mt-2 font-bold">⚠️ SECURITY WARNING: This is the Admin Key. Keep it safe.</p>
+              </div>
+              <div>
+                  <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Region / Country</label>
+                  <select id="countrySelect" class="input-field cursor-pointer" onchange="updateRegionInfo()">
+                      <option value="+64">New Zealand (+64)</option>
+                      <option value="+61">Australia (+61)</option>
+                      <option value="+44">United Kingdom (+44)</option>
+                      <option value="+1">USA / Canada (+1)</option>
+                      <option value="">Other (No Auto-Format)</option>
+                  </select>
+                  <p id="regionInfo" class="text-xs text-gray-400 mt-2">Detected Timezone: <span id="detectedTz" class="text-blue-400 font-mono">Loading...</span></p>
+                  <input type="hidden" id="timezoneVal">
               </div>
             </div>
+            
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-gray-400 text-xs font-bold uppercase mb-2">App Logo</label>
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo</label>
               <div id="dropZone" class="drop-zone w-full" onclick="document.getElementById('logoInput').click()">
-                <div id="logoPreviewArea" class="h-24 w-24 mx-auto rounded-full flex items-center justify-center overflow-hidden bg-gray-700">
-                    <img id="logoImg" class="hidden h-full w-full object-cover"><span id="logoText" class="text-xs">Click to Upload</span>
+                <div id="logoPreviewArea" class="h-32 w-32 mx-auto rounded-full flex items-center justify-center overflow-hidden">
+                    <img id="logoImg" class="hidden h-full w-full object-cover">
+                    <span id="logoText" class="text-gray-500 text-sm">Drag & Drop<br>Logo Here</span>
                 </div>
               </div>
-              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)"><input type="hidden" id="logoUrl" oninput="saveInput(this)">
-              <p class="text-[10px] text-gray-500 mt-2">If skipped, a default icon will be used.</p>
+              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
+              <input type="hidden" id="logoUrl" oninput="saveInput(this)">
             </div>
           </div>
 
-          <div class="highlight-box border-blue-500/30 space-y-4">
-             <h3 class="text-lg font-bold text-white">Safety & Features</h3>
-             <div class="grid md:grid-cols-2 gap-4">
-                 <div><label class="block text-gray-400 text-xs font-bold uppercase">Escalation Allowance (Mins)</label><input type="number" id="escalationMins" value="15" class="input-field" oninput="saveInput(this)"></div>
-                 <div><label class="block text-gray-400 text-xs font-bold uppercase">Stats Frequency</label><select id="statsFreq" class="input-field" onchange="saveInput(this)"><option value="MONTHLY">Monthly</option><option value="WEEKLY">Weekly</option><option value="DAILY">Daily</option></select></div>
+          <div class="highlight-box border-blue-500/30">
+             <h3 class="text-xl font-bold text-white mb-4">Safety & Fleet Options</h3>
+             <div class="grid md:grid-cols-2 gap-6">
+                 <div>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Escalation Delay (Minutes)</label>
+                    <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold" oninput="saveInput(this)">
+                    <span class="text-xs text-gray-400 block mt-1">Time allowed after "Overdue" before RED ALERT.</span>
+                 </div>
+                 <div>
+                    <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Check-in Interval</label>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="chkCheckin" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleCheckin(); saveInput(this)">
+                        <span class="text-sm font-bold text-gray-300">Enable?</span>
+                        <div id="checkinOptions" class="hidden flex items-center gap-2 ml-2">
+                            <input type="number" id="checkinMins" value="60" min="5" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-24 text-center font-bold" oninput="saveInput(this)">
+                            <span class="text-xs text-gray-400">mins</span>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-1">Nags worker to press "I'm OK" periodically. Only use for high-risk lone work.</p>
+                 </div>
              </div>
-             <div class="flex items-center gap-4 pt-2 border-t border-gray-600">
-                <div class="flex items-center gap-2"><input type="checkbox" id="chkVehicle" class="w-4 h-4" onchange="toggleVehicle(); saveInput(this)" checked><span class="text-sm font-bold">Vehicle Checks</span></div>
-                <div id="vehOptions" class="flex items-center gap-2 text-sm"><input type="number" id="vehFreq" value="90" class="bg-gray-700 rounded p-1 w-16 text-center text-white" oninput="saveInput(this)"><span>Days</span></div>
+
+             <div class="mt-4 pt-4 border-t border-gray-600">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="chkVehicle" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleVehicle(); saveInput(this)" checked>
+                    <span class="text-white font-bold">Enable Vehicle Safety Checks?</span>
+                </label>
+                <div id="vehOptions" class="pl-8 mt-2 text-sm text-gray-400">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span>Check Frequency (Days):</span>
+                        <input type="number" id="vehFreq" value="120" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold" oninput="saveInput(this)">
+                    </div>
+                    <p class="text-xs text-gray-500">Includes WOF Expiry Reminders (starts 14 days prior).</p>
+                </div>
              </div>
-             <div class="flex items-center gap-2"><input type="checkbox" id="chkTravelReport" class="w-4 h-4" onchange="saveInput(this)" checked><span class="text-sm font-bold">Req. Form on Travel End?</span></div>
-             <div class="grid md:grid-cols-2 gap-4 pt-2">
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Textbelt Key (SMS)</label><a href="https://textbelt.com/" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><div class="flex items-center gap-2"><input type="checkbox" id="enableAi" class="w-4 h-4" onchange="saveInput(this); toggleAiInput()"><label class="block text-gray-500 text-xs uppercase cursor-pointer" for="enableAi">Enable AI Grammar</label></div><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field text-sm opacity-50" disabled placeholder="Optional..." oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">ORS Key (Maps)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
-                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-500 text-xs uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="input-field text-sm" placeholder="Optional" oninput="saveInput(this)"></div>
+             
+             <div class="mt-4 pt-4 border-t border-gray-600">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="chkTravelReport" class="w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="saveInput(this)" checked>
+                    <span class="text-white font-bold">Default: Require Form on Travel Finish?</span>
+                </label>
+                <p class="pl-8 mt-1 text-xs text-gray-500">Sets the default. Workers can still toggle this per-trip in the app settings.</p>
+             </div>
+
+             <div class="mt-4 pt-4 border-t border-gray-600">
+                <h4 class="text-sm font-bold text-purple-400 mb-2">Privacy & AI Redaction</h4>
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="chkRedaction" class="mt-1 w-5 h-5 rounded bg-gray-700 text-purple-600" onchange="saveInput(this)" checked>
+                    <div>
+                        <span class="text-white font-bold">Redact Personal Info before AI Check?</span>
+                        <p class="text-xs text-gray-500 mt-1">Attempts to remove Emails and Phone Numbers before sending text to Gemini.</p>
+                        <p class="text-[10px] text-red-400 mt-1 font-bold">NOTE: The Free Tier of Gemini is NOT private. Data may be used for training. Always redact PII.</p>
+                    </div>
+                </label>
+             </div>
+             
+             <div class="mt-4 pt-4 border-t border-gray-600 grid md:grid-cols-2 gap-4">
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (Buy key for Non-US/Global)" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For AI Reporting" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Road Mileage" oninput="saveInput(this)"></div>
+                 <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Drive Folder ID</label><span onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link cursor-pointer">Where is this?</span></div><input type="text" id="folderId" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional: For Photos" oninput="saveInput(this)"></div>
              </div>
           </div>
-          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary">Next: Spreadsheet →</button></div>
+          <div class="flex justify-end"><button onclick="gotoStep(2)" class="btn btn-primary text-lg">Next: Spreadsheet →</button></div>
         </div>
 
-        <div id="step2" class="step-section space-y-6">
-          <div class="text-center"><a href="https://sheets.new" target="_blank" class="btn btn-success text-lg">1. Create New Google Sheet</a><p class="text-gray-400 text-xs mt-2">Suggestion: Name it "OTG Safety DB"</p></div>
-          <div class="bg-blue-900/20 p-3 rounded border border-blue-500/50 text-xs text-blue-200 text-center">Create these 5 tabs. Names are Case-Sensitive.</div>
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="bg-gray-900 p-4 rounded border border-gray-600"><h3 class="font-bold text-blue-400">A. Visits Tab</h3><button onclick="copyData('Visits')" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white text-xs py-2 mt-2">Copy Blueprint</button></div>
-            <div class="bg-gray-900 p-4 rounded border border-gray-600"><h3 class="font-bold text-purple-400">B. Templates Tab</h3><button onclick="copyData('Templates')" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white text-xs py-2 mt-2">Copy Blueprint</button></div>
-            <div class="bg-gray-900 p-4 rounded border border-gray-600"><h3 class="font-bold text-green-400">C. Sites Tab</h3><button onclick="copyData('Sites')" class="w-full btn bg-green-700 hover:bg-green-600 text-white text-xs py-2 mt-2">Copy Blueprint</button></div>
-            <div class="bg-gray-900 p-4 rounded border border-red-600"><h3 class="font-bold text-red-400">D. Staff Tab</h3><button onclick="copyData('Staff')" class="w-full btn bg-red-800 hover:bg-red-700 text-white text-xs py-2 mt-2">Copy Blueprint</button></div>
+        <div id="step2" class="step-section space-y-8">
+          <div class="text-center">
+              <a href="https://sheets.new" target="_blank" class="btn btn-success text-xl px-10 py-4 shadow-lg transform hover:-translate-y-1">1. Create New Google Sheet</a>
+              <p class="text-gray-400 text-sm mt-2">Suggestion: Name it <strong>"OTG Safety DB"</strong></p>
           </div>
-          <div class="bg-gray-900 p-4 rounded border border-gray-600"><h3 class="font-bold text-yellow-400">E. Admin_Help Tab (AI Prompts)</h3><button onclick="copyData('AdminHelp')" class="btn bg-yellow-600 hover:bg-yellow-500 text-white text-xs py-2 mt-2 px-6">Copy AI Guide & Prompts</button></div>
-          <div class="flex justify-between"><button onclick="gotoStep(1)" class="text-gray-400">Back</button><button onclick="generateScript()" class="btn btn-primary">Next: Backend →</button></div>
+          <div class="bg-blue-900/20 p-4 rounded border border-blue-500/50 text-sm text-blue-200"><strong>💡 How to Setup Tabs:</strong> At the bottom of your Google Sheet, click the <strong>+</strong> icon to add a tab. Double-click a tab to rename it.</div>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
+                <h3 class="font-bold text-lg text-blue-400">A. Setup 'Visits' Tab</h3>
+                <button onclick="copyVisitsHeaders()" class="w-full btn bg-blue-700 hover:bg-blue-600 text-white py-2">Copy 'Visits' Headers</button>
+            </div>
+            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
+                <h3 class="font-bold text-lg text-purple-400">B. Setup 'Templates' Tab</h3>
+                <button onclick="copyTemplatesSetup()" class="w-full btn bg-purple-700 hover:bg-purple-600 text-white py-2">Copy Setup + Guide</button>
+            </div>
+            <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
+                <h3 class="font-bold text-lg text-green-400">C. Setup 'Sites' Tab</h3>
+                <button onclick="copySitesSetup()" class="w-full btn bg-green-700 hover:bg-green-600 text-white py-2">Copy Setup + Guide</button>
+            </div>
+            <div class="bg-gray-900 p-6 rounded-lg border-2 border-red-600 space-y-4">
+                <h3 class="font-bold text-lg text-red-400">D. Setup 'Staff' Tab</h3>
+                <button onclick="copyStaffSetup()" class="w-full btn bg-red-800 hover:bg-red-700 text-white py-2">Copy Setup + Guide</button>
+            </div>
+          </div>
+          <div class="mt-4 bg-gray-900 p-6 rounded-lg border border-gray-600 space-y-4">
+                <h3 class="font-bold text-lg text-yellow-400">E. AI Reporting Tab</h3>
+                <button onclick="copyReportGuide()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white py-2 px-6">Copy Full AI Prompt Guide</button>
+          </div>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="generateScript()" class="btn btn-primary text-lg">Next: Backend →</button></div>
         </div>
 
-        <div id="step3" class="step-section space-y-8">
-          <div class="relative"><div class="flex justify-between items-end mb-2"><label class="text-sm font-bold text-gray-400">YOUR CUSTOM BACKEND CODE</label><button onclick="copyScript()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded">COPY ALL</button></div><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
-          
-          <div class="pt-4 border-t border-gray-700">
-              <label class="block text-green-400 font-bold text-center mb-2 text-xl">🏥 The Server Doctor</label>
-              <div class="flex gap-2 max-w-xl mx-auto">
-                  <input type="url" id="webAppUrl" class="input-field text-center text-yellow-300 font-mono text-sm" placeholder="Paste Web App URL here..." oninput="cleanUrl(this); saveInput(this)">
-                  <button onclick="runDoctor()" class="btn bg-green-600 hover:bg-green-500 text-white shadow-lg whitespace-nowrap">RUN DIAGNOSTIC</button>
-              </div>
-              <div id="testResult" class="text-center font-bold text-sm hidden mt-4 p-4 rounded bg-gray-900 border border-gray-600"></div>
+        <div id="step3" class="step-section space-y-6">
+          <div class="relative">
+            <button onclick="copyScript()" class="absolute top-2 right-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded">COPY CODE</button>
+            <pre id="codeDisplay" class="code-scroll">Generating code...</pre>
           </div>
-
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary opacity-50 cursor-not-allowed">Next: Download →</button></div>
+          <div class="bg-gray-900 p-6 rounded-lg border border-gray-600 text-sm text-gray-300 space-y-4">
+             <h3 class="font-bold text-green-400 text-lg">Deploy Backend</h3>
+             <ol class="list-decimal pl-5 space-y-3">
+                <li>Go to Google Sheet > <strong>Extensions > Apps Script</strong>.</li>
+                <li>Delete existing code. <strong>Paste</strong> new code.</li>
+                <li>Click <strong>Deploy > New Deployment</strong>. Select <strong>Web App</strong>.</li>
+                <li class="p-3 border-2 border-red-500 rounded bg-red-900/20 text-white font-bold">⚠️ CRITICAL: Set "Who has access" to <span class="text-red-400 underline">"Anyone"</span>.</li>
+                <li>Click <strong>Deploy</strong>. Copy the URL.</li>
+             </ol>
+          </div>
+          <div class="bg-yellow-900/30 border border-yellow-600/50 p-6 rounded-lg mt-4">
+             <h3 class="font-bold text-yellow-400 text-lg flex items-center gap-2">⏰ Set Automation Triggers</h3>
+             <p class="text-xs text-gray-400">Apps Script > Alarm Clock Icon > + Add Trigger</p>
+             <ul class="list-disc pl-5 space-y-2 text-sm text-gray-300">
+                <li><strong>Safety Watchdog:</strong> <code>checkOverdueVisits</code> → Time-driven → Minutes timer → Every 10 minutes.</li>
+                <li><strong>Auto-Archive:</strong> <code>archiveOldData</code> → Time-driven → Month timer → 1st of month.</li>
+             </ul>
+          </div>
+          <div><label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)"></div>
+          <div class="flex justify-center gap-4"><button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button></div>
+          <div id="testResult" class="text-center font-bold text-lg hidden mt-4"></div>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button></div>
         </div>
 
         <div id="step4" class="step-section text-center space-y-10 py-8">
-          <div class="bg-gray-900 p-6 rounded-lg border border-gray-700 text-left">
-              <h2 class="text-xl font-bold text-white mb-4">4. Load Templates</h2>
-              <div class="space-y-1" id="fileStatusArea">
-                  <div id="st_worker" class="file-status"><span>Worker App</span><span class="status-badge status-pending">...</span></div>
-                  <div id="st_monitor" class="file-status"><span>Monitor App</span><span class="status-badge status-pending">...</span></div>
-                  <div id="st_backend" class="file-status"><span>Backend</span><span class="status-badge status-pending">...</span></div>
-                  <div id="st_guide" class="file-status"><span>Guide</span><span class="status-badge status-pending">...</span></div>
-                  <div id="st_manual" class="file-status"><span>Manual</span><span class="status-badge status-pending">...</span></div>
-              </div>
-          </div>
-          <button id="btnDlZip" onclick="downloadZip()" disabled class="w-full btn btn-success py-4 text-xl shadow-xl opacity-50">Download .ZIP</button>
-          <div class="flex justify-between"><button onclick="gotoStep(3)" class="text-gray-400">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Deployment Guide →</button></div>
+          <div><h2 class="text-4xl font-bold text-white mb-2">Ready to Build</h2><p class="text-gray-400">Files generated for: <span id="finalAppName" class="text-blue-400">App</span></p></div>
+          <button onclick="downloadZip()" class="w-full max-w-md mx-auto btn btn-success py-5 text-2xl shadow-xl transform hover:scale-105">Download On-The-Go_Lone_Worker_Apps.zip</button>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(3)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Next: Deployment Guide →</button></div>
         </div>
 
-        <div id="step5" class="step-section space-y-8">
-            <div class="bg-gray-900 p-6 rounded-xl border border-gray-700"><div class="flex items-center gap-3 mb-4"><div class="bg-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-bold">1</div><h2 class="text-lg font-bold text-white">Create NEW Site</h2></div><ul class="list-disc pl-11 space-y-2 text-sm text-gray-400"><li>Go to <a href="https://app.netlify.com" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com</a> and Sign Up/Log In.</li><li>Go to the <strong>"Sites"</strong> tab.</li><li>Look for the box: <em>"Drag and drop your site output folder here"</em>.</li><li><strong>Drag the 'WorkerApp' FOLDER</strong> into that box. (Do not upload the Zip).</li><li>Wait 10 seconds. You will get a random URL (e.g., <code>happy-hippo-123.netlify.app</code>).</li><li><strong>Copy this URL.</strong> This is the link you send to your workers.</li></ol></div>
-            <div class="bg-gray-900 p-6 rounded-xl border border-gray-700"><div class="flex items-center gap-3 mb-4"><div class="bg-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-bold">3</div><h2 class="text-lg font-bold text-white">Repeat for Monitor</h2></div><p class="pl-11 text-sm text-gray-400">Repeat the process for the <code>MonitorApp</code> folder to create your Office Dashboard link.</p></div>
-            <div class="flex justify-start"><button onclick="gotoStep(4)" class="text-gray-400">Back</button></div>
+        <div id="step5" class="step-section space-y-10">
+            <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
+                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Host with Netlify (Free)</h2></div></div>
+                <p class="text-sm text-gray-300 mb-4">A complete step-by-step guide is included in your ZIP file: <code>OPERATIONS_MANUAL.html</code></p>
+                <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
+                    <li>Sign up at <a href="https://app.netlify.com/signup" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com</a>.</li>
+                    <li>Drag the <strong>WorkerApp</strong> folder from your ZIP into the Netlify "Sites" tab.</li>
+                    <li>Repeat for the <strong>MonitorApp</strong> folder.</li>
+                </ol>
+            </div>
+            <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
         </div>
 
       </div>
     </div>
   </div>
 
-<script>
-const FILES = { 'worker_template.html': 'st_worker', 'monitor_template.html': 'st_monitor', 'backend_template.js': 'st_backend', 'guide_template.html': 'st_guide', 'ops_manual_template.html': 'st_manual' };
-let TEMPLATES = {}; 
+  <script>
+    const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
+    let TEMPLATES = {};
+    const workerKey = "wk_" + Math.random().toString(36).substr(2, 9); // CONSTANT KEY
 
-const SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
-const BLUEPRINTS = {
-    Visits: `Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4\n2024-01-01T08:00:00.000Z\t2024-01-01\tJohn Doe\t+6421123456\tJane Doe\t+6421999888\tjane@test.com\t\t\t\t"ON SITE"\t"Arrived safely"\t"Head Office"\t"123 Queen St"\t"-36.8,174.7"\t2024-01-01T08:00:00.000Z\t95%\t\t0`,
-    Staff: `Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry\nJohn Doe\tDriver\tActive\t\t\t\t${SPACER}INSTRUCTIONS (Do not delete):\n1. GATEKEEPER MODE: The existence of this tab turns on High Security.\n2. AUTHORIZATION: Only names listed here (Case Sensitive) can use the app.\n3. REVOKING ACCESS: To fire a worker, delete their row or change Status to 'Inactive'.\n4. DEVICE LOCK: The system will auto-fill Col E (DeviceID) on first sync. To let a worker switch phones, clear their DeviceID cell.\n5. VEHICLE: Columns F and G are updated automatically when workers submit a Vehicle Safety Check.`,
-    Sites: `Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455${SPACER}SITES GUIDE (Starting Cell A20):\n1. Use this tab to assign sites to workers.\n2. Column A (Assigned To): Enter a Worker Name (Exact Match) or 'ALL'.\n3. Template Name: Must match a name from the 'Templates' tab.\n4. Address: If populated, the app will show a 'Navigate' button.\n5. Contact Info: Shows a 'Call' button in the app.`,
-    Templates: `Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo${SPACER}TEMPLATE LEGEND & GUIDE:\n1. TYPE COLUMN (Col A):\n- 'FORM': Appears in the 'Add Notes/Form' menu during a visit (e.g. Accident Report, Vehicle Check).\n- 'REPORT': Triggered when leaving a site. Must be linked to a location in the 'Sites' tab.\n2. ASSIGNED TO (Col C - FORMS ONLY):\n- 'ALL': Every worker sees this form.\n- 'John, Sarah': Only John and Sarah see this form (Comma separated, exact name match).\n3. CODES (Use these in Question columns):\n- [TEXT] : Multi-line text box\n- [NUMBER] : Numeric keypad input\n- [YESNO] : Yes/No buttons\n- [CHECK] : Simple checkbox\n- [PHOTO] : Camera button\n- [GPS] : Button to capture current location\n- [SIGN] : Signature pad\n- [HEADING] : Section Title (Visual separator)\n- [NOTE] : Read-only instruction text`,
-    AdminHelp: `Task\tAI Prompt Suggestion\nCreate PDF Report\t"I have a Google Sheet with a tab 'Visits'. Columns are: A=Timestamp, C=Worker Name, K=Status, S=Distance. Please write a Google Apps Script function to email me a PDF summary of total distance per worker for the last 7 days."\nData Clean Up\t"Write a script to archive rows from 'Visits' that are older than 30 days to a new tab called 'Archive' inside the same spreadsheet."${SPACER}AI REPORTING GUIDE...\nUse this guide to ask Gemini or ChatGPT to write custom report scripts for you.\n---------------------------------------------------\nSECTION 1: DEPLOYMENT RULE (READ FIRST)\n---------------------------------------------------\nIf you write a script that only READS the spreadsheet and creates a new Report Tab (like the examples below):\n1. You DO NOT need to update the Web App Deployment.\n2. Just paste the code into Apps Script and click "Run" (or set a Time Trigger).\n3. The script runs "locally" inside the sheet.\nOnly update the Web App Deployment if you change "doPost" or "doGet" (the core backend).\n---------------------------------------------------\nSECTION 2: DATA MAP (For the AI)\n---------------------------------------------------\nPaste this into your AI prompt so it knows your data structure:\nI have a Google Sheet named 'Visits'.\nThe columns are mapped as follows:\n- Col A: Timestamp (Start of Visit)\n- Col C: Worker Name\n- Col K: Status (e.g. 'DEPARTED', 'EMERGENCY')\n- Col M: Location Name\n- Col P: Device Timestamp (End of Visit / Last Check-in)\n- Col Q: Battery Level (e.g. '85%')\n- Col S: Distance (km)\n- Col T: Visit Report Data (JSON string containing form answers)\n- Col U: Anticipated Departure Time\n---------------------------------------------------\nSECTION 2B: LONG-TERM HISTORY (THE ARCHIVE)\n---------------------------------------------------\nPRO TIP: If you need a report covering more than 30 days (e.g., Annual Mileage), you must tell the AI to look at the Archive.\nAdd this to your prompt:\nPlease note: Older data is moved to a sheet named 'Archive'. Please modify the script to read data from BOTH the 'Visits' sheet and the 'Archive' sheet, combine them into one array, and then generate the report.\n---------------------------------------------------\nSECTION 3: PROMPT RECIPES (Copy & Paste these)\n---------------------------------------------------\nRECIPE 1: MILEAGE REPORT\nWrite a Google Apps Script function called 'generateMileageReport'.\n1. Read all data from 'Visits'.\n2. Create/Overwrite a sheet called 'Mileage Report'.\n3. Group data by Worker Name (Col C) and Location (Col M).\n4. Sum the Distance (Col S) for each group.\n5. Create a clean table: Worker | Location | Total KM.\n6. Add a Grand Total at the bottom.\nRECIPE 2: TIMESHEET (PAYROLL)\nWrite a script called 'generateTimesheet'.\n1. Read 'Visits'.\n2. Calculate duration in minutes: (Col P - Col A).\n3. Ignore rows where Status is not 'DEPARTED'.\n4. Create a sheet 'Weekly Timesheet'.\n5. List: Worker | Date | Location | Start Time | End Time | Duration (Hours).\n6. Sum Total Hours per Worker.\nRECIPE 3: SAFETY AUDIT (COMPLIANCE)\nWrite a script called 'auditSafety'.\n1. Read 'Visits'.\n2. Identify rows where Battery Level (Col Q) is < 20%.\n3. Identify rows where Status (Col K) contains 'EMERGENCY' or 'OVERDUE'.\n4. Create a sheet 'Safety Audit'.\n5. List these high-risk visits.\n6. Highlight 'EMERGENCY' rows in Red.\nRECIPE 4: SITE HISTORY (JSON EXTRACTION)\nWrite a script called 'collateSiteComments'.\n1. Read 'Visits'.\n2. Filter for Location Name = 'Main Office' (make this a variable).\n3. Parse the JSON in Col T ('Visit Report Data').\n4. Extract the field labeled 'Notes' or 'Comments' from that JSON.\n5. Create a sheet 'Site Log - Main Office'.\n6. List: Date | Worker | Extracted Notes.\nRECIPE 5: AFTER-HOURS WORK\nWrite a script to find after-hours work.\n1. Read 'Visits'.\n2. Flag rows where Start Time (Col A) is on a Saturday/Sunday OR after 6:00 PM.\n3. Output to a new sheet 'After Hours Log'.\nRECIPE 6: WORKER ACTIVITY SUMMARY\nWrite a script for an Executive Summary.\n1. Count total unique visits per Worker.\n2. Calculate average duration per visit per Worker.\n3. Count total 'EMERGENCY' statuses per Worker.\n4. Output a summary table.\nRECIPE 7: MISSING REPORTS\nWrite a script to find missing reports.\n1. Filter rows where Status is 'DEPARTED'.\n2. Check if Col T (Report Data) is empty or '{}'.\n3. List workers who departed without filing a report.\nRECIPE 8: TRAVEL VS ON-SITE\nWrite a script to compare Travel vs Work.\n1. Sum duration for rows where Location Name contains 'Travel'.\n2. Sum duration for all other rows.\n3. Calculate the ratio per worker.\nRECIPE 9: MONTHLY ARCHIVE\nWrite a script to move last month's data.\n1. Identify rows from the previous month.\n2. Move them to a sheet named 'Archive - [Month-Year]'.\n3. Delete them from 'Visits' to keep it fast.\nRECIPE 10: FORM DATA EXPORT\nWrite a script to flatten the JSON form data.\n1. Read Col T.\n2. Find all unique keys used in the JSON objects (e.g. 'Hazard?', 'Safe?').\n3. Create a new sheet with these keys as Column Headers.\n4. Populate the rows with the values from the JSON.`
-};
+    const AI_GUIDE_TEXT = `AI REPORTING GUIDE
+==================
+Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
+... (Same as before) ...
+`;
 
-window.onload = async () => { 
-    loadPersistedData(); 
-    detectTimezoneOnLoad(); 
-    handleLogo({files:[]});
-    toggleAiInput(); 
-    genKey();
-    for (const [f, id] of Object.entries(FILES)) { try { const r = await fetch(f + "?v=" + Date.now()); if (r.ok) { TEMPLATES[f] = await r.text(); document.querySelector(`#${id} .status-badge`).className="status-badge status-ok"; document.querySelector(`#${id} .status-badge`).innerText="LOADED"; } } catch(e){} }
-    checkAssets(Object.keys(TEMPLATES).length === 5);
-};
+    window.onload = async () => { 
+        loadPersistedData(); 
+        updateRegionInfo(); // Detect TZ on load
+        setupDragDrop(); 
+        for (const [k, f] of Object.entries(FILES)) {
+            try { const r = await fetch(f); if (r.ok) TEMPLATES[k] = await r.text(); } catch(e){}
+        }
+    };
 
-function saveInput(el){localStorage.setItem('otg_'+el.id,el.type==='checkbox'?el.checked:el.value);}
-function loadPersistedData(){
-    const ids=['orgName','secretKey','webAppUrl','geminiKey','orsKey','textbeltKey','folderId','escalationMins','vehFreq','countrySelect','statsFreq','timezoneVal','workerKeyInput'];
-    ids.forEach(id=>{const v=localStorage.getItem('otg_'+id);if(v)document.getElementById(id).value=v;});
-    if(localStorage.getItem('otg_chkTravelReport')!==null)document.getElementById('chkTravelReport').checked=localStorage.getItem('otg_chkTravelReport')==='true';
-    if(localStorage.getItem('otg_enableAi')!==null)document.getElementById('enableAi').checked=localStorage.getItem('otg_enableAi')==='true';
-}
-
-function detectTimezoneOnLoad() {
-    const saved = localStorage.getItem('otg_timezoneVal');
-    if(saved) return;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const drop = document.getElementById('timezoneVal');
-    for(let i=0; i<drop.options.length; i++) {
-        if(drop.options[i].value === tz) { drop.selectedIndex = i; saveInput(drop); return; }
+    function saveInput(el) { 
+        if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked);
+        else localStorage.setItem('otg_' + el.id, el.value); 
     }
-    if(tz.includes("Auckland")) drop.value = "Pacific/Auckland";
-    else if(tz.includes("Sydney")) drop.value = "Australia/Sydney";
-    else if(tz.includes("London")) drop.value = "Europe/London";
-    else if(tz.includes("New_York")) drop.value = "America/New_York";
-    saveInput(drop);
-}
-
-function toggleEnterBtn(){const b=document.getElementById('btnEnter'),c=document.getElementById('chkAccept');b.disabled=!c.checked;if(c.checked){b.classList.remove('bg-gray-700','text-gray-500');b.classList.add('bg-blue-600','text-white','hover:bg-blue-500');}else{b.classList.add('bg-gray-700','text-gray-500');b.classList.remove('bg-blue-600','text-white','hover:bg-blue-500');}}
-function closeModal(id){document.getElementById(id).style.display='none';if(id==='disclaimerModal')document.getElementById('mainContent').classList.remove('blur-sm');}
-function handleLogo(i){if(i.files && i.files[0]){const r=new FileReader();r.onload=e=>{TEMPLATES.logo=e.target.result;document.getElementById('logoImg').src=e.target.result;document.getElementById('logoImg').classList.remove('hidden');document.getElementById('logoText').innerText="✅ Ready";document.getElementById('logoUrl').value=e.target.result;saveInput(document.getElementById('logoUrl'));};r.readAsDataURL(i.files[0]);}}
-function gotoStep(n){if(n===4)checkAssets(Object.keys(TEMPLATES).length===5);document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active'));document.getElementById('step'+n).classList.add('active');for(let i=1;i<=5;i++){const t=document.getElementById('tab'+i);if(i===n)t.classList.add('active');else t.classList.remove('active');}}
-function toggleVehicle(){document.getElementById('vehOptions').style.display=document.getElementById('chkVehicle').checked?'flex':'none';}
-function toggleAiInput(){const c=document.getElementById('enableAi'),i=document.getElementById('geminiKey');i.disabled=!c.checked;i.style.opacity=c.checked?'1':'0.5';}
-function genKey(){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let r='';for(let i=0;i<32;i++)r+=c.charAt(Math.floor(Math.random()*c.length));if(!document.getElementById('secretKey').value)document.getElementById('secretKey').value=r;if(!document.getElementById('workerKeyInput').value){let r2='';for(let i=0;i<32;i++)r2+=c.charAt(Math.floor(Math.random()*c.length));document.getElementById('workerKeyInput').value="wk_"+r2;}}
-function regenKey(id, prefix=''){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let r=prefix;for(let i=0;i<32;i++)r+=c.charAt(Math.floor(Math.random()*c.length));document.getElementById(id).value=r;saveInput(document.getElementById(id));}
-function copyData(k){navigator.clipboard.writeText(BLUEPRINTS[k]);alert(k+" Data Copied!");}
-function copyToClip(text){navigator.clipboard.writeText(text);alert(`Copied "${text}"`);}
-function cleanUrl(el){el.value=el.value.replace(/\/dev$/,'/exec').replace(/\/edit.*$/,'/exec');}
-
-function runDoctor(){
-    const url = document.getElementById('webAppUrl').value;
-    const workerKey = document.getElementById('workerKeyInput').value;
-    const r = document.getElementById('testResult');
-    r.classList.remove('hidden'); r.innerHTML = "⏳ Contacting Server...";
-    r.className = "text-center font-bold text-sm mt-4 p-4 rounded bg-yellow-900 border border-yellow-600 text-yellow-200";
-
-    const payload = new FormData();
-    payload.append('action', 'checkin');
-    payload.append('key', workerKey);
-    payload.append('Worker Name', 'FACTORY_TEST_BOT');
-    payload.append('Alarm Status', 'TESTING_CONNECTION');
-    payload.append('Notes', 'If you see this, the WRITE connection is working.');
-
-    fetch(url, { method: 'POST', body: payload })
-    .then(resp => {
-        if(resp.status === 404) throw new Error("404 Not Found (Wrong URL)");
-        if(resp.status === 401 || resp.status === 403) throw new Error("Access Denied (Permissions)");
-        return resp.text();
-    })
-    .then(txt => {
-        try {
-            const j = JSON.parse(txt);
-            if(j.status === 'success') {
-                r.innerHTML = "✅ Success! Server is ONLINE and WRITABLE.";
-                r.className = "text-center font-bold text-sm mt-4 p-4 rounded bg-green-900 border border-green-600 text-green-200";
-                document.getElementById('btnNextDownload').disabled = false;
-                document.getElementById('btnNextDownload').classList.remove('opacity-50','cursor-not-allowed');
-            } else {
-                throw new Error(j.message || "Unknown Server Error");
-            }
-        } catch(e) {
-            if(txt.includes("<!DOCTYPE html>")) throw new Error("Received HTML instead of JSON. Check 'Who has access' = ANYONE.");
-            throw e;
-        }
-    })
-    .catch(e => {
-        r.innerHTML = "❌ FAILURE: " + e.message + "<br><br>Check: 1. Deployment Version is 'New' <br> 2. Access is 'Anyone' <br> 3. URL ends in /exec";
-        r.className = "text-center font-bold text-sm mt-4 p-4 rounded bg-red-900 border border-red-600 text-red-200";
-    });
-}
-
-function generateScript(){
-    if(!TEMPLATES['backend_template.js']){setTimeout(generateScript,500);return;}
-    const workerKey = document.getElementById('workerKeyInput').value;
-    const secretKey = document.getElementById('secretKey').value;
-    
-    // TEMPLATE PURIFIER - BACKEND
-    let code=TEMPLATES['backend_template.js'];
-    code = code.replace(/MIN_CLIENT_VERSION\s*=\s*['"].*?['"]/g, 'MIN_CLIENT_VERSION = "0.0"'); 
-    code = code.replace(/MIN_APP_VERSION\s*=\s*['"].*?['"]/g, 'MIN_CLIENT_VERSION = "0.0"');
-    code = code.replace(/if\s*\(.*?MIN_CLIENT_VERSION.*?\)\s*\{[\s\S]*?SERVER UPDATE REQUIRED[\s\S]*?\}/g, '// Version Check Removed');
-    if(!code.includes("setMimeType(ContentService.MimeType.JSON)")) { code = code.replace(/return\s+ContentService\.createTextOutput\(JSON\.stringify\(response\)\)/g, 'return ContentService.createTextOutput(JSON.stringify(response)).setMimeType(ContentService.MimeType.JSON)'); }
-
-    code = code.replace('%%SECRET_KEY%%',secretKey).replace(/%%WORKER_KEY%%/g,workerKey).replace('%%ORS_API_KEY%%',document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%',document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%',document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%',document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%',document.getElementById('orgName').value).replace('%%TIMEZONE%%',document.getElementById('timezoneVal').value||"Pacific/Auckland").replace('%%COUNTRY_CODE%%',document.getElementById('countrySelect').value.replace('+','')).replace('%%STATS_FREQ%%',document.getElementById('statsFreq').value).replace('%%ENABLE_AI%%',document.getElementById('enableAi').checked).replace('%%ESCALATION_MINUTES%%',document.getElementById('escalationMins').value);
-    document.getElementById('codeDisplay').textContent=code;gotoStep(3);
-}
-function copyScript(){navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent);alert("Copied!");}
-
-function checkAssets(r){const b=document.getElementById('btnDlZip');if(r){b.disabled=false;b.classList.remove('opacity-50');}}
-
-// DEFAULT ICON GENERATOR (1x1 Transparent or Blue Shield)
-function createDefaultIcon() {
-    const cvs = document.createElement('canvas'); cvs.width=192; cvs.height=192;
-    const ctx = cvs.getContext('2d');
-    ctx.fillStyle = "#1e40af"; ctx.beginPath(); ctx.arc(96,96,96,0,2*Math.PI); ctx.fill();
-    ctx.fillStyle = "white"; ctx.font = "100px sans-serif"; ctx.textAlign = "center"; ctx.fillText("🛡️", 96, 130);
-    return cvs.toDataURL().split(',')[1];
-}
-
-// SAFE INJECTION GENERATOR
-function getHeadInject(url, org) {
-    return `<script>
-    // AUTO-INJECTED CONFIG
-    window.OTG_CONFIG = { url: "${url}", org: "${org}" };
-    try { 
-        localStorage.setItem('otg_config', JSON.stringify(window.OTG_CONFIG));
-        if(!localStorage.getItem('otg_debug_alert_v89')) {
-            alert("DEBUG: Connected to " + "${url}");
-            localStorage.setItem('otg_debug_alert_v89', 'true');
-        }
-    } catch(e){}
-    <\/script>`;
-}
-
-// WORKER APP ERROR HANDLER (With Syntax Shield)
-const WORKER_FETCH_PATCH = `
-function forceSync(){
-    if(!state.settings.workerName)return alert("Please enter your name in Settings first.");
-    document.getElementById('uploadBanner').classList.remove('hidden');
-    
-    // READ CONFIG FROM WINDOW OR STORAGE
-    let activeUrl = CONFIG.url;
-    if(window.OTG_CONFIG && window.OTG_CONFIG.url) activeUrl = window.OTG_CONFIG.url;
-    else {
-        try { 
-            const saved = JSON.parse(localStorage.getItem('otg_config'));
-            if(saved && saved.url) activeUrl = saved.url;
-        } catch(e){}
-    }
-
-    if(!activeUrl || activeUrl.length < 10) return alert("FATAL ERROR: No Server URL configured. Re-install App.");
-
-    const dId=getDeviceID();
-    fetch(\`\${activeUrl}?action=sync&worker=\${encodeURIComponent(state.settings.workerName)}&key=\${CONFIG.key}&deviceId=\${dId}\`)
-    .then(r=>r.text())
-    .then(txt=>{
-        if(!txt.trim().startsWith("{")) throw new Error("Invalid Server Response (Not JSON)");
-        return JSON.parse(txt);
-    })
-    .then(data=>{
-        if(data.status==="error"){ 
-            alert("⚠️ SERVER ERROR:\\n" + data.message); 
-            if(data.message.includes("ACCESS DENIED")) startWizard();
-            document.getElementById('uploadBanner').classList.add('hidden');
-            return;
-        }
-        if(!Array.isArray(data.sites)) throw new Error("Invalid Data: Missing Sites List");
+    function loadPersistedData() { 
+        const ids = ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect']; 
+        ids.forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
         
-        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
-        const ms=data.sites.map(s=>({id:'site_'+s.siteName.replace(/\\s/g,''),name:s.siteName,address:s.address,companyName:s.company,templateName:s.template,noReport:false,contactName:s.contactName,contactPhone:s.contactPhone,contactEmail:s.contactEmail,notes:s.notes}));
-        if(CONFIG.mileage)ms.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
-        state.locations=ms.concat(existingManual);
-        state.globalForms=data.forms||[];
-        state.cachedForms=data.cachedTemplates||{};
-        state.meta=data.meta||{};
-        if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
-        state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];
-        if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
-        const tLoc = state.locations.find(x => x.id === 'travel');
-        const userPref = localStorage.getItem('otg_user_travel_pref');
-        if (tLoc && userPref !== null) {tLoc.noReport = (userPref === 'true');}
-        saveState();
-        renderLocations();
-        checkVehicleStatus();
-        document.getElementById('uploadBanner').classList.add('hidden');
-        alert("Sync Complete!");
-    })
-    .catch(e=>{
-        document.getElementById('uploadBanner').classList.add('hidden');
-        alert("Sync Failed: "+e.message);
-    });
-}
+        const checks = ['chkTravelReport', 'chkRedaction', 'chkVehicle', 'chkCheckin'];
+        checks.forEach(id => {
+            const v = localStorage.getItem('otg_' + id);
+            if(v !== null) document.getElementById(id).checked = (v === 'true');
+        });
+    }
+
+    function updateRegionInfo() {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById('detectedTz').textContent = tz;
+        document.getElementById('timezoneVal').value = tz;
+        saveInput(document.getElementById('countrySelect'));
+    }
+
+    function toggleEnterBtn() { 
+        const btn = document.getElementById('btnEnter');
+        const chk = document.getElementById('chkAccept');
+        btn.disabled = !chk.checked;
+        if(chk.checked) {
+            btn.classList.remove('bg-gray-700', 'text-gray-500');
+            btn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+        } else {
+            btn.classList.add('bg-gray-700', 'text-gray-500');
+            btn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-500');
+        }
+    }
+    
+    function closeModal(id) { document.getElementById(id).style.display='none'; if(id==='disclaimerModal') document.getElementById('mainContent').classList.remove('blur-sm'); }
+
+    function setupDragDrop() {
+        const dz = document.getElementById('dropZone');
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); });
+        dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); });
+        dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); });
+    }
+    function handleLogo(input) {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas'); canvas.width = 192; canvas.height = 192; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
+                    const data = canvas.toDataURL('image/png');
+                    document.getElementById('logoImg').src = data; document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoText').textContent = "✅ Logo Ready";
+                    document.getElementById('logoUrl').value = data; saveInput(document.getElementById('logoUrl'));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function gotoStep(n) { 
+        document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); 
+        document.getElementById('step'+n).classList.add('active'); 
+        for(let i=1; i<=5; i++){ 
+            const tab = document.getElementById('tab'+i); 
+            if(i===n){ tab.classList.add('active'); } else { tab.classList.remove('active'); } 
+        } 
+    }
+    
+    function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
+    function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
+    function copyVisitsHeaders() { navigator.clipboard.writeText("Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4"); alert("Copied!"); }
+    function copyTemplatesSetup() { navigator.clipboard.writeText("Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\nREPORT\tVehicle Safety Check\tALL\t\t[TEXT] Registration Plate\t[YESNO] Current Rego & WOF?\t[DATE] WOF Expiry\t[GPS] Inspection Location\t[HEADING] Tyres\t[TEXT] Tread Depth (New/Good/Low)\t[PHOTO] Tread Photo\t[TEXT] Tyre Pressures (PSI)\t[HEADING] Under Hood\t[YESNO] Oil Level OK?\t[PHOTO] Oil Level\t[YESNO] Coolant/Water OK?\t[PHOTO] Coolant Level\t[YESNO] Brake Fluid OK?\t[PHOTO] Brake Fluid\nREPORT\tTravel Report\tALL\t\t[NUMBER] Distance (km)\t[TEXT] Trip Details\t[PHOTO] Odometer Photo"); alert("Copied Setup + Guide!"); }
+    function copySitesSetup() { navigator.clipboard.writeText("Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\nALL\tStandard Visit\tAcme Corp\tHead Office\t123 Main St\tSteve\t021123456\tsteve@acme.com\tGate Code: 4455"); alert("Copied Setup + Guide!"); }
+    function copyStaffSetup() { navigator.clipboard.writeText("Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry\nJohn Doe\tDriver\tActive\t\t\t\t"); alert("Copied Setup + Guide!"); }
+    function copyReportGuide() { navigator.clipboard.writeText(AI_GUIDE_TEXT); alert("AI Guide Copied!"); }
+
+    function generateScript() {
+        if(!TEMPLATES.backend) { setTimeout(generateScript, 500); return; } 
+        const code = TEMPLATES.backend
+            .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
+            .replace(/%%WORKER_KEY%%/g, workerKey)
+            .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
+            .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
+            .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
+            .replace('%%PHOTOS_FOLDER_ID%%', document.getElementById('folderId').value)
+            .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
+            .replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland")
+            .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
+            .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked);
+        document.getElementById('codeDisplay').textContent = code;
+        gotoStep(3); 
+    }
+    function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Backend Code Copied!"); }
+
+    function testConnection() {
+        const url = document.getElementById('webAppUrl').value;
+        if(!url.includes('/exec')) { alert('Invalid URL'); return; }
+        const r = document.getElementById('testResult'); r.classList.remove('hidden'); r.textContent = "Testing..."; r.className = "text-center font-bold text-lg text-yellow-400 p-3 bg-gray-900 inline-block";
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value))
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === "success") {
+                  r.textContent = "✅ Success!"; r.className = "text-center font-bold text-lg text-green-400 p-3 bg-gray-900 inline-block";
+                  document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed');
+                  document.getElementById('finalAppName').innerText = document.getElementById('orgName').value;
+                } else throw new Error();
+            }).catch(() => { r.textContent = "❌ Failed."; r.className = "text-center font-bold text-lg text-red-400 p-3 bg-gray-900 inline-block"; });
+    }
+
+    function processGuideTemplate(html) {
+        if(!html) return "";
+        let out = html;
+        const org = document.getElementById('orgName').value;
+        const esc = document.getElementById('escalationMins').value;
+        const chkInt = document.getElementById('checkinMins').value;
+        const vehInt = document.getElementById('vehFreq').value;
+        
+        // Replace Vars
+        out = out.replace(/%%ORG_NAME%%/g, org).replace(/%%ESCALATION_MINUTES%%/g, esc).replace(/%%CHECKIN_INTERVAL%%/g, chkInt).replace(/%%VEHICLE_INTERVAL%%/g, vehInt);
+        
+        // Process Conditional Blocks
+        const processBlock = (tag, isActive) => {
+            const regex = new RegExp(`([\\s\\S]*?)`, 'g');
+            out = out.replace(regex, (match, content) => isActive ? content : "");
+        };
+
+        processBlock('VEHICLE', document.getElementById('chkVehicle').checked);
+        processBlock('CHECKIN', document.getElementById('chkCheckin').checked);
+        processBlock('TRAVEL_REPORT', document.getElementById('chkTravelReport').checked);
+        
+        return out;
+    }
+
+    function downloadZip() {
+        const zip = new JSZip();
+        const org = document.getElementById('orgName').value;
+        const url = document.getElementById('webAppUrl').value;
+        const secret = document.getElementById('secretKey').value;
+        const logo = document.getElementById('logoUrl').value;
+        const orsKey = document.getElementById('orsKey').value;
+        const checkinEnabled = document.getElementById('chkCheckin').checked;
+        const vehEnabled = document.getElementById('chkVehicle').checked;
+        const escalationMins = document.getElementById('escalationMins').value;
+        const countryPrefix = document.getElementById('countrySelect').value;
+        const reqTravelReport = document.getElementById('chkTravelReport').checked;
+        localStorage.setItem('otg_chkTravelReport', reqTravelReport);
+        localStorage.setItem('otg_chkRedaction', document.getElementById('chkRedaction').checked);
+
+        // INJECT KEYS & CONFIGS
+        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, workerKey).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value).replace(/%%COUNTRY_PREFIX%%/g, countryPrefix).replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport);
+        let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo);
+        let bCode = document.getElementById('codeDisplay').textContent;
+        let gHtml = processGuideTemplate(TEMPLATES.guide);
+        
+        // Operations Manual Processing
+        let opHtml = TEMPLATES.manual
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%SECRET_KEY%%/g, secret)
+            .replace(/%%WORKER_KEY%%/g, workerKey);
+
+        const swCode = `
+const CACHE_NAME = 'otg-cache-v77';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json'
+];
+self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });
+self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });
 `;
 
-// MONITOR FETCH PATCH (With Syntax Shield)
-const MONITOR_FETCH_PATCH = `
-function fetchData() { 
-    // READ CONFIG FROM WINDOW OR STORAGE
-    let activeUrl = SCRIPT_URL;
-    if(window.OTG_CONFIG && window.OTG_CONFIG.url) activeUrl = window.OTG_CONFIG.url;
+        const manifest = { name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
 
-    fetch(\`\${activeUrl}?action=fetch&key=\${encodeURIComponent(API_KEY)}\`)
-    .then(r => r.json())
-    .then(data => { 
-        if(data.error) { alert("Security Error: " + data.error); return; } 
-        if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
-        handleData(data); 
-    })
-    .catch(e => { console.warn("Fetch Error", e); });
-}
-`;
+        zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
+        zip.folder("MonitorApp").file("index.html", mHtml);
+        zip.file("Code.gs", bCode);
+        zip.file("OPERATIONS_MANUAL.html", opHtml);
 
-function downloadZip(){
-    const org=document.getElementById('orgName').value,url=document.getElementById('webAppUrl').value;
-    const workerKey=document.getElementById('workerKeyInput').value;
-    const secretKey=document.getElementById('secretKey').value;
-    if(url.length<10||!url.includes("script.google.com")){alert("⚠️ STOP!\n\nEnter a valid Web App URL in Step 3.");gotoStep(3);return;}
-    
-    const HEAD_INJECT = getHeadInject(url, org);
-    const zip=new JSZip();
-    
-    // PURIFIER - WORKER APP
-    let wHtml=TEMPLATES['worker_template.html']
-        .replace('<head>', '<head>' + HEAD_INJECT) 
-        .replace('', 'v89.0') 
-        .replace(/%%ORG_NAME%%/g,org)
-        .replace(/%%SHEET_URL%%/g,url) // Legacy Fallback
-        .replace(/%%LOGO_DATA%%/g, "icon.png") 
-        .replace(/%%WORKER_KEY%%/g,workerKey)
-        .replace(/%%ORS_API_KEY%%/g,document.getElementById('orsKey').value)
-        .replace(/%%ESCALATION_MINUTES%%/g,document.getElementById('escalationMins').value)
-        .replace(/%%VEH_ENABLED%%/g,document.getElementById('chkVehicle').checked)
-        .replace(/%%VEH_INTERVAL%%/g,document.getElementById('vehFreq').value)
-        .replace(/%%MILEAGE_ENABLED%%/g,"true")
-        .replace(/%%COUNTRY_CODE%%/g,document.getElementById('countrySelect').value.replace('+',''))
-        .replace(/%%REQ_TRAVEL_REPORT%%/g,document.getElementById('chkTravelReport').checked);
-    
-    // APPLY WORKER PATCH
-    wHtml = wHtml.replace(/function forceSync\(\)\s*\{[\s\S]*?catch\(e=>\{[\s\S]*?\}\);?\s*\}/, WORKER_FETCH_PATCH);
-
-    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "89.0";');
-    wHtml = wHtml.replace(/v75\.9/g, "v89.0"); 
-
-    // PURIFIER - MONITOR APP
-    let mHtml=TEMPLATES['monitor_template.html']
-        .replace('<head>', '<head>' + HEAD_INJECT)
-        .replace('', 'v89.0') 
-        .replace(/%%ORG_NAME%%/g,org)
-        .replace(/%%LOGO_URL%%/g, "icon.png") 
-        .replace(/%%SHEET_URL%%/g,url); // Legacy Fallback
-    
-    // APPLY MONITOR PATCH
-    mHtml = mHtml.replace(/function fetchData\(\) \{[\s\S]*?document\.body\.appendChild\(script\); \s*\}/, MONITOR_FETCH_PATCH);
-
-    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "89.0";');
-    mHtml = mHtml.replace(/v75\.9/g, "v89.0");
-
-    let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
-    
-    const timeHash = "v89.0_" + Date.now();
-    const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json','./icon.png'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.map(c=>{if(c!==CACHE_NAME)return caches.delete(c)}))))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
-    
-    const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
-    
-    zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",swCode).file("manifest.json",JSON.stringify(manifest)).file("USER_GUIDE.html",gHtml);
-    if(TEMPLATES.logo) zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
-    else zip.folder("WorkerApp").file("icon.png",createDefaultIcon(),{base64:true});
-    
-    zip.folder("MonitorApp").file("index.html",mHtml);
-    if(TEMPLATES.logo) zip.folder("MonitorApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
-    else zip.folder("MonitorApp").file("icon.png",createDefaultIcon(),{base64:true});
-
-    zip.file("Code.gs",document.getElementById('codeDisplay').textContent);
-    zip.file("ADMIN_MANUAL.html",TEMPLATES['ops_manual_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SECRET_KEY%%/g,document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey));
-    zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi,'_')+"_OTG_Apps.zip";a.click();});
-}
-</script>
+        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_On-The-Go_Lone_Worker_Apps.zip";a.click()});
+    }
+  </script>
 </body>
 </html>
-
