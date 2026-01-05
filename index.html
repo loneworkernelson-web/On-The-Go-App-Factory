@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v85.1 (Restoration)</title>
+  <title>OTG Factory v86.0 (Synchronized)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -46,7 +46,7 @@
   <div class="max-w-5xl mx-auto" id="mainContent">
     <header class="text-center mb-8">
       <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v85.1 | The Restoration</p>
+      <p class="text-gray-400">v86.0 | Synchronized</p>
     </header>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -142,8 +142,17 @@
         <div id="step3" class="step-section space-y-8">
           <div class="relative"><div class="flex justify-between items-end mb-2"><label class="text-sm font-bold text-gray-400">YOUR CUSTOM BACKEND CODE</label><button onclick="copyScript()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded">COPY ALL</button></div><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
           <div class="bg-gray-900 p-5 rounded-xl border border-blue-500/30"><h3 class="text-blue-400 font-bold text-lg mb-3">Part A: Deploy the Web App</h3><ol class="space-y-3 text-sm text-gray-300"><li class="flex gap-2"><span class="step-badge">1</span> Open Spreadsheet > <strong>Extensions</strong> > <strong>Apps Script</strong>.</li><li class="flex gap-2"><span class="step-badge">2</span> Delete any code there. <strong>Paste</strong> your code.</li><li class="flex gap-2"><span class="step-badge">3</span> Click the blue <strong>Deploy</strong> button (top right) > <strong>New Deployment</strong>.</li><li class="flex gap-2"><span class="step-badge">4</span> Click the <strong>Gear Icon (⚙️)</strong> next to "Select type" > Choose <strong>Web App</strong>.</li><li class="flex gap-2 bg-blue-900/40 p-2 rounded border border-blue-800"><span class="step-badge bg-blue-500">5</span> <strong>IMPORTANT:</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong> (Critical)</li><li class="flex gap-2"><span class="step-badge">6</span> Click <strong>Deploy</strong>. Copy the <strong>Web App URL</strong> provided.</li></ol></div>
-          <div class="bg-gray-900 p-5 rounded-xl border border-yellow-500/30"><h3 class="text-yellow-400 font-bold text-lg mb-3">Part B: Set up Automation Triggers</h3><p class="text-xs text-gray-400 mb-4">In Apps Script, click the <strong>Alarm Clock Icon</strong> (Left Sidebar) to open Triggers.</p><div class="grid md:grid-cols-3 gap-4"><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-red-400 block mb-2">1. SAFETY (Critical)</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>checkOverdueVisits</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Minutes timer</strong></li><li>Interval: <strong>Every 10 minutes</strong></li></ul></div><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-green-400 block mb-2">2. STATISTICS</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>generateStatistics</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Week timer</strong></li><li>Interval: <strong>Every Monday</strong></li></ul></div><div class="bg-black/30 p-3 rounded border border-gray-700"><strong class="text-purple-400 block mb-2">3. MAINTENANCE</strong><ul class="text-xs text-gray-300 space-y-1"><li>Func: <strong>archiveOldVisits</strong></li><li>Source: <strong>Time-driven</strong></li><li>Type: <strong>Day timer</strong></li><li>Interval: <strong>Midnight to 1am</strong></li></ul></div></div></div>
-          <div class="pt-4 border-t border-gray-700"><label class="block text-green-400 font-bold text-center mb-2">Paste Web App URL to Verify</label><div class="flex gap-2 max-w-xl mx-auto"><input type="url" id="webAppUrl" class="input-field text-center text-yellow-300 font-mono text-sm" placeholder="https://script.google.com/macros/s/..." oninput="saveInput(this)"><button onclick="testConnection()" class="btn bg-green-600 hover:bg-green-500 text-white shadow-lg whitespace-nowrap">Test 📡</button></div><div id="testResult" class="text-center font-bold text-sm hidden mt-3"></div></div>
+          
+          <div class="pt-4 border-t border-gray-700">
+              <label class="block text-green-400 font-bold text-center mb-2 text-xl">🏥 The Server Doctor</label>
+              <p class="text-center text-gray-400 text-xs mb-4">Paste your URL below to verify Write Permissions.</p>
+              <div class="flex gap-2 max-w-xl mx-auto">
+                  <input type="url" id="webAppUrl" class="input-field text-center text-yellow-300 font-mono text-sm" placeholder="https://script.google.com/macros/s/..." oninput="cleanUrl(this); saveInput(this)">
+                  <button id="btnTest" onclick="runDoctor()" class="btn bg-green-600 hover:bg-green-500 text-white shadow-lg whitespace-nowrap">RUN DIAGNOSTIC</button>
+              </div>
+              <div id="testResult" class="text-center font-bold text-sm hidden mt-4 p-4 rounded bg-gray-900 border border-gray-600"></div>
+          </div>
+
           <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary opacity-50 cursor-not-allowed">Next: Download →</button></div>
         </div>
 
@@ -391,7 +400,7 @@ function downloadZip(){
     // PURIFIER - WORKER APP
     let wHtml=TEMPLATES['worker_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT) 
-        .replace('', 'v85.1') 
+        .replace('', 'v86.0') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%SHEET_URL%%/g,url)
         .replace(/%%LOGO_DATA%%/g, "icon.png") // FIX: Replaced Base64 Injection with File Path
@@ -407,13 +416,13 @@ function downloadZip(){
     // APPLY WORKER PATCH
     wHtml = wHtml.replace(/function forceSync\(\)\s*\{[\s\S]*?catch\(e=>\{[\s\S]*?\}\);?\s*\}/, WORKER_FETCH_PATCH);
 
-    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "85.1";');
-    wHtml = wHtml.replace(/v75\.9/g, "v85.1"); 
+    wHtml = wHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "86.0";');
+    wHtml = wHtml.replace(/v75\.9/g, "v86.0"); 
 
     // PURIFIER - MONITOR APP
     let mHtml=TEMPLATES['monitor_template.html']
         .replace('<head>', '<head>' + HEAD_INJECT)
-        .replace('', 'v85.1') 
+        .replace('', 'v86.0') 
         .replace(/%%ORG_NAME%%/g,org)
         .replace(/%%LOGO_URL%%/g, "icon.png") // FIX: Replaced Base64 Injection with File Path
         .replace(/%%SHEET_URL%%/g,url);
@@ -421,24 +430,18 @@ function downloadZip(){
     // APPLY MONITOR PATCH
     mHtml = mHtml.replace(/function fetchData\(\) \{[\s\S]*?document\.body\.appendChild\(script\); \s*\}/, MONITOR_FETCH_PATCH);
 
-    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "85.1";');
-    mHtml = mHtml.replace(/v75\.9/g, "v85.1");
+    mHtml = mHtml.replace(/(const|var) APP_VERSION = ".*?";/g, 'const APP_VERSION = "86.0";');
+    mHtml = mHtml.replace(/v75\.9/g, "v86.0");
 
     let gHtml=TEMPLATES['guide_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%VEHICLE_INTERVAL%%/g,document.getElementById('vehFreq').value);
     
-    const timeHash = "v85.1_" + Date.now();
+    const timeHash = "v86.0_" + Date.now();
     const swCode=`const CACHE_NAME='${timeHash}';const u=['./','./index.html','./manifest.json','./icon.png'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(u)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>{return r||fetch(e.request)}))});`;
     
     const manifest={name:org,short_name:"Safety",start_url:"./index.html",display:"standalone",background_color:"#111827",theme_color:"#1e40af",icons:[{src:"icon.png",sizes:"192x192",type:"image/png"},{src:"icon.png",sizes:"512x512",type:"image/png"}]};
-    
-    // WORKER ZIP
     zip.folder("WorkerApp").file("index.html",wHtml).file("sw.js",swCode).file("manifest.json",JSON.stringify(manifest)).file("USER_GUIDE.html",gHtml);
-    if(TEMPLATES.logo) zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
-    
-    // MONITOR ZIP (Copy same icon)
+    if(TEMPLATES.logo)zip.folder("WorkerApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
     zip.folder("MonitorApp").file("index.html",mHtml);
-    if(TEMPLATES.logo) zip.folder("MonitorApp").file("icon.png",TEMPLATES.logo.split(',')[1],{base64:true});
-
     zip.file("Code.gs",document.getElementById('codeDisplay').textContent);
     zip.file("ADMIN_MANUAL.html",TEMPLATES['ops_manual_template.html'].replace(/%%ORG_NAME%%/g,org).replace(/%%SECRET_KEY%%/g,document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g,workerKey));
     zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi,'_')+"_OTG_Apps.zip";a.click();});
