@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="%%LOGO_DATA%%">
+<link rel="icon" type="image/png" href="icon.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
@@ -112,7 +112,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="mainPage" class="page">
     <div class="header-bar">
-        <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
+        <div class="flex items-center gap-2"><img src="icon.png" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
         <div class="flex items-center gap-3">
             <div id="iconHighRisk" class="hidden animate-pulse text-red-500 text-xl" title="High Risk Active">🛡️</div>
             <div class="flex flex-col items-end gap-0.5"><span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">GPS</span><div class="flex gap-0.5"><div id="gps1" class="gps-bar"></div><div id="gps2" class="gps-bar"></div><div id="gps3" class="gps-bar"></div></div></div>
@@ -188,6 +188,9 @@ function forceSync(){
     if(!state.settings.workerName)return alert("Please enter your name in Settings first.");
     document.getElementById('uploadBanner').classList.remove('hidden');
     const dId=getDeviceID();
+    // Safety check on URL
+    if(!CONFIG.url || CONFIG.url.length < 10) { alert("Error: No Server URL found. Please reinstall app."); document.getElementById('uploadBanner').classList.add('hidden'); return; }
+    
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r=>r.text())
     .then(txt=>{
