@@ -1,8 +1,17 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v77.1 (International)
- * Features: Zero Tolerance Mode, Privacy Redaction, Staged Escalation, i18n Terminology.
+ * OTG APPSUITE - MASTER BACKEND v79.0 (Global Edition)
+ * * CORE FEATURES:
+ * 1. API Gateway (doGet/doPost) for Worker and Monitor Apps.
+ * 2. Database Controller (Google Sheets).
+ * 3. Watchdog Timer (Safety Alerts).
+ * 4. AI Integration (Gemini) with PII Redaction.
+ * 5. Weekly Reporting.
  */
 
+// ==========================================
+// 1. CONFIGURATION
+// ==========================================
+// These values are injected by the Factory App (index.html) during generation.
 const CONFIG = {
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
@@ -25,32 +34,31 @@ const tid = sp.getProperty('REPORT_TEMPLATE_ID');
 if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 
 // ==========================================
-// 1. GET HANDLER (Read/Sync Operations)
+// 2. GET HANDLER (Read Operations)
 // ==========================================
 function doGet(e) {
   try {
       if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
       const p = e.parameter;
 
-      // A. Connection Test
+      // A. Connection Test (Used by Factory)
       if(p.test) {
           if(p.key === CONFIG.MASTER_KEY) return sendJSON({status:"success", message:"OTG Online"});
           return sendJSON({status:"error", message:"Auth Fail"});
       }
 
-      // B. Monitor Dashboard Polling (Protected by Master Key)
+      // B. Monitor Dashboard Data (Protected by Master Key)
       if(p.key === CONFIG.MASTER_KEY && !p.action) {
           return sendJSON(getDashboardData());
       }
 
-      // C. Worker App Sync (Protected by Shared Worker Key)
+      // C. Worker App Sync (Protected by Shared Worker Key or Master Key)
       if(p.action === 'sync') {
-          // Worker-level auth: Can use Master Key OR Worker Key
           if(p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"ACCESS DENIED"});
           return sendJSON(getSyncData(p.worker, p.deviceId));
       }
       
-      // D. Get Global Forms
+      // D. Get Global Forms (Public endpoint for quick notes)
       if(p.action === 'getGlobalForms') {
           return sendJSON(getGlobalForms());
       }
@@ -63,7 +71,7 @@ function doGet(e) {
 }
 
 // ==========================================
-// 2. POST HANDLER (Write Operations)
+// 3. POST HANDLER (Write Operations)
 // ==========================================
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error", message:"No Data"});
@@ -81,8 +89,9 @@ function doPost(e) {
   }
 
   // B. Worker Posting Data
+  // We use a Lock to prevent race conditions when multiple workers report at once.
   const lock = LockService.getScriptLock();
-  if (lock.tryLock(10000)) {
+  if (lock.tryLock(10000)) { // Wait up to 10 seconds
       try {
           handleWorkerPost(p, e);
           return sendJSON({status:"success"});
@@ -97,31 +106,33 @@ function doPost(e) {
 }
 
 // ==========================================
-// 3. CORE LOGIC
+// 4. CORE LOGIC (Handling Visits)
 // ==========================================
 
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
+    
+    // Auto-create visits tab if missing
     if(!sheet) {
-        // Auto-create visits tab
         sheet = ss.insertSheet('Visits');
         sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
     }
 
-    // Parse Photos
+    // Process Photos (Save to Drive)
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1']);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2']);
     if(p['Photo 3']) p3 = saveImage(p['Photo 3']);
     if(p['Photo 4']) p4 = saveImage(p['Photo 4']);
-    if(p['Signature']) sig = saveImage(p['Signature']); // Signature is just an image
+    if(p['Signature']) sig = saveImage(p['Signature']);
 
-    // Handle "Visit Report Data" - if it exists, it might trigger an AI summary
+    // Handle AI Summarization (If Key Present)
     let reportSummary = "";
     if(p['Visit Report Data']) {
        try {
            const reportObj = JSON.parse(p['Visit Report Data']);
+           // Only run AI if a key is provided
            if(CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
                reportSummary = smartScribe(reportObj, p['Template Name'] || "Report", p['Notes']);
                if(reportSummary) p['Notes'] = (p['Notes'] + "\n[AI]: " + reportSummary).trim();
@@ -129,7 +140,7 @@ function handleWorkerPost(p, e) {
        } catch(e) {}
     }
 
-    // Append Row
+    // Prepare Row Data
     const ts = new Date();
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
     const row = [
@@ -148,7 +159,7 @@ function handleWorkerPost(p, e) {
         p['Location Name'],
         p['Location Address'],
         p['Last Known GPS'],
-        p['Timestamp'], // GPS Timestamp from phone
+        p['Timestamp'], // Client-side timestamp
         p['Battery Level'],
         p1,
         p['Distance'] || "",
@@ -156,12 +167,15 @@ function handleWorkerPost(p, e) {
         p['Anticipated Departure Time'],
         sig, p2, p3, p4
     ];
+    
+    // Append to Database
     sheet.appendRow(row);
 
-    // Update Staff Status (DeviceID binding)
+    // Update Staff Status (Device Binding & WOF Tracking)
     updateStaffStatus(p);
 
-    // Check Immediate Escalation
+    // Immediate Escalation Check
+    // If the status is already EMERGENCY/PANIC/DURESS, send alerts immediately.
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
         triggerAlerts(p, "IMMEDIATE");
     }
@@ -175,18 +189,19 @@ function updateStaffStatus(p) {
     const data = sheet.getDataRange().getValues();
     for(let i=1; i<data.length; i++) {
         if(data[i][0] === p['Worker Name']) {
-            sheet.getRange(i+1, 5).setValue(p['deviceId']); // Col E is DeviceID
+            // Bind Device ID if empty (Security Feature)
+            sheet.getRange(i+1, 5).setValue(p['deviceId']); 
             
-            // Check for Vehicle Check Updates
+            // Check for Vehicle Check Updates (Update WOF/Rego Expiry)
             if(p['Template Name'] && p['Template Name'].includes('Vehicle')) {
-                sheet.getRange(i+1, 6).setValue(new Date()); // LastVehCheck
+                sheet.getRange(i+1, 6).setValue(new Date()); // Update LastVehCheck timestamp
                 try {
                     const rData = JSON.parse(p['Visit Report Data']);
-                    // Look for Expiry Key using Configured Term or standard keywords
                     const term = CONFIG.VEHICLE_TERM || "WOF";
+                    // Look for keys like "Rego Expiry" or "WOF Expiry"
                     const expKey = Object.keys(rData).find(k => k.includes('Expiry') || k.includes(term) || k.includes('Rego'));
                     if(expKey && rData[expKey]) {
-                        sheet.getRange(i+1, 7).setValue(rData[expKey]); // WOFExpiry
+                        sheet.getRange(i+1, 7).setValue(rData[expKey]); // Update WOFExpiry column
                     }
                 } catch(e){}
             }
@@ -195,29 +210,38 @@ function updateStaffStatus(p) {
     }
 }
 
+// ==========================================
+// 5. ALERTING SYSTEM
+// ==========================================
+
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: https://maps.google.com/?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
+    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: http://googleusercontent.com/maps.google.com/?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
     
-    // 1. Email
+    // 1. Send Emails
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) {
         MailApp.sendEmail({to: emails.join(','), subject: subject, body: body});
     }
 
-    // 2. SMS (Textbelt)
+    // 2. Send SMS via Textbelt
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].filter(n => n && n.length > 5);
         numbers.forEach(num => {
             UrlFetchApp.fetch('https://textbelt.com/text', {
                 method: 'post',
-                payload: { phone: num, message: subject + " " + p['Last Known GPS'], key: CONFIG.TEXTBELT_API_KEY }
+                payload: { 
+                    phone: num, 
+                    message: subject + " " + p['Last Known GPS'], 
+                    key: CONFIG.TEXTBELT_API_KEY 
+                }
             });
         });
     }
 }
 
 function resolveAlert(p) {
+    // Monitor App calls this to clear an alarm manually
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const ts = new Date();
@@ -239,8 +263,10 @@ function resolveAlert(p) {
 }
 
 // ==========================================
-// 4. WATCHDOG (Time-Driven Trigger)
+// 6. WATCHDOG (The "Dead Man's Switch")
 // ==========================================
+// This function MUST be triggered by a Time-Driven Trigger (e.g. Every 10 Mins)
+
 function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -249,7 +275,7 @@ function checkOverdueVisits() {
     const data = sheet.getDataRange().getValues();
     const now = new Date();
     
-    // Get latest status per worker
+    // 1. Get latest status per worker
     const latest = {};
     for(let i=1; i<data.length; i++) {
         const row = data[i];
@@ -258,27 +284,29 @@ function checkOverdueVisits() {
         else if(new Date(row[0]) > latest[name].time) latest[name] = { r: i+1, time: new Date(row[0]), rowData: row };
     }
 
+    // 2. Check for Overdue
     Object.keys(latest).forEach(worker => {
         const entry = latest[worker].rowData;
         const status = entry[10]; // Alarm Status
         const dueTimeStr = entry[20]; // Anticipated Departure
         
-        // Skip if safe
+        // Ignore if already safe
         if(status.includes("DEPARTED") || status.includes("SAFE") || status.includes("COMPLETED")) return;
         
         if(dueTimeStr) {
             const due = new Date(dueTimeStr);
-            const diffMins = (now - due) / 60000;
+            const diffMins = (now - due) / 60000; // Minutes overdue
             
             // Logic: Zero Tolerance check
+            // If the note contains [ZERO_TOLERANCE], we ignore the Grace Period.
             const isZeroTolerance = (entry[11] && entry[11].includes("[ZERO_TOLERANCE]"));
             const threshold = isZeroTolerance ? 0 : CONFIG.ESCALATION_MINUTES;
 
             if(diffMins > threshold && !status.includes("EMERGENCY")) {
-                // ESCALATE
+                // ESCALATE!
                 const newStatus = isZeroTolerance ? "EMERGENCY - ZERO TOLERANCE OVERDUE" : "EMERGENCY - OVERDUE";
                 
-                // Add new row to log the escalation
+                // Add new row to log the escalation (Audit Trail)
                 const newRow = [...entry];
                 newRow[0] = new Date().toISOString(); // New timestamp
                 newRow[10] = newStatus; // New Status
@@ -305,21 +333,21 @@ function checkOverdueVisits() {
 }
 
 // ==========================================
-// 5. DATA FETCHERS
+// 7. DATA FETCHERS
 // ==========================================
+
 function getDashboardData() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const staffSheet = ss.getSheetByName('Staff');
     if(!sheet) return {workers: []};
     
-    // Get last 500 rows for performance
+    // Optimization: Only get last 500 rows to prevent timeouts
     const lastRow = sheet.getLastRow();
     const startRow = Math.max(1, lastRow - 500);
     const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 25).getValues();
     const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
     
-    // Map to JSON
     const workers = data.map(r => {
         let obj = {};
         headers.forEach((h, i) => obj[h] = r[i]);
@@ -350,7 +378,6 @@ function getSyncData(workerName, deviceId) {
     if(siteSheet) {
         const sData = siteSheet.getDataRange().getValues();
         for(let i=1; i<sData.length; i++) {
-            // Check assignment (Col A)
             const assigned = sData[i][0];
             if(assigned === "ALL" || assigned.includes(workerName)) {
                 sites.push({
@@ -384,14 +411,14 @@ function getSyncData(workerName, deviceId) {
         }
     }
     
-    // 3. Get Metadata (WOF Status)
+    // 3. Get Metadata (Device Binding & Expiry)
     const meta = {};
     const stSheet = ss.getSheetByName('Staff');
     if(stSheet) {
         const stData = stSheet.getDataRange().getValues();
         for(let i=1; i<stData.length; i++) {
             if(stData[i][0] === workerName) {
-                // Security Check: Bind DeviceID if empty
+                // Bind DeviceID if empty
                 if(!stData[i][4]) stSheet.getRange(i+1, 5).setValue(deviceId);
                 else if(stData[i][4] !== deviceId) return {status:"error", message:"DEVICE MISMATCH. Contact Admin."};
                 
@@ -423,12 +450,13 @@ function getGlobalForms() {
 }
 
 // ==========================================
-// 6. UTILITIES
+// 8. UTILITIES (Helpers)
 // ==========================================
 
 function saveImage(b64) {
     if(!b64 || !CONFIG.PHOTOS_FOLDER_ID) return "";
     try {
+        // Simple base64 decoding and saving to Drive
         const data = Utilities.base64Decode(b64.split(',')[1]);
         const blob = Utilities.newBlob(data, 'image/jpeg', 'photo_' + Date.now() + '.jpg');
         const folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
@@ -441,26 +469,26 @@ function saveImage(b64) {
 function smartScribe(data, type, notes) {
     if(!CONFIG.GEMINI_API_KEY) return "";
     
-    // 1. Data Preparation & Redaction (v77.0 + v77.1)
     let safeNotes = notes || "";
     let safeData = JSON.stringify(data || {});
     
+    // REDACTION LOGIC (Privacy Feature)
     if(CONFIG.ENABLE_REDACTION) {
         // Redact Emails
         const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
         safeNotes = safeNotes.replace(emailRegex, "[EMAIL_REDACTED]");
         safeData = safeData.replace(emailRegex, "[EMAIL_REDACTED]");
         
-        // Redact Phones (Global approximate matches)
+        // Redact Phones (Rough global match)
         const phoneRegex = /\b(\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b/g;
         safeNotes = safeNotes.replace(phoneRegex, "[PHONE_REDACTED]");
         safeData = safeData.replace(phoneRegex, "[PHONE_REDACTED]");
     }
 
-    // 2. Terminology Injection (v77.1)
+    // TERMINOLOGY INJECTION (i18n Feature)
     const term = CONFIG.VEHICLE_TERM || "Vehicle Inspection";
     
-    // 3. Prompt Construction
+    // AI PROMPT
     const prompt = `Analyze this ${type} report using terminology relevant to "${term}".
     User Notes: ${safeNotes}
     Form Data: ${safeData}
@@ -496,7 +524,7 @@ function archiveOldData() {
     const move = [];
     
     for(let i=1; i<data.length; i++) {
-        // Archive based on Date and 'Closed' status
+        // Move row if OLDER than cutoff AND Status is 'Closed'
         if(new Date(data[i][0]) < cutoff && (data[i][10].includes('DEPARTED') || data[i][10].includes('SAFE') || data[i][10].includes('COMPLETED'))) {
             move.push(data[i]);
         } else {
@@ -509,4 +537,47 @@ function archiveOldData() {
         sheet.clearContents();
         sheet.getRange(1, 1, keep.length, keep[0].length).setValues(keep);
     }
+}
+
+// ==========================================
+// 9. WEEKLY REPORTING (NEW in v79.0)
+// ==========================================
+function sendWeeklySummary() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Visits');
+  if(!sheet) return;
+  
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  
+  let count = 0;
+  let distance = 0;
+  let alerts = 0;
+  
+  for(let i=1; i<data.length; i++) {
+    const rowTime = new Date(data[i][0]);
+    if(rowTime > oneWeekAgo) {
+      count++;
+      if(data[i][18]) distance += Number(data[i][18]); // Col 19 is Distance
+      if(data[i][10].toString().includes("EMERGENCY")) alerts++;
+    }
+  }
+  
+  const html = `
+    <h2>Weekly Safety Report</h2>
+    <p><strong>Period:</strong> Last 7 Days</p>
+    <table border="1" cellpadding="10" style="border-collapse:collapse;">
+      <tr><td><strong>Total Visits</strong></td><td>${count}</td></tr>
+      <tr><td><strong>Distance Traveled</strong></td><td>${distance.toFixed(2)} km</td></tr>
+      <tr><td><strong>Safety Alerts</strong></td><td style="color:${alerts>0?'red':'green'}">${alerts}</td></tr>
+    </table>
+    <p><em>Generated by OTG AppSuite</em></p>
+  `;
+  
+  MailApp.sendEmail({
+    to: Session.getEffectiveUser().getEmail(),
+    subject: "Weekly Safety Summary",
+    htmlBody: html
+  });
 }
