@@ -47,6 +47,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
+/* TOAST NOTIFICATION STYLE */
+#toastMsg { z-index: 1000; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateY(-150%); }
+#toastMsg.show { transform: translateY(0); }
+
 /* INSTALL BANNER STYLES */
 #installBanner { animation: slideDown 0.5s ease-out; }
 @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
@@ -54,6 +58,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </style>
 </head>
 <body class="bg-gray-900 text-white">
+
+<div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-green-500 text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3">
+    <div class="text-xl">✅</div>
+    <div>
+        <p class="font-bold text-sm" id="toastText">Operation Successful</p>
+    </div>
+</div>
+
 <div id="app-container" class="relative h-full w-full">
 <div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
 <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
@@ -260,7 +272,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50"><h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2><input type="hidden" id="locId"><div class="space-y-4"><div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div><div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div><div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1"><button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button></div></div><div id="advLocOptions" class="pt-2 border-t border-gray-700"><div class="mb-3 bg-gray-900 p-2 rounded"><label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label><div class="flex gap-6"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500"><span class="text-sm text-white font-bold">Yes</span></label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500"><span class="text-sm text-gray-300">No</span></label></div></div><div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Templates' sheet.</p></div></div></div><div class="mt-6 flex justify-end space-x-3"><button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button><div class="flex-1"></div><button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button></div></div></div>
 <script>
-const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",orsKey:"%%ORS_API_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];;let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer;let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",currentBatteryLevel="100%";let calculatedDist=null;let gpsWarm=false;
+const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",orsKey:"%%ORS_API_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer;let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",currentBatteryLevel="100%";let calculatedDist=null;let gpsWarm=false;
 
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
@@ -286,6 +298,13 @@ function closeModal(id) {
     document.getElementById('modalBackdrop').classList.remove('flex');
     document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));
     document.getElementById('locationModal').classList.add('hidden');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toastMsg');
+    document.getElementById('toastText').innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => { t.classList.remove('show'); }, 3000);
 }
 
 function toggleWofContinue(){
@@ -507,7 +526,6 @@ function forceSync(){
         return JSON.parse(txt);
     })
     .then(data=>{
-        // UPDATED ERROR HANDLING (v79.1)
         if(data.status==="error"){
             document.getElementById('uploadBanner').classList.add('hidden');
             if(data.message.includes("ACCESS DENIED")){
@@ -520,7 +538,6 @@ function forceSync(){
         }
         const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
         
-        // SAFE PARSING (v79.1)
         const safeSites = data.sites || [];
         const ms = safeSites.map(s=>({
             id:'site_'+s.siteName.replace(/\s/g,''),
@@ -552,7 +569,7 @@ function forceSync(){
         renderLocations();
         checkVehicleStatus();
         document.getElementById('uploadBanner').classList.add('hidden');
-        alert("Sync Complete!");
+        showToast("Sync Complete!");
     })
     .catch(e=>{
         document.getElementById('uploadBanner').classList.add('hidden');
@@ -563,7 +580,6 @@ function forceSync(){
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return;
     const b=document.getElementById('vehNagBar');let s=false;
-    // Dynamic Terminology Update
     if(CONFIG.vehicleTerm) {
         document.getElementById('vehNagBar').innerText = `⚠️ ${CONFIG.vehicleTerm} Check Overdue - Tap to Complete`;
     }
@@ -662,7 +678,6 @@ function updateArrivedButtonState(){
     document.getElementById('durationDisplay').innerText=v>=60?(Math.floor(v/60)+' hr '+(v%60)+' min'):v+' min';
     state.visitDurationMinutes=v;
     
-    // VISUAL BUTTON FEEDBACK
     [15,30,60,120].forEach(m => {
         const btn = document.getElementById('btnDur'+m); 
         if(btn){
@@ -687,6 +702,7 @@ function updateArrivedButtonState(){
 function quickSetTime(m){document.getElementById('durationSlider').value=DURATION_MAP.findIndex(x=>x===m);updateArrivedButtonState();}
 
 function startVisit(){
+    warmUpSpeech(); // NEW: Force voice warmup
     const s=state.locations.find(x=>x.id===state.selectedLocationId);
     if(s.id==='travel')startTravellingPulse();
     const n=new Date();
@@ -729,7 +745,15 @@ function tick(){
         const absRem=Math.abs(remaining); const m=Math.floor(absRem/60000),s=Math.floor((absRem%60000)/1000);
         document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
-        if(timeUntilEscalation<=120000&&timeUntilEscalation>118000){playSound('warning');navigator.vibrate([1000,500,1000]);speakWithAccent("Warning. Safety alarm will activate in two minutes.");}
+        
+        // FIXED AUDIO SEQUENCING
+        if(timeUntilEscalation<=120000&&timeUntilEscalation>118000){
+            playSound('warning');
+            navigator.vibrate([1000,500,1000]);
+            setTimeout(() => {
+                speakWithAccent("Warning. Safety alarm will activate in two minutes.");
+            }, 1000); // 1s delay prevents audio overlap
+        }
     } else {
         const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
         document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); document.getElementById('overdueLabel').classList.add('hidden');
@@ -741,12 +765,23 @@ function tick(){
     if(CONFIG.checkinEnabled&&state.activeVisit.nextCheckin&&new Date()>new Date(state.activeVisit.nextCheckin))triggerCheckin();
 }
 
+function warmUpSpeech() {
+    // Force a silent utterance to unlock the audio context for later
+    if('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(" ");
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+    }
+}
+
 function speakWithAccent(msg){
     if(!'speechSynthesis' in window)return;
+    window.speechSynthesis.cancel(); // Clear queue first
     const u=new SpeechSynthesisUtterance(msg);
     const v=window.speechSynthesis.getVoices();
-    // V77.1: USE FACTORY LOCALE
     u.voice = v.find(x=>x.lang.includes(CONFIG.voiceLocale)) || v.find(x=>x.lang.includes('en-GB')) || v.find(x=>x.lang.includes('en-US'));
+    u.rate = 1.0;
+    u.volume = 1.0;
     window.speechSynthesis.speak(u);
 }
 
@@ -774,7 +809,7 @@ function loadFormAndShow(t){
 
 function submitReport(){
     if(currentActiveTemplate === 'Note to Self' && !state.settings.workerEmail) { if(!confirm("⚠️ NO EMAIL ADDRESS FOUND\n\nYou have not entered a 'Work Email' in settings. This note will be saved to the database, but you will NOT receive a copy.\n\nContinue anyway?")) { return; } }
-    const d=gatherFormData();const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};if(d.custom&&d.custom["Distance (km)"])fd["Distance"]=d.custom["Distance (km)"];const im=Object.values(state.photoStore);im.forEach((img,i)=>{fd[`Photo ${i+1}`]=img;});if(d.sig)fd["Signature"]=d.sig;if(!state.activeVisit){processUploadQueue(buildPayload({...fd,"Alarm Status":"DATA_ENTRY_ONLY","Notes":d.notes,"Worker Email":state.settings.workerEmail}));alert("Report Sent Successfully");closeModal('report');return;}if(isMidVisitUpdate){let s="ON SITE";if(state.activeVisit.locationId==='travel')s="TRAVELLING";processUploadQueue(buildPayload({...fd,"Alarm Status":s,"Notes":d.notes,"Worker Email":state.settings.workerEmail}));alert("Update Sent");isMidVisitUpdate=false;closeModal('report');return;}processUploadQueue(buildPayload({...fd,"Alarm Status":"DEPARTED","Notes":d.notes,"Worker Email":state.settings.workerEmail}));if(navigator.onLine)alert("✅ Sent");else alert("💾 Saved to Outbox");state.activeVisit=null;state.photoStore={};state.visitDurationMinutes=0;isMidVisitUpdate=false;
+    const d=gatherFormData();const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};if(d.custom&&d.custom["Distance (km)"])fd["Distance"]=d.custom["Distance (km)"];const im=Object.values(state.photoStore);im.forEach((img,i)=>{fd[`Photo ${i+1}`]=img;});if(d.sig)fd["Signature"]=d.sig;if(!state.activeVisit){processUploadQueue(buildPayload({...fd,"Alarm Status":"DATA_ENTRY_ONLY","Notes":d.notes,"Worker Email":state.settings.workerEmail}));showToast("Report Sent Successfully");closeModal('report');return;}if(isMidVisitUpdate){let s="ON SITE";if(state.activeVisit.locationId==='travel')s="TRAVELLING";processUploadQueue(buildPayload({...fd,"Alarm Status":s,"Notes":d.notes,"Worker Email":state.settings.workerEmail}));showToast("Update Sent");isMidVisitUpdate=false;closeModal('report');return;}processUploadQueue(buildPayload({...fd,"Alarm Status":"DEPARTED","Notes":d.notes,"Worker Email":state.settings.workerEmail}));if(navigator.onLine)showToast("✅ Sent");else showToast("💾 Saved to Outbox");state.activeVisit=null;state.photoStore={};state.visitDurationMinutes=0;isMidVisitUpdate=false;
     document.getElementById('chkHighRisk').checked = false; document.getElementById('highRiskBadge').classList.add('hidden');
     saveState();closeModal('report');navigate('main');playSound('depart');if(travellingInterval)clearInterval(travellingInterval);checkVehicleStatus();
 }
@@ -786,11 +821,11 @@ function initSigPad(c){const ctx=c.getContext('2d');ctx.lineWidth=2;ctx.strokeSt
 function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
 function startReminderTimer(){clearTimeout(mainScreenReminderTimer);document.getElementById('startReminderBanner').classList.add('hidden');mainScreenReminderTimer=setTimeout(()=>{if(!state.activeVisit&&document.getElementById('mainPage').classList.contains('active')){document.getElementById('startReminderBanner').classList.remove('hidden');}},300000);}
-function triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem===60||rem===30||rem===10)playSound('checkin');if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));alert('MISSED CHECK-IN ALERT SENT');}},1000);}
+function triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem===60||rem===30||rem===10)playSound('checkin');if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();playSound('extend');processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
 function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3){triggerPanic();panicTapCount=0;}}
-function triggerPanic(){state.activeVisit=state.activeVisit||{};state.activeVisit.isPanic=true;saveState();renderPanicState();playSound('panic');processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Button Pressed"}));setTimeout(()=>alert('🚨 SOS SENT 🚨\n\nEmergency contacts have been notified.\nLocation broadcast active.'),100);}
+function triggerPanic(){state.activeVisit=state.activeVisit||{};state.activeVisit.isPanic=true;saveState();renderPanicState();playSound('panic');processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Button Pressed"}));setTimeout(()=>showToast('🚨 SOS SENT 🚨'),100);}
 function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
 function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker confirmed safe"}));state.activeVisit.isPanic=false;document.getElementById('lockedPage').classList.remove('panic-mode');document.getElementById('btnSafe').classList.add('hidden');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnExtend').classList.remove('hidden');preDepart(true);});}
 function startTravellingPulse(){toggleBatterySaver();travellingInterval=setInterval(()=>{navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING","Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));})},300000);}
@@ -798,9 +833,9 @@ function toggleBatterySaver(){document.getElementById('batterySaver').classList.
 function buildPayload(d){let dt="";let ln="Unknown";let la="";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Emergency Contact Name':state.settings.emergencyName,'Emergency Contact Number':state.settings.emergencyPhone,'Emergency Contact Email':state.settings.emergencyEmail,'Escalation Contact Name':state.settings.escalationName,'Escalation Contact Number':state.settings.escalationPhone,'Escalation Contact Email':state.settings.escalationEmail,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
 function processUploadQueue(d){if(d)state.pendingUploads.push(d);if(navigator.onLine&&state.pendingUploads.length){const fd=new FormData();for(let k in state.pendingUploads[0])fd.append(k,state.pendingUploads[0][k]);fetch(CONFIG.url,{method:'POST',mode:'no-cors',body:fd}).then(()=>{state.pendingUploads.shift();saveState();processUploadQueue();});}saveState();}
 function setupLongPress(btn,cb){let t;const start=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1500);};const cancel=(e)=>{clearTimeout(t);btn.classList.remove('pressing');};btn.onmousedown=btn.ontouchstart=start;btn.onmouseup=btn.ontouchend=btn.onmouseleave=cancel;}
-function withPinVerification(d,c){showModal('pin');const i=document.getElementById('pinInput');i.value='';i.focus();const cf=()=>{const v=i.value;closeModal('pin');if(v===state.settings.pinCode)c();else if(v===state.settings.duressPin){processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm"}));if(d)c();else alert("PIN Accepted");}else alert("Incorrect PIN");document.getElementById('confirmPinBtn').removeEventListener('click',cf);};document.getElementById('confirmPinBtn').addEventListener('click',cf);document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin');}
+function withPinVerification(d,c){showModal('pin');const i=document.getElementById('pinInput');i.value='';i.focus();const cf=()=>{const v=i.value;closeModal('pin');if(v===state.settings.pinCode)c();else if(v===state.settings.duressPin){processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm"}));if(d)c();else showToast("PIN Accepted");}else showToast("Incorrect PIN");document.getElementById('confirmPinBtn').removeEventListener('click',cf);};document.getElementById('confirmPinBtn').addEventListener('click',cf);document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin');}
 function clearData(){if(confirm('Reset all data?')){localStorage.clear();location.reload();}}
-function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();alert("Forms Syncing...");}
+function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Forms Syncing...");}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
@@ -836,7 +871,7 @@ window.addEventListener('load', () => {
     checkIosInstall();
 });
 
-// PWA INSTALL LOGIC (Smart v77.5)
+// PWA INSTALL LOGIC
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -877,4 +912,3 @@ function checkIosInstall() {
 </script>
 </body>
 </html>
-
