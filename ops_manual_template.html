@@ -17,7 +17,7 @@
         .key-value { font-family: 'Consolas', monospace; font-size: 1.8em; color: #111827; background: white; padding: 10px 20px; border-radius: 6px; border: 1px solid #bfdbfe; display: inline-block; }
         .step { background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px; }
         .step-num { display: inline-block; background: #3b82f6; color: white; width: 30px; height: 30px; text-align: center; line-height: 30px; border-radius: 50%; font-weight: bold; margin-right: 10px; }
-        .warning { background: #fef2f2; border-left: 5px solid #ef4444; padding: 20px; color: #991b1b; }
+        .warning { background: #fff5f5; border-left: 5px solid #ef4444; padding: 20px; color: #991b1b; border: 1px solid #feb2b2; }
         .monitor-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
         .legend-item { padding: 15px; border-radius: 8px; font-weight: bold; color: white; text-align: center; }
         hr { border: 0; height: 1px; background: #e5e7eb; margin: 50px 0; }
@@ -29,7 +29,7 @@
 <div class="container">
     <header>
         <h1>Operations Manual</h1>
-        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v76.5 (Global)</p>
+        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v79.4 (Golden Master)</p>
     </header>
 
     <div class="key-box">
@@ -42,15 +42,25 @@
         Worker App Key (Embedded): <code>%%WORKER_KEY%%</code>
     </div>
 
-    <h2>Part 1: Deployment Guide</h2>
-    <p>Follow these steps to bring your serverless system online.</p>
+    <h2>Part 1: Deployment & Updates</h2>
+    <div class="warning">
+        <h3>⚠️ THE "ONE-SHOT" RULE (Critical)</h3>
+        <p>The App (Frontend) and the Database (Backend) share a secret "Worker Key". This key is regenerated every time you refresh the Factory page.</p>
+        <p><strong>To update the system, you must do steps 1-3 in ONE session without closing the tab:</strong></p>
+        <ol>
+            <li><strong>Copy Script:</strong> Paste the code into your Google Sheet Script Editor and Save.</li>
+            <li><strong>Download ZIP:</strong> Download the App files immediately after.</li>
+            <li><strong>Upload App:</strong> Put the new App on Netlify.</li>
+        </ol>
+        <p>If you refresh the Factory page in between, the keys will not match, and you will get an <strong>"Access Denied"</strong> error.</p>
+    </div>
 
     <div class="step">
         <span class="step-num">1</span> <strong>The Database (Google Sheets)</strong>
         <ol>
             <li>Go to <a href="https://sheets.new" target="_blank">sheets.new</a>. Name it "OTG Safety DB".</li>
             <li>Create exactly 4 tabs: <code>Visits</code>, <code>Staff</code>, <code>Templates</code>, <code>Sites</code>.</li>
-            <li><strong>Copy Headers:</strong> Open this file in a text editor to see the column headers required, or use the buttons in the Factory App to copy them.</li>
+            <li><strong>Copy Headers:</strong> Use the "Copy Headers" buttons in the Factory App (Step 2) to set these up correctly.</li>
         </ol>
     </div>
 
@@ -116,12 +126,11 @@
         </li>
     </ol>
 
-    <h3>4. Map View & Breadcrumbs</h3>
-    <p>Switch to <strong>Map View</strong> using the toggle in the top right.</p>
+    <h3>4. "Sound of Silence" Watchdog</h3>
+    <p>This system includes a connection monitor.</p>
     <ul>
-        <li><strong>Live Location:</strong> Shows the last known GPS ping.</li>
-        <li><strong>Breadcrumbs:</strong> A dotted blue line shows the worker's path (last 10 pings).</li>
-        <li><strong>GPS Quality:</strong> If the pin is missing, it means the phone hasn't sent valid GPS data yet.</li>
+        <li>If your office internet drops or the Monitor loses connection to Google for more than 5 minutes, a <strong>"Connection Lost"</strong> overlay will appear.</li>
+        <li>A distinct, low-pitch drone sound will play to alert you that you are flying blind.</li>
     </ul>
 
     <hr>
