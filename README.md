@@ -5,6 +5,7 @@
 **Lead Architect:** Russell Nimmo - Assisted by Google Gemini
 **System Type:** Distributed Serverless Progressive Web App (PWA)
 **License / Philosophy:** "Forever Free" (Zero-Dependency, Client-Side Logic)
+**Target:** Small organisations.. especially charities running on very small budgets.
 
 ---
 
