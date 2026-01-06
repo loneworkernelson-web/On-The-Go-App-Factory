@@ -2,7 +2,7 @@
 
 **Version:** 78.0 (Global Gold Master)
 **Date:** January 6, 2026
-**Lead Architect:** Gemini
+**Lead Architect:** Russell Nimmo - Assisted by Google Gemini
 **System Type:** Distributed Serverless Progressive Web App (PWA)
 **License / Philosophy:** "Forever Free" (Zero-Dependency, Client-Side Logic)
 
