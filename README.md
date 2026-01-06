@@ -1,232 +1,189 @@
-# 💎 OTG AppSuite v76.5: Technical Reconstruction Blueprint
+# 📘 OTG AppSuite v78.0: Master System Architecture & Logic Specification
 
-**Version:** 76.5 (Global Edition)
-**Date:** December 23, 2025
-**System Architecture:** Distributed Serverless PWA Ecosystem.
-**Core Stack:** HTML5, TailwindCSS, Vanilla JS, Google Apps Script, Google Sheets.
-**Offline Strategy:** Service Worker Caching + LocalStorage Transaction Queue.
-
----
-
-## 1. Data Schemas & Constants
-
-### A. Spreadsheet Database Structure
-The backend relies on a Google Sheet with specific tab names and column orders.
-
-#### 1. Tab: `Visits` (Main Ledger)
-* **A:** `Timestamp` (ISO String of entry creation)
-* **B:** `Date` (YYYY-MM-DD for filtering)
-* **C:** `Worker Name` (String)
-* **D:** `Worker Phone Number` (Global format: `+64...`, `+61...`)
-* **E-G:** `Emergency Contact` (Name, Number, Email)
-* **H-J:** `Escalation Contact` (Name, Number, Email)
-* **K:** `Alarm Status` (e.g., `ON SITE`, `EMERGENCY - OVERDUE (Stage 1)`, `DEPARTED`, `SAFE - MANUALLY CLEARED`)
-* **L:** `Notes` (Append-only log)
-* **M:** `Location Name`
-* **N:** `Location Address`
-* **O:** `Last Known GPS` (Lat,Lon)
-* **P:** `GPS Timestamp` (Last heartbeat time)
-* **Q:** `Battery Level` (e.g., "85%")
-* **R:** `Photo 1` (Google Drive URL)
-* **S:** `Distance` (Float, km)
-* **T:** `Visit Report Data` (Stringified JSON of form answers)
-* **U:** `Anticipated Departure Time` (ISO String)
-* **V:** `Signature` (Base64/URL)
-* **W-Y:** `Photo 2-4` (URLs)
-
-#### 2. Tab: `Staff` (Auth & Meta)
-* **A:** `Name` (Primary Key for Auth)
-* **B:** `Role` (Display only)
-* **C:** `Status` (If contains 'Inactive', block access)
-* **D:** `Token` (Unused legacy)
-* **E:** `DeviceID` (UUID string. If empty, auto-binds on next sync. If mismatch, block access)
-* **F:** `LastVehCheck` (ISO Timestamp)
-* **G:** `WOFExpiry` (YYYY-MM-DD)
-
-#### 3. Tab: `Templates` (Form Builder)
-* **Columns:** `Type`, `Name`, `Assigned To`, `Email Recipient`, `Question 1`, `Question 2`...
-* **Parser Rules:**
-    * `[TEXT]`: Textarea.
-    * `[YESNO]`: Radio buttons.
-    * `[PHOTO]`: File input + Canvas compression.
-    * `[GPS]`: Button to capture current coords.
-    * `[SIGN]`: Canvas signature pad.
-    * `[HEADING]`: H3 divider.
-
-### B. Worker App State Object
-The client-side `localStorage` key `loneWorkerState` persists this JSON structure:
-
-    {
-      "settings": {
-        "workerName": "John Doe",
-        "workerPhone": "+6421...",
-        "pinCode": "1234",
-        "duressPin": "9999",
-        "googleSheetUrl": "https://..."
-      },
-      "locations": [
-        { "id": "loc_123", "name": "Office", "address": "...", "noReport": false, "templateName": "Visit Report" },
-        { "id": "travel", "name": "Travelling", "noReport": true, "templateName": "Travel Report" }
-      ],
-      "activeVisit": {
-        "locationId": "loc_123",
-        "startTime": "ISO_STRING",
-        "anticipatedDepartureTime": "ISO_STRING",
-        "startGPS": "-41.2,174.7",
-        "fiveMinWarned": false,
-        "criticalSent": false,
-        "isPanic": false
-      },
-      "pendingUploads": [ { "payload": "..." } ],
-      "meta": { "wofExpiry": "2025-12-01", "lastVehCheck": "..." }
-    }
+**Version:** 78.0 (Global Gold Master)
+**Date:** January 6, 2026
+**Lead Architect:** Gemini
+**System Type:** Distributed Serverless Progressive Web App (PWA)
+**License / Philosophy:** "Forever Free" (Zero-Dependency, Client-Side Logic)
 
 ---
 
-## 2. Component Specifications
+## 1. System Topology & Data Flow
 
-### A. Factory App (`index.html`)
-**Role:** Configuration Wizard & Build Engine.
-**Libraries:** `JSZip` (for zip generation).
+The OTG AppSuite is not a single SaaS application. It is a **Factory Pattern** system that generates standalone, air-gapped instances for individual organizations.
 
-**Detailed Logic:**
-1.  **Inputs:** Captures 10+ config variables (Org Name, Keys, Timezone, Toggles).
-2.  **Region Logic:**
-    * Dropdown selects Country (e.g., `+61`).
-    * Browser API detects Timezone (e.g., `Australia/Sydney`).
-    * Both are injected into the final build.
-3.  **Template Injection:**
-    * **User Guide:** Loads `guide_template.html`. Performs Regex replacement on `` blocks.
-    * **Ops Manual:** Loads `ops_manual_template.html`. Injects Keys and URLs.
-4.  **Zip Construction:**
-    * Bundles `WorkerApp` (index.html, sw.js, manifest.json, USER_GUIDE.html).
-    * Bundles `MonitorApp` (index.html).
-    * Bundles `Code.gs` and `OPERATIONS_MANUAL.html`.
-    * Naming Convention: `OrgName_AppSuite.zip` (No "Diamond").
+### A. The Factory Pattern
+* **Input:** The Administrator visits `index.html` (The Factory).
+* **Process:** The Factory takes configuration data (Org Name, Secrets, Region), loads raw template strings (HTML/JS), performs Regex injection (`.replace(/%%KEY%%/g, value)`), and bundles the result into a ZIP file using `JSZip`.
+* **Output:** A completely self-contained `WorkerApp`, `MonitorApp`, and `BackendScript` that operate independently of the Factory.
 
-### B. Worker App (`worker_template.html`)
-**Role:** Primary User Interface.
-**UI Framework:** Single HTML file, Tab-based navigation.
-
-**Key Logic Modules:**
-
-1.  **GPS Pre-warming:**
-    * Action: When user taps a Location Tile.
-    * Logic: Call `navigator.geolocation.getCurrentPosition` immediately (fire-and-forget).
-    * Result: Wakes up GPS radio so the "Hold to Start" lock acquires a fix almost instantly.
-
-2.  **Gatekeeper (Phone Formatting):**
-    * Function: `cleanGlobalPhone(number)`
-    * Logic: Strips non-integers. Checks `CONFIG.countryPrefix`.
-    * If input starts with `0`, replace `0` with Prefix.
-    * Ensures consistent E.164 format for SMS.
-
-3.  **Smart Timer (The "Overdue" State):**
-    * `tick()` function runs every 1000ms.
-    * **Phase 1 (Normal):** Timer > 0. UI Green/Grey.
-    * **Phase 2 (Grace Period):** Timer < 0 AND Time < EscalationLimit.
-        * UI: Flashing Red "OVERDUE".
-        * Button: "Hold to End" (Red) **remains visible**. User can end without PIN.
-    * **Phase 3 (Alarm):** Time < EscalationLimit (e.g., -15 mins).
-        * Action: Trigger `triggerAutoAlert('EMERGENCY - OVERDUE')`.
-        * UI: Hides "Hold to End". Shows "I AM SAFE" (Green).
-        * Requirement: User must enter PIN to clear.
-
-4.  **Travel Logic:**
-    * **Toggle:** "Report Required?" (Yes/No) is editable via the `i` button.
-    * **End Visit Flow:**
-        * If `noReport == true`: Stop timer, submit `DEPARTED`, skip form/mileage.
-        * If `noReport == false`: Get GPS (End point), calc distance using `haversine` or `ORS API`, open Report Modal.
-
-5.  **Edit Location Logic:**
-    * Manual Locations (`loc_...`) and "Travelling" (`travel`) can be edited.
-    * Fields: Business Name, Site Name, Address (GPS Button), Report Required (Bool), Template Name.
-    * Persistence: Saves to `state.locations` in `localStorage`.
-
-### C. Monitor App (`monitor_template.html`)
-**Role:** Operations Dashboard.
-**Libraries:** `Leaflet.js` (Maps), `Tone.js` (Audio).
-
-**Key Logic Modules:**
-
-1.  **Robust GPS Parsing:**
-    * Raw data from sheet may be messy (e.g., `" -41.2, 174.0 "`).
-    * Logic: `str.replace(/[^0-9.,-]/g, '')`. Split by comma. Parse Float. Check `isNaN`.
-    * Only plot on map if valid.
-
-2.  **Map Safety:**
-    * `handleData` calls `renderMap`.
-    * **Safety Check:** `if(typeof renderMap === 'function')`. Prevents race conditions on load.
-
-3.  **Alert State Machine:**
-    * Track `acknowledgedAlerts` (Set of names).
-    * If `status.includes('EMERGENCY')` AND name NOT in `acknowledgedAlerts`:
-        * Trigger Full Screen Red Alert.
-        * Play Siren Loop (`Tone.js`).
-
-### D. Backend (`backend_template.js`)
-**Role:** API Gateway & Watchdog.
-
-**Key Logic Modules:**
-
-1.  **Staged Escalation (Watchdog):**
-    * Trigger: Time-driven (Every 10 mins).
-    * **Check 1:** Is `DueTime + 15mins < Now`?
-        * Set Status: `EMERGENCY - OVERDUE (Stage 1)`.
-        * Notify: Emergency Contact ONLY.
-    * **Check 2:** Is Status == `Stage 1` AND `DueTime + 25mins < Now`?
-        * Set Status: `EMERGENCY - OVERDUE (Stage 2)`.
-        * Notify: Escalation Contact + Emergency Contact (Second Notice).
-
-2.  **Timezone Handling:**
-    * Fix: `Utilities.formatDate(date, CONFIG.TIMEZONE, "yyyy-MM-dd")`.
-    * Ensures "Today's Visits" align with the user's actual day.
-
-3.  **Resolution Logic (`action=resolve`):**
-    * Input: `Worker Name`, `Notes`.
-    * Action: Find last row for Worker.
-    * Write: New row with status `SAFE - MANUALLY CLEARED`.
-    * Notify: Send "Green Alert" email to Emergency Contacts saying "All Clear".
-
-### E. Documentation Templates
-
-1.  **`guide_template.html` (User Guide):**
-    * **Role:** Instructions for the end-user (Worker).
-    * **Features:** GPS Signal explanation, Adding Locations, Emergency Disclaimer ("Does not call Police").
-    * **Dynamic:** Factory removes "Vehicle Safety" section if disabled.
-
-2.  **`ops_manual_template.html` (Admin Manual):**
-    * **Role:** Instructions for the Administrator.
-    * **Features:**
-        * Display Master Keys.
-        * Deployment Guide (Google Apps Script + Netlify).
-        * Monitor Dashboard Guide (Status Codes, Resolution).
-        * AI Co-Pilot Guide (How to prompt for customizations).
+### B. Data Lifecycle
+1.  **Creation:** Worker App captures data (GPS, Timestamps, Forms). Data is queued in `localStorage` if offline.
+2.  **Transmission:** Worker App `POST`s JSON data to the Google Apps Script Web App URL.
+3.  **Storage:** Google Apps Script appends data to a specific Google Sheet (`Visits` tab).
+4.  **Monitoring:** Monitor App `GET`s data from the Web App (polling every 10s).
+5.  **Alerting:** Google Apps Script "Watchdog" (Time-Driven Trigger) scans the Sheet for overdue timestamps and triggers external APIs (Gmail, Textbelt).
 
 ---
 
-## 3. Implementation Steps (The "Recipe")
+## 2. The Backend (`Code.gs`)
 
-To rebuild this system from scratch:
+The Backend is the "Brain" of the system. It runs on Google's V8 Engine within the Apps Script environment.
 
-1.  **Setup Google Environment:**
-    * Create a Google Sheet. Setup tabs: `Visits`, `Staff`, `Templates`, `Sites`.
-    * Create a Google Apps Script project linked to the Sheet.
-    * Paste `backend_template.js` logic.
-    * **Critical:** Deploy as Web App -> Execute as Me -> Access: Anyone.
+### A. Configuration Object (`CONFIG`)
+Hardcoded at the top of the file during Factory generation:
+* `MASTER_KEY`: Admin password for Monitor/Factory access.
+* `WORKER_KEY`: Shared secret for Worker App authentication.
+* `TEXTBELT_API_KEY`: Key for SMS gateway (Optional).
+* `GEMINI_API_KEY`: Key for AI summarization (Optional).
+* `ESCALATION_MINUTES`: The "Grace Period" buffer (default 15m).
+* `ENABLE_REDACTION`: Boolean flag for PII scrubbing.
+* `VEHICLE_TERM`: Localized string (e.g., "WOF", "Rego").
 
-2.  **Build the Factory:**
-    * Create `index.html`.
-    * Create `guide_template.html` and `ops_manual_template.html`.
-    * Create `worker_template.html` and `monitor_template.html`.
-    * Implement the `JSZip` logic to bundle the configured files.
+### B. API Endpoints
+The script is deployed as a Web App (`Execute as: Me`, `Access: Anyone`).
 
-3.  **Deploy Client Apps:**
-    * Use the Factory to generate the ZIP.
-    * Host `WorkerApp` on a static HTTPS host (Netlify).
-    * Host `MonitorApp` similarly.
+#### 1. `doGet(e)` - Read Operations
+* **Connection Test (`?test=1`):** Returns HTTP 200 if Key is valid. Used by Factory.
+* **Monitor Poll (`?callback=...`):**
+    * **Auth:** Requires `MASTER_KEY`.
+    * **Logic:** Reads last 500 rows of `Visits` + `Staff` metadata.
+    * **Return:** JSONP payload containing worker status, battery, GPS, and WOF expiry.
+* **Worker Sync (`?action=sync`):**
+    * **Auth:** Requires `WORKER_KEY` or `MASTER_KEY`.
+    * **Logic:** Reads `Sites`, `Templates`, and `Staff` tabs. Returns JSON config for the app.
 
-4.  **Initialize:**
-    * Open Worker App -> Run Wizard (Generates UUID).
-    * Open Sheet -> `Staff` tab -> Clear `DeviceID` for the worker to Authorize the new UUID.
-    * Test Sync.
+#### 2. `doPost(e)` - Write Operations
+* **Auth:** Strict check of `key` parameter. Returns 403 error if invalid.
+* **Concurrency:** Uses `LockService.getScriptLock()` (30s wait) to prevent race conditions during simultaneous writes.
+* **Image Handling:** Decodes Base64 strings from POST payload -> Creates Blobs -> Saves to Google Drive -> Returns Drive URL.
+* **Row Logic:**
+    * **Update:** Searches last 200 rows for an active session (same Worker Name, Status != DEPARTED/SAFE). If found, updates columns (e.g., appends Notes).
+    * **Append:** If no active session, appends a new row.
+
+### C. The Watchdog (`checkOverdueVisits`)
+**CRITICAL SAFETY MECHANISM.** This function must be triggered by a Google Clock Trigger (recommended: every 10 minutes).
+1.  **Scan:** Reads active visits from the Sheet.
+2.  **Calculate:** `TimeOverdue = Now - Anticipated_Departure_Time`.
+3.  **Zero Tolerance Logic:**
+    * If row notes contain `[ZERO_TOLERANCE]`, the `Grace Period` is effectively **0 minutes**.
+    * Otherwise, `Grace Period` = `CONFIG.ESCALATION_MINUTES`.
+4.  **Escalation Logic:**
+    * **Condition:** `TimeOverdue > Threshold` AND Status is not yet `EMERGENCY`.
+    * **Action:** Updates Status to `EMERGENCY - OVERDUE`.
+    * **Notification:** Calls `sendAlert()` targeting **Emergency Contacts**.
+    * **Stage 2:** If already in `Stage 1` and +10 mins have passed, triggers `Stage 2` (escalates to Manager/HQ).
+
+### D. Alerting Systems (`sendAlert`)
+* **Email:** Uses native `MailApp.sendEmail`. Costs: 0 (Quotas apply).
+* **SMS (Textbelt):**
+    * **Service:** Sends HTTP POST to `https://textbelt.com/text`.
+    * **Free Tier:** If no key is provided, it attempts to use the 'textbelt' free key (1 SMS per IP per day).
+    * **Paid Tier:** If `CONFIG.TEXTBELT_API_KEY` is present, it uses that for reliable delivery.
+    * **Content:** "SOS: [Worker] - [Status] at [Location]".
+
+### E. AI Integration (`smartScribe`)
+* **Purpose:** Cleans up and summarizes messy voice-to-text notes using Google Gemini.
+* **Privacy Layer (Redaction):**
+    * Before sending to AI, regex replaces emails (`/...@.../`) with `[EMAIL_REDACTED]`.
+    * Regex replaces phone numbers (International `+64...` and Local `021...`) with `[PHONE_REDACTED]`.
+* **Context:** Injects `VEHICLE_TERM` into the system prompt so the AI knows to use "Rego" vs "WOF".
+
+---
+
+## 3. The Worker App (`worker_template.html`)
+
+A single-file HTML5 application designed for resilience in low-connectivity environments.
+
+### A. Offline Engine
+* **Service Worker:** A generated `sw.js` file caches the HTML, Manifest, and Icon. The app loads instantly in Airplane Mode.
+* **Transaction Queue:**
+    * All outbound requests (Start, Heartbeat, Stop) are pushed to `state.pendingUploads` array in `localStorage`.
+    * **Sync Loop:** A timer runs every few seconds. If `navigator.onLine` is true, it attempts to send the oldest request.
+    * **Retry Logic:** If a request fails, it stays in the queue.
+
+### B. "Dead Man's Switch" Timer
+The app maintains a local countdown timer (`setInterval`).
+* **State 1: Active:** Timer counts down from Duration (e.g., 60 mins).
+* **State 2: Warning (T-5 Mins):**
+    * **Visual:** "5 MINUTES REMAINING" Banner.
+    * **Audio:** Plays "Pre-Alert" tone (High C6 beep).
+    * **Haptic:** Vibrate pattern.
+* **State 3: Overdue (T < 0):**
+    * **Visual:** Counter turns RED and counts UP (negative time).
+    * **Audio:** "Warning" tone repeats.
+* **State 4: Imminent Alarm (T + Grace Period - 2 Mins):**
+    * **Visual:** Flashing warning.
+    * **Audio:** **Spoken Warning** via `SpeechSynthesis`.
+    * **Voice:** *"Warning. Safety alarm will activate in two minutes."* (Uses localized accent).
+* **State 5: Alarm Sent:**
+    * **Trigger:** `TimeOverdue > EscalationMinutes`.
+    * **Action:** App pushes `EMERGENCY - OVERDUE` payload to backend.
+
+### C. Installation Logic (Smart Install)
+* **Android/Chrome:** Listens for `beforeinstallprompt`. Prevents default. Shows a custom "Install Banner" in the app UI. Clicking it triggers the native install prompt.
+* **iOS/Safari:** Detects User Agent. If not in `standalone` mode, shows a CSS overlay pointing to the bottom "Share" button with instructions.
+
+### D. Zero Tolerance Mode
+* **UI:** A toggle switch on the main screen.
+* **Logic:** Sets `state.activeVisit.highRisk = true`.
+* **Impact:** Adds `[ZERO_TOLERANCE]` tag to the "Started" payload notes. The Backend Watchdog sees this tag and sets the Grace Period to 0 minutes.
+* **Client Side:** If timer hits 00:00, the client *immediately* fires the `triggerAutoAlert('EMERGENCY')` function, skipping the local grace period visual states.
+
+---
+
+## 4. The Monitor App (`monitor_template.html`)
+
+A read-only situational awareness dashboard.
+
+### A. Polling Architecture
+* **Mechanism:** Uses `JSONP` (script injection) to bypass CORS restrictions when fetching data from Google Apps Script.
+* **Frequency:** Refreshes data every 10 seconds.
+* **Heartbeat:** Shows a "Connection Lost" overlay if data is stale (>45 seconds).
+
+### B. Status Visualization Logic
+* **Green (Active):** Worker is checked in, time remaining > 0.
+* **Amber (Overdue):** `Due Time < Now`, but within Grace Period.
+* **Red (Emergency):** Status contains `EMERGENCY` or `PANIC`. Triggers "Siren" sound (Tone.js).
+* **Purple (Duress):** Status contains `DURESS`. Triggers "Stealth" visual alert (no sound, or distinct sound).
+
+---
+
+## 5. Database Schema (Google Sheets)
+
+### Tab 1: `Visits` (The Ledger)
+| Col | Field | Usage |
+| :-- | :--- | :--- |
+| **A** | `Timestamp` | System time of entry. Used for sorting Monitor feed. |
+| **B** | `Date` | Used for archiving logic. |
+| **C** | `Worker Name` | Unique ID for the worker. |
+| **D** | `Worker Phone` | Contact info (Normalized E.164). |
+| **K** | `Alarm Status` | **Key State.** Controls Monitor color and Backend alerts. |
+| **L** | `Notes` | Contains user notes, `[ZERO_TOLERANCE]` tags, and `[AI]` summaries. |
+| **O** | `Last Known GPS` | Format: `lat,lon`. Parsed by Monitor for Map View. |
+| **U** | `Anticipated Departure` | ISO String. The target time for the Dead Man's Switch. |
+
+### Tab 2: `Staff` (Auth)
+* **Col A (Name):** Must match Worker Name in app settings exactly.
+* **Col E (DeviceID):** Locks a user to a specific browser instance. Backend rejects posts if DeviceID mismatches.
+
+### Tab 3: `Templates` (Forms)
+* **Structure:** `Type | Name | Assigned To | Recipient | Q1 | Q2 ...`
+* **Logic:** If `Assigned To` is "ALL", every worker sees it. If "Name", only that worker sees it.
+
+---
+
+## 6. Security & Limitations
+
+### Threat Model
+1.  **Public Endpoint:** The Web App URL is technically public.
+    * *Mitigation:* App logic requires a valid `key` parameter (Secret Key) to read or write.
+2.  **API Key Exposure:** Keys are visible in client source.
+    * *Mitigation:* Use "Free Tier" keys. Worst case scenario is quota exhaustion.
+3.  **Spoofing:** A worker could spoof a "SAFE" signal.
+    * *Mitigation:* The "Duress PIN" feature allows a worker to simulate a safe clearance while silently triggering a Purple Alert.
+
+### Limitations
+1.  **Textbelt Free Tier:** 1 SMS per day. Highly recommended to buy a $5 key for production use.
+2.  **Netlify "Drop":** Sites deleted after 1 hour unless claimed (Free Account required).
+3.  **Browser Sleep:** Mobile browsers aggressively throttle JavaScript timers when the screen is off. The Server-Side Watchdog (`checkOverdueVisits`) is the ultimate fail-safe.
