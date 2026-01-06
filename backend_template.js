@@ -1,9 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.1 (Smart Ledger Edition)
- * * UPDATED LOGIC:
- * 1. Checks for 'Visit Report Data'. If present (Form Submit) -> APPENDS new row.
- * 2. If NO Report Data (GPS Ping) -> Scans for active visit and UPDATES existing row.
- * 3. Prevents "Row Spam" from GPS tracking.
+ * OTG APPSUITE - MASTER BACKEND v79.2 (CORB Fix)
+ * * CRITICAL UPDATE:
+ * - Restored JSONP support in doGet() to fix Monitor App CORB errors.
+ * - Monitor App requests via <script> tag (JSONP).
+ * - Worker App requests via fetch() (JSON).
+ * - This backend now intelligently switches formats based on the '?callback=' parameter.
  */
 
 // ==========================================
@@ -34,31 +35,35 @@ if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 // ==========================================
 function doGet(e) {
   try {
-      if(!e || !e.parameter) return sendJSON({status:"error", message:"No Params"});
+      if(!e || !e.parameter) return sendResponse(e, {status:"error", message:"No Params"});
       const p = e.parameter;
 
+      // A. Connection Test
       if(p.test) {
-          if(p.key === CONFIG.MASTER_KEY) return sendJSON({status:"success", message:"OTG Online"});
-          return sendJSON({status:"error", message:"Auth Fail"});
+          if(p.key === CONFIG.MASTER_KEY) return sendResponse(e, {status:"success", message:"OTG Online"});
+          return sendResponse(e, {status:"error", message:"Auth Fail"});
       }
 
+      // B. Monitor Dashboard Data (JSONP Request)
       if(p.key === CONFIG.MASTER_KEY && !p.action) {
-          return sendJSON(getDashboardData());
+          return sendResponse(e, getDashboardData());
       }
 
+      // C. Worker App Sync (Standard JSON Request)
       if(p.action === 'sync') {
-          if(p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error", message:"ACCESS DENIED"});
-          return sendJSON(getSyncData(p.worker, p.deviceId));
+          if(p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendResponse(e, {status:"error", message:"ACCESS DENIED"});
+          return sendResponse(e, getSyncData(p.worker, p.deviceId));
       }
       
+      // D. Global Forms
       if(p.action === 'getGlobalForms') {
-          return sendJSON(getGlobalForms());
+          return sendResponse(e, getGlobalForms());
       }
 
-      return sendJSON({status:"error", message:"Invalid Request"});
+      return sendResponse(e, {status:"error", message:"Invalid Request"});
 
   } catch(err) {
-      return sendJSON({status:"error", message: err.toString()});
+      return sendResponse(e, {status:"error", message: err.toString()});
   }
 }
 
@@ -66,6 +71,7 @@ function doGet(e) {
 // 3. POST HANDLER (Write Operations)
 // ==========================================
 function doPost(e) {
+  // Post requests are always JSON, never JSONP
   if(!e || !e.parameter) return sendJSON({status:"error", message:"No Data"});
   
   if(e.parameter.key !== CONFIG.MASTER_KEY && e.parameter.key !== CONFIG.WORKER_KEY) {
@@ -94,7 +100,30 @@ function doPost(e) {
 }
 
 // ==========================================
-// 4. CORE LOGIC (Smart Ledger)
+// 4. SMART RESPONSE HANDLER (THE FIX)
+// ==========================================
+function sendResponse(e, data) {
+    const json = JSON.stringify(data);
+    
+    // Check if the request is JSONP (Monitor App)
+    if (e && e.parameter && e.parameter.callback) {
+        return ContentService.createTextOutput(`${e.parameter.callback}(${json})`)
+            .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    
+    // Default to plain JSON (Worker App)
+    return ContentService.createTextOutput(json)
+        .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Helper for POST requests (always JSON)
+function sendJSON(data) {
+    return ContentService.createTextOutput(JSON.stringify(data))
+        .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ==========================================
+// 5. CORE LOGIC (Smart Ledger)
 // ==========================================
 
 function handleWorkerPost(p, e) {
@@ -133,46 +162,31 @@ function handleWorkerPost(p, e) {
     const workerName = p['Worker Name'];
 
     // C. SMART UPDATE LOGIC
-    // Rule: If it's a Form Submit, always APPEND. If it's a heartbeat, try to UPDATE.
-    
     let rowUpdated = false;
 
     if (!hasFormData) {
-        // This is likely a GPS/Status heartbeat. Scan for active row.
         const lastRow = sheet.getLastRow();
         if (lastRow > 1) {
-            // Scan last 50 rows only for performance
             const startRow = Math.max(2, lastRow - 50);
             const numRows = lastRow - startRow + 1;
-            const data = sheet.getRange(startRow, 1, numRows, 11).getValues(); // Get cols A to K (Status is K/11)
+            const data = sheet.getRange(startRow, 1, numRows, 11).getValues();
             
-            // Loop backwards to find latest
             for (let i = data.length - 1; i >= 0; i--) {
                 const rowData = data[i];
-                // Col C (Index 2) is Name, Col K (Index 10) is Status
                 if (rowData[2] === workerName) {
                     const status = String(rowData[10]);
-                    // Check if row is "Active"
                     if (!status.includes('DEPARTED') && !status.includes('SAFE') && !status.includes('COMPLETED')) {
                         const targetRow = startRow + i;
-                        
-                        // FOUND ACTIVE ROW: UPDATE IT
-                        // Update Timestamp (A)
                         sheet.getRange(targetRow, 1).setValue(ts.toISOString());
-                        // Update Status (K)
                         sheet.getRange(targetRow, 11).setValue(p['Alarm Status']);
-                        // Append Notes (L) if new notes exist
-                        if (p['Notes'] && p['Notes'] !== rowData[11]) { // Avoid duplicating identical notes
+                        if (p['Notes'] && p['Notes'] !== rowData[11]) {
                              const oldNotes = sheet.getRange(targetRow, 12).getValue();
                              if (!oldNotes.includes(p['Notes'])) {
                                  sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + p['Notes']).trim());
                              }
                         }
-                        // Update GPS (O)
                         if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
-                        // Update Battery (Q)
                         if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
-                        
                         rowUpdated = true;
                         break;
                     }
@@ -181,7 +195,6 @@ function handleWorkerPost(p, e) {
         }
     }
 
-    // D. If not updated (or if it was a Form Submit), APPEND new row
     if (!rowUpdated) {
         const row = [
             ts.toISOString(),
@@ -212,7 +225,6 @@ function handleWorkerPost(p, e) {
 
     updateStaffStatus(p);
 
-    // E. Escalation Check
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
         triggerAlerts(p, "IMMEDIATE");
     }
@@ -409,8 +421,24 @@ function smartScribe(data, type, notes) {
     } catch (e) { return ""; }
 }
 
-function sendJSON(data) {
-  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+function sendWeeklySummary() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Visits');
+  if(!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  let count = 0, distance = 0, alerts = 0;
+  for(let i=1; i<data.length; i++) {
+    const rowTime = new Date(data[i][0]);
+    if(rowTime > oneWeekAgo) {
+      count++;
+      if(data[i][18]) distance += Number(data[i][18]);
+      if(data[i][10].toString().includes("EMERGENCY")) alerts++;
+    }
+  }
+  const html = `<h2>Weekly Safety Report</h2><p><strong>Period:</strong> Last 7 Days</p><table border="1" cellpadding="10" style="border-collapse:collapse;"><tr><td><strong>Total Visits</strong></td><td>${count}</td></tr><tr><td><strong>Distance Traveled</strong></td><td>${distance.toFixed(2)} km</td></tr><tr><td><strong>Safety Alerts</strong></td><td style="color:${alerts>0?'red':'green'}">${alerts}</td></tr></table><p><em>Generated by OTG AppSuite</em></p>`;
+  MailApp.sendEmail({to: Session.getEffectiveUser().getEmail(), subject: "Weekly Safety Summary", htmlBody: html});
 }
 
 function archiveOldData() {
@@ -433,22 +461,3 @@ function archiveOldData() {
     }
 }
 
-function sendWeeklySummary() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Visits');
-  if(!sheet) return;
-  const data = sheet.getDataRange().getValues();
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  let count = 0, distance = 0, alerts = 0;
-  for(let i=1; i<data.length; i++) {
-    const rowTime = new Date(data[i][0]);
-    if(rowTime > oneWeekAgo) {
-      count++;
-      if(data[i][18]) distance += Number(data[i][18]);
-      if(data[i][10].toString().includes("EMERGENCY")) alerts++;
-    }
-  }
-  const html = `<h2>Weekly Safety Report</h2><p><strong>Period:</strong> Last 7 Days</p><table border="1" cellpadding="10" style="border-collapse:collapse;"><tr><td><strong>Total Visits</strong></td><td>${count}</td></tr><tr><td><strong>Distance Traveled</strong></td><td>${distance.toFixed(2)} km</td></tr><tr><td><strong>Safety Alerts</strong></td><td style="color:${alerts>0?'red':'green'}">${alerts}</td></tr></table><p><em>Generated by OTG AppSuite</em></p>`;
-  MailApp.sendEmail({to: Session.getEffectiveUser().getEmail(), subject: "Weekly Safety Summary", htmlBody: html});
-}
