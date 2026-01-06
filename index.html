@@ -210,6 +210,12 @@
           
           <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
               <h2 class="text-3xl font-bold text-white mb-2">Option A: The Easy Way (Recommended)</h2>
+              
+              <div class="bg-yellow-900/50 border-l-4 border-yellow-500 p-4 mb-6 text-left max-w-2xl mx-auto rounded-r">
+                  <p class="font-bold text-yellow-300 text-sm flex items-center gap-2">⚠️ Pre-Flight Check:</p>
+                  <p class="text-gray-300 text-xs mt-1">Please sign in to the Google Account you want to <strong>OWN</strong> this system (e.g., your business account). If you are signed in to a personal Gmail, the database will be created there.</p>
+              </div>
+
               <p class="text-blue-200 mb-6">Create your database automatically in one click.</p>
               <button onclick="openMagicLink()" class="btn btn-success text-xl px-10 py-5 shadow-lg transform hover:-translate-y-1 hover:shadow-2xl">
                   ✨ Create Database Copy
@@ -248,7 +254,7 @@
               </div>
           </div>
 
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="generateScript()" class="btn btn-primary text-lg">Next: Cloud System →</button></div>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg">Next: Cloud System →</button></div>
         </div>
 
         <div id="step3" class="step-section space-y-6">
@@ -347,7 +353,7 @@
   <script>
     // ADMIN CONFIG: PASTE YOUR MASTER SHEET URL HERE
     // Example: "https://docs.google.com/spreadsheets/d/1abc.../copy"
-    const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QtcQVe0Ppl-mQbN4MOEp2RgncnHv1jyphKB4vCBPe4g/copy?usp=sharing"; 
+    const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QtcQVe0Ppl-mQbN4MOEp2RgncnHv1jyphKB4vCBPe4g/copy"; 
 
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
     let TEMPLATES = {};
@@ -495,7 +501,9 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
         document.getElementById('step'+n).classList.add('active'); 
         for(let i=1; i<=5; i++){ 
             const tab = document.getElementById('tab'+i); 
-            if(i===n){ tab.classList.add('active'); } else { tab.classList.remove('active'); } 
+            if(i===n){ tab.classList.add('active'); 
+                if(n===3) generateScript(); // Force Generation on Tab Click
+            } else { tab.classList.remove('active'); } 
         } 
     }
     
@@ -524,7 +532,24 @@ Use this guide to ask Gemini or ChatGPT to write custom report scripts for you.
         document.getElementById('codeDisplay').textContent = code;
         gotoStep(3); 
     }
-    function copyScript() { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Backend Code Copied!"); }
+    // FIXED COPY SCRIPT LOGIC
+    function copyScript() { 
+        const display = document.getElementById('codeDisplay');
+        if(display.textContent === "Generating code...") generateScript();
+        
+        // Slight delay to allow generation
+        setTimeout(() => {
+            navigator.clipboard.writeText(display.textContent); 
+            const btn = document.querySelector('button[onclick="copyScript()"]');
+            const originalText = btn.innerText;
+            btn.innerText = "✅ COPIED!";
+            btn.classList.add('bg-green-600');
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('bg-green-600');
+            }, 2000);
+        }, 100);
+    }
 
     function testConnection() {
         const url = document.getElementById('webAppUrl').value;
@@ -635,4 +660,3 @@ self.addEventListener('fetch', event => { event.respondWith(caches.match(event.r
   </script>
 </body>
 </html>
-
