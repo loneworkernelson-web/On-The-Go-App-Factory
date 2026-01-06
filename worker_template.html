@@ -46,6 +46,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .wizard-step { display: none; height: 100%; flex-direction: column; }
 .wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* INSTALL BANNER STYLES */
+#installBanner { animation: slideDown 0.5s ease-out; }
+@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+.ios-arrow { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #1e293b; }
 </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -143,6 +148,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <button onclick="closeWofWarn(); startVehicleCheck();" class="text-blue-400 text-sm font-bold underline p-2">I have a new <span class="dynamic-wof">WOF</span> (Update Now)</button>
 </div>
 
+<div id="iosInstallModal" class="hidden fixed inset-x-0 bottom-4 z-[200] px-4">
+    <div class="bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl relative">
+        <button onclick="dismissInstall('ios')" class="absolute top-2 right-3 text-gray-400 hover:text-white font-bold">×</button>
+        <div class="flex flex-col items-center text-center">
+            <h3 class="text-lg font-bold text-white mb-2">Install App</h3>
+            <p class="text-sm text-gray-300 mb-4">Install this app to your Home Screen for quick access and offline safety.</p>
+            <div class="flex items-center gap-2 text-blue-400 font-bold text-sm animate-pulse">
+                <span>👇 Tap Share</span>
+                <span>→</span>
+                <span>⊞ Add to Home Screen</span>
+            </div>
+        </div>
+        <div class="ios-arrow absolute bottom-[-10px] left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-gray-800 border-t-blue-500"></div>
+    </div>
+</div>
+
 <div id="settingsPage" class="page z-50 bg-gray-800">
     <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
     <div class="content-area pb-24">
@@ -168,6 +189,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
     <div class="content-area">
+        <div id="installBanner" class="hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 rounded-lg mb-4 flex justify-between items-center shadow-lg">
+            <div onclick="triggerInstall()" class="flex-1 flex items-center gap-3 cursor-pointer">
+                <div class="text-2xl">📲</div>
+                <div>
+                    <p class="font-bold text-sm">Install App</p>
+                    <p class="text-xs text-blue-200">Add to Home Screen for Offline use.</p>
+                </div>
+            </div>
+            <button onclick="dismissInstall('android')" class="p-2 text-blue-200 hover:text-white font-bold">✕</button>
+        </div>
+
         <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
         <div id="locationList" class="space-y-3 pb-4"></div>
@@ -769,7 +801,6 @@ function buildReportForm(n,c){state.photoStore={};const sn=n?n.trim():"Standard 
 // INITIALIZATION
 window.addEventListener('load', () => {
     initLocations();
-    // Dynamic Labels
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
     
@@ -783,32 +814,57 @@ window.addEventListener('load', () => {
     } else {
         if(state.activeVisit) enterLockedScreen();
         else navigate('main');
-        // Background Sync
         if(navigator.onLine) forceSync();
     }
     renderLocations();
     checkVehicleStatus();
     
-    // RESTORED PWA PLUMBING
+    // PWA & INSTALL LOGIC
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
     if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
+    checkIosInstall();
 });
 
-// PWA INSTALL LISTENER (Restored)
+// PWA INSTALL LOGIC (Smart v77.5)
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
+  if(!localStorage.getItem('otg_install_dismissed')) {
+      document.getElementById('installBanner').classList.remove('hidden');
+  }
   document.getElementById('installAppContainer').classList.remove('hidden');
+  
+  // Settings Button Listener
   document.getElementById('btnInstallApp').addEventListener('click', () => {
     document.getElementById('installAppContainer').classList.add('hidden');
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      deferredPrompt = null;
-    });
+    deferredPrompt.userChoice.then((c) => { deferredPrompt = null; });
   });
 });
+
+function triggerInstall() {
+    if(deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((c) => { deferredPrompt = null; });
+        document.getElementById('installBanner').classList.add('hidden');
+    }
+}
+
+function dismissInstall(type) {
+    if(type==='android') document.getElementById('installBanner').classList.add('hidden');
+    if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden');
+    localStorage.setItem('otg_install_dismissed', 'true');
+}
+
+function checkIosInstall() {
+  const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  const isStandalone = window.navigator.standalone === true;
+  if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
+      document.getElementById('iosInstallModal').classList.remove('hidden');
+  }
+}
 </script>
 </body>
 </html>
