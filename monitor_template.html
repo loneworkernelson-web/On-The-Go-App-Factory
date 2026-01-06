@@ -99,7 +99,7 @@
         <div class="flex justify-between items-center mb-2">
             <div class="flex items-center gap-4">
                 <img id="orgLogo" src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1" onerror="this.style.display='none'">
-                <div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v77.1</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div>
+                <div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v79.0</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
@@ -118,10 +118,10 @@
     </div>
 <script>
 const SCRIPT_URL = "%%SHEET_URL%%";
-const VEHICLE_TERM = "%%VEHICLE_TERM%%"; // Dynamic Terminology v77.1
+const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
 let API_KEY = localStorage.getItem('otg_monitor_key'); 
 let workerData = []; let allRows = []; let escalationLimit = 15; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null;
-let lastHeartbeat = Date.now(); 
+let lastHeartbeat = Date.now(); // Track connection health
 
 async function startApp() {
     document.getElementById('startOverlay').classList.add('hidden');
@@ -147,10 +147,21 @@ function startPolling() {
     fetchData(); 
     setInterval(fetchData, 10000); 
     setInterval(renderGrid, 1000);
+    // SOUND OF SILENCE (Watchdog Loop) - NEW v79.0
     setInterval(() => {
-        if (Date.now() - lastHeartbeat > 45000) document.getElementById('connectionOverlay').classList.remove('hidden');
-        else document.getElementById('connectionOverlay').classList.add('hidden');
-    }, 2000);
+        const timeSince = Date.now() - lastHeartbeat;
+        const ol = document.getElementById('connectionOverlay');
+        // If > 5 minutes without data
+        if (timeSince > 300000) { 
+            ol.classList.remove('hidden');
+            // Play Low Pitch Fault Tone (C2)
+            if(audioEnabled && synth) {
+                try { synth.triggerAttackRelease("C2", "0.5"); } catch(e){} 
+            }
+        } else {
+            ol.classList.add('hidden');
+        }
+    }, 10000); // Check every 10s
 }
 
 function saveAuthKey() { 
@@ -191,7 +202,7 @@ function fetchData() {
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
     window[cbName] = function(data) { 
-        lastHeartbeat = Date.now();
+        lastHeartbeat = Date.now(); // RESET WATCHDOG
         if(data.error) { alert("Security Error: " + data.error); return; } 
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
@@ -306,7 +317,7 @@ function renderGrid() {
         
         if(isWofExpired && !isAlert && !isDuress && !isOverdue) {
             borderClass = 'bd-amber'; 
-            statusText += ` [⚠️ ${VEHICLE_TERM} EXP]`; // v77.1 Dynamic Term
+            statusText += ` [⚠️ ${VEHICLE_TERM} EXP]`; 
         }
 
         const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
@@ -334,8 +345,6 @@ function initMap() {
 
 function renderMap() { 
     if(!mapInstance) return; 
-    
-    // Safety check: ensure layer exists
     if (!markersLayer) markersLayer = L.layerGroup().addTo(mapInstance);
     
     markersLayer.clearLayers(); 
@@ -347,15 +356,13 @@ function renderMap() {
         const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
         if (currentFilter === 'ACTIVE' && isSafe && !w.status.includes('EMERGENCY')) return; 
         
-        // ROBUST GPS PARSING
         if(!w.gps || w.gps.length < 5) return; 
-        const cleanGps = w.gps.replace(/[^0-9.,-]/g, ''); // Remove unexpected chars like quotes
+        const cleanGps = w.gps.replace(/[^0-9.,-]/g, ''); 
         const parts = cleanGps.split(',');
         if(parts.length !== 2) return;
         
         const lat = parseFloat(parts[0]);
         const lng = parseFloat(parts[1]);
-        
         if(isNaN(lat) || isNaN(lng)) return; 
         
         let colorClass = 'grey'; 
