@@ -1,9 +1,8 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.3 (Header Fix)
+ * OTG APPSUITE - MASTER BACKEND v79.4 (Map Link Fix)
  * * UPDATES:
- * - Fixed 'Worker Name' ghost entry in Monitor (now skips Header row).
- * - Includes JSONP support for Monitor (CORB Fix).
- * - Includes Smart Ledger logic (Update vs Append).
+ * - Fixed Broken Google Maps URL in Email Alerts.
+ * - Includes previous fixes: Ghost Worker (Header), CORB (JSONP), Smart Ledger.
  */
 
 // ==========================================
@@ -238,9 +237,10 @@ function updateStaffStatus(p) {
     }
 }
 
+// FIXED: Correct Google Maps URL format
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: http://googleusercontent.com/maps.google.com/?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
+    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: https://www.google.com/maps?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
@@ -293,7 +293,6 @@ function checkOverdueVisits() {
     });
 }
 
-// FIXED: getDashboardData skips headers
 function getDashboardData() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -301,9 +300,9 @@ function getDashboardData() {
     if(!sheet) return {workers: []};
     
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return {workers: []}; // Handle empty sheet
+    if (lastRow < 2) return {workers: []}; 
 
-    const startRow = Math.max(2, lastRow - 500); // Start at Row 2
+    const startRow = Math.max(2, lastRow - 500); 
     const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 25).getValues();
     const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
     const workers = data.map(r => { let obj = {}; headers.forEach((h, i) => obj[h] = r[i]); return obj; });
