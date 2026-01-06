@@ -1,10 +1,9 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.2 (CORB Fix)
- * * CRITICAL UPDATE:
- * - Restored JSONP support in doGet() to fix Monitor App CORB errors.
- * - Monitor App requests via <script> tag (JSONP).
- * - Worker App requests via fetch() (JSON).
- * - This backend now intelligently switches formats based on the '?callback=' parameter.
+ * OTG APPSUITE - MASTER BACKEND v79.3 (Header Fix)
+ * * UPDATES:
+ * - Fixed 'Worker Name' ghost entry in Monitor (now skips Header row).
+ * - Includes JSONP support for Monitor (CORB Fix).
+ * - Includes Smart Ledger logic (Update vs Append).
  */
 
 // ==========================================
@@ -38,24 +37,20 @@ function doGet(e) {
       if(!e || !e.parameter) return sendResponse(e, {status:"error", message:"No Params"});
       const p = e.parameter;
 
-      // A. Connection Test
       if(p.test) {
           if(p.key === CONFIG.MASTER_KEY) return sendResponse(e, {status:"success", message:"OTG Online"});
           return sendResponse(e, {status:"error", message:"Auth Fail"});
       }
 
-      // B. Monitor Dashboard Data (JSONP Request)
       if(p.key === CONFIG.MASTER_KEY && !p.action) {
           return sendResponse(e, getDashboardData());
       }
 
-      // C. Worker App Sync (Standard JSON Request)
       if(p.action === 'sync') {
           if(p.key !== CONFIG.MASTER_KEY && p.key !== CONFIG.WORKER_KEY) return sendResponse(e, {status:"error", message:"ACCESS DENIED"});
           return sendResponse(e, getSyncData(p.worker, p.deviceId));
       }
       
-      // D. Global Forms
       if(p.action === 'getGlobalForms') {
           return sendResponse(e, getGlobalForms());
       }
@@ -71,7 +66,6 @@ function doGet(e) {
 // 3. POST HANDLER (Write Operations)
 // ==========================================
 function doPost(e) {
-  // Post requests are always JSON, never JSONP
   if(!e || !e.parameter) return sendJSON({status:"error", message:"No Data"});
   
   if(e.parameter.key !== CONFIG.MASTER_KEY && e.parameter.key !== CONFIG.WORKER_KEY) {
@@ -100,23 +94,18 @@ function doPost(e) {
 }
 
 // ==========================================
-// 4. SMART RESPONSE HANDLER (THE FIX)
+// 4. SMART RESPONSE HANDLER
 // ==========================================
 function sendResponse(e, data) {
     const json = JSON.stringify(data);
-    
-    // Check if the request is JSONP (Monitor App)
     if (e && e.parameter && e.parameter.callback) {
         return ContentService.createTextOutput(`${e.parameter.callback}(${json})`)
             .setMimeType(ContentService.MimeType.JAVASCRIPT);
     }
-    
-    // Default to plain JSON (Worker App)
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Helper for POST requests (always JSON)
 function sendJSON(data) {
     return ContentService.createTextOutput(JSON.stringify(data))
         .setMimeType(ContentService.MimeType.JSON);
@@ -135,7 +124,6 @@ function handleWorkerPost(p, e) {
         sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
     }
 
-    // A. Image Processing
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1']);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2']);
@@ -143,7 +131,6 @@ function handleWorkerPost(p, e) {
     if(p['Photo 4']) p4 = saveImage(p['Photo 4']);
     if(p['Signature']) sig = saveImage(p['Signature']);
 
-    // B. AI Processing
     let reportSummary = "";
     const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
     
@@ -161,7 +148,6 @@ function handleWorkerPost(p, e) {
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
     const workerName = p['Worker Name'];
 
-    // C. SMART UPDATE LOGIC
     let rowUpdated = false;
 
     if (!hasFormData) {
@@ -307,13 +293,17 @@ function checkOverdueVisits() {
     });
 }
 
+// FIXED: getDashboardData skips headers
 function getDashboardData() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     const staffSheet = ss.getSheetByName('Staff');
     if(!sheet) return {workers: []};
+    
     const lastRow = sheet.getLastRow();
-    const startRow = Math.max(1, lastRow - 500);
+    if (lastRow < 2) return {workers: []}; // Handle empty sheet
+
+    const startRow = Math.max(2, lastRow - 500); // Start at Row 2
     const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 25).getValues();
     const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
     const workers = data.map(r => { let obj = {}; headers.forEach((h, i) => obj[h] = r[i]); return obj; });
@@ -421,24 +411,8 @@ function smartScribe(data, type, notes) {
     } catch (e) { return ""; }
 }
 
-function sendWeeklySummary() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Visits');
-  if(!sheet) return;
-  const data = sheet.getDataRange().getValues();
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  let count = 0, distance = 0, alerts = 0;
-  for(let i=1; i<data.length; i++) {
-    const rowTime = new Date(data[i][0]);
-    if(rowTime > oneWeekAgo) {
-      count++;
-      if(data[i][18]) distance += Number(data[i][18]);
-      if(data[i][10].toString().includes("EMERGENCY")) alerts++;
-    }
-  }
-  const html = `<h2>Weekly Safety Report</h2><p><strong>Period:</strong> Last 7 Days</p><table border="1" cellpadding="10" style="border-collapse:collapse;"><tr><td><strong>Total Visits</strong></td><td>${count}</td></tr><tr><td><strong>Distance Traveled</strong></td><td>${distance.toFixed(2)} km</td></tr><tr><td><strong>Safety Alerts</strong></td><td style="color:${alerts>0?'red':'green'}">${alerts}</td></tr></table><p><em>Generated by OTG AppSuite</em></p>`;
-  MailApp.sendEmail({to: Session.getEffectiveUser().getEmail(), subject: "Weekly Safety Summary", htmlBody: html});
+function sendJSON(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function archiveOldData() {
@@ -461,3 +435,22 @@ function archiveOldData() {
     }
 }
 
+function sendWeeklySummary() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Visits');
+  if(!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const now = new Date();
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  let count = 0, distance = 0, alerts = 0;
+  for(let i=1; i<data.length; i++) {
+    const rowTime = new Date(data[i][0]);
+    if(rowTime > oneWeekAgo) {
+      count++;
+      if(data[i][18]) distance += Number(data[i][18]);
+      if(data[i][10].toString().includes("EMERGENCY")) alerts++;
+    }
+  }
+  const html = `<h2>Weekly Safety Report</h2><p><strong>Period:</strong> Last 7 Days</p><table border="1" cellpadding="10" style="border-collapse:collapse;"><tr><td><strong>Total Visits</strong></td><td>${count}</td></tr><tr><td><strong>Distance Traveled</strong></td><td>${distance.toFixed(2)} km</td></tr><tr><td><strong>Safety Alerts</strong></td><td style="color:${alerts>0?'red':'green'}">${alerts}</td></tr></table><p><em>Generated by OTG AppSuite</em></p>`;
+  MailApp.sendEmail({to: Session.getEffectiveUser().getEmail(), subject: "Weekly Safety Summary", htmlBody: html});
+}
