@@ -507,14 +507,22 @@ function forceSync(){
         return JSON.parse(txt);
     })
     .then(data=>{
-        if(data.status==="error"&&data.message.includes("ACCESS DENIED")){
-            alert("⛔ ACCESS DENIED\n\n"+data.message);
-            startWizard();
+        // UPDATED ERROR HANDLING (v79.1)
+        if(data.status==="error"){
             document.getElementById('uploadBanner').classList.add('hidden');
+            if(data.message.includes("ACCESS DENIED")){
+                alert("⛔ ACCESS DENIED\n\n"+data.message);
+                startWizard();
+            } else {
+                alert("❌ Sync Error: " + data.message);
+            }
             return;
         }
         const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
-        const ms=data.sites.map(s=>({
+        
+        // SAFE PARSING (v79.1)
+        const safeSites = data.sites || [];
+        const ms = safeSites.map(s=>({
             id:'site_'+s.siteName.replace(/\s/g,''),
             name:s.siteName,
             address:s.address,
@@ -526,6 +534,7 @@ function forceSync(){
             contactEmail:s.contactEmail,
             notes:s.notes
         }));
+        
         if(CONFIG.mileage) ms.unshift({id:'travel',name:'Travelling',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
         state.locations=ms.concat(existingManual);
         state.globalForms=data.forms||[];
@@ -837,7 +846,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   document.getElementById('installAppContainer').classList.remove('hidden');
   
   // Settings Button Listener
-  // 
   document.getElementById('btnInstallApp').addEventListener('click', () => {
     document.getElementById('installAppContainer').classList.add('hidden');
     deferredPrompt.prompt();
@@ -869,4 +877,3 @@ function checkIosInstall() {
 </script>
 </body>
 </html>
-
