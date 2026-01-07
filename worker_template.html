@@ -213,16 +213,20 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="dismissInstall('android')" class="p-2 text-blue-200 hover:text-white font-bold">✕</button>
         </div>
 
-        <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
-        <div id="locationList" class="space-y-3 pb-4"></div>
+        
+        <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
+        
         <div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button></div>
     </div>
     <div class="footer-bar">
-        <label class="flex items-center justify-between bg-gray-800 p-3 rounded mb-4 border border-gray-700">
-            <span class="text-xs font-bold text-red-400 uppercase flex items-center gap-2">⚡ Higher Risk (No grace period)</span>
-            <input type="checkbox" id="chkHighRisk" class="w-5 h-5 accent-red-600 cursor-pointer">
-        </label>
+        <div class="flex justify-end items-center gap-2 mb-2">
+            <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest" id="lblHighRisk">Zero Tolerance Mode</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
+              <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+            </label>
+        </div>
         
         <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
             <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Duration</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
@@ -635,33 +639,81 @@ function renderIconGrid(forms, loc) {
 function createTemplateBtn(l,v){return null;}
 function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
 
+// UPDATED: Grid Layout for Locations + Distinct Travel Tile
 function renderLocations(){
     const l=document.getElementById('locationList');
     l.innerHTML='';
     if (!state.locations) state.locations = [];
+    
     state.locations.forEach(loc=>{
         if (!loc || !loc.id) return;
-        const d=document.createElement('div');
-        let c=state.selectedLocationId===loc.id?'border-blue-500 bg-blue-900':'border-transparent bg-gray-900';
-        if(loc.id==='travel') c=state.selectedLocationId===loc.id?'border-purple-500 bg-purple-900':'border-purple-900/30 bg-gray-900';
-        d.className=`p-4 rounded-lg border-2 ${c} cursor-pointer flex justify-between items-center mb-2`;
-        let isMan = loc.id.startsWith('loc_') || loc.id === 'travel';
-        let ib = (loc.notes || loc.contactName || isMan) ? `<button class="p-2 text-gray-400 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : '';
-        d.innerHTML=`<div><div class="text-lg font-bold text-white uppercase">${loc.companyName||''}</div><div class="text-sm text-gray-400">${loc.name}</div></div><div class="flex gap-2">${ib}</div>`;
-        d.onclick=(e)=>{if(e.target.tagName!=='BUTTON'){
-            if(state.meta.wofExpiry && loc.id === 'travel'){
-                const w=new Date(state.meta.wofExpiry);
-                const days = (w.getTime()-Date.now())/(1000*60*60*24);
-                if(days < 0) { document.getElementById('wofBlockModal').classList.remove('hidden'); return; } 
-                else if (days < 14) {
-                    document.getElementById('wofWarnModal').classList.remove('hidden');
-                    document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days (${w.toLocaleDateString()})`;
-                    state.selectedLocationId=loc.id; 
-                    warmUpGps(); renderLocations(); updateArrivedButtonState(); return;
-                }
-            }
-            state.selectedLocationId=loc.id; warmUpGps(); renderLocations();updateArrivedButtonState();
-        }};l.appendChild(d);
+        
+        // --- Special Handling for Travel Tile ---
+        if(loc.id === 'travel') {
+            const isSel = state.selectedLocationId === 'travel';
+            const d = document.createElement('div');
+            // Full width (col-span-2) + Gradient Background
+            d.className = `col-span-2 p-4 rounded-xl shadow-lg flex items-center justify-between cursor-pointer transition-all border-2 ${isSel ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-transparent hover:border-white/20'} bg-gradient-to-r from-indigo-600 to-purple-700`;
+            
+            d.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/20 p-3 rounded-full text-2xl">🚗</div>
+                    <div>
+                        <div class="text-lg font-bold text-white tracking-tight">Travelling</div>
+                        <div class="text-xs text-indigo-200 font-medium">GPS Mileage Tracking</div>
+                    </div>
+                </div>
+                <div class="text-white/50 text-xl">→</div>
+            `;
+            d.onclick = () => {
+               if(state.meta.wofExpiry){
+                   const w=new Date(state.meta.wofExpiry);
+                   const days = (w.getTime()-Date.now())/(1000*60*60*24);
+                   if(days < 0) { document.getElementById('wofBlockModal').classList.remove('hidden'); return; } 
+                   else if (days < 14) {
+                       document.getElementById('wofWarnModal').classList.remove('hidden');
+                       document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days (${w.toLocaleDateString()})`;
+                       state.selectedLocationId=loc.id; 
+                       warmUpGps(); renderLocations(); updateArrivedButtonState(); return;
+                   }
+               }
+               state.selectedLocationId = 'travel';
+               warmUpGps(); renderLocations(); updateArrivedButtonState();
+            };
+            
+            // Add Info Button for Travel Settings
+            const infoBtn = document.createElement('button');
+            infoBtn.innerHTML = '⚙️';
+            infoBtn.className = "absolute top-2 right-2 text-white/40 hover:text-white text-xs p-2";
+            infoBtn.onclick = (e) => { e.stopPropagation(); editTravelSettings(); };
+            d.style.position = 'relative';
+            d.appendChild(infoBtn);
+            
+            l.appendChild(d);
+            return;
+        }
+
+        // --- Standard Site Tiles (Grid Items) ---
+        const d = document.createElement('div');
+        const isSel = state.selectedLocationId === loc.id;
+        // Compact card style
+        d.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800 hover:bg-gray-750'}`;
+        
+        let icon = "🏢";
+        if(loc.name.includes("Home")) icon = "🏠";
+        
+        d.innerHTML = `
+            <div class="flex justify-between items-start">
+                <span class="text-2xl">${icon}</span>
+                ${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) ? `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : ''}
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-400 uppercase truncate">${loc.companyName||''}</div>
+                <div class="text-sm font-bold text-white truncate leading-tight">${loc.name}</div>
+            </div>
+        `;
+        d.onclick = () => { state.selectedLocationId = loc.id; warmUpGps(); renderLocations(); updateArrivedButtonState(); };
+        l.appendChild(d);
     });
 }
 
@@ -673,6 +725,19 @@ function showSiteInfo(id,e){
 }
 
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
+
+function toggleHighRiskUI(){
+    // Visual feedback for toggle
+    const chk = document.getElementById('chkHighRisk');
+    const lbl = document.getElementById('lblHighRisk');
+    if(chk.checked){
+        lbl.classList.remove('text-gray-500');
+        lbl.classList.add('text-red-500', 'animate-pulse');
+    } else {
+        lbl.classList.add('text-gray-500');
+        lbl.classList.remove('text-red-500', 'animate-pulse');
+    }
+}
 
 function updateArrivedButtonState(){
     const v=DURATION_MAP[document.getElementById('durationSlider').value];
@@ -879,7 +944,6 @@ window.addEventListener('load', () => {
     }
     renderLocations();
     checkVehicleStatus();
-    startGPSMonitoring();
     
     // PWA & INSTALL LOGIC
     document.body.addEventListener('click',initAudio,{once:true});
