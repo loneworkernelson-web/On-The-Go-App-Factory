@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v79.3 (Global)</title>
+  <title>OTG Factory v79.4 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -76,7 +76,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v79.3 (Global Edition)</p>
+      <p class="text-gray-400">v79.4 (Global Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -94,6 +94,16 @@
           <div class="grid md:grid-cols-2 gap-8">
             <div class="space-y-4">
               <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
+              
+              <div>
+                  <div class="flex justify-between items-center mb-2">
+                      <label class="block text-blue-300 font-bold text-sm uppercase">App Icon Label</label>
+                      <span class="text-xs text-gray-500" id="charCount">6/12</span>
+                  </div>
+                  <input type="text" id="appName" maxlength="12" class="input-field text-center font-bold text-green-400 border-green-600/50" value="Safety" oninput="updateCharCount(this); saveInput(this)">
+                  <p class="text-[10px] text-gray-500 mt-1">Short name for the phone Home Screen (Max 12 chars).</p>
+              </div>
+
               <div>
                   <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key (Admin Password)</label>
                   <div class="flex gap-2">
@@ -403,6 +413,10 @@ Management`;
         document.getElementById('launchPack').classList.remove('hidden');
     }
 
+    function updateCharCount(el) {
+        document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`;
+    }
+
     // Standard Helper Functions (Minified slightly for brevity, full logic preserved)
     function saveInput(el) { if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); else localStorage.setItem('otg_' + el.id, el.value); }
     function generateMemorableKey() {
@@ -422,7 +436,7 @@ Management`;
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
     function showUrlInput() { if(Array.from(document.querySelectorAll('.checklist-checkbox')).every(i => i.checked)) { document.getElementById('urlInputSection').classList.remove('hidden'); setTimeout(()=>document.getElementById('urlInputSection').classList.remove('opacity-0'),100); }}
     function loadPersistedData() { 
-        ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
+        ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
         ['chkTravelReport', 'chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); });
     }
     function updateRegionInfo() {
@@ -497,6 +511,7 @@ Management`;
     function downloadZip() {
         const zip = new JSZip();
         const org = document.getElementById('orgName').value;
+        const appName = document.getElementById('appName').value || "Safety"; // NEW
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
         const logo = document.getElementById('logoUrl').value;
@@ -512,6 +527,7 @@ Management`;
         // INJECT KEYS & CONFIGS
         let wHtml = TEMPLATES.worker
             .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%APP_NAME%%/g, appName) // NEW
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
             .replace(/%%SHEET_URL%%/g, url)
             .replace(/%%LOGO_DATA%%/g, logo)
@@ -540,7 +556,15 @@ const urlsToCache = ['./','./index.html','./manifest.json'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });
 self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });
 `;
-        const manifest = { name: org, short_name: "Safety", start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: "#1e40af", icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
+        const manifest = { 
+            name: org, 
+            short_name: appName, // NEW
+            start_url: "./index.html", 
+            display: "standalone", 
+            background_color: "#111827", 
+            theme_color: "#1e40af", 
+            icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] 
+        };
 
         zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
         zip.folder("MonitorApp").file("index.html", mHtml);
