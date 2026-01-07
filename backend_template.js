@@ -1,8 +1,9 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.4 (Map Link Fix)
+ * OTG APPSUITE - MASTER BACKEND v79.5 (Smart Ledger Fix)
  * * UPDATES:
- * - Fixed Broken Google Maps URL in Email Alerts.
- * - Includes previous fixes: Ghost Worker (Header), CORB (JSONP), Smart Ledger.
+ * - Fixed: Travel Reports now correctly UPDATE (Close) the existing 'Travelling' row instead of creating a new one.
+ * - Logic: The system now ALWAYS scans for an active session before appending.
+ * - Includes: JSONP (CORB Fix), Header Skip (Ghost Fix), Map Link Fix.
  */
 
 // ==========================================
@@ -123,6 +124,7 @@ function handleWorkerPost(p, e) {
         sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
     }
 
+    // Process Images
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1']);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2']);
@@ -130,15 +132,14 @@ function handleWorkerPost(p, e) {
     if(p['Photo 4']) p4 = saveImage(p['Photo 4']);
     if(p['Signature']) sig = saveImage(p['Signature']);
 
-    let reportSummary = "";
+    // Process AI Summary
     const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
-    
     if(hasFormData) {
        try {
            const reportObj = JSON.parse(p['Visit Report Data']);
            if(CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
-               reportSummary = smartScribe(reportObj, p['Template Name'] || "Report", p['Notes']);
-               if(reportSummary) p['Notes'] = (p['Notes'] + "\n[AI]: " + reportSummary).trim();
+               const summary = smartScribe(reportObj, p['Template Name'] || "Report", p['Notes']);
+               if(summary) p['Notes'] = (p['Notes'] + "\n[AI]: " + summary).trim();
            }
        } catch(e) {}
     }
@@ -147,39 +148,65 @@ function handleWorkerPost(p, e) {
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
     const workerName = p['Worker Name'];
 
+    // --- SMART LEDGER LOGIC (v79.5) ---
+    // Goal: Find the "Open" session for this worker and update it. 
+    // Only create a new row if no open session exists.
+    
     let rowUpdated = false;
-
-    if (!hasFormData) {
-        const lastRow = sheet.getLastRow();
-        if (lastRow > 1) {
-            const startRow = Math.max(2, lastRow - 50);
-            const numRows = lastRow - startRow + 1;
-            const data = sheet.getRange(startRow, 1, numRows, 11).getValues();
-            
-            for (let i = data.length - 1; i >= 0; i--) {
-                const rowData = data[i];
-                if (rowData[2] === workerName) {
-                    const status = String(rowData[10]);
-                    if (!status.includes('DEPARTED') && !status.includes('SAFE') && !status.includes('COMPLETED')) {
-                        const targetRow = startRow + i;
-                        sheet.getRange(targetRow, 1).setValue(ts.toISOString());
-                        sheet.getRange(targetRow, 11).setValue(p['Alarm Status']);
-                        if (p['Notes'] && p['Notes'] !== rowData[11]) {
-                             const oldNotes = sheet.getRange(targetRow, 12).getValue();
-                             if (!oldNotes.includes(p['Notes'])) {
-                                 sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + p['Notes']).trim());
-                             }
-                        }
-                        if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
-                        if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
-                        rowUpdated = true;
-                        break;
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow > 1) {
+        const startRow = Math.max(2, lastRow - 50); // Scan last 50 rows
+        const numRows = lastRow - startRow + 1;
+        const data = sheet.getRange(startRow, 1, numRows, 11).getValues(); // Get Cols A-K
+        
+        // Loop backwards to find latest entry for this worker
+        for (let i = data.length - 1; i >= 0; i--) {
+            const rowData = data[i];
+            // Check Name (Col C/2) and ensure it's not a "Closed" status
+            if (rowData[2] === workerName) {
+                const status = String(rowData[10]);
+                const isClosed = status.includes('DEPARTED') || status.includes('SAFE') || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
+                
+                if (!isClosed) {
+                    // FOUND ACTIVE ROW -> UPDATE IT
+                    const targetRow = startRow + i;
+                    
+                    // 1. Update Core Fields
+                    sheet.getRange(targetRow, 1).setValue(ts.toISOString()); // Update Timestamp
+                    sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); // Update Status
+                    
+                    // 2. Append Notes (Prevent duplicates)
+                    if (p['Notes'] && p['Notes'] !== rowData[11]) {
+                         const oldNotes = sheet.getRange(targetRow, 12).getValue();
+                         if (!oldNotes.includes(p['Notes'])) {
+                             sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + p['Notes']).trim());
+                         }
                     }
+                    
+                    // 3. Update Hardware Telemetry
+                    if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
+                    if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
+                    
+                    // 4. MERGE REPORT DATA (If submitting a form to close the visit)
+                    if (hasFormData) {
+                        sheet.getRange(targetRow, 20).setValue(p['Visit Report Data']);
+                        if(p['Distance']) sheet.getRange(targetRow, 19).setValue(p['Distance']);
+                        if(sig) sheet.getRange(targetRow, 22).setValue(sig);
+                        if(p1) sheet.getRange(targetRow, 18).setValue(p1);
+                        if(p2) sheet.getRange(targetRow, 23).setValue(p2);
+                        if(p3) sheet.getRange(targetRow, 24).setValue(p3);
+                        if(p4) sheet.getRange(targetRow, 25).setValue(p4);
+                    }
+
+                    rowUpdated = true;
+                    break;
                 }
             }
         }
     }
 
+    // If no active row found (or it was a cold start), APPEND new row
     if (!rowUpdated) {
         const row = [
             ts.toISOString(),
@@ -237,10 +264,9 @@ function updateStaffStatus(p) {
     }
 }
 
-// FIXED: Correct Google Maps URL format
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: https://www.google.com/maps?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
+    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: http://googleusercontent.com/maps.google.com/?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
