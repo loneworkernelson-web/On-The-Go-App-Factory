@@ -37,10 +37,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .chip-btn:active { background-color: #2563eb; border-color: #3b82f6; transform: scale(0.95); }
 .chip-btn.selected { background-color: #2563eb; border-color: #3b82f6; color: white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
 .panic-mode { background-color: #7f1d1d !important; }
-.gps-bar { width: 4px; height: 12px; background-color: #4b5563; border-radius: 1px; transition: background-color 0.3s; }
-.gps-bar.active-red { background-color: #ef4444; }
-.gps-bar.active-amber { background-color: #f59e0b; }
-.gps-bar.active-green { background-color: #22c55e; }
+.gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
+.gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
+.gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
+.gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
 .menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
 .menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
 .wizard-step { display: none; height: 100%; flex-direction: column; }
@@ -272,7 +272,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 <div id="locationModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50"><h2 id="locModalTitle" class="text-xl font-bold mb-4 text-white">Edit Location</h2><input type="hidden" id="locId"><div class="space-y-4"><div><label class="text-xs text-gray-400 uppercase font-bold">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="e.g. Acme Corp"></div><div><label class="text-xs text-gray-400 uppercase font-bold">Site Name</label><input type="text" id="locName" class="form-input" placeholder="e.g. Head Office"></div><div><label class="text-xs text-gray-400 uppercase font-bold">Address</label><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1"><button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-lg font-bold text-xs shrink-0 shadow-lg">📍 GPS</button></div></div><div id="advLocOptions" class="pt-2 border-t border-gray-700"><div class="mb-3 bg-gray-900 p-2 rounded"><label class="text-xs text-gray-400 uppercase font-bold block mb-2">Report Required on Departure?</label><div class="flex gap-6"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-500 focus:ring-blue-500"><span class="text-sm text-white font-bold">Yes</span></label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-5 h-5 text-red-500 bg-gray-700 border-gray-500 focus:ring-red-500"><span class="text-sm text-gray-300">No</span></label></div></div><div><label class="text-xs text-gray-400 uppercase font-bold">Template Name</label><input type="text" id="locTemplate" class="form-input text-sm" placeholder="(Standard)"><p class="text-xs text-gray-500 mt-1">Must match 'Templates' sheet.</p></div></div></div><div class="mt-6 flex justify-end space-x-3"><button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-bold py-2 px-4 rounded-lg hidden">Delete</button><div class="flex-1"></div><button onclick="closeModal('location')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Save</button></div></div></div>
 <script>
-const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",orsKey:"%%ORS_API_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer;let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",currentBatteryLevel="100%";let calculatedDist=null;let gpsWarm=false;
+const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",orsKey:"%%ORS_API_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer;let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",currentBatteryLevel="100%";let calculatedDist=null;let gpsWarm=false;let gpsWatchId=null;
 
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
@@ -714,6 +714,22 @@ function startVisit(){
 
 function warmUpGps() {if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{},()=>{},{enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000);}
 
+function startGPSMonitoring() {
+    if (!'geolocation' in navigator) return;
+    const updateUI = (acc) => {
+        const bars = [document.getElementById('gps1'), document.getElementById('gps2'), document.getElementById('gps3')];
+        bars.forEach(b => b.className = 'gps-bar'); // Reset
+        if(acc <= 20) { bars.forEach(b => b.classList.add('active-green')); }
+        else if(acc <= 50) { bars[0].classList.add('active-amber'); bars[1].classList.add('active-amber'); }
+        else { bars[0].classList.add('active-red'); }
+    };
+    gpsWatchId = navigator.geolocation.watchPosition(
+        (pos) => { updateUI(pos.coords.accuracy); },
+        (err) => { console.warn("GPS Watch Error"); },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
+    );
+}
+
 function enterLockedScreen(){
     const l=state.locations.find(x=>x.id===state.activeVisit.locationId);
     document.getElementById('lockedLocationName').innerText=l.name;
@@ -736,17 +752,6 @@ function tick(){
     if(!state.activeVisit){clearInterval(timerInt);return;}
     const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
     const isZeroTolerance = state.activeVisit.highRisk; const escTime = isZeroTolerance ? 0 : (CONFIG.escalationMinutes||15)*60000; const timeUntilEscalation = remaining + escTime;
-    
-    // NEW: ZERO TOLERANCE 90s WARNING (v79.4)
-    if (state.activeVisit.highRisk) {
-        if (remaining <= 90000 && remaining > 88000 && !state.activeVisit.ninetySecWarned) {
-             state.activeVisit.ninetySecWarned = true;
-             playSound('warning');
-             // Delay speech slightly to let beep finish
-             setTimeout(() => speakWithAccent("Warning. Zero Tolerance Alarm activates in ninety seconds."), 1000);
-        }
-    }
-
     if(timeUntilEscalation <= 0) {
         document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe);
         document.getElementById('countdownTimer').innerText="ALARM SENT";
@@ -757,13 +762,13 @@ function tick(){
         document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
         
-        // STANDARD 2 MINUTE WARNING
+        // FIXED AUDIO SEQUENCING
         if(timeUntilEscalation<=120000&&timeUntilEscalation>118000){
             playSound('warning');
             navigator.vibrate([1000,500,1000]);
             setTimeout(() => {
                 speakWithAccent("Warning. Safety alarm will activate in two minutes.");
-            }, 1000); 
+            }, 1000); // 1s delay prevents audio overlap
         }
     } else {
         const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
@@ -873,6 +878,7 @@ window.addEventListener('load', () => {
     }
     renderLocations();
     checkVehicleStatus();
+    startGPSMonitoring();
     
     // PWA & INSTALL LOGIC
     document.body.addEventListener('click',initAudio,{once:true});
