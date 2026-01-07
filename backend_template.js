@@ -1,8 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.10 (Photo Sub-folders)
+ * OTG APPSUITE - MASTER BACKEND v79.12 (Tokenized Sync)
  * * UPDATES:
- * - Feature: Photos are now organized into sub-folders by Worker Name (e.g., "Safety Photos/John Doe/Photo.jpg").
- * - Includes: Photo Renaming, SMS Fix, Resolve Logic, Smart Ledger.
+ * - Logic: Sync now splits 'Assigned To' by commas to support multiple workers correctly.
+ * - Security: Prevents partial name matching (e.g., "John" seeing "Johnson's" sites).
+ * - Stability: Forces string conversion to prevent crashes on empty/number cells.
+ * - Includes: Photo Sub-folders, SMS Fix, Resolve Fix, Smart Ledger.
  */
 
 // ==========================================
@@ -383,19 +385,39 @@ function getDashboardData() {
     return {workers: workers, escalation_limit: CONFIG.ESCALATION_MINUTES};
 }
 
+// FIXED: Robust, Tokenized Sync Logic
 function getSyncData(workerName, deviceId) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const siteSheet = ss.getSheetByName('Sites');
     const sites = [];
+    
+    // Normalize Worker Name
+    const wNameSafe = (workerName || "").toString().toLowerCase().trim();
+
     if(siteSheet) {
         const sData = siteSheet.getDataRange().getValues();
         for(let i=1; i<sData.length; i++) {
-            const assigned = sData[i][0];
-            if(assigned === "ALL" || assigned.includes(workerName)) {
-                sites.push({ template: sData[i][1], company: sData[i][2], siteName: sData[i][3], address: sData[i][4], contactName: sData[i][5], contactPhone: sData[i][6], contactEmail: sData[i][7], notes: sData[i][8] });
+            const assignedRaw = sData[i][0];
+            const assignedStr = (assignedRaw || "").toString().toLowerCase();
+            
+            // Split by comma -> Trim -> Check Array inclusion
+            const allowedUsers = assignedStr.split(',').map(s => s.trim());
+            
+            if(allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
+                sites.push({ 
+                    template: sData[i][1], 
+                    company: sData[i][2], 
+                    siteName: sData[i][3], 
+                    address: sData[i][4], 
+                    contactName: sData[i][5], 
+                    contactPhone: sData[i][6], 
+                    contactEmail: sData[i][7], 
+                    notes: sData[i][8] 
+                });
             }
         }
     }
+    
     const tSheet = ss.getSheetByName('Templates');
     const forms = [];
     const cachedTemplates = {};
@@ -403,7 +425,11 @@ function getSyncData(workerName, deviceId) {
         const tData = tSheet.getDataRange().getValues();
         for(let i=1; i<tData.length; i++) {
             const row = tData[i];
-            if(row[2] === "ALL" || row[2].includes(workerName)) {
+            const assignedRaw = row[2];
+            const assignedStr = (assignedRaw || "").toString().toLowerCase();
+            const allowedUsers = assignedStr.split(',').map(s => s.trim());
+            
+            if(allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
                 const questions = [];
                 for(let q=4; q<9; q++) { if(row[q]) questions.push(row[q]); }
                 forms.push({name: row[1], type: row[0], questions: questions});
@@ -411,12 +437,13 @@ function getSyncData(workerName, deviceId) {
             }
         }
     }
+    
     const meta = {};
     const stSheet = ss.getSheetByName('Staff');
     if(stSheet) {
         const stData = stSheet.getDataRange().getValues();
         for(let i=1; i<stData.length; i++) {
-            if(stData[i][0] === workerName) {
+            if((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
                 if(!stData[i][4]) stSheet.getRange(i+1, 5).setValue(deviceId);
                 else if(stData[i][4] !== deviceId) return {status:"error", message:"DEVICE MISMATCH. Contact Admin."};
                 meta.lastVehCheck = stData[i][5];
@@ -444,34 +471,25 @@ function getGlobalForms() {
     return forms;
 }
 
-// FIXED: saveImage now creates/finds Sub-folders
 function saveImage(b64, workerName, isSignature) {
     if(!b64 || !CONFIG.PHOTOS_FOLDER_ID) return "";
     try {
         const data = Utilities.base64Decode(b64.split(',')[1]);
         const mainFolder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
         
-        // 1. Determine Target Folder (Main or Sub-folder)
         let targetFolder = mainFolder;
         if (workerName && workerName.length > 2) {
-            // Check if sub-folder exists
             const folders = mainFolder.getFoldersByName(workerName);
-            if (folders.hasNext()) {
-                targetFolder = folders.next();
-            } else {
-                // Create it
-                targetFolder = mainFolder.createFolder(workerName);
-            }
+            if (folders.hasNext()) { targetFolder = folders.next(); } 
+            else { targetFolder = mainFolder.createFolder(workerName); }
         }
 
-        // 2. Format Filename
         const now = new Date();
         const timeStr = Utilities.formatDate(now, CONFIG.TIMEZONE, "yyyy-MM-dd_HH-mm");
         const safeName = (workerName || "Unknown").replace(/[^a-zA-Z0-9]/g, ''); 
         const type = isSignature ? "Signature" : "Photo";
         const fileName = `${timeStr}_${safeName}_${type}_${Math.floor(Math.random()*100)}.jpg`;
 
-        // 3. Save File
         const blob = Utilities.newBlob(data, 'image/jpeg', fileName);
         const file = targetFolder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
