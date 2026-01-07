@@ -99,7 +99,7 @@
         <div class="flex justify-between items-center mb-2">
             <div class="flex items-center gap-4">
                 <img id="orgLogo" src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1" onerror="this.style.display='none'">
-                <div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v79.2</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div>
+                <div><h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor v79.4</span></h1><div class="flex items-center gap-2 text-xs text-gray-400"><span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span><span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span></div></div>
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
@@ -330,7 +330,7 @@ function renderGrid() {
 
 function escapeHtml(text) { 
     if (!text) return ""; 
-    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); 
+    return String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'"); 
 }
 
 function initMap() { 
@@ -389,11 +389,17 @@ function setFilter(f) { currentFilter = f; const btnAct = document.getElementByI
 function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; document.getElementById('resNameInput').value = ""; document.getElementById('resNoteInput').value = ""; }
 function closeResolve() { document.getElementById('resolveModal').classList.add('hidden'); }
 
+// FIXED: Case-insensitive name matching
 function submitResolution() { 
     const targetName = document.getElementById('resWorkerNameDisplay').innerText; 
-    const typedName = document.getElementById('resNameInput').value.trim(); 
+    const typedName = document.getElementById('resNameInput').value; 
     const note = document.getElementById('resNoteInput').value.trim(); 
-    if(targetName !== typedName) { alert("Error: Name does not match exactly."); return; } 
+    
+    // NEW: Robust Comparison
+    if(targetName.trim().toLowerCase() !== typedName.trim().toLowerCase()) { 
+        alert("Error: Name does not match exactly."); return; 
+    } 
+    
     if(note.length < 5) { alert("Error: Please enter a resolution note."); return; } 
     
     const formData = new FormData(); 
