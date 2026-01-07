@@ -1,9 +1,8 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.8 (SMS & Logic Fix)
+ * OTG APPSUITE - MASTER BACKEND v79.10 (Photo Sub-folders)
  * * UPDATES:
- * - SMS: Forces E.164 phone formatting using COUNTRY_CODE to fix TextBelt delivery.
- * - Logic: Prevented duplicate rows when a worker confirms safety after a manual clear.
- * - Logic: Resolve logic now correctly updates rows even if they are in 'MANUALLY CLEARED' state.
+ * - Feature: Photos are now organized into sub-folders by Worker Name (e.g., "Safety Photos/John Doe/Photo.jpg").
+ * - Includes: Photo Renaming, SMS Fix, Resolve Logic, Smart Ledger.
  */
 
 // ==========================================
@@ -158,12 +157,14 @@ function handleWorkerPost(p, e) {
         sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
     }
 
+    const workerName = p['Worker Name'];
+
     let p1="", p2="", p3="", p4="", sig="";
-    if(p['Photo 1']) p1 = saveImage(p['Photo 1']);
-    if(p['Photo 2']) p2 = saveImage(p['Photo 2']);
-    if(p['Photo 3']) p3 = saveImage(p['Photo 3']);
-    if(p['Photo 4']) p4 = saveImage(p['Photo 4']);
-    if(p['Signature']) sig = saveImage(p['Signature']);
+    if(p['Photo 1']) p1 = saveImage(p['Photo 1'], workerName);
+    if(p['Photo 2']) p2 = saveImage(p['Photo 2'], workerName);
+    if(p['Photo 3']) p3 = saveImage(p['Photo 3'], workerName);
+    if(p['Photo 4']) p4 = saveImage(p['Photo 4'], workerName);
+    if(p['Signature']) sig = saveImage(p['Signature'], workerName, true); 
 
     const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
     if(hasFormData) {
@@ -178,7 +179,6 @@ function handleWorkerPost(p, e) {
 
     const ts = new Date();
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
-    const workerName = p['Worker Name'];
 
     let rowUpdated = false;
     const lastRow = sheet.getLastRow();
@@ -192,8 +192,6 @@ function handleWorkerPost(p, e) {
             const rowData = data[i];
             if (rowData[2] === workerName) {
                 const status = String(rowData[10]);
-                // FIX: 'MANUALLY CLEARED' is NOT considered Closed for the purpose of worker updates.
-                // This allows the worker to update the row to 'SAFE' or 'DEPARTED' even after a manager resolves it.
                 const isClosed = status.includes('DEPARTED') || (status.includes('SAFE') && !status.includes('MANUALLY')) || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
                 
                 if (!isClosed) {
@@ -285,23 +283,13 @@ function updateStaffStatus(p) {
     }
 }
 
-// Helper to enforce E.164 formatting for TextBelt
 function _cleanPhone(num) {
     if (!num) return null;
-    let n = num.toString().replace(/[^0-9]/g, ''); // Strip spaces, dashes, pluses
-    // If empty after strip, invalid
+    let n = num.toString().replace(/[^0-9]/g, ''); 
     if (n.length < 5) return null;
-    
-    // If it starts with '0', strip it and prepend Country Code
-    if (n.startsWith('0')) {
-        return (CONFIG.COUNTRY_CODE || "+64") + n.substring(1);
-    }
-    // If it starts with Country Code (e.g. 64), just add +
+    if (n.startsWith('0')) { return (CONFIG.COUNTRY_CODE || "+64") + n.substring(1); }
     const ccRaw = (CONFIG.COUNTRY_CODE || "").replace('+', '');
-    if (n.startsWith(ccRaw)) {
-        return "+" + n;
-    }
-    // Default fallback: prepend +
+    if (n.startsWith(ccRaw)) { return "+" + n; }
     return "+" + n;
 }
 
@@ -314,24 +302,19 @@ function triggerAlerts(p, type) {
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
     
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']]
-            .map(n => _cleanPhone(n)) // Clean numbers before sending
-            .filter(n => n);
-            
+        const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
         numbers.forEach(num => { 
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', { 
                     method: 'post', 
-                    contentType: 'application/json', // Force JSON payload
+                    contentType: 'application/json', 
                     payload: JSON.stringify({ 
                         phone: num, 
                         message: `${subject} ${gpsLink}`, 
                         key: CONFIG.TEXTBELT_API_KEY 
                     }) 
                 }); 
-            } catch(e) {
-                console.error("SMS Failed: " + e.toString());
-            }
+            } catch(e) { console.error("SMS Failed: " + e.toString()); }
         });
     }
 }
@@ -461,16 +444,39 @@ function getGlobalForms() {
     return forms;
 }
 
-function saveImage(b64) {
+// FIXED: saveImage now creates/finds Sub-folders
+function saveImage(b64, workerName, isSignature) {
     if(!b64 || !CONFIG.PHOTOS_FOLDER_ID) return "";
     try {
         const data = Utilities.base64Decode(b64.split(',')[1]);
-        const blob = Utilities.newBlob(data, 'image/jpeg', 'photo_' + Date.now() + '.jpg');
-        const folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
-        const file = folder.createFile(blob);
+        const mainFolder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
+        
+        // 1. Determine Target Folder (Main or Sub-folder)
+        let targetFolder = mainFolder;
+        if (workerName && workerName.length > 2) {
+            // Check if sub-folder exists
+            const folders = mainFolder.getFoldersByName(workerName);
+            if (folders.hasNext()) {
+                targetFolder = folders.next();
+            } else {
+                // Create it
+                targetFolder = mainFolder.createFolder(workerName);
+            }
+        }
+
+        // 2. Format Filename
+        const now = new Date();
+        const timeStr = Utilities.formatDate(now, CONFIG.TIMEZONE, "yyyy-MM-dd_HH-mm");
+        const safeName = (workerName || "Unknown").replace(/[^a-zA-Z0-9]/g, ''); 
+        const type = isSignature ? "Signature" : "Photo";
+        const fileName = `${timeStr}_${safeName}_${type}_${Math.floor(Math.random()*100)}.jpg`;
+
+        // 3. Save File
+        const blob = Utilities.newBlob(data, 'image/jpeg', fileName);
+        const file = targetFolder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         return file.getUrl();
-    } catch(e) { return "Error saving photo"; }
+    } catch(e) { return "Error saving photo: " + e.toString(); }
 }
 
 function smartScribe(data, type, notes) {
