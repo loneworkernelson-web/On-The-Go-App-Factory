@@ -736,6 +736,17 @@ function tick(){
     if(!state.activeVisit){clearInterval(timerInt);return;}
     const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
     const isZeroTolerance = state.activeVisit.highRisk; const escTime = isZeroTolerance ? 0 : (CONFIG.escalationMinutes||15)*60000; const timeUntilEscalation = remaining + escTime;
+    
+    // NEW: ZERO TOLERANCE 90s WARNING (v79.4)
+    if (state.activeVisit.highRisk) {
+        if (remaining <= 90000 && remaining > 88000 && !state.activeVisit.ninetySecWarned) {
+             state.activeVisit.ninetySecWarned = true;
+             playSound('warning');
+             // Delay speech slightly to let beep finish
+             setTimeout(() => speakWithAccent("Warning. Zero Tolerance Alarm activates in ninety seconds."), 1000);
+        }
+    }
+
     if(timeUntilEscalation <= 0) {
         document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe);
         document.getElementById('countdownTimer').innerText="ALARM SENT";
@@ -746,13 +757,13 @@ function tick(){
         document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
         
-        // FIXED AUDIO SEQUENCING
+        // STANDARD 2 MINUTE WARNING
         if(timeUntilEscalation<=120000&&timeUntilEscalation>118000){
             playSound('warning');
             navigator.vibrate([1000,500,1000]);
             setTimeout(() => {
                 speakWithAccent("Warning. Safety alarm will activate in two minutes.");
-            }, 1000); // 1s delay prevents audio overlap
+            }, 1000); 
         }
     } else {
         const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
