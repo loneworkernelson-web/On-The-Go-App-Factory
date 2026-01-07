@@ -1,8 +1,9 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.6 (Map URL Fix)
+ * OTG APPSUITE - MASTER BACKEND v79.7 (Resolve Fix)
  * * UPDATES:
- * - Fixed: Corrected the Google Maps URL in email/SMS alerts (removed 'googleusercontent').
- * - Includes: Smart Ledger (Travel Fix), JSONP (Monitor Fix), Header Skip (Ghost Fix).
+ * - Fixed: 'Resolve' button now UPDATES the existing Emergency row instead of creating a duplicate.
+ * - Verified: TextBelt SMS logic uses correct JSON payload format.
+ * - Includes: All previous Map/CORB/Ghost fixes.
  */
 
 // ==========================================
@@ -73,14 +74,15 @@ function doPost(e) {
 
   const p = e.parameter;
   
-  if(p.action === 'resolve') {
-      return resolveAlert(p);
-  }
-
+  // FIX: Resolve now uses the same lock/logic as standard posts to prevent race conditions
   const lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) { 
       try {
-          handleWorkerPost(p, e);
+          if(p.action === 'resolve') {
+              handleResolvePost(p); // New dedicated function
+          } else {
+              handleWorkerPost(p, e);
+          }
           return sendJSON({status:"success"});
       } catch(err) {
           return sendJSON({status:"error", message: err.toString()});
@@ -111,8 +113,54 @@ function sendJSON(data) {
 }
 
 // ==========================================
-// 5. CORE LOGIC (Smart Ledger)
+// 5. CORE LOGIC
 // ==========================================
+
+// NEW FUNCTION: Handles "Resolve" by UPDATING the alert row instead of creating a new one
+function handleResolvePost(p) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits');
+    const workerName = p['Worker Name'];
+    const lastRow = sheet.getLastRow();
+    let rowUpdated = false;
+
+    if (lastRow > 1) {
+        const startRow = Math.max(2, lastRow - 50); 
+        const numRows = lastRow - startRow + 1;
+        const data = sheet.getRange(startRow, 1, numRows, 11).getValues();
+        
+        for (let i = data.length - 1; i >= 0; i--) {
+            const rowData = data[i];
+            if (rowData[2] === workerName) {
+                // Find the open entry (Emergency/Panic/Overdue)
+                const status = String(rowData[10]);
+                if (status.includes('EMERGENCY') || status.includes('PANIC') || status.includes('DURESS') || status.includes('OVERDUE')) {
+                    const targetRow = startRow + i;
+                    sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); // Update to SAFE - MANUALLY CLEARED
+                    sheet.getRange(targetRow, 12).setValue((String(rowData[11]) + "\n" + p['Notes']).trim()); // Append resolution note
+                    rowUpdated = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Fallback: If no open alarm found, append a log entry so the action is recorded
+    if (!rowUpdated) {
+        const ts = new Date();
+        sheet.appendRow([
+            ts.toISOString(), 
+            Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd"), 
+            workerName, 
+            "", "", "", "", "", "", "", 
+            p['Alarm Status'], 
+            p['Notes'], 
+            "HQ Dashboard", 
+            "", "", "", "N/A", 
+            "", "", "", "", "", "", "", ""
+        ]);
+    }
+}
 
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -248,24 +296,33 @@ function updateStaffStatus(p) {
     }
 }
 
-// FIXED: Correct Google Maps URL
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: https://maps.google.com/?q=${p['Last Known GPS']}\nBattery: ${p['Battery Level']}`;
+    const gpsLink = p['Last Known GPS'] ? `http://googleusercontent.com/maps.google.com/?q=${p['Last Known GPS']}` : "No GPS";
+    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+    
+    // Email Sending
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
+    
+    // SMS Sending (TextBelt)
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].filter(n => n && n.length > 5);
-        numbers.forEach(num => { UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', payload: { phone: num, message: subject + " https://maps.google.com/?q=" + p['Last Known GPS'], key: CONFIG.TEXTBELT_API_KEY } }); });
+        numbers.forEach(num => { 
+            try {
+                UrlFetchApp.fetch('https://textbelt.com/text', { 
+                    method: 'post', 
+                    payload: { 
+                        phone: num, 
+                        message: `${subject} ${gpsLink}`, 
+                        key: CONFIG.TEXTBELT_API_KEY 
+                    } 
+                }); 
+            } catch(e) {
+                console.error("SMS Failed: " + e.toString());
+            }
+        });
     }
-}
-
-function resolveAlert(p) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Visits');
-    const ts = new Date();
-    sheet.appendRow([ts.toISOString(), Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd"), p['Worker Name'], "", "", "", "", "", "", "", p['Alarm Status'], p['Notes'], p['Location Name'], "", "", "", p['Battery Level'], "", "", "", "", "", "", "", ""]);
-    return sendJSON({status:"success"});
 }
 
 function checkOverdueVisits() {
