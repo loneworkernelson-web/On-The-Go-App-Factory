@@ -187,7 +187,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </button>
         </div>
 
-        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
+        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="forceSync(true)" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
     </div>
 </div>
 
@@ -213,9 +213,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div id="startReminderBanner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-200 text-xs rounded p-2 mb-2 text-center">Reminder: Don't forget to start your timer when you arrive.</div>
-        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
+        
         <div id="locationList" class="space-y-3 pb-4"></div>
-        <div class="flex gap-3 mt-4"><button onclick="forceSync()" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button></div>
+        <div class="flex gap-3 mt-4"><button onclick="forceSync(true)" class="flex-1 py-4 bg-gray-700 text-blue-300 font-bold rounded-xl shadow-lg border border-gray-600 text-sm">↻ Sync</button><button onclick="openLocModal()" class="flex-[2] py-4 border-2 border-dashed border-gray-600 text-gray-400 rounded-xl hover:border-gray-500 hover:text-white transition font-bold text-sm">+ Add Manual Location</button></div>
     </div>
     <div class="footer-bar">
         <label class="flex items-center justify-between bg-gray-800 p-3 rounded mb-4 border border-gray-700">
@@ -484,7 +484,7 @@ function wizSave(){
     saveState();
     document.getElementById('setupWizard').classList.add('hidden');
     navigate('main');
-    forceSync();
+    forceSync(true); // Trigger initial sync on setup complete
 }
 
 function cleanGlobalPhone(num) {
@@ -515,9 +515,15 @@ function populateWizard(){
 function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;}
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
-function forceSync(){
-    if(!state.settings.workerName)return alert("Please enter your name in Settings first.");
-    document.getElementById('uploadBanner').classList.remove('hidden');
+// UPDATED: Silent Sync Logic
+function forceSync(isManual = false){
+    if(!state.settings.workerName) return; 
+    
+    // Only show "Syncing" toast if manually triggered
+    if(isManual) showToast("Syncing..."); 
+    
+    // NOTE: Removed uploadBanner toggle (the visual clutter)
+    
     const dId=getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r=>r.text())
@@ -527,17 +533,17 @@ function forceSync(){
     })
     .then(data=>{
         if(data.status==="error"){
-            document.getElementById('uploadBanner').classList.add('hidden');
             if(data.message.includes("ACCESS DENIED")){
                 alert("⛔ ACCESS DENIED\n\n"+data.message);
                 startWizard();
             } else {
-                alert("❌ Sync Error: " + data.message);
+                if(isManual) alert("❌ Sync Error: " + data.message);
             }
             return;
         }
-        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
         
+        // --- DATA PROCESSING (Identical to before) ---
+        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
         const safeSites = data.sites || [];
         const ms = safeSites.map(s=>({
             id:'site_'+s.siteName.replace(/\s/g,''),
@@ -568,12 +574,12 @@ function forceSync(){
         saveState();
         renderLocations();
         checkVehicleStatus();
-        document.getElementById('uploadBanner').classList.add('hidden');
-        showToast("Sync Complete!");
+        
+        // Only show "Success" toast if manually triggered
+        if(isManual) showToast("Sync Complete!");
     })
     .catch(e=>{
-        document.getElementById('uploadBanner').classList.add('hidden');
-        alert("Sync Failed: "+e.message);
+        if(isManual) alert("Sync Failed: "+e.message);
     });
 }
 
@@ -874,11 +880,10 @@ window.addEventListener('load', () => {
     } else {
         if(state.activeVisit) enterLockedScreen();
         else navigate('main');
-        if(navigator.onLine) forceSync();
+        if(navigator.onLine) forceSync(false); // Silent sync on load
     }
     renderLocations();
     checkVehicleStatus();
-    startGPSMonitoring();
     
     // PWA & INSTALL LOGIC
     document.body.addEventListener('click',initAudio,{once:true});
