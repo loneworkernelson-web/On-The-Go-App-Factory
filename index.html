@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v79.4 (Global)</title>
+  <title>OTG Factory v79.20 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -76,7 +76,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v79.4 (Global Edition)</p>
+      <p class="text-gray-400">v79.20 (Global Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -104,15 +104,30 @@
                   <p class="text-[10px] text-gray-500 mt-1">Short name for the phone Home Screen (Max 12 chars).</p>
               </div>
 
-              <div>
-                  <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Secret Key (Admin Password)</label>
-                  <div class="flex gap-2">
-                      <input type="text" id="secretKey" class="input-field text-yellow-400 font-mono tracking-wider" placeholder="Generating..." oninput="saveInput(this); validateKey();">
-                      <button onclick="generateMemorableKey()" class="btn bg-gray-700 hover:bg-gray-600 text-white" title="Generate New Key">🔄</button>
+              <div class="p-4 bg-gray-900 rounded-lg border border-gray-700">
+                  <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-wider">🔐 Security Keys</h3>
+                  
+                  <div class="mb-4">
+                      <label class="block text-blue-300 font-bold mb-2 text-sm">Secret Key (Admin)</label>
+                      <div class="flex gap-2">
+                          <input type="text" id="secretKey" class="input-field text-yellow-400 font-mono tracking-wider text-sm" placeholder="Generating..." oninput="saveInput(this); validateKey();">
+                          <button onclick="generateMemorableKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white" title="Generate New Key">🔄</button>
+                      </div>
+                      <p id="keyStrength" class="text-xs mt-2 font-bold text-green-400">✅ Strength: Good</p>
                   </div>
-                  <p id="keyStrength" class="text-xs mt-2 font-bold text-green-400">✅ Strength: Good</p>
-                  <p class="text-xs text-red-400 mt-1 font-bold bg-red-900/20 border border-red-900/50 p-2 rounded">⚠️ SECURITY CRITICAL: This key protects your database. Keep it safe and do not share it.</p>
+
+                  <div>
+                      <label class="block text-blue-300 font-bold mb-2 text-sm">Worker Key (App Connection)</label>
+                      <div class="flex gap-2">
+                          <input type="text" id="workerKey" class="input-field text-green-400 font-mono tracking-wider text-sm" placeholder="Generating..." oninput="saveInput(this)">
+                          <button onclick="generateMemorableKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white" title="Generate New Key">🔄</button>
+                      </div>
+                      <div class="mt-2 text-xs bg-orange-900/20 border border-orange-700/50 p-2 rounded text-orange-200">
+                          <strong>⚠️ UPDATE WARNING:</strong> If you are updating an existing system, you MUST paste your OLD Worker Key here. If you generate a new one, all existing phones will disconnect.
+                      </div>
+                  </div>
               </div>
+
               <div>
                   <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Region / Country</label>
                   <select id="countrySelect" class="input-field cursor-pointer" onchange="updateRegionInfo()">
@@ -221,64 +236,64 @@
 
         <div id="step3" class="step-section space-y-6">
           <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-             <h3 class="font-bold text-green-400 text-lg">1. Install System Code</h3>
-             <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click "Copy Script" (below).</span></div>
-             <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Go to your Google Sheet > <strong>Extensions > Apps Script</strong>.</span></div>
-             <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Delete any code there. <strong>Paste</strong> the code.</span></div>
-             <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Save</strong> (Disk icon).</span></div>
-             <div class="flex items-center gap-4 mt-2">
-                 <button onclick="copyScript()" class="btn bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex-1">📋 COPY SCRIPT TO CLIPBOARD</button>
-                 <button onclick="document.getElementById('codeContainer').classList.toggle('hidden')" class="text-xs text-gray-500 underline">Show Source Code (Advanced)</button>
-             </div>
-             <div id="codeContainer" class="hidden relative mt-2"><pre id="codeDisplay" class="code-scroll h-48">Generating code...</pre></div>
+              <h3 class="font-bold text-green-400 text-lg">1. Install System Code</h3>
+              <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click "Copy Script" (below).</span></div>
+              <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Go to your Google Sheet > <strong>Extensions > Apps Script</strong>.</span></div>
+              <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Delete any code there. <strong>Paste</strong> the code.</span></div>
+              <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Save</strong> (Disk icon).</span></div>
+              <div class="flex items-center gap-4 mt-2">
+                  <button onclick="copyScript()" class="btn bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex-1">📋 COPY SCRIPT TO CLIPBOARD</button>
+                  <button onclick="document.getElementById('codeContainer').classList.toggle('hidden')" class="text-xs text-gray-500 underline">Show Source Code (Advanced)</button>
+              </div>
+              <div id="codeContainer" class="hidden relative mt-2"><pre id="codeDisplay" class="code-scroll h-48">Generating code...</pre></div>
           </div>
 
           <div class="bg-gray-900 p-6 rounded-xl border border-purple-600/50 space-y-4">
-             <div class="flex items-center gap-3"><span class="text-2xl">⏰</span><div><h3 class="font-bold text-purple-400 text-lg">2. Wake Up The System (Triggers)</h3><p class="text-xs text-gray-400">You must set "Watchdog" timers, or safety alarms will not fire automatically.</p></div></div>
-             <div class="space-y-4">
-                 <div class="bg-gray-800 p-3 rounded border border-purple-500/30">
-                     <h4 class="font-bold text-white text-sm mb-2">Safety Watchdog</h4>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click the <strong>Clock Icon</strong> (Triggers) on the left sidebar.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> (Blue button, bottom right of page).</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>checkOverdueVisits</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Leave "which deployment" as <strong>Head</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
-                 </div>
+              <div class="flex items-center gap-3"><span class="text-2xl">⏰</span><div><h3 class="font-bold text-purple-400 text-lg">2. Wake Up The System (Triggers)</h3><p class="text-xs text-gray-400">You must set "Watchdog" timers, or safety alarms will not fire automatically.</p></div></div>
+              <div class="space-y-4">
+                  <div class="bg-gray-800 p-3 rounded border border-purple-500/30">
+                      <h4 class="font-bold text-white text-sm mb-2">Safety Watchdog</h4>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click the <strong>Clock Icon</strong> (Triggers) on the left sidebar.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> (Blue button, bottom right of page).</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>checkOverdueVisits</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Leave "which deployment" as <strong>Head</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
+                  </div>
 
-                 <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded text-xs text-gray-300">
-                     <p class="font-bold text-blue-300 mb-1">ℹ️ Permission Help:</p>
-                     <ul class="list-disc pl-4 mt-1 space-y-1">
-                         <li>When you click Save, Google will ask for permission.</li>
-                         <li>Click <strong>Review Permissions</strong> -> Choose Account.</li>
-                         <li>If you see "Google hasn't verified this app":</li>
-                         <li>Click <strong>Advanced</strong> (small text) -> <strong>Go to ... (unsafe)</strong>.</li>
-                         <li>Type "Continue" or "Allow" if asked.</li>
-                     </ul>
-                 </div>
+                  <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded text-xs text-gray-300">
+                      <p class="font-bold text-blue-300 mb-1">ℹ️ Permission Help:</p>
+                      <ul class="list-disc pl-4 mt-1 space-y-1">
+                          <li>When you click Save, Google will ask for permission.</li>
+                          <li>Click <strong>Review Permissions</strong> -> Choose Account.</li>
+                          <li>If you see "Google hasn't verified this app":</li>
+                          <li>Click <strong>Advanced</strong> (small text) -> <strong>Go to ... (unsafe)</strong>.</li>
+                          <li>Type "Continue" or "Allow" if asked.</li>
+                      </ul>
+                  </div>
 
-                 <div class="bg-gray-800 p-3 rounded border border-gray-600">
-                     <h4 class="font-bold text-white text-sm mb-2">Weekly Summary (Optional)</h4>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> again (bottom right).</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>sendWeeklySummary</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Week timer</strong>.</span></div>
-                     <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Day of week: <strong>Monday</strong>. Click <strong>Save</strong>.</span></div>
-                 </div>
-             </div>
+                  <div class="bg-gray-800 p-3 rounded border border-gray-600">
+                      <h4 class="font-bold text-white text-sm mb-2">Weekly Summary (Optional)</h4>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> again (bottom right).</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>sendWeeklySummary</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Week timer</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Day of week: <strong>Monday</strong>. Click <strong>Save</strong>.</span></div>
+                  </div>
+              </div>
           </div>
 
           <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-             <h3 class="font-bold text-yellow-400 text-lg">3. Publish to Web</h3>
-             <p class="text-xs text-gray-400 mb-2">Tick off each task as you complete it:</p>
-             <div class="space-y-2">
-                 <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Deploy > New Deployment</strong> (Top right blue button).</span></div>
-                 <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select type: <strong>Web App</strong> (Gear icon).</span></div>
-                 <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select "Execute as: <strong>Me</strong>".</span></div>
-                 <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm font-bold text-yellow-300">CRITICAL: Set "Who has access" to "Anyone".</span></div>
-                 <div class="checklist-item" onclick="toggleCheck(this); showUrlInput()"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click Deploy and copy the <strong>Web App URL</strong> (ends in /exec).</span></div>
-             </div>
+              <h3 class="font-bold text-yellow-400 text-lg">3. Publish to Web</h3>
+              <p class="text-xs text-gray-400 mb-2">Tick off each task as you complete it:</p>
+              <div class="space-y-2">
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Deploy > New Deployment</strong> (Top right blue button).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select type: <strong>Web App</strong> (Gear icon).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select "Execute as: <strong>Me</strong>".</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm font-bold text-yellow-300">CRITICAL: Set "Who has access" to "Anyone".</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this); showUrlInput()"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click Deploy and copy the <strong>Web App URL</strong> (ends in /exec).</span></div>
+              </div>
           </div>
 
           <div id="urlInputSection" class="hidden opacity-0 transition-opacity duration-500">
@@ -344,7 +359,6 @@
     // IMPORTANT: File names must match exactly what you saved locally
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
     let TEMPLATES = {};
-    const workerKey = "wk_" + Math.random().toString(36).substr(2, 9); 
 
     const REGION_DATA = {
         "+64": { name: "New Zealand", term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" },
@@ -356,10 +370,14 @@
     let selectedConfig = REGION_DATA["+64"]; 
 
     window.onload = async () => { 
-        document.getElementById('mainContent').classList.remove('blur-sm'); // Remove blur for dev
-        document.getElementById('disclaimerModal').style.display = 'none'; // Auto-close for dev
+        document.getElementById('mainContent').classList.remove('blur-sm'); 
+        document.getElementById('disclaimerModal').style.display = 'none'; 
         loadPersistedData(); 
-        if(!document.getElementById('secretKey').value) generateMemorableKey();
+        
+        // Ensure keys exist or prompt generation
+        if(!document.getElementById('secretKey').value) generateMemorableKey('secretKey');
+        if(!document.getElementById('workerKey').value) generateMemorableKey('workerKey');
+        
         updateRegionInfo(); 
         setupDragDrop(); 
         
@@ -417,15 +435,28 @@ Management`;
         document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`;
     }
 
-    // Standard Helper Functions (Minified slightly for brevity, full logic preserved)
-    function saveInput(el) { if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); else localStorage.setItem('otg_' + el.id, el.value); }
-    function generateMemorableKey() {
+    // Standard Helper Functions
+    function saveInput(el) { 
+        if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); 
+        else localStorage.setItem('otg_' + el.id, el.value); 
+    }
+    
+    function generateMemorableKey(targetId) {
         const adjs = ['Safe','Swift','Blue','Red','Gold','Green','Bright','Firm','Iron','Steel'];
         const nouns = ['Guard','Watch','Shield','Falcon','Eagle','Hawk','Post','Base','Fort','Gate'];
         const num = Math.floor(Math.random() * 90) + 10;
-        document.getElementById('secretKey').value = `${adjs[Math.floor(Math.random()*adjs.length)]}-${nouns[Math.floor(Math.random()*nouns.length)]}-${num}`;
-        saveInput(document.getElementById('secretKey')); validateKey();
+        let prefix = targetId === 'secretKey' ? 'OTG_M_' : 'OTG_W_';
+        // For Worker key, use random string for better security, for Master use memorable
+        if (targetId === 'workerKey') {
+             prefix = "wk_" + Math.random().toString(36).substr(2, 9);
+             document.getElementById(targetId).value = prefix;
+        } else {
+             document.getElementById(targetId).value = `${adjs[Math.floor(Math.random()*adjs.length)]}-${nouns[Math.floor(Math.random()*nouns.length)]}-${num}`;
+        }
+        saveInput(document.getElementById(targetId)); 
+        if(targetId === 'secretKey') validateKey();
     }
+    
     function validateKey() {
         const k = document.getElementById('secretKey').value;
         const el = document.getElementById('keyStrength');
@@ -435,10 +466,12 @@ Management`;
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
     function showUrlInput() { if(Array.from(document.querySelectorAll('.checklist-checkbox')).every(i => i.checked)) { document.getElementById('urlInputSection').classList.remove('hidden'); setTimeout(()=>document.getElementById('urlInputSection').classList.remove('opacity-0'),100); }}
+    
     function loadPersistedData() { 
-        ['orgName', 'secretKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
+        ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); 
         ['chkTravelReport', 'chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); });
     }
+    
     function updateRegionInfo() {
         const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA[""];
         document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('timezoneVal').value = selectedConfig.tz;
@@ -467,7 +500,7 @@ Management`;
         if(!TEMPLATES.backend) return;
         const code = TEMPLATES.backend
             .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
-            .replace(/%%WORKER_KEY%%/g, workerKey)
+            .replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value)
             .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
             .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
             .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
@@ -477,7 +510,7 @@ Management`;
             .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
             .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked)
             .replace('%%VEHICLE_TERM%%', selectedConfig.term)
-            .replace('%%COUNTRY_PREFIX%%', document.getElementById('countrySelect').value); // FIXED: Added this line
+            .replace('%%COUNTRY_PREFIX%%', document.getElementById('countrySelect').value);
         document.getElementById('codeDisplay').textContent = code;
     }
     
@@ -511,9 +544,10 @@ Management`;
     function downloadZip() {
         const zip = new JSZip();
         const org = document.getElementById('orgName').value;
-        const appName = document.getElementById('appName').value || "Safety"; // NEW
+        const appName = document.getElementById('appName').value || "Safety";
         const url = document.getElementById('webAppUrl').value;
         const secret = document.getElementById('secretKey').value;
+        const worker = document.getElementById('workerKey').value;
         const logo = document.getElementById('logoUrl').value;
         const orsKey = document.getElementById('orsKey').value;
         const checkinEnabled = document.getElementById('chkCheckin').checked;
@@ -527,11 +561,11 @@ Management`;
         // INJECT KEYS & CONFIGS
         let wHtml = TEMPLATES.worker
             .replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%APP_NAME%%/g, appName) // NEW
+            .replace(/%%APP_NAME%%/g, appName)
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
             .replace(/%%SHEET_URL%%/g, url)
             .replace(/%%LOGO_DATA%%/g, logo)
-            .replace(/%%SECRET_KEY%%/g, workerKey)
+            .replace(/%%SECRET_KEY%%/g, worker) // Use Worker Key here
             .replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled)
             .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
             .replace(/%%ESCALATION_MINUTES%%/g, escalationMins)
@@ -548,7 +582,7 @@ Management`;
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
         let bCode = document.getElementById('codeDisplay').textContent;
         let gHtml = processGuideTemplate(TEMPLATES.guide);
-        let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, workerKey);
+        let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker);
 
         const swCode = `
 const CACHE_NAME = 'otg-cache-v79';
@@ -558,7 +592,7 @@ self.addEventListener('fetch', event => { event.respondWith(caches.match(event.r
 `;
         const manifest = { 
             name: org, 
-            short_name: appName, // NEW
+            short_name: appName,
             start_url: "./index.html", 
             display: "standalone", 
             background_color: "#111827", 
