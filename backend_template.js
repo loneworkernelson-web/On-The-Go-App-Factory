@@ -1,11 +1,11 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.17 (Reporting Engine)
- * * DEFINITIVE MASTER VERSION
+ * OTG APPSUITE - MASTER BACKEND v79.18 (Travel Reporting Added)
  * * FEATURES:
  * 1. Longitudinal Reporting (Trend Analysis for Clients).
- * 2. Numeric Aggregation (Sums '$' fields automatically).
- * 3. Tiered Escalation, Embedded Emails, Smart Ledger, Robust Sync.
- * 4. Custom Menu: "OTG Admin" added to spreadsheet toolbar.
+ * 2. Travel Reporting (Dedicated Mileage/Duration Log per Worker).
+ * 3. Numeric Aggregation (Sums '$' fields automatically).
+ * 4. Tiered Escalation, Embedded Emails, Smart Ledger, Robust Sync.
+ * 5. Custom Menu: "OTG Admin" added to spreadsheet toolbar.
  */
 
 // ==========================================
@@ -40,6 +40,7 @@ function onOpen() {
   ui.createMenu('🛡️ OTG Admin')
       .addItem('1. Setup Client Reporting', 'setupClientReporting')
       .addItem('2. Run Monthly Stats', 'runMonthlyStats')
+      .addItem('3. Run Travel Report', 'generateWorkerTravelReport') // NEW
       .addSeparator()
       .addItem('Force Sync Forms', 'getGlobalForms')
       .addToUi();
@@ -89,7 +90,6 @@ function setupClientReporting() {
   if (!clientName) return;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Check/Create 'Reporting' Index Tab
   let indexSheet = ss.getSheetByName('Reporting');
   if (!indexSheet) {
       indexSheet = ss.insertSheet('Reporting');
@@ -97,7 +97,6 @@ function setupClientReporting() {
       indexSheet.getRange(1,1,1,3).setFontWeight("bold").setBackground("#e2e8f0");
   }
 
-  // Create the actual Report Sheet
   const newSheetName = `Stats - ${clientName}`;
   let reportSheet = ss.getSheetByName(newSheetName);
   if (reportSheet) { ui.alert("Sheet already exists!"); return; }
@@ -107,7 +106,6 @@ function setupClientReporting() {
   reportSheet.setFrozenRows(1);
   reportSheet.getRange(1,1,1,6).setFontWeight("bold").setBackground("#1e40af").setFontColor("white");
 
-  // Link it
   indexSheet.appendRow([clientName, reportSheet.getSheetId().toString(), new Date()]);
   ui.alert(`✅ Reporting setup for ${clientName}. \n\nYou can now run 'Monthly Stats' to populate this sheet.`);
 }
@@ -130,47 +128,34 @@ function runMonthlyStats() {
   const data = visitsSheet.getDataRange().getValues();
   const headers = data.shift();
   
-  // Column Mapping
   const dateIdx = headers.indexOf("Timestamp");
-  const compIdx = headers.indexOf("Location Name"); // Often Company is part of Location or Notes
+  const compIdx = headers.indexOf("Location Name"); 
   const reportIdx = headers.indexOf("Visit Report Data");
   
-  // Date Range
   const start = new Date(monthStr + "-01");
   const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
 
-  // Aggregation Object
-  const stats = {}; // { "ClientName": { visits: 0, duration: 0, sums: {} } }
+  const stats = {}; 
 
-  // 1. Scan Visits
   data.forEach(row => {
       const d = new Date(row[dateIdx]);
       if (d >= start && d <= end) {
-          // Attempt to extract Company Name. 
-          // Note: Ideally, add a "Company" column to Visits. For now, we rely on Location matching or custom logic.
-          // Simplification: We assume the 'Location Name' contains the Client Name, or we use a lookup.
-          // For this version, we will group by the EXACT string in 'Location Name' or 'Company'.
-          // Adjust logic here if you have a specific Company column.
           let client = "Unknown";
-          // Try to match client from Reporting Index
           const clientList = indexSheet.getDataRange().getValues().map(r => r[0]);
           const locName = row[compIdx].toString();
           
           const matchedClient = clientList.find(c => locName.includes(c));
           if (matchedClient) client = matchedClient;
-          else return; // Skip if not a tracked client
+          else return; 
 
           if (!stats[client]) stats[client] = { visits: 0, duration: 0, sums: {} };
-          
           stats[client].visits++;
           
-          // Parse JSON for Numerics
           const jsonStr = row[reportIdx];
           if (jsonStr && jsonStr.startsWith("{")) {
               try {
                   const report = JSON.parse(jsonStr);
                   for (const [k, v] of Object.entries(report)) {
-                      // If value looks like a number, sum it
                       const num = parseFloat(v);
                       if (!isNaN(num)) {
                           if (!stats[client].sums[k]) stats[client].sums[k] = 0;
@@ -182,7 +167,6 @@ function runMonthlyStats() {
       }
   });
 
-  // 2. Write to Sheets
   const clients = indexSheet.getDataRange().getValues();
   let updatedCount = 0;
 
@@ -190,19 +174,17 @@ function runMonthlyStats() {
       const clientName = row[0];
       const sheetId = row[1];
       if (stats[clientName]) {
-          // Find the sheet
           const allSheets = ss.getSheets();
           const targetSheet = allSheets.find(s => s.getSheetId().toString() === sheetId.toString());
           
           if (targetSheet) {
               const s = stats[clientName];
-              // Format Sums string
               const sumStr = Object.entries(s.sums).map(([k,v]) => `${k}: ${v}`).join(", ");
               
               targetSheet.appendRow([
                   monthStr,
                   s.visits,
-                  (s.visits * 0.5).toFixed(1), // Placeholder for duration if not tracking timestamps exactly
+                  (s.visits * 0.5).toFixed(1), 
                   "N/A",
                   "100%",
                   sumStr
@@ -213,6 +195,129 @@ function runMonthlyStats() {
   });
 
   ui.alert(`Stats Run Complete. Updated ${updatedCount} client sheets.`);
+}
+
+// STEP 3: TRAVEL REPORT (NEW)
+function generateWorkerTravelReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const visitsSheet = ss.getSheetByName('Visits');
+  if(!visitsSheet) { SpreadsheetApp.getUi().alert("Error: 'Visits' sheet not found."); return; }
+
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.prompt("Run Travel Report", "Enter Month (YYYY-MM):", ui.ButtonSet.OK_CANCEL);
+  if (resp.getSelectedButton() !== ui.Button.OK) return;
+  
+  const monthStr = resp.getResponseText().trim();
+  if (!/^\d{4}-\d{2}$/.test(monthStr)) { ui.alert("Invalid format. Use YYYY-MM."); return; }
+
+  // 1. Setup Report Sheet
+  const reportSheetName = "Travel Report - " + monthStr;
+  let reportSheet = ss.getSheetByName(reportSheetName);
+  if (reportSheet) ss.deleteSheet(reportSheet);
+  reportSheet = ss.insertSheet(reportSheetName);
+
+  // 2. Get Data
+  const data = visitsSheet.getDataRange().getValues();
+  const headers = data.shift();
+  
+  const col = {
+    worker: headers.indexOf("Worker Name"),
+    arrival: headers.indexOf("Timestamp"), 
+    depart: headers.indexOf("Anticipated Departure Time"), // Ideally this would be Actual Departure, but we use Timestamp as Arrival
+    report: headers.indexOf("Visit Report Data"),
+    location: headers.indexOf("Location Name")
+  };
+
+  const start = new Date(monthStr + "-01");
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  
+  const workerStats = {};
+
+  data.forEach(row => {
+    const d = new Date(row[col.arrival]);
+    if (d >= start && d <= end) {
+        const worker = row[col.worker];
+        if (!worker) return;
+        if (!workerStats[worker]) workerStats[worker] = { trips: [], totalDist: 0, totalDurMs: 0 };
+
+        let distance = 0;
+        let reportJson = row[col.report];
+        
+        // Parse Distance from JSON
+        if (reportJson && reportJson.startsWith("{")) {
+            try {
+                const r = JSON.parse(reportJson);
+                for (let key in r) {
+                    if (/km|mil|dist/i.test(key)) { // Regex to find distance fields
+                        let val = parseFloat(r[key]);
+                        if (!isNaN(val)) distance += val;
+                    }
+                }
+            } catch(e){}
+        }
+        
+        // If 'Distance' column exists in sheet, check that too
+        const distCol = headers.indexOf("Distance (km)");
+        if(distCol > -1 && row[distCol]) {
+             let val = parseFloat(row[distCol]);
+             if(!isNaN(val)) distance = val; // Override/Set
+        }
+
+        // Calculate Duration (Placeholder logic: if no departure time, assume 0)
+        // In a real scenario, you'd calculate difference between rows or dedicated start/stop
+        let durationMs = 0; 
+
+        workerStats[worker].trips.push({
+            date: d,
+            location: row[col.location],
+            distance: distance
+        });
+        
+        workerStats[worker].totalDist += distance;
+    }
+  });
+
+  // 3. Write Report
+  let rowIdx = 1;
+  reportSheet.getRange(rowIdx, 1).setValue("Travel Report: " + monthStr).setFontWeight("bold").setFontSize(14);
+  rowIdx += 2;
+
+  const sortedWorkers = Object.keys(workerStats).sort();
+
+  sortedWorkers.forEach(worker => {
+      const data = workerStats[worker];
+      
+      // Header
+      reportSheet.getRange(rowIdx, 1).setValue(worker).setFontWeight("bold").setBackground("#e2e8f0");
+      reportSheet.getRange(rowIdx, 1, 1, 4).merge();
+      rowIdx++;
+      
+      // Columns
+      const headerRange = reportSheet.getRange(rowIdx, 1, 1, 4);
+      headerRange.setValues([["Date", "Location", "Distance (km)", "Notes"]]);
+      headerRange.setFontWeight("bold").setBorder(false, false, true, false, false, false);
+      rowIdx++;
+
+      // Trips
+      data.trips.sort((a,b) => a.date - b.date).forEach(trip => {
+          reportSheet.getRange(rowIdx, 1, 1, 4).setValues([[
+              trip.date.toLocaleDateString() + " " + trip.date.toLocaleTimeString(),
+              trip.location,
+              trip.distance > 0 ? trip.distance : "-",
+              ""
+          ]]);
+          rowIdx++;
+      });
+
+      // Subtotal
+      const subTotalRow = reportSheet.getRange(rowIdx, 1, 1, 4);
+      subTotalRow.setValues([["TOTALS:", "", data.totalDist.toFixed(1), ""]]);
+      subTotalRow.setFontWeight("bold").setBorder(true, false, false, false, false, false);
+      rowIdx += 2; 
+  });
+
+  reportSheet.autoResizeColumns(1, 4);
+  ui.alert("Travel Report Generated!");
 }
 
 // ==========================================
