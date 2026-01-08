@@ -14,7 +14,7 @@
         code { background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: 'Consolas', monospace; color: #dc2626; font-weight: bold; font-size: 0.9em; border: 1px solid #e5e7eb; }
         .key-box { background: #eff6ff; border: 2px solid #3b82f6; padding: 25px; border-radius: 10px; margin: 30px 0; text-align: center; }
         .key-label { display: block; font-weight: bold; text-transform: uppercase; color: #1e40af; letter-spacing: 1px; font-size: 0.9em; margin-bottom: 10px; }
-        .key-value { font-family: 'Consolas', monospace; font-size: 1.8em; color: #111827; background: white; padding: 10px 20px; border-radius: 6px; border: 1px solid #bfdbfe; display: inline-block; }
+        .key-value { font-family: 'Consolas', monospace; font-size: 1.8em; color: #111827; background: white; padding: 10px 20px; border-radius: 6px; border: 1px solid #bfdbfe; display: inline-block; word-break: break-all; }
         .step { background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px; }
         .step-num { display: inline-block; background: #3b82f6; color: white; width: 30px; height: 30px; text-align: center; line-height: 30px; border-radius: 50%; font-weight: bold; margin-right: 10px; }
         .warning { background: #fff5f5; border-left: 5px solid #ef4444; padding: 20px; color: #991b1b; border: 1px solid #feb2b2; }
@@ -23,7 +23,7 @@
         hr { border: 0; height: 1px; background: #e5e7eb; margin: 50px 0; }
         .prompt-box { background: #1e1e1e; color: #a5b4fc; padding: 20px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; margin: 15px 0; border-left: 5px solid #6366f1; font-size: 0.9em; }
         
-        /* New Table Styles */
+        /* Table Styles */
         table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; font-size: 0.95em; }
         th { background: #eff6ff; color: #1e40af; text-align: left; padding: 12px; border: 1px solid #dbeafe; }
         td { padding: 12px; border: 1px solid #e5e7eb; color: #374151; }
@@ -35,39 +35,37 @@
 <div class="container">
     <header>
         <h1>Operations Manual</h1>
-        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v79.18 (Golden Master)</p>
-        <p>This system is a distributed "Serverless" platform. It relies on your Google Drive to function. This document allows you to administer, report on, and troubleshoot the system.</p>
+        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v79.20 (Golden Master)</p>
     </header>
 
-    <div class="key-box">
-        <span class="key-label">Admin / Monitor Master Key</span>
-        <div class="key-value">%%SECRET_KEY%%</div>
-        <p style="margin-top:15px; font-size:0.85em; color:#6b7280;">Keep this key safe. It provides full access to the Dashboard.</p>
-    </div>
-
-    <div style="background:#ecfdf5; border:1px solid #10b981; padding:15px; border-radius:8px; color:#065f46; text-align:center; font-weight:bold;">
-        Worker App Key (Embedded): <code>%%WORKER_KEY%%</code>
-    </div>
-
-    <h2>Part 1: Deployment & Updates</h2>
     <div class="warning">
-        <h3>⚠️ THE "ONE-SHOT" RULE (Critical)</h3>
-        <p>The App (Frontend) and the Database (Backend) share a secret "Worker Key". This key is regenerated every time you refresh the Factory page.</p>
-        <p><strong>To update the system, you must do steps 1-3 in ONE session without closing the tab:</strong></p>
-        <ol>
-            <li><strong>Copy Script:</strong> Paste the code into your Google Sheet Script Editor and Save.</li>
-            <li><strong>Download ZIP:</strong> Download the App files immediately after.</li>
-            <li><strong>Upload App:</strong> Put the new App on Netlify.</li>
-        </ol>
-        <p>If you refresh the Factory page in between, the keys will not match, and you will get an <strong>"Access Denied"</strong> error.</p>
+        <h3>🔐 THE GOLDEN RULE OF KEYS</h3>
+        <p>Your system relies on two secret passwords (Keys) to connect the Worker App to the Google Sheet.</p>
+        <p><strong>You must save these keys somewhere safe right now.</strong></p>
+        <ul>
+            <li>If you update the system later using <strong>DIFFERENT</strong> keys, every phone currently in use will stop connecting, and you will have to reinstall the app on every device.</li>
+            <li>If you update using the <strong>SAME</strong> keys, the phones will update seamlessly in the background.</li>
+        </ul>
     </div>
+
+    <div class="key-box">
+        <span class="key-label">Master Key (Admin Access)</span>
+        <div class="key-value">%%SECRET_KEY%%</div>
+    </div>
+
+    <div class="key-box" style="border-color:#10b981; background:#ecfdf5;">
+        <span class="key-label" style="color:#065f46;">Worker Key (App Connection)</span>
+        <div class="key-value">%%WORKER_KEY%%</div>
+    </div>
+
+    <h2>Part 1: Initial Deployment</h2>
 
     <div class="step">
         <span class="step-num">1</span> <strong>The Database (Google Sheets)</strong>
         <ol>
             <li>Go to <a href="https://sheets.new" target="_blank">sheets.new</a>. Name it "OTG Safety DB".</li>
             <li>Create exactly 4 tabs: <code>Visits</code>, <code>Staff</code>, <code>Templates</code>, <code>Sites</code>.</li>
-            <li><strong>Copy Headers:</strong> Use the "Copy Headers" buttons in the Factory App (Step 2) to set these up correctly.</li>
+            <li>Use the "Copy Headers" buttons in the Factory App to set these up.</li>
         </ol>
     </div>
 
@@ -75,17 +73,11 @@
         <span class="step-num">2</span> <strong>The Backend (Apps Script)</strong>
         <ol>
             <li>In your Sheet, go to <strong>Extensions > Apps Script</strong>.</li>
-            <li>Open the file <code>Code.gs</code> included in this ZIP. Copy all text.</li>
-            <li>Paste it into the Script Editor (replace default code). Save.</li>
+            <li>Paste the <code>Code.gs</code> content from the Factory.</li>
             <li><strong>Deploy:</strong> Click Deploy (Blue Button) -> New Deployment.</li>
             <li><strong>Select Type:</strong> Web App.</li>
-            <li><strong>Configuration:</strong>
-                <ul>
-                    <li>Execute as: <strong>Me</strong>.</li>
-                    <li>Who has access: <strong>Anyone</strong> (Critical for App connection).</li>
-                </ul>
-            </li>
-            <li>Click Deploy -> Authorize Access -> Copy the <strong>Web App URL</strong>.</li>
+            <li><strong>Configuration:</strong> Execute as: <strong>Me</strong>, Who has access: <strong>Anyone</strong>.</li>
+            <li>Copy the <strong>Web App URL</strong>.</li>
         </ol>
     </div>
 
@@ -93,47 +85,27 @@
         <span class="step-num">3</span> <strong>Hosting the Apps</strong>
         <p>Use a static host like Netlify Drop (free).</p>
         <ol>
-            <li>Sign up at <a href="https://netlify.com" target="_blank">Netlify.com</a>.</li>
-            <li>Drag the <strong>WorkerApp</strong> folder from this ZIP onto the Netlify dashboard.</li>
-            <li>Once uploaded, click <strong>"Sign up to claim site"</strong> so the link doesn't expire in 1 hour.</li>
-            <li>Repeat this process for the <strong>MonitorApp</strong> folder.</li>
+            <li>Drag the <strong>WorkerApp</strong> folder to Netlify.</li>
+            <li><strong>Important:</strong> Click "Sign up to claim site" so the link doesn't expire.</li>
+            <li>Repeat for the <strong>MonitorApp</strong>.</li>
         </ol>
     </div>
 
     <hr>
 
-    <h2>Part 2: Monitor Dashboard Guide</h2>
-    <p>The Monitor App is your "Mission Control". It runs in any web browser.</p>
-
-    <h3>1. Accessing the Monitor</h3>
-    <ul>
-        <li>Open your deployed Monitor URL.</li>
-        <li>Enter the <strong>Master Key</strong> (from the top of this document).</li>
-        <li><strong>IMPORTANT:</strong> Click the <strong style="color:#10b981;">🔊 Click to Start</strong> button. Browsers block audio alerts until you interact with the page.</li>
-    </ul>
-
-    <h3>2. Understanding Status Codes</h3>
+    <h2>Part 2: Monitor Dashboard</h2>
+    <p>Access your dashboard using the Master Key. Remember to click "Start" to enable audio alerts.</p>
     <div class="monitor-legend">
-        <div class="legend-item" style="background:#10b981;">🟢 ACTIVE<br><span style="font-weight:normal; font-size:0.8em;">Worker checked in.</span></div>
-        <div class="legend-item" style="background:#f59e0b;">🟠 OVERDUE<br><span style="font-weight:normal; font-size:0.8em;">Timer expired.</span></div>
-        <div class="legend-item" style="background:#ef4444; animation: pulse 1s infinite;">🔴 EMERGENCY<br><span style="font-weight:normal; font-size:0.8em;">Panic / Escalate.</span></div>
-        <div class="legend-item" style="background:#d946ef;">🟣 DURESS<br><span style="font-weight:normal; font-size:0.8em;">Silent Alarm.</span></div>
+        <div class="legend-item" style="background:#10b981;">🟢 ACTIVE</div>
+        <div class="legend-item" style="background:#f59e0b;">🟠 OVERDUE</div>
+        <div class="legend-item" style="background:#ef4444; animation: pulse 1s infinite;">🔴 EMERGENCY</div>
+        <div class="legend-item" style="background:#d946ef;">🟣 DURESS</div>
     </div>
-
-    <h3>3. "Sound of Silence" Watchdog</h3>
-    <p>If your office internet drops or the Monitor loses connection to Google for more than 5 minutes, a <strong>"Connection Lost"</strong> overlay will appear with a low-pitch drone sound.</p>
 
     <hr>
 
     <h2>Part 3: Daily Administration</h2>
-    <p>All configuration happens in the <strong>Google Sheet</strong>.</p>
-
-    <h3>Managing Sites (Sites Tab)</h3>
-    <p><strong>Col A (Assigned To):</strong> Controls visibility. Enter <code>ALL</code> or specific names (e.g. <code>John Doe, Jane Smith</code>). The app uses robust matching (case-insensitive).</p>
-
     <h3>Building Smart Forms (Templates Tab)</h3>
-    <p>The app reads the column headers in your <code>Templates</code> tab to generate forms. Use these codes:</p>
-
     <table>
         <thead>
             <tr>
@@ -146,17 +118,17 @@
             <tr>
                 <td><code># Header Name</code></td>
                 <td><strong>Section Header</strong></td>
-                <td>Dividing sections (e.g., "# Vehicle Info").</td>
+                <td>Dividing sections.</td>
             </tr>
             <tr>
                 <td><code>% Question</code></td>
                 <td><strong>Text Area</strong></td>
-                <td>Long answers, descriptions.</td>
+                <td>Long answers, notes.</td>
             </tr>
             <tr>
                 <td><code>$ Label</code></td>
                 <td><strong>Number Input</strong></td>
-                <td>Mileage, Costs, Hours (Summed in Reports).</td>
+                <td>Mileage, Costs (Summed in Reports).</td>
             </tr>
             <tr>
                 <td><code>[YESNO] Label</code></td>
@@ -165,8 +137,8 @@
             </tr>
             <tr>
                 <td><code>[CHECK] Label</code></td>
-                <td><strong>Simple Checkbox</strong></td>
-                <td>Confirmations ("I have read hazards").</td>
+                <td><strong>Checkbox</strong></td>
+                <td>Confirmations.</td>
             </tr>
             <tr>
                 <td><code>[PHOTO] Label</code></td>
@@ -181,70 +153,70 @@
             <tr>
                 <td><code>[DATE] Label</code></td>
                 <td><strong>Date Picker</strong></td>
-                <td>Expiry dates, Incident dates.</td>
+                <td>Expiry dates.</td>
             </tr>
         </tbody>
     </table>
 
     <hr>
 
-    <h2>Part 4: The BI Reporting Engine</h2>
-    <p>Access the built-in reporting engine via the <strong>"🛡️ OTG Admin"</strong> menu in your Google Sheet toolbar.</p>
-
-    <div class="step">
-        <span class="step-num">A</span> <strong>Client Trend Reports (Longitudinal)</strong>
-        <p>Creates a permanent scorecard for a specific client that updates every month.</p>
+    <h2>Part 4: Updates & Modifications</h2>
+    <div class="warning">
+        <h3>⚠️ THE "NEW VERSION" TRAP</h3>
+        <p>When you edit code in Google Apps Script, clicking "Save" <strong>DOES NOT</strong> update the live system.</p>
+        <p>For any change to take effect, you must:</p>
         <ol>
-            <li>Click <strong>🛡️ OTG Admin > 1. Setup Client Reporting</strong>.</li>
-            <li>Enter the exact Client Name.</li>
-            <li><strong>Monthly:</strong> Click <strong>2. Run Monthly Stats</strong> to aggregate data and update the sheet.</li>
+            <li>Click <strong>Deploy</strong> (Blue Button).</li>
+            <li>Select <strong>Manage Deployments</strong>.</li>
+            <li>Click the Pencil Icon (Edit).</li>
+            <li>Change "Version" to <strong>"New version"</strong>.</li>
+            <li>Click <strong>Deploy</strong>.</li>
         </ol>
     </div>
 
-    <div class="step">
-        <span class="step-num">B</span> <strong>The Travel Log</strong>
-        <p>Creates an itemized list of every trip (Start/End times, Duration, Distance).</p>
-        <ol>
-            <li>Click <strong>🛡️ OTG Admin > 3. Run Travel Report</strong>.</li>
-            <li>Enter the month (e.g., <code>2025-11</code>).</li>
-            <li>A new tab is created with detailed mileage logs.</li>
-        </ol>
-    </div>
+    <h3>Scenario A: Performing a "Soft Update" (Code Only)</h3>
+    <p>Use this method to update the Worker App features without forcing everyone to reinstall.</p>
+    <ol>
+        <li>Open the Factory App (<code>index.html</code>).</li>
+        <li><strong>CRITICAL:</strong> Paste your saved <strong>Master Key</strong> and <strong>Worker Key</strong> into the configuration boxes.</li>
+        <li>Click <strong>Generate Backend Code</strong>.</li>
+        <li>Copy the new code and paste it into your Google Apps Script editor.</li>
+        <li>Perform the "New Version" deployment steps above.</li>
+        <li>Download the new AppSuite ZIP.</li>
+        <li>Upload the new <code>WorkerApp</code> folder to Netlify (drag and drop it onto your existing site dashboard to update it).</li>
+        <li>Tell staff to <strong>Close and Reopen</strong> their app twice to pull the update.</li>
+    </ol>
 
-    <div class="step">
-        <span class="step-num">C</span> <strong>Numeric Aggregation ($)</strong>
-        <p>If you used the <code>$</code> code in your forms (e.g., <code>$ Parking Cost</code>), running the "Monthly Stats" report will automatically find these columns and SUM them up for you in the report.</p>
-    </div>
+    <h3>Scenario B: Modifying the Backend Logic</h3>
+    <p>You can edit <code>Code.gs</code> directly to change how the system behaves (e.g., AI prompts, Email formatting).</p>
+    <ol>
+        <li>Open your Google Sheet > Extensions > Apps Script.</li>
+        <li>Find the function you want to change (e.g., <code>smartScribe</code> for AI, <code>sendAlertEmail</code> for notifications).</li>
+        <li>Make your changes.</li>
+        <li><strong>Test:</strong> Click the "Run" button to test specific functions (like <code>checkOverdueWorkers</code>).</li>
+        <li><strong>Deploy:</strong> Follow the "New Version" deployment steps above.</li>
+    </ol>
 
     <hr>
 
-    <h2>Part 5: Expanding with AI</h2>
-    <p>Your system is connected to Google Gemini. You can edit the <strong>Apps Script</strong> (`Code.gs`) to make the system "think" differently.</p>
+    <h2>Part 5: Reporting & AI</h2>
+    <p>Access reports via the <strong>"🛡️ OTG Admin"</strong> menu in your Google Sheet.</p>
+    
+    <h3>Expanding with AI (Code Snippets)</h3>
+    <p>You can paste these snippets into <code>Code.gs</code> to enhance the AI functionality.</p>
 
-    <h3>Idea 1: The "Mood Ring" (Sentiment Analysis)</h3>
-    <p><strong>Goal:</strong> Flag if a worker sounds stressed or angry in their notes.</p>
-    <div class="prompt-box">// Find 'smartScribe' function and replace the 'prompt' line:
-const prompt = `You are a safety analyst. Read these notes: "${safeNotes}".
-1. Correct the grammar.
-2. Analyze sentiment. If the worker seems stressed, angry, or threatened, add "[WARNING: HIGH STRESS DETECTED]" at the start.
-3. Return the corrected text.`;</div>
-
-    <h3>Idea 2: The "Hazard Hunter" (Categorization)</h3>
-    <p><strong>Goal:</strong> Automatically tag visits (e.g., Maintenance vs. Training).</p>
-    <div class="prompt-box">// Update the 'smartScribe' prompt:
+    <h4>Idea 1: The "Mood Ring" (Sentiment Analysis)</h4>
+    <div class="prompt-box">// Find 'smartScribe' and replace the prompt:
 const prompt = `Read these notes: "${safeNotes}".
-Classify this visit into ONE of these categories: [Client Visit, Maintenance, Training, Admin].
-Return the format: "Category: [Category] - [Corrected Notes]"`;</div>
+1. Correct grammar.
+2. If the worker seems stressed/angry, add "[HIGH STRESS]" at the start.
+3. Return corrected text.`;</div>
 
-    <h3>Idea 3: The "Smart Summary" (Weekly Email)</h3>
-    <p><strong>Goal:</strong> Get a written executive summary in your weekly email.</p>
-    <div class="prompt-box">// Add inside 'sendWeeklySummary' before MailApp.sendEmail:
-let aiSummary = "No insights.";
-if(CONFIG.GEMINI_API_KEY) {
-    const prompt = `My team did ${count} visits and ${distance} km this week with ${alerts} alerts. Write a 2-sentence executive summary for me (The Manager).`;
-    // ... (Add UrlFetchApp logic here) ...
-}
-const html = `<h2>Weekly Report</h2><p><strong>AI Insight:</strong> ${aiSummary}</p>...`;</div>
+    <h4>Idea 2: The "Hazard Hunter" (Categorization)</h4>
+    <div class="prompt-box">// Update 'smartScribe' prompt:
+const prompt = `Read these notes: "${safeNotes}".
+Classify visit as: [Client, Maintenance, Training, Admin].
+Format: "Category: [Category] - [Notes]"`;</div>
 
     <hr>
 
@@ -259,29 +231,24 @@ const html = `<h2>Weekly Report</h2><p><strong>AI Insight:</strong> ${aiSummary}
         </thead>
         <tbody>
             <tr>
-                <td><strong>"Access Denied"</strong> (Worker App)</td>
+                <td><strong>"Access Denied"</strong></td>
                 <td>Key Mismatch</td>
-                <td>Re-do Factory Steps 1-3 in one session without refreshing.</td>
+                <td>You generated new keys in the Factory but the phone has old keys. Reinstall app.</td>
             </tr>
             <tr>
                 <td><strong>"Failed to Fetch"</strong></td>
                 <td>URL Mismatch</td>
-                <td>The Google Deployment URL changed. Update Factory and re-download app.</td>
+                <td>You deployed a new script but didn't update the App URL in the Factory.</td>
             </tr>
             <tr>
-                <td><strong>SMS Not Sending</strong></td>
-                <td>TextBelt Error</td>
-                <td>Check daily quota (1 free per IP). Ensure Key is set if paid.</td>
+                <td><strong>Changes ignored</strong></td>
+                <td>Version Trap</td>
+                <td>You clicked "Save" in Apps Script but didn't deploy a "New version".</td>
             </tr>
             <tr>
-                <td><strong>Monitor: "Connection Lost"</strong></td>
-                <td>PC Offline</td>
-                <td>Dashboard stopped receiving heartbeats. Check office internet.</td>
-            </tr>
-            <tr>
-                <td><strong>Photos not in Email</strong></td>
-                <td>Email Client</td>
-                <td>Outlook/Gmail may block inline images. Click "Show Images".</td>
+                <td><strong>Monitor Silence</strong></td>
+                <td>Browser Block</td>
+                <td>You must click the page once to allow audio to play.</td>
             </tr>
         </tbody>
     </table>
