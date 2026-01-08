@@ -930,8 +930,62 @@ function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobal
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-function buildReportForm(n,c){state.photoStore={};const sn=n?n.trim():"Standard Visit Note";let t=null;if(state.globalForms)t=state.globalForms.find(f=>f.name.trim()===sn)?.questions;if(!t&&state.cachedForms)t=state.cachedForms[sn];if(!t)t=state.cachedForms["(Standard)"];if(!t){console.warn("Template not found:",sn);t=[{type:'note',text:'Standard Check-in (Default)'},{type:'text',text:'Notes'}];}c.innerHTML='';if(t.length===0){c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';}else{t.forEach((f,i)=>{let y=f.type||'check',x=f.text||f;if(typeof f==='string'){if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}else if(f.includes('$')){y='number';x=f.replace('$','').trim();}else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}}let h='';if(y==='header')h=`<h3 class="text-blue-400 font-bold mt-4 border-b border-gray-700 pb-1">${x}</h3>`;else if(y==='note')h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;else h=`<div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">${x}</label>`;if(y==='text')h+=`<textarea data-key="${x}" class="form-input h-24"></textarea>`;else if(y==='number')h+=`<input type="number" data-key="${x}" class="form-input">`;else if(y==='date')h+=`<input type="date" data-key="${x}" class="form-input">`;else if(y==='yesno')h+=`<div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div>`;else if(y==='photo')h+=`<div><input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold text-gray-300 border border-dashed border-gray-500">📷 Add Photo</button></div>`;else if(y==='signature')h+=`<div class="border border-gray-600 rounded bg-white"><canvas id="sig-canvas" width="300" height="150" class="w-full touch-none"></canvas><button onclick="clearSig()" class="w-full py-1 bg-gray-200 text-gray-600 text-xs font-bold border-t border-gray-300">Clear Signature</button></div><script>setTimeout(()=>initSigPad(document.getElementById('sig-canvas')),500);<\/script>`;else if(y==='gps')h+=`<div class="flex gap-2"><button onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold shadow">📍 Capture GPS</button><input readonly data-key="${x}" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 text-xs text-gray-400"></div>`;if(y!=='header'&&y!=='note')h+='</div>';c.innerHTML+=h;});}}
-
+function buildReportForm(n,c){
+    state.photoStore={};
+    const sn=n?n.trim():"Standard Visit Note";
+    let t=null;
+    if(state.globalForms)t=state.globalForms.find(f=>f.name.trim()===sn)?.questions;
+    if(!t&&state.cachedForms)t=state.cachedForms[sn];
+    if(!t)t=state.cachedForms["(Standard)"];
+    if(!t){console.warn("Template not found:",sn);t=[{type:'note',text:'Standard Check-in (Default)'},{type:'text',text:'Notes'}];}
+    
+    c.innerHTML='';
+    if(t.length===0){
+        c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+    } else {
+        t.forEach((f,i)=>{
+            let y='check'; 
+            let x=f.text||f;
+            
+            // UPDATED: PARSE FORM SYNTAX (Added [CHECK])
+            if(typeof f==='string'){
+                if(f.trim().startsWith('#')) { y='header'; x=f.replace(/^#\s*/, '').trim(); }
+                else if(f.trim().startsWith('%')) { y='text'; x=f.replace(/^%\s*/, '').trim(); }
+                else if(f.trim().startsWith('$')) { y='number'; x=f.replace(/^\$\s*/, '').trim(); }
+                else if(f.includes('[TEXT]')){y='text';x=f.replace('[TEXT]','').trim();}
+                else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}
+                else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}
+                else if(f.includes('[CHECK]')){y='checkbox';x=f.replace('[CHECK]','').trim();} // NEW
+                else if(f.includes('[NUMBER]')){y='number';x=f.replace('[NUMBER]','').trim();}
+                else if(f.includes('$')){y='number';x=f.replace('$','').trim();}
+                else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}
+                else if(f.includes('[HEADING]')){y='header';x=f.replace('[HEADING]','').trim();}
+                else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}
+                else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}
+                else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}
+                else { y='input'; } // Default Text Input
+            }
+            
+            let h='';
+            if(y==='header') h=`<h3 class="text-blue-400 font-bold mt-6 mb-2 border-b border-gray-700 pb-1">${x}</h3>`;
+            else if(y==='note') h=`<p class="text-gray-500 text-sm italic my-2">${x}</p>`;
+            else if(y!=='checkbox') h=`<div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">${x}</label>`; // Standard label for inputs
+            
+            if(y==='text') h+=`<textarea data-key="${x}" class="form-input h-24"></textarea>`;
+            else if(y==='number') h+=`<input type="number" data-key="${x}" class="form-input font-mono text-blue-400 font-bold" placeholder="0">`;
+            else if(y==='date') h+=`<input type="date" data-key="${x}" class="form-input">`;
+            else if(y==='yesno') h+=`<div class="flex gap-4"><label class="flex items-center gap-2"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div>`;
+            else if(y==='checkbox') h+=`<div class="flex items-center gap-3 p-3 bg-gray-800 rounded border border-gray-600 mb-3 shadow-sm active:bg-gray-700 transition"><input type="checkbox" data-key="${x}" class="w-6 h-6 text-blue-600 rounded bg-gray-700 border-gray-500 focus:ring-blue-500"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
+            else if(y==='photo') h+=`<div><input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold text-gray-300 border border-dashed border-gray-500">📷 Add Photo</button></div>`;
+            else if(y==='signature') h+=`<div class="border border-gray-600 rounded bg-white"><canvas id="sig-canvas" width="300" height="150" class="w-full touch-none"></canvas><button onclick="clearSig()" class="w-full py-1 bg-gray-200 text-gray-600 text-xs font-bold border-t border-gray-300">Clear Signature</button></div><script>setTimeout(()=>initSigPad(document.getElementById('sig-canvas')),500);<\/script>`;
+            else if(y==='gps') h+=`<div class="flex gap-2"><button onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold shadow">📍 Capture GPS</button><input readonly data-key="${x}" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 text-xs text-gray-400"></div>`;
+            else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input">`; 
+            
+            if(y!=='header'&&y!=='note'&&y!=='checkbox') h+='</div>';
+            c.innerHTML+=h;
+        });
+    }
+}
 // INITIALIZATION
 window.addEventListener('load', () => {
     initLocations();
@@ -1003,3 +1057,4 @@ function checkIosInstall() {
 </script>
 </body>
 </html>
+
