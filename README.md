@@ -98,14 +98,27 @@ The system prevents the root "Safety Photos" folder from becoming a dumping grou
     * Event Listener: `levelchange`.
     * Payload: Appends `Battery Level: XX%` to every single heartbeat sent to the server.
 
-### 3.3 Dynamic Form Builder
-The app renders forms based on the `Templates` sheet columns using a prefix parser:
-* `#` (Header): Renders `<h3>`.
-* `%` (TextArea): Renders `<textarea>` (allows multi-line input).
-* `$` (Numeric): Renders `<input type="number">`. These fields are tagged for summation in the Backend Reporting Engine.
-* `[PHOTO]`: Renders `<input type="file" capture="environment">`.
-* `[GPS]`: Renders a button calling `navigator.geolocation.getCurrentPosition`.
+### 3.3 Form Builder Syntax (Complete)
+The app dynamically builds forms based on headers in the `Templates` sheet using a prefix parser:.
 
+**Structure & Instructions**
+* `# Header Name` or `[HEADING] Name` -> Creates a large Section Heading.
+* `[NOTE] Text` -> Creates read-only instruction text (not an input).
+
+**Standard Inputs**
+* `Standard Text` -> Creates a single-line text input.
+* `% Question` -> Creates a Multi-line Text Area.
+* `[DATE] Label` -> Creates a Date Picker.
+
+**Choices**
+* `[YESNO] Label` -> Creates Yes/No Radio Buttons.
+* `[CHECK] Label` -> Creates a simple Checkbox (e.g., "Tick to confirm").
+
+**Smart Inputs**
+* `$ Label` or `[NUMBER] Label` -> Creates a Number Input (Automatically summed in Monthly Reports).
+* `[PHOTO] Label` -> Creates a Camera/Upload button.
+* `[GPS] Label` -> Creates a button to capture current coordinates.
+* `[SIGN] Label` -> Creates a Touchscreen Signature Pad.
 ---
 
 ## 4. Monitor App Specification
