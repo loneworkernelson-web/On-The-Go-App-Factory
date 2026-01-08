@@ -1,9 +1,14 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.16 (Tiered Escalation & AI Polish)
- * * UPDATES:
- * - Logic: Tiered Escalation (Warning at +5m, Emergency at +Config Mins).
- * - AI: Proofreads email content but SAVES RAW CONTENT to Spreadsheet (Source of Truth).
- * - Syntax: Supports old Form Builder syntax (#, %) in processing.
+ * OTG APPSUITE - MASTER BACKEND v79.16 (Tiered Escalation & Embedded Emails)
+ * * DEFINITIVE MASTER VERSION
+ * * FEATURES INCLUDED:
+ * 1. Tiered Escalation (Warning @ 5m, Emergency @ Config Mins).
+ * 2. Embedded Photos (Inline CID images in emails).
+ * 3. Smart Ledger (Updates rows, doesn't duplicate).
+ * 4. Robust Sync (Tokenized, case-insensitive).
+ * 5. TextBelt Fix (JSON payload, E.164 phone format).
+ * 6. Sub-folder Photo Storage (Organized by Worker).
+ * 7. AI Proofreading (Non-destructive).
  */
 
 // ==========================================
@@ -31,7 +36,7 @@ const tid = sp.getProperty('REPORT_TEMPLATE_ID');
 if(tid) CONFIG.REPORT_TEMPLATE_ID = tid;
 
 // ==========================================
-// 2. GET HANDLER
+// 2. GET HANDLER (Read Operations)
 // ==========================================
 function doGet(e) {
   try {
@@ -64,7 +69,7 @@ function doGet(e) {
 }
 
 // ==========================================
-// 3. POST HANDLER
+// 3. POST HANDLER (Write Operations)
 // ==========================================
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error", message:"No Data"});
@@ -160,7 +165,7 @@ function handleWorkerPost(p, e) {
 
     const workerName = p['Worker Name'];
 
-    // SAVE PHOTOS
+    // 1. SAVE PHOTOS TO DRIVE (Organized by Worker)
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1'], workerName);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2'], workerName);
@@ -171,12 +176,10 @@ function handleWorkerPost(p, e) {
     const ts = new Date();
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
 
-    // === SOURCE OF TRUTH: SAVE RAW DATA TO SHEET FIRST ===
-    // We do NOT modify p['Notes'] or p['Visit Report Data'] before saving.
+    // 2. SMART LEDGER UPDATE (Update existing row vs Append new)
     let rowUpdated = false;
     const lastRow = sheet.getLastRow();
     
-    // Smart Ledger Update Logic (Simplified for brevity, logic maintained)
     if (lastRow > 1) {
         const startRow = Math.max(2, lastRow - 50); 
         const numRows = lastRow - startRow + 1;
@@ -187,25 +190,32 @@ function handleWorkerPost(p, e) {
             if (rowData[2] === workerName) {
                 const status = String(rowData[10]);
                 const isClosed = status.includes('DEPARTED') || (status.includes('SAFE') && !status.includes('MANUALLY')) || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
+                
                 if (!isClosed) {
                     const targetRow = startRow + i;
                     sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
                     sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
+                    
                     if (p['Notes'] && p['Notes'] !== rowData[11]) {
                          const oldNotes = sheet.getRange(targetRow, 12).getValue();
                          if (!oldNotes.includes(p['Notes'])) {
                              sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + p['Notes']).trim());
                          }
                     }
+                    
                     if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
                     if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
-                    if (p['Visit Report Data']) sheet.getRange(targetRow, 20).setValue(p['Visit Report Data']);
-                    if(p['Distance']) sheet.getRange(targetRow, 19).setValue(p['Distance']);
-                    if(sig) sheet.getRange(targetRow, 22).setValue(sig);
-                    if(p1) sheet.getRange(targetRow, 18).setValue(p1);
-                    if(p2) sheet.getRange(targetRow, 23).setValue(p2);
-                    if(p3) sheet.getRange(targetRow, 24).setValue(p3);
-                    if(p4) sheet.getRange(targetRow, 25).setValue(p4);
+                    
+                    if (p['Visit Report Data']) {
+                        sheet.getRange(targetRow, 20).setValue(p['Visit Report Data']);
+                        if(p['Distance']) sheet.getRange(targetRow, 19).setValue(p['Distance']);
+                        if(sig) sheet.getRange(targetRow, 22).setValue(sig);
+                        if(p1) sheet.getRange(targetRow, 18).setValue(p1);
+                        if(p2) sheet.getRange(targetRow, 23).setValue(p2);
+                        if(p3) sheet.getRange(targetRow, 24).setValue(p3);
+                        if(p4) sheet.getRange(targetRow, 25).setValue(p4);
+                    }
+
                     rowUpdated = true;
                     break;
                 }
@@ -214,38 +224,38 @@ function handleWorkerPost(p, e) {
     }
 
     if (!rowUpdated) {
-        const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, p['Distance'] || "", p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
+        const row = [
+            ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, p['Distance'] || "", p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4
+        ];
         sheet.appendRow(row);
     }
 
     updateStaffStatus(p);
 
-    // === AI PROOFREADING & EMAILING (AFTER SAVING) ===
+    // 3. AI PROOFREADING & EMAIL ROUTING
     const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
     if(hasFormData) {
        try {
            const reportObj = JSON.parse(p['Visit Report Data']);
-           let polishedNotes = p['Notes']; // Default to raw if AI fails
+           let polishedNotes = p['Notes'];
            
+           // Use AI to polish notes for the email ONLY (Source of truth remains raw in Sheet)
            if(CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
-               // Ask AI to proofread ONLY for the email
                polishedNotes = smartScribe(reportObj, p['Template Name'] || "Report", p['Notes']);
            }
            
-           // Create a Display Object for the email (Uses Polished Notes)
-           const displayObj = {...reportObj}; // Clone
-           
-           // Trigger Email with Polished Content
-           processFormEmail(p, displayObj, polishedNotes, p1, p2, p3, p4, sig);
+           // Send Beautiful Email with Embedded Images
+           processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig);
        } catch(e) { console.error("Email/AI Error: " + e); }
     }
 
+    // 4. IMMEDIATE EMERGENCY ALERTS
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
         triggerAlerts(p, "IMMEDIATE");
     }
 }
 
-// EMAIL PROCESSOR (With AI Polished Notes passed in)
+// === NEW: PROCESS FORM EMAIL WITH EMBEDDED IMAGES ===
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     const templateName = p['Template Name'];
     if (!templateName) return;
@@ -268,18 +278,25 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
 
     if (!recipientEmail || !recipientEmail.includes('@')) return;
 
-    // Prepare Inline Images
+    // Prepare Inline Images (CID)
     const inlineImages = {};
     const imgTags = [];
+    
     const processImg = (key, cidName, title) => {
         if (p[key] && p[key].length > 100) { 
             const blob = dataURItoBlob(p[key]);
             if (blob) {
                 inlineImages[cidName] = blob;
-                imgTags.push(`<div style="margin-bottom: 20px; text-align: center;"><p style="color:#6b7280; font-size:12px; font-weight:bold; margin-bottom:5px; text-transform:uppercase;">${title}</p><img src="cid:${cidName}" style="max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>`);
+                imgTags.push(`
+                    <div style="margin-bottom: 20px; text-align: center;">
+                        <p style="color:#6b7280; font-size:12px; font-weight:bold; margin-bottom:5px; text-transform:uppercase;">${title}</p>
+                        <img src="cid:${cidName}" style="max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    </div>
+                `);
             }
         }
     };
+
     processImg('Photo 1', 'photo1', 'Attached Photo 1');
     processImg('Photo 2', 'photo2', 'Attached Photo 2');
     processImg('Photo 3', 'photo3', 'Attached Photo 3');
@@ -290,33 +307,91 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    // HTML Construction
-    let html = `<div style="background-color:#f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px;"><div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
-            <div style="background-color: #1e40af; padding: 24px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">${p['Template Name']}</h1><p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 14px; font-weight: 600;">${CONFIG.ORG_NAME}</p></div>
-            <div style="background-color: #eff6ff; padding: 16px; border-bottom: 1px solid #dbeafe; display: flex; justify-content: space-between;"><div style="width: 48%;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Worker</p><p style="margin:0; font-size:14px; color:#1f2937; font-weight:bold;">${p['Worker Name']}</p></div><div style="width: 48%; text-align:right;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Date</p><p style="margin:0; font-size:14px; color:#1f2937;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p></div></div>
+    // Build Beautiful HTML
+    let html = `
+    <div style="background-color:#f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+            
+            <div style="background-color: #1e40af; padding: 24px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">${p['Template Name']}</h1>
+                <p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 14px; font-weight: 600;">${CONFIG.ORG_NAME}</p>
+            </div>
+
+            <div style="background-color: #eff6ff; padding: 16px; border-bottom: 1px solid #dbeafe; display: flex; justify-content: space-between;">
+                <div style="width: 48%;">
+                    <p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Worker</p>
+                    <p style="margin:0; font-size:14px; color:#1f2937; font-weight:bold;">${p['Worker Name']}</p>
+                </div>
+                <div style="width: 48%; text-align:right;">
+                    <p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Date</p>
+                    <p style="margin:0; font-size:14px; color:#1f2937;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+                </div>
+            </div>
+
             <div style="padding: 24px;">
-                <div style="margin-bottom: 24px;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold; margin-bottom: 4px;">Location</p><div style="background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; color: #374151; font-size: 13px;">${p['Location Name'] || p['Location Address'] || 'Unknown Location'}</div></div>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">`;
+                
+                <div style="margin-bottom: 24px;">
+                    <p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold; margin-bottom: 4px;">Location</p>
+                    <div style="background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; color: #374151; font-size: 13px;">
+                        ${p['Location Name'] || p['Location Address'] || 'Unknown Location'}
+                        ${p['Last Known GPS'] ? `<br><a href="http://maps.google.com/?q=${p['Last Known GPS']}" style="color:#2563eb; text-decoration:none; font-weight:bold; display:inline-block; margin-top:4px;">📍 View on Map</a>` : ''}
+                    </div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+    `;
 
     let rowCount = 0;
     for (const [key, value] of Object.entries(reportObj)) {
         if(key && value) {
             const bg = rowCount % 2 === 0 ? '#ffffff' : '#f9fafb';
-            html += `<tr style="background-color: ${bg};"><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-weight: bold; font-size: 13px; width: 40%; vertical-align: top;">${key}</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 13px;">${value}</td></tr>`;
+            html += `
+            <tr style="background-color: ${bg};">
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-weight: bold; font-size: 13px; width: 40%; vertical-align: top;">${key}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 13px;">${value}</td>
+            </tr>`;
             rowCount++;
         }
     }
 
     if (polishedNotes) {
-        html += `<tr style="background-color: #fffbeb;"><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #b45309; font-weight: bold; font-size: 13px; vertical-align: top;">Notes (AI Polished)</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #78350f; font-size: 13px; font-style: italic;">${polishedNotes}</td></tr>`;
+        html += `
+            <tr style="background-color: #fffbeb;">
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #b45309; font-weight: bold; font-size: 13px; vertical-align: top;">Notes (AI Polished)</td>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #78350f; font-size: 13px; font-style: italic;">${polishedNotes}</td></tr>`;
     }
 
     html += `</table>`;
-    if (imgTags.length > 0) html += `<div style="margin-top: 30px; border-top: 2px dashed #e5e7eb; padding-top: 20px;">` + imgTags.join('') + `</div>`;
-    if (inlineImages['signature']) html += `<div style="margin-top: 20px; text-align: right;"><p style="font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Signed By Worker</p><img src="cid:signature" style="max-height: 60px; border-bottom: 2px solid #d1d5db; padding-bottom: 4px;"></div>`;
-    html += `</div><div style="background-color: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">Generated by OTG AppSuite • Raw data stored in database.</p></div></div></div>`;
 
-    MailApp.sendEmail({ to: recipientEmail, subject: `[Report] ${p['Template Name']} - ${p['Worker Name']}`, htmlBody: html, inlineImages: inlineImages });
+    // INSERT PHOTOS
+    if (imgTags.length > 0) {
+        html += `<div style="margin-top: 30px; border-top: 2px dashed #e5e7eb; padding-top: 20px;">` + imgTags.join('') + `</div>`;
+    }
+
+    // SIGNATURE
+    if (inlineImages['signature']) {
+        html += `
+        <div style="margin-top: 20px; text-align: right;">
+            <p style="font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Signed By Worker</p>
+            <img src="cid:signature" style="max-height: 60px; border-bottom: 2px solid #d1d5db; padding-bottom: 4px;">
+        </div>`;
+    }
+
+    html += `
+            </div>
+            <div style="background-color: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">
+                <p style="margin: 0; font-size: 11px; color: #9ca3af;">Generated by OTG AppSuite • Raw data stored in database.</p>
+            </div>
+        </div>
+    </div>
+    `;
+
+    MailApp.sendEmail({
+        to: recipientEmail,
+        subject: `[Report] ${p['Template Name']} - ${p['Worker Name']}`,
+        htmlBody: html,
+        inlineImages: inlineImages
+    });
 }
 
 function dataURItoBlob(dataURI) {
@@ -351,6 +426,7 @@ function updateStaffStatus(p) {
     }
 }
 
+// === FIX: E.164 Formatting for TextBelt ===
 function _cleanPhone(num) {
     if (!num) return null;
     let n = num.toString().replace(/[^0-9]/g, ''); 
@@ -365,13 +441,24 @@ function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
     const gpsLink = p['Last Known GPS'] ? `http://googleusercontent.com/maps.google.com/?q=${p['Last Known GPS']}` : "No GPS";
     const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+    
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
+    
+    // === FIX: JSON Payload for TextBelt ===
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
         numbers.forEach(num => { 
             try {
-                UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: num, message: `${subject} ${gpsLink}`, key: CONFIG.TEXTBELT_API_KEY }) }); 
+                UrlFetchApp.fetch('https://textbelt.com/text', { 
+                    method: 'post', 
+                    contentType: 'application/json', 
+                    payload: JSON.stringify({ 
+                        phone: num, 
+                        message: `${subject} ${gpsLink}`, 
+                        key: CONFIG.TEXTBELT_API_KEY 
+                    }) 
+                }); 
             } catch(e) { console.error("SMS Failed: " + e.toString()); }
         });
     }
@@ -385,7 +472,7 @@ function resolveAlert(p) {
     return sendJSON({status:"success"});
 }
 
-// UPDATED: TIERED ESCALATION LOGIC
+// === UPDATED: TIERED ESCALATION ===
 function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -412,7 +499,7 @@ function checkOverdueVisits() {
             const isZeroTolerance = (entry[11] && entry[11].includes("[ZERO_TOLERANCE]"));
             
             // TIER 1: WARNING (5 Mins Overdue)
-            // Skipped if Zero Tolerance
+            // Send Warning Email only (No SMS usually)
             if (diffMins > 5 && diffMins < CONFIG.ESCALATION_MINUTES && !status.includes('WARNING') && !status.includes('EMERGENCY') && !isZeroTolerance) {
                 const newStatus = "OVERDUE - WARNING SENT";
                 const newRow = [...entry];
@@ -420,7 +507,6 @@ function checkOverdueVisits() {
                 newRow[10] = newStatus; 
                 newRow[11] = entry[11] + " [AUTO-WARNING]";
                 sheet.appendRow(newRow);
-                // Send Warning Email only (No SMS usually, to save credits, but configurable)
                 triggerAlerts({ 'Worker Name': worker, 'Alarm Status': "WARNING - 5 Mins Overdue", 'Location Name': entry[12], 'Notes': "Worker is 5 minutes overdue. Please extend or check-in.", 'Last Known GPS': entry[14], 'Battery Level': entry[16], 'Emergency Contact Email': entry[6], 'Emergency Contact Number': entry[5] }, "WARNING");
             }
             
@@ -457,6 +543,7 @@ function getDashboardData() {
     return {workers: workers, escalation_limit: CONFIG.ESCALATION_MINUTES};
 }
 
+// === FIX: Robust Sync Logic ===
 function getSyncData(workerName, deviceId) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const siteSheet = ss.getSheetByName('Sites');
@@ -528,6 +615,7 @@ function getGlobalForms() {
     return forms;
 }
 
+// === FIX: Sub-folder Photo Storage ===
 function saveImage(b64, workerName, isSignature) {
     if(!b64 || !CONFIG.PHOTOS_FOLDER_ID) return "";
     try {
@@ -551,9 +639,8 @@ function saveImage(b64, workerName, isSignature) {
     } catch(e) { return "Error saving photo: " + e.toString(); }
 }
 
-// UPDATED: SMART SCRIBE (Returns polished string, does not save to DB)
 function smartScribe(data, type, notes) {
-    if(!CONFIG.GEMINI_API_KEY) return notes; // Fallback to original notes
+    if(!CONFIG.GEMINI_API_KEY) return notes;
     let safeNotes = notes || "";
     let safeData = JSON.stringify(data || {});
     if(CONFIG.ENABLE_REDACTION) {
