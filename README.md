@@ -1,4 +1,57 @@
-# OTG AppSuite v79.17: Comprehensive Technical Reference Manual
+# Meeting the OTG AppSuite: A "BYO" Safety System for Lean Organizations
+
+I designed the **On-The-Go (OTG) AppSuite** to solve a specific problem: professional Lone Worker safety systems are often too expensive or complex for small charities and community organizations.
+
+The OTG AppSuite is not a standard SaaS product. You don't sign up for an account, you don't pay a monthly subscription, and your data doesn't live on our servers. Instead, it is a **self-hosted system engine** that you deploy into your own Google Cloud environment.
+
+Here is a realistic breakdown of what it does and who it is for.
+
+---
+
+### **How It Works**
+The system is "Serverless." It uses **Google Sheets** as its database and **Google Apps Script** as its brain.
+
+1.  **The Worker App:** Staff install a web app (PWA) on their phones. It handles GPS tracking, check-in timers, and form reporting. It works offline and syncs when connection is restored.
+2.  **The Backend:** A script running in your Google Drive receives data, saves photos to your Drive folders, and acts as a "Watchdog." If a worker misses a check-in, the script triggers an escalation (Email/SMS).
+3.  **The Dashboard:** Managers view a live status board on their office PC, showing active workers, battery levels, and locations.
+
+### **Key Capabilities**
+* **Tiered Escalation:** Sends a gentle "nudge" email if a worker is 5 minutes overdue, followed by a full "Emergency" SMS/Email alert to managers if they remain unresponsive.
+* **Zero Tolerance:** Workers entering high-risk situations can toggle a mode that skips the warning and alerts HQ immediately if the timer expires.
+* **Business Intelligence:** It doesn't just log safety; it tracks work. The system generates monthly PDF reports showing visit trends, total hours on-site, and aggregated numeric data (e.g., total mileage).
+* **AI Integration:** Raw data is stored exactly as typed for legal accuracy, but email notifications use AI to "polish" hasty notes into professional English for management updates.
+
+---
+
+### **The "Litmus Test": Is this right for you?**
+
+This solution is **NOT** a fit for everyone. Use this checklist to assess suitability:
+
+**✅ You are the ideal user if:**
+* **Budget is a primary constraint.** You are a charity, non-profit, or small business that cannot justify $20/user/month fees.
+* **You value Data Sovereignty.** You want to own your data in your own Google Drive, not trust a third-party vendor.
+* **You have "One Tech-Savvy Person."** You don't need a developer, but you need someone comfortable copying and pasting code, generating API keys, and managing a Google Sheet.
+* **Your fleet is Small to Medium.** The system works best for teams of 5 to ~50 active workers.
+
+**❌ This is likely NOT for you if:**
+* **You need an SLA.** Because you host it, you are the support team. There is no 24/7 helpdesk to call if you break your spreadsheet.
+* **You need Enterprise Integration.** It does not plug into Active Directory, SAP, or complex HR systems out of the box.
+* **You have 500+ staff.** Google Sheets has processing limits (quotas) that very large organizations might hit.
+
+---
+
+### **Best-Fit Organizations**
+Based on its architecture, the OTG AppSuite is tailored for:
+
+1.  **Community Care & Social Services:** Organizations visiting clients in their homes where staff safety is a concern but funding is tight.
+2.  **Environmental & Conservation Groups:** Staff working in remote areas who need offline-capable check-in tools and GPS tracking.
+3.  **Property Management & Real Estate:** Solo agents performing inspections who need a discreet "Dead Man's Switch."
+4.  **Volunteer Networks:** Temporary or casual fleets where installing a heavy, paid corporate app is impractical.
+
+---
+
+### **Summary**
+The OTG AppSuite is a **"Build Your Own"** professional safety platform. It trades the convenience of a "Sign Up" button for the power of **ownership, customization, and zero running costs**. If you are willing to spend 20 minutes setting it up, you get a safety system that rivals commercial alternatives for free.# OTG AppSuite v79.17: Comprehensive Technical Reference Manual
 
 **Version:** 79.17 (Global Golden Master)  
 **Date:** January 8, 2026  
