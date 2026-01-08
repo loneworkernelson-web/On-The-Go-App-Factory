@@ -21,7 +21,13 @@
         .monitor-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
         .legend-item { padding: 15px; border-radius: 8px; font-weight: bold; color: white; text-align: center; }
         hr { border: 0; height: 1px; background: #e5e7eb; margin: 50px 0; }
-        .prompt-box { background: #1e1e1e; color: #a5b4fc; padding: 20px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; margin: 15px 0; border-left: 5px solid #6366f1; }
+        .prompt-box { background: #1e1e1e; color: #a5b4fc; padding: 20px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; margin: 15px 0; border-left: 5px solid #6366f1; font-size: 0.9em; }
+        
+        /* New Table Styles */
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; font-size: 0.95em; }
+        th { background: #eff6ff; color: #1e40af; text-align: left; padding: 12px; border: 1px solid #dbeafe; }
+        td { padding: 12px; border: 1px solid #e5e7eb; color: #374151; }
+        tr:nth-child(even) { background: #f9fafb; }
     </style>
 </head>
 <body>
@@ -29,7 +35,8 @@
 <div class="container">
     <header>
         <h1>Operations Manual</h1>
-        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v79.4 (Golden Master)</p>
+        <p><strong>System:</strong> %%ORG_NAME%% Safety AppSuite<br><strong>Version:</strong> v79.18 (Golden Master)</p>
+        <p>This system is a distributed "Serverless" platform. It relies on your Google Drive to function. This document allows you to administer, report on, and troubleshoot the system.</p>
     </header>
 
     <div class="key-box">
@@ -84,11 +91,11 @@
 
     <div class="step">
         <span class="step-num">3</span> <strong>Hosting the Apps</strong>
-        <p>Use a static host like Netlify, Vercel, or GitHub Pages.</p>
+        <p>Use a static host like Netlify Drop (free).</p>
         <ol>
             <li>Sign up at <a href="https://netlify.com" target="_blank">Netlify.com</a>.</li>
             <li>Drag the <strong>WorkerApp</strong> folder from this ZIP onto the Netlify dashboard.</li>
-            <li>Once uploaded, go to Site Settings > Change Site Name (e.g. <code>acme-safety.netlify.app</code>).</li>
+            <li>Once uploaded, click <strong>"Sign up to claim site"</strong> so the link doesn't expire in 1 hour.</li>
             <li>Repeat this process for the <strong>MonitorApp</strong> folder.</li>
         </ol>
     </div>
@@ -107,66 +114,177 @@
 
     <h3>2. Understanding Status Codes</h3>
     <div class="monitor-legend">
-        <div class="legend-item" style="background:#10b981;">🟢 ACTIVE<br><span style="font-weight:normal; font-size:0.8em;">Worker is on site/travelling. Time remaining.</span></div>
-        <div class="legend-item" style="background:#f59e0b;">🟠 OVERDUE<br><span style="font-weight:normal; font-size:0.8em;">Timer expired. Grace period active.</span></div>
-        <div class="legend-item" style="background:#ef4444; animation: pulse 1s infinite;">🔴 ALARM<br><span style="font-weight:normal; font-size:0.8em;">Emergency Triggered. Siren Sounding.</span></div>
-        <div class="legend-item" style="background:#d946ef;">🟣 DURESS<br><span style="font-weight:normal; font-size:0.8em;">Silent Alarm. Forced PIN entry.</span></div>
+        <div class="legend-item" style="background:#10b981;">🟢 ACTIVE<br><span style="font-weight:normal; font-size:0.8em;">Worker checked in.</span></div>
+        <div class="legend-item" style="background:#f59e0b;">🟠 OVERDUE<br><span style="font-weight:normal; font-size:0.8em;">Timer expired.</span></div>
+        <div class="legend-item" style="background:#ef4444; animation: pulse 1s infinite;">🔴 EMERGENCY<br><span style="font-weight:normal; font-size:0.8em;">Panic / Escalate.</span></div>
+        <div class="legend-item" style="background:#d946ef;">🟣 DURESS<br><span style="font-weight:normal; font-size:0.8em;">Silent Alarm.</span></div>
     </div>
 
-    <h3>3. Managing Alerts</h3>
-    <p>When an alarm triggers (Red/Purple):</p>
-    <ol>
-        <li><strong>Acknowledge:</strong> Click the big "Acknowledge" button to silence the siren locally. This DOES NOT clear the alarm on the server.</li>
-        <li><strong>Resolve:</strong> Once you have contacted the worker and confirmed safety:
-            <ul>
-                <li>Click the <strong>"✅ RESOLVE ALERT"</strong> button on their card.</li>
-                <li>Enter a Note (e.g., "False alarm, spoke to John").</li>
-                <li>Click Confirm. This sends a "Green Alert" (All Clear) email to the emergency contacts.</li>
-            </ul>
-        </li>
-    </ol>
-
-    <h3>4. "Sound of Silence" Watchdog</h3>
-    <p>This system includes a connection monitor.</p>
-    <ul>
-        <li>If your office internet drops or the Monitor loses connection to Google for more than 5 minutes, a <strong>"Connection Lost"</strong> overlay will appear.</li>
-        <li>A distinct, low-pitch drone sound will play to alert you that you are flying blind.</li>
-    </ul>
+    <h3>3. "Sound of Silence" Watchdog</h3>
+    <p>If your office internet drops or the Monitor loses connection to Google for more than 5 minutes, a <strong>"Connection Lost"</strong> overlay will appear with a low-pitch drone sound.</p>
 
     <hr>
 
-    <h2>Part 3: The AI Co-Pilot</h2>
-    <p>This system provides you with the raw source code (`.html` and `.js` files). You can use AI tools (Gemini, ChatGPT) to customize it without knowing how to code.</p>
+    <h2>Part 3: Daily Administration</h2>
+    <p>All configuration happens in the <strong>Google Sheet</strong>.</p>
 
-    <h3>How to Prompt for Changes</h3>
-    <p>To get working code, you must provide the AI with context. Always paste your current code first.</p>
+    <h3>Managing Sites (Sites Tab)</h3>
+    <p><strong>Col A (Assigned To):</strong> Controls visibility. Enter <code>ALL</code> or specific names (e.g. <code>John Doe, Jane Smith</code>). The app uses robust matching (case-insensitive).</p>
 
-    <h4>Scenario A: Changing Colors</h4>
-    <div class="prompt-box">"Here is the CSS from my worker_template.html file:
-[PASTE CODE CHUNK]
+    <h3>Building Smart Forms (Templates Tab)</h3>
+    <p>The app reads the column headers in your <code>Templates</code> tab to generate forms. Use these codes:</p>
 
-Please change the primary branding color from Blue (#3b82f6) to Safety Orange (#f97316). Keep the functionality the same."</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Code Syntax</th>
+                <th>Component Rendered</th>
+                <th>Best Used For</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code># Header Name</code></td>
+                <td><strong>Section Header</strong></td>
+                <td>Dividing sections (e.g., "# Vehicle Info").</td>
+            </tr>
+            <tr>
+                <td><code>% Question</code></td>
+                <td><strong>Text Area</strong></td>
+                <td>Long answers, descriptions.</td>
+            </tr>
+            <tr>
+                <td><code>$ Label</code></td>
+                <td><strong>Number Input</strong></td>
+                <td>Mileage, Costs, Hours (Summed in Reports).</td>
+            </tr>
+            <tr>
+                <td><code>[YESNO] Label</code></td>
+                <td><strong>Yes/No Buttons</strong></td>
+                <td>Compliance checks.</td>
+            </tr>
+            <tr>
+                <td><code>[CHECK] Label</code></td>
+                <td><strong>Simple Checkbox</strong></td>
+                <td>Confirmations ("I have read hazards").</td>
+            </tr>
+            <tr>
+                <td><code>[PHOTO] Label</code></td>
+                <td><strong>Camera Button</strong></td>
+                <td>Evidence capture.</td>
+            </tr>
+            <tr>
+                <td><code>[GPS] Label</code></td>
+                <td><strong>GPS Button</strong></td>
+                <td>Pinpointing hazards.</td>
+            </tr>
+            <tr>
+                <td><code>[DATE] Label</code></td>
+                <td><strong>Date Picker</strong></td>
+                <td>Expiry dates, Incident dates.</td>
+            </tr>
+        </tbody>
+    </table>
 
-    <h4>Scenario B: Adding a Field to the Sign-On Wizard</h4>
-    <div class="prompt-box">"I have a Setup Wizard in my worker_template.html.
-[PASTE WIZARD HTML CODE]
+    <hr>
 
-Please add a new input field for 'Employee ID Number'. It should be mandatory. Save it to the settings object so it is included in every report."</div>
+    <h2>Part 4: The BI Reporting Engine</h2>
+    <p>Access the built-in reporting engine via the <strong>"🛡️ OTG Admin"</strong> menu in your Google Sheet toolbar.</p>
 
-    <h4>Scenario C: Creating a Custom Report Script</h4>
-    <div class="prompt-box">"Here is the structure of my Google Sheet 'Visits' tab:
-Col A: Date
-Col C: Worker Name
-Col S: Distance
+    <div class="step">
+        <span class="step-num">A</span> <strong>Client Trend Reports (Longitudinal)</strong>
+        <p>Creates a permanent scorecard for a specific client that updates every month.</p>
+        <ol>
+            <li>Click <strong>🛡️ OTG Admin > 1. Setup Client Reporting</strong>.</li>
+            <li>Enter the exact Client Name.</li>
+            <li><strong>Monthly:</strong> Click <strong>2. Run Monthly Stats</strong> to aggregate data and update the sheet.</li>
+        </ol>
+    </div>
 
-Please write a Google Apps Script function called 'emailMonthlyMileage'. It should sum the distance for each worker for the current month and email me a summary table."</div>
+    <div class="step">
+        <span class="step-num">B</span> <strong>The Travel Log</strong>
+        <p>Creates an itemized list of every trip (Start/End times, Duration, Distance).</p>
+        <ol>
+            <li>Click <strong>🛡️ OTG Admin > 3. Run Travel Report</strong>.</li>
+            <li>Enter the month (e.g., <code>2025-11</code>).</li>
+            <li>A new tab is created with detailed mileage logs.</li>
+        </ol>
+    </div>
 
-    <h3>Best Practices</h3>
-    <ul>
-        <li><strong>Backup First:</strong> Always keep a copy of your working file before pasting AI code.</li>
-        <li><strong>Be Specific:</strong> Describe <em>what</em> you want, not <em>how</em> to do it.</li>
-        <li><strong>Iterate:</strong> If the code errors, copy the error message and paste it back to the AI.</li>
-    </ul>
+    <div class="step">
+        <span class="step-num">C</span> <strong>Numeric Aggregation ($)</strong>
+        <p>If you used the <code>$</code> code in your forms (e.g., <code>$ Parking Cost</code>), running the "Monthly Stats" report will automatically find these columns and SUM them up for you in the report.</p>
+    </div>
+
+    <hr>
+
+    <h2>Part 5: Expanding with AI</h2>
+    <p>Your system is connected to Google Gemini. You can edit the <strong>Apps Script</strong> (`Code.gs`) to make the system "think" differently.</p>
+
+    <h3>Idea 1: The "Mood Ring" (Sentiment Analysis)</h3>
+    <p><strong>Goal:</strong> Flag if a worker sounds stressed or angry in their notes.</p>
+    <div class="prompt-box">// Find 'smartScribe' function and replace the 'prompt' line:
+const prompt = `You are a safety analyst. Read these notes: "${safeNotes}".
+1. Correct the grammar.
+2. Analyze sentiment. If the worker seems stressed, angry, or threatened, add "[WARNING: HIGH STRESS DETECTED]" at the start.
+3. Return the corrected text.`;</div>
+
+    <h3>Idea 2: The "Hazard Hunter" (Categorization)</h3>
+    <p><strong>Goal:</strong> Automatically tag visits (e.g., Maintenance vs. Training).</p>
+    <div class="prompt-box">// Update the 'smartScribe' prompt:
+const prompt = `Read these notes: "${safeNotes}".
+Classify this visit into ONE of these categories: [Client Visit, Maintenance, Training, Admin].
+Return the format: "Category: [Category] - [Corrected Notes]"`;</div>
+
+    <h3>Idea 3: The "Smart Summary" (Weekly Email)</h3>
+    <p><strong>Goal:</strong> Get a written executive summary in your weekly email.</p>
+    <div class="prompt-box">// Add inside 'sendWeeklySummary' before MailApp.sendEmail:
+let aiSummary = "No insights.";
+if(CONFIG.GEMINI_API_KEY) {
+    const prompt = `My team did ${count} visits and ${distance} km this week with ${alerts} alerts. Write a 2-sentence executive summary for me (The Manager).`;
+    // ... (Add UrlFetchApp logic here) ...
+}
+const html = `<h2>Weekly Report</h2><p><strong>AI Insight:</strong> ${aiSummary}</p>...`;</div>
+
+    <hr>
+
+    <h2>Part 6: Troubleshooting</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Issue</th>
+                <th>Likely Cause</th>
+                <th>Fix</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>"Access Denied"</strong> (Worker App)</td>
+                <td>Key Mismatch</td>
+                <td>Re-do Factory Steps 1-3 in one session without refreshing.</td>
+            </tr>
+            <tr>
+                <td><strong>"Failed to Fetch"</strong></td>
+                <td>URL Mismatch</td>
+                <td>The Google Deployment URL changed. Update Factory and re-download app.</td>
+            </tr>
+            <tr>
+                <td><strong>SMS Not Sending</strong></td>
+                <td>TextBelt Error</td>
+                <td>Check daily quota (1 free per IP). Ensure Key is set if paid.</td>
+            </tr>
+            <tr>
+                <td><strong>Monitor: "Connection Lost"</strong></td>
+                <td>PC Offline</td>
+                <td>Dashboard stopped receiving heartbeats. Check office internet.</td>
+            </tr>
+            <tr>
+                <td><strong>Photos not in Email</strong></td>
+                <td>Email Client</td>
+                <td>Outlook/Gmail may block inline images. Click "Show Images".</td>
+            </tr>
+        </tbody>
+    </table>
 
 </div>
 
