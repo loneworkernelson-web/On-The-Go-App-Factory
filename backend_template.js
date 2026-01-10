@@ -1,5 +1,5 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.18 (RESTORED & PATCHED)
+ * OTG APPSUITE - MASTER BACKEND v79.20
  * * FEATURES:
  * 1. Longitudinal Reporting (Trend Analysis for Clients).
  * 2. Travel Reporting (Dedicated Mileage/Duration Log per Worker).
@@ -10,6 +10,7 @@
  * - Robust Base64 Image Decoding.
  * - Error-Resilient Dead Man's Switch.
  * - AI Model Version Verification.
+ * - Form Limit Increased to 30 Items.
  */
 
 // ==========================================
@@ -682,7 +683,8 @@ function getSyncData(workerName, deviceId) {
             
             if(allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
                 const questions = [];
-                for(let q=4; q<9; q++) { if(row[q]) questions.push(row[q]); }
+                // FIXED: Increased limit from 9 (5 items) to 34 (30 items)
+                for(let q=4; q<34; q++) { if(row[q]) questions.push(row[q]); }
                 forms.push({name: row[1], type: row[0], questions: questions});
                 cachedTemplates[row[1]] = questions;
             }
@@ -715,7 +717,8 @@ function getGlobalForms() {
         const row = tData[i];
         if(row[2] === "ALL") {
             const questions = [];
-            for(let q=4; q<9; q++) { if(row[q]) questions.push(row[q]); }
+            // FIXED: Increased limit from 9 (5 items) to 34 (30 items)
+            for(let q=4; q<34; q++) { if(row[q]) questions.push(row[q]); }
             forms.push({name: row[1], questions: questions});
         }
     }
