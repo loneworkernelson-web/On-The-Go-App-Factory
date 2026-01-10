@@ -148,7 +148,7 @@
             </div>
             
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo</label>
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo & Branding</label>
               <div id="dropZone" class="drop-zone w-full" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-32 w-32 mx-auto rounded-full flex items-center justify-center overflow-hidden">
                     <img id="logoImg" class="hidden h-full w-full object-cover">
@@ -159,18 +159,18 @@
               <input type="hidden" id="logoUrl" oninput="saveInput(this)">
 
               <div id="colorPreview" class="hidden mt-6 w-full space-y-3">
-                  <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Logo Sampled Palette</p>
-                  <div class="flex gap-2 justify-center">
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="primaryColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
-                      </div>
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="accentColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
-                      </div>
-                  </div>
-                  <p class="text-[10px] text-blue-400 font-bold">UI Theme updated automatically!</p>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Logo Sampled Palette</p>
+                <div class="flex gap-2 justify-center">
+                    <div class="flex flex-col items-center gap-1">
+                        <div id="primaryColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
+                        <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-1">
+                        <div id="accentColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
+                        <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
+                    </div>
+                </div>
+                <p class="text-[10px] text-blue-400 font-bold">App UI scheme updated!</p>
               </div>
             </div>
           </div>
@@ -273,8 +273,8 @@
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>checkOverdueVisits</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Leave "which deployment" as <strong>Head</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
                   </div>
 
                   <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded text-xs text-gray-300">
@@ -413,7 +413,7 @@
                     const ctx = c.getContext('2d');
                     ctx.drawImage(img, 0, 0, 192, 192);
                     
-                    // NEW: COLOR SAMPLING LOGIC
+                    // SMART COLOR SAMPLING
                     const pixels = ctx.getImageData(48, 48, 96, 96).data;
                     let rSum=0, gSum=0, bSum=0, count=0;
                     for (let i=0; i<pixels.length; i+=16) {
@@ -550,7 +550,33 @@
         let gHtml = processGuideTemplate(TEMPLATES.guide);
         let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker);
 
-        const swCode = `const CACHE_NAME = 'otg-cache-v79';const urlsToCache = ['./','./index.html','./manifest.json'];self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });`;
+        // UPDATED: ROBUST OFFLINE SERVICE WORKER (CACHES TONE.JS AND FONTS)
+        const swCode = `
+const CACHE_NAME = 'otg-safety-v81';
+const urlsToCache = [
+  './',
+  './index.html',
+  './manifest.json',
+  'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      // NETWORK FIRST strategy for HTML (to get updates), CACHE FIRST for Tone.js
+      if (response && event.request.url.includes('Tone.js')) return response;
+      return fetch(event.request).catch(() => response);
+    })
+  );
+});
+`;
         const manifest = { name: org, short_name: appName, start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
 
         zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
