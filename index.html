@@ -157,6 +157,21 @@
               </div>
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
               <input type="hidden" id="logoUrl" oninput="saveInput(this)">
+
+              <div id="colorPreview" class="hidden mt-6 w-full space-y-3">
+                  <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Logo Sampled Palette</p>
+                  <div class="flex gap-2 justify-center">
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="primaryColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
+                          <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="accentColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
+                          <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
+                      </div>
+                  </div>
+                  <p class="text-[10px] text-blue-400 font-bold">UI Theme updated automatically!</p>
+              </div>
             </div>
           </div>
 
@@ -289,7 +304,7 @@
               <p class="text-xs text-gray-400 mb-2">Tick off each task as you complete it:</p>
               <div class="space-y-2">
                   <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Deploy > New Deployment</strong> (Top right blue button).</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select type: <strong>Web App</strong> (Gear icon).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Select type: <strong>Web App</strong> (Gear icon).</span></div>
                   <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select "Execute as: <strong>Me</strong>".</span></div>
                   <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm font-bold text-yellow-300">CRITICAL: Set "Who has access" to "Anyone".</span></div>
                   <div class="checklist-item" onclick="toggleCheck(this); showUrlInput()"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click Deploy and copy the <strong>Web App URL</strong> (ends in /exec).</span></div>
@@ -356,7 +371,6 @@
   <script>
     const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QtcQVe0Ppl-mQbN4MOEp2RgncnHv1jyphKB4vCBPe4g/copy"; 
     
-    // IMPORTANT: File names must match exactly what you saved locally
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
     let TEMPLATES = {};
 
@@ -374,95 +388,100 @@
         document.getElementById('disclaimerModal').style.display = 'none'; 
         loadPersistedData(); 
         
-        // Ensure keys exist or prompt generation
         if(!document.getElementById('secretKey').value) generateMemorableKey('secretKey');
         if(!document.getElementById('workerKey').value) generateMemorableKey('workerKey');
         
         updateRegionInfo(); 
         setupDragDrop(); 
         
-        // FETCH EXTERNAL TEMPLATES
         for (const [k, f] of Object.entries(FILES)) {
             try { 
                 const r = await fetch(f); 
                 if (r.ok) TEMPLATES[k] = await r.text();
-                else console.error("Failed to load: " + f);
             } catch(e){ console.error(e); }
         }
     };
+
+    function handleLogo(input) {
+        if (input.files[0]) {
+            const r = new FileReader();
+            r.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const c = document.createElement('canvas');
+                    c.width = 192; c.height = 192;
+                    const ctx = c.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 192, 192);
+                    
+                    // NEW: COLOR SAMPLING LOGIC
+                    const pixels = ctx.getImageData(48, 48, 96, 96).data;
+                    let rSum=0, gSum=0, bSum=0, count=0;
+                    for (let i=0; i<pixels.length; i+=16) {
+                        if(pixels[i+3] > 200) { rSum += pixels[i]; gSum += pixels[i+1]; bSum += pixels[i+2]; count++; }
+                    }
+                    
+                    let hex = "#1e40af"; // Default blue
+                    if(count > 0) {
+                        const avgR = Math.round(rSum/count);
+                        const avgG = Math.round(gSum/count);
+                        const avgB = Math.round(bSum/count);
+                        hex = "#" + ((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1);
+                    }
+                    
+                    document.getElementById('colorPreview').classList.remove('hidden');
+                    document.getElementById('primaryColorBox').style.backgroundColor = hex;
+                    const accentHex = hex + "cc";
+                    document.getElementById('accentColorBox').style.backgroundColor = accentHex;
+
+                    localStorage.setItem('otg_theme_primary', hex);
+                    localStorage.setItem('otg_theme_accent', accentHex);
+
+                    const d = c.toDataURL('image/png');
+                    document.getElementById('logoImg').src = d;
+                    document.getElementById('logoImg').classList.remove('hidden');
+                    document.getElementById('logoText').textContent = "✅ Logo Ready";
+                    document.getElementById('logoUrl').value = d;
+                    saveInput(document.getElementById('logoUrl'));
+                };
+                img.src = e.target.result;
+            };
+            r.readAsDataURL(input.files[0]);
+        }
+    }
 
     function generateLaunchPack() {
         const url = document.getElementById('workerAppUrl').value;
         if(url.length < 10) return;
         const org = document.getElementById('orgName').value;
         const term = selectedConfig.term;
-        
         document.getElementById('qrImage').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(url);
-        
-        const email = `SUBJECT: IMPORTANT: New Safety App for ${org} Staff
-
-Hi Team,
-
-We are launching a new Lone Worker Safety System.
-Please install the app on your phone immediately.
-
-INSTALLATION STEPS:
-1. Click this link: ${url}
-2. Important: You must "Add to Home Screen" to make it work offline.
-   - iPhone: Tap 'Share' (Square with arrow) > Scroll down > "Add to Home Screen".
-   - Android: Tap 'Menu' (3 dots) > "Install App" or "Add to Home Screen".
-
-HOW TO USE:
-- Open the app when you arrive at a site.
-- Set your estimated duration.
-- Tap "HOLD TO START".
-- If you go overtime, the app will alert us automatically.
-- Remember to update your ${term} status via the app if prompted.
-
-PRIVACY NOTE:
-The app only tracks your GPS while a visit timer is running. It does not track you off the clock.
-
-If you have issues, please reply to this email.
-
-Thanks,
-Management`;
-        
+        const email = `SUBJECT: IMPORTANT: New Safety App for ${org} Staff\n\nHi Team,\n\nWe are launching a new Lone Worker Safety System.\nPlease install the app on your phone immediately.\n\nINSTALLATION STEPS:\n1. Click this link: ${url}\n2. Important: You must "Add to Home Screen" to make it work offline.\n   - iPhone: Tap 'Share' (Square with arrow) > Scroll down > "Add to Home Screen".\n   - Android: Tap 'Menu' (3 dots) > "Install App" or "Add to Home Screen".\n\nHOW TO USE:\n- Open the app when you arrive at a site.\n- Set your estimated duration.\n- Tap "HOLD TO START".\n- If you go overtime, the app will alert us automatically.\n- Remember to update your ${term} status via the app if prompted.\n\nPRIVACY NOTE:\nThe app only tracks your GPS while a visit timer is running. It does not track you off the clock.\n\nIf you have issues, please reply to this email.\n\nThanks,\nManagement`;
         document.getElementById('launchEmail').value = email;
         document.getElementById('launchPack').classList.remove('hidden');
     }
 
-    function updateCharCount(el) {
-        document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`;
-    }
-
-    // Standard Helper Functions
-    function saveInput(el) { 
-        if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); 
-        else localStorage.setItem('otg_' + el.id, el.value); 
-    }
+    function updateCharCount(el) { document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`; }
+    function saveInput(el) { if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); else localStorage.setItem('otg_' + el.id, el.value); }
     
     function generateMemorableKey(targetId) {
         const adjs = ['Safe','Swift','Blue','Red','Gold','Green','Bright','Firm','Iron','Steel'];
         const nouns = ['Guard','Watch','Shield','Falcon','Eagle','Hawk','Post','Base','Fort','Gate'];
         const num = Math.floor(Math.random() * 90) + 10;
-        let prefix = targetId === 'secretKey' ? 'OTG_M_' : 'OTG_W_';
-        // For Worker key, use random string for better security, for Master use memorable
-        if (targetId === 'workerKey') {
-             prefix = "wk_" + Math.random().toString(36).substr(2, 9);
-             document.getElementById(targetId).value = prefix;
-        } else {
-             document.getElementById(targetId).value = `${adjs[Math.floor(Math.random()*adjs.length)]}-${nouns[Math.floor(Math.random()*nouns.length)]}-${num}`;
-        }
-        saveInput(document.getElementById(targetId)); 
+        let val = "";
+        if (targetId === 'workerKey') val = "wk_" + Math.random().toString(36).substr(2, 9);
+        else val = `${adjs[Math.floor(Math.random()*adjs.length)]}-${nouns[Math.floor(Math.random()*nouns.length)]}-${num}`;
+        document.getElementById(targetId).value = val;
+        saveInput(document.getElementById(targetId));
         if(targetId === 'secretKey') validateKey();
     }
     
     function validateKey() {
         const k = document.getElementById('secretKey').value;
         const el = document.getElementById('keyStrength');
-        if(k.length < 8) { el.innerText = "⚠️ Strength: Weak"; el.className = "text-xs mt-2 font-bold text-red-400"; } 
+        if(k.length < 8) { el.innerText = "⚠️ Strength: Weak"; el.className = "text-xs mt-2 font-bold text-red-400"; }
         else { el.innerText = "✅ Strength: Good"; el.className = "text-xs mt-2 font-bold text-green-400"; }
     }
+
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
     function showUrlInput() { if(Array.from(document.querySelectorAll('.checklist-checkbox')).every(i => i.checked)) { document.getElementById('urlInputSection').classList.remove('hidden'); setTimeout(()=>document.getElementById('urlInputSection').classList.remove('opacity-0'),100); }}
@@ -478,16 +497,9 @@ Management`;
         document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('phoneFmtDisplay').textContent = sel + "...";
         document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; saveInput(document.getElementById('countrySelect'));
     }
+
     function toggleEnterBtn() { const chk = document.getElementById('chkAccept'); document.getElementById('btnEnter').disabled = !chk.checked; }
-    function setupDragDrop() {
-        const dz = document.getElementById('dropZone');
-        dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); });
-        dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); });
-        dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); });
-    }
-    function handleLogo(input) {
-        if (input.files[0]) { const r = new FileReader(); r.onload = function(e) { const img = new Image(); img.onload = function() { const c = document.createElement('canvas'); c.width = 192; c.height = 192; c.getContext('2d').drawImage(img, 0, 0, 192, 192); const d = c.toDataURL('image/png'); document.getElementById('logoImg').src = d; document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoText').textContent = "✅ Logo Ready"; document.getElementById('logoUrl').value = d; saveInput(document.getElementById('logoUrl')); }; img.src = e.target.result; }; r.readAsDataURL(input.files[0]); }
-    }
+    function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); }); dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
     function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++){ const t = document.getElementById('tab'+i); if(i===n){t.classList.add('active'); if(n===3)generateScript();}else{t.classList.remove('active');} } }
     function toggleCheckin() { document.getElementById('checkinOptions').style.display = document.getElementById('chkCheckin').checked ? 'flex' : 'none'; }
     function toggleVehicle() { document.getElementById('vehOptions').style.display = document.getElementById('chkVehicle').checked ? 'block' : 'none'; }
@@ -498,48 +510,21 @@ Management`;
 
     function generateScript() {
         if(!TEMPLATES.backend) return;
-        const code = TEMPLATES.backend
-            .replace('%%SECRET_KEY%%', document.getElementById('secretKey').value)
-            .replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value)
-            .replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value)
-            .replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value)
-            .replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value)
-            .replace('%%PHOTOS_FOLDER_ID%%', document.getElementById('folderId').value)
-            .replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value)
-            .replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland")
-            .replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value)
-            .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked)
-            .replace('%%VEHICLE_TERM%%', selectedConfig.term)
-            .replace('%%COUNTRY_PREFIX%%', document.getElementById('countrySelect').value);
+        const code = TEMPLATES.backend.replace('%%SECRET_KEY%%', document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value).replace('%%ORS_API_KEY%%', document.getElementById('orsKey').value).replace('%%GEMINI_API_KEY%%', document.getElementById('geminiKey').value).replace('%%TEXTBELT_API_KEY%%', document.getElementById('textbeltKey').value).replace('%%PHOTOS_FOLDER_ID%%', document.getElementById('folderId').value).replace('%%ORGANISATION_NAME%%', document.getElementById('orgName').value).replace('%%TIMEZONE%%', document.getElementById('timezoneVal').value || "Pacific/Auckland").replace('%%ESCALATION_MINUTES%%', document.getElementById('escalationMins').value).replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked).replace('%%VEHICLE_TERM%%', selectedConfig.term).replace('%%COUNTRY_PREFIX%%', document.getElementById('countrySelect').value);
         document.getElementById('codeDisplay').textContent = code;
     }
     
-    function copyScript() {
-        if(document.getElementById('codeDisplay').textContent === "Generating code...") generateScript();
-        setTimeout(() => { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Copied!"); }, 100);
-    }
+    function copyScript() { if(document.getElementById('codeDisplay').textContent === "Generating code...") generateScript(); setTimeout(() => { navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Copied!"); }, 100); }
 
     function testConnection() {
         const url = document.getElementById('webAppUrl').value;
         const resBox = document.getElementById('testResult');
         resBox.classList.remove('hidden'); resBox.textContent = "Testing..."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-gray-900 text-yellow-400 font-bold";
         if(!url.includes('/exec')) { resBox.textContent = "❌ Invalid URL."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; document.getElementById('troubleshooter').classList.remove('hidden'); return; }
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value))
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error();
-            }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; document.getElementById('troubleshooter').classList.remove('hidden'); });
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(res => res.json()).then(data => { if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error(); }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; document.getElementById('troubleshooter').classList.remove('hidden'); });
     }
 
-    function processGuideTemplate(html) {
-        if(!html) return "";
-        let out = html.replace(/%%ORG_NAME%%/g, document.getElementById('orgName').value)
-                      .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-                      .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
-        const processBlock = (tag, isActive) => { const regex = new RegExp(`([\\s\\S]*?)`, 'g'); out = out.replace(regex, (m, c) => isActive ? c : ""); };
-        processBlock('VEHICLE', document.getElementById('chkVehicle').checked);
-        return out;
-    }
+    function processGuideTemplate(html) { if(!html) return ""; let out = html.replace(/%%ORG_NAME%%/g, document.getElementById('orgName').value).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term); const processBlock = (tag, isActive) => { const regex = new RegExp(`([\\s\\S]*?)`, 'g'); out = out.replace(regex, (m, c) => isActive ? c : ""); }; processBlock('VEHICLE', document.getElementById('chkVehicle').checked); return out; }
 
     function downloadZip() {
         const zip = new JSZip();
@@ -555,50 +540,18 @@ Management`;
         const escalationMins = document.getElementById('escalationMins').value;
         const countryPrefix = document.getElementById('countrySelect').value;
         const reqTravelReport = document.getElementById('chkTravelReport').checked;
-        localStorage.setItem('otg_chkTravelReport', reqTravelReport);
-        localStorage.setItem('otg_chkRedaction', document.getElementById('chkRedaction').checked);
 
-        // INJECT KEYS & CONFIGS
-        let wHtml = TEMPLATES.worker
-            .replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%APP_NAME%%/g, appName)
-            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
-            .replace(/%%SHEET_URL%%/g, url)
-            .replace(/%%LOGO_DATA%%/g, logo)
-            .replace(/%%SECRET_KEY%%/g, worker) // Use Worker Key here
-            .replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled)
-            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
-            .replace(/%%ESCALATION_MINUTES%%/g, escalationMins)
-            .replace(/%%IS_ADVANCED%%/g, "true")
-            .replace(/%%ENABLE_MILEAGE%%/g, "true")
-            .replace(/%%ORS_API_KEY%%/g, orsKey)
-            .replace(/%%VEHICLE_ENABLED%%/g, vehEnabled)
-            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
-            .replace(/%%COUNTRY_PREFIX%%/g, countryPrefix)
-            .replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport)
-            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
-            .replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale);
+        const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
+        const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
 
+        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appName).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, worker).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value).replace(/%%COUNTRY_PREFIX%%/g, countryPrefix).replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
         let bCode = document.getElementById('codeDisplay').textContent;
         let gHtml = processGuideTemplate(TEMPLATES.guide);
         let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker);
 
-        const swCode = `
-const CACHE_NAME = 'otg-cache-v79';
-const urlsToCache = ['./','./index.html','./manifest.json'];
-self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });
-self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });
-`;
-        const manifest = { 
-            name: org, 
-            short_name: appName,
-            start_url: "./index.html", 
-            display: "standalone", 
-            background_color: "#111827", 
-            theme_color: "#1e40af", 
-            icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] 
-        };
+        const swCode = `const CACHE_NAME = 'otg-cache-v79';const urlsToCache = ['./','./index.html','./manifest.json'];self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); });self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response) { return response; } return fetch(event.request); })); });`;
+        const manifest = { name: org, short_name: appName, start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
 
         zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
         zip.folder("MonitorApp").file("index.html", mHtml);
@@ -607,6 +560,7 @@ self.addEventListener('fetch', event => { event.respondWith(caches.match(event.r
 
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_On-The-Go_Lone_Worker_Apps.zip";a.click()});
     }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
   </script>
 </body>
 </html>
