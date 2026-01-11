@@ -433,7 +433,7 @@
                     document.getElementById('logoUrl').value = d;
                     saveInput(document.getElementById('logoUrl'));
                     
-                    // Trigger initial resample
+                    // REFINED: Trigger advanced sampling
                     triggerResample();
                 };
                 img.src = e.target.result;
@@ -451,23 +451,53 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, 192, 192);
         
-        // Sampling logic
-        const pixels = ctx.getImageData(48, 48, 96, 96).data;
-        let rSum=0, gSum=0, bSum=0, count=0;
-        for (let i=0; i<pixels.length; i+=16) {
-            if(pixels[i+3] > 200) { rSum += pixels[i]; gSum += pixels[i+1]; bSum += pixels[i+2]; count++; }
+        // Sampling Area: Middle 60% of logo
+        const data = ctx.getImageData(40, 40, 112, 112).data;
+        const colorMap = {};
+
+        for (let i = 0; i < data.length; i += 16) { // Step to speed up
+            if (data[i + 3] < 150) continue; // Skip transparency
+            
+            const r = data[i], g = data[i+1], b = data[i+2];
+            
+            // Skip Neutrals (Whites, Blacks, Greys)
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = (max - min) / max;
+            const brightness = max / 255;
+            
+            if (saturation < 0.15 || brightness > 0.95 || brightness < 0.15) continue;
+            
+            // Quantize to group similar colors
+            const key = `${Math.round(r/10)*10},${Math.round(g/10)*10},${Math.round(b/10)*10}`;
+            colorMap[key] = (colorMap[key] || 0) + 1;
         }
+
+        // Sort by frequency
+        const sorted = Object.entries(colorMap).sort((a,b) => b[1] - a[1]);
         
-        let hex = "#1e40af"; 
-        if(count > 0) {
-            const avgR = Math.round(rSum/count);
-            const avgG = Math.round(gSum/count);
-            const avgB = Math.round(bSum/count);
-            hex = "#" + ((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1);
+        let primary = "#1e40af"; // Default
+        let accent = "#3b82f6";
+
+        if(sorted.length > 0) {
+            primary = `rgb(${sorted[0][0]})`;
+            // Find an accent that is distinctly different if possible
+            if(sorted.length > 1) {
+                accent = `rgb(${sorted[1][0]})`;
+            } else {
+                accent = primary; // Fallback
+            }
         }
-        
-        applyPreset(hex, hex + "cc");
+
+        applyPreset(rgbToHex(primary), rgbToHex(accent));
         document.getElementById('paletteArea').classList.remove('hidden');
+    }
+
+    function rgbToHex(rgb) {
+        if(rgb.startsWith('#')) return rgb;
+        const match = rgb.match(/\d+/g);
+        if(!match) return "#1e40af";
+        return "#" + match.slice(0,3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
     }
 
     function applyPreset(primary, accent) {
