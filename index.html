@@ -32,8 +32,9 @@
     .checklist-item:hover { background: #475569; }
     .checklist-item.checked { background: #064e3b; border-color: #059669; }
     .checklist-checkbox { width: 20px; height: 20px; accent-color: #10b981; cursor: pointer; }
-    .preset-swatch { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
-    .preset-swatch:hover { transform: scale(1.2); }
+    .preset-swatch { width: 32px; height: 32px; border-radius: 6px; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: all 0.1s; display: flex; overflow: hidden; }
+    .preset-swatch:hover { transform: scale(1.15); border-color: white; }
+    .swatch-half { flex: 1; height: 100%; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -150,11 +151,11 @@
             </div>
             
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo</label>
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo & Branding</label>
               <div id="dropZone" class="drop-zone w-full mb-4" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-32 w-32 mx-auto rounded-full flex items-center justify-center overflow-hidden">
                     <img id="logoImg" class="hidden h-full w-full object-cover">
-                    <span id="logoText" class="text-gray-500 text-sm">Drag & Drop<br>Logo Here</span>
+                    <span id="logoText" class="text-gray-500 text-sm">Drag & Drop Logo</span>
                 </div>
               </div>
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
@@ -162,27 +163,29 @@
 
               <div id="paletteArea" class="hidden w-full bg-gray-900/50 p-4 rounded-xl border border-gray-700">
                   <div class="flex justify-between items-center mb-3">
-                      <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Theme Colors</span>
-                      <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline">↻ Resample Logo</button>
+                      <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Branding Schemes</span>
+                      <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline">↻ Resample</button>
                   </div>
-                  <div class="flex gap-4 justify-center items-center mb-4">
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="primaryColorBox" class="w-10 h-10 rounded-lg border border-white/20 shadow-lg"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
-                      </div>
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="accentColorBox" class="w-10 h-10 rounded-lg border border-white/20 shadow-lg"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
-                      </div>
-                  </div>
+                  
+                  <div class="flex gap-3 justify-center mb-4" id="logoClusterSwatches"></div>
+
                   <div class="pt-3 border-t border-gray-800">
-                      <p class="text-[8px] text-gray-500 font-bold uppercase mb-2">Safe Presets</p>
+                      <div class="flex gap-4 justify-center items-center mb-4">
+                          <div class="flex flex-col items-center gap-1">
+                              <div id="primaryColorBox" class="w-8 h-8 rounded border border-white/20"></div>
+                              <span class="text-[7px] text-gray-500 font-bold uppercase">Primary</span>
+                          </div>
+                          <div class="flex flex-col items-center gap-1">
+                              <div id="accentColorBox" class="w-8 h-8 rounded border border-white/20"></div>
+                              <span class="text-[7px] text-gray-500 font-bold uppercase">Accent</span>
+                          </div>
+                      </div>
+                      <p class="text-[8px] text-gray-500 font-bold uppercase mb-2">Enterprise Presets</p>
                       <div class="flex gap-2 justify-center">
-                          <div class="preset-swatch bg-[#1e40af]" onclick="applyPreset('#1e40af', '#3b82f6')" title="Corporate Blue"></div>
-                          <div class="preset-swatch bg-[#064e3b]" onclick="applyPreset('#064e3b', '#10b981')" title="Forest Green"></div>
-                          <div class="preset-swatch bg-[#450a0a]" onclick="applyPreset('#450a0a', '#ef4444')" title="Emergency Red"></div>
-                          <div class="preset-swatch bg-[#1e293b]" onclick="applyPreset('#1e293b', '#64748b')" title="Slate Grey"></div>
-                          <div class="preset-swatch bg-[#312e81]" onclick="applyPreset('#312e81', '#6366f1')" title="Indigo"></div>
+                          <div class="preset-swatch" onclick="applyPreset('#1e40af', '#3b82f6')"><div class="swatch-half bg-[#1e40af]"></div><div class="swatch-half bg-[#3b82f6]"></div></div>
+                          <div class="preset-swatch" onclick="applyPreset('#064e3b', '#10b981')"><div class="swatch-half bg-[#064e3b]"></div><div class="swatch-half bg-[#10b981]"></div></div>
+                          <div class="preset-swatch" onclick="applyPreset('#450a0a', '#ef4444')"><div class="swatch-half bg-[#450a0a]"></div><div class="swatch-half bg-[#ef4444]"></div></div>
+                          <div class="preset-swatch" onclick="applyPreset('#1e293b', '#64748b')"><div class="swatch-half bg-[#1e293b]"></div><div class="swatch-half bg-[#64748b]"></div></div>
                       </div>
                   </div>
               </div>
@@ -218,18 +221,17 @@
                  <div>
                      <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Textbelt Key</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div>
                      <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (SMS)" oninput="saveInput(this)">
-                     <p class="text-[10px] text-gray-500 mt-1">Highly recommended. Adds SMS alerts for overdue workers. Vital if not using live monitoring.</p>
+                     <p class="text-[10px] text-gray-500 mt-1">Highly recommended. Adds SMS alerts for overdue workers.</p>
                  </div>
                  <div>
                      <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Gemini AI Key</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div>
                      <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (AI)" oninput="saveInput(this)">
-                     <p class="text-[10px] text-gray-500 mt-1">Professionalises reports by correcting spelling/grammar. Does not alter original raw data.</p>
+                     <p class="text-[10px] text-gray-500 mt-1">Professionalises reports by correcting spelling/grammar.</p>
                  </div>
                  <div><div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (Mileage)" oninput="saveInput(this)"></div>
                  <div>
                      <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Drive Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where is this?</a></div>
                      <input type="text" id="folderId" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional (Photos)" oninput="saveInput(this)">
-                     <p class="text-[10px] text-gray-500 mt-1">Stores all photos filed in reports in one organized location.</p>
                  </div>
              </div>
           </div>
@@ -239,11 +241,6 @@
         <div id="step2" class="step-section space-y-8">
           <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
               <h2 class="text-3xl font-bold text-white mb-2">Option A: The Easy Way (Recommended)</h2>
-              <div class="bg-yellow-900/50 border-l-4 border-yellow-500 p-4 mb-6 text-left max-w-2xl mx-auto rounded-r">
-                  <p class="font-bold text-yellow-300 text-sm flex items-center gap-2">⚠️ BEST PRACTICE:</p>
-                  <p class="text-gray-300 text-xs mt-1">We <strong>strongly recommend</strong> creating a new, dedicated Google Account (e.g. <code>safety.yourcompany@gmail.com</code>) to own this system. Do not use your personal Gmail.</p>
-                  <p class="text-gray-400 text-xs mt-1">Sign into that account now before clicking the button below.</p>
-              </div>
               <p class="text-blue-200 mb-6">Create your database automatically in one click.</p>
               <button onclick="openMagicLink()" class="btn btn-success text-xl px-10 py-5 shadow-lg transform hover:-translate-y-1 hover:shadow-2xl">✨ Create Database Copy</button>
               <p id="magicLinkError" class="hidden text-red-400 text-sm mt-4 font-bold bg-red-900/50 p-2 rounded">⚠️ Admin: Please configure MASTER_SHEET_URL in index.html</p>
@@ -282,46 +279,11 @@
               <div class="space-y-4">
                   <div class="bg-gray-800 p-3 rounded border border-purple-500/30">
                       <h4 class="font-bold text-white text-sm mb-2">Safety Watchdog</h4>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click the <strong>Clock Icon</strong> (Triggers) on the left sidebar.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> (Blue button, bottom right of page).</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click the <strong>Clock Icon</strong> (Triggers).</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>checkOverdueVisits</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Leave "which deployment" as <strong>Head</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
                   </div>
-
-                  <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded text-xs text-gray-300">
-                      <p class="font-bold text-blue-300 mb-1">ℹ️ Permission Help:</p>
-                      <ul class="list-disc pl-4 mt-1 space-y-1">
-                          <li>When you click Save, Google will ask for permission.</li>
-                          <li>Click <strong>Review Permissions</strong> -> Choose Account.</li>
-                          <li>If you see "Google hasn't verified this app":</li>
-                          <li>Click <strong>Advanced</strong> (small text) -> <strong>Go to ... (unsafe)</strong>.</li>
-                          <li>Type "Continue" or "Allow" if asked.</li>
-                      </ul>
-                  </div>
-
-                  <div class="bg-gray-800 p-3 rounded border border-gray-600">
-                      <h4 class="font-bold text-white text-sm mb-2">Weekly Summary (Optional)</h4>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>+ Add Trigger</strong> again (bottom right).</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>sendWeeklySummary</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Week timer</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Day of week: <strong>Monday</strong>. Click <strong>Save</strong>.</span></div>
-                  </div>
-              </div>
-          </div>
-
-          <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-              <h3 class="font-bold text-yellow-400 text-lg">3. Publish to Web</h3>
-              <p class="text-xs text-gray-400 mb-2">Tick off each task as you complete it:</p>
-              <div class="space-y-2">
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click <strong>Deploy > New Deployment</strong> (Top right blue button).</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Select type: <strong>Web App</strong> (Gear icon).</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Select "Execute as: <strong>Me</strong>".</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm font-bold text-yellow-300">CRITICAL: Set "Who has access" to "Anyone".</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this); showUrlInput()"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Click Deploy and copy the <strong>Web App URL</strong> (ends in /exec).</span></div>
               </div>
           </div>
 
@@ -329,8 +291,7 @@
               <label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste Web App URL:</label>
               <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)">
               <div class="flex justify-center gap-4 mt-6"><button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg">📡 Test Connection</button></div>
-              <div id="testResult" class="hidden mt-4 p-4 rounded-lg text-center"></div>
-              <div id="troubleshooter" class="hidden bg-red-900/30 border border-red-500/50 p-4 rounded-lg mt-4 text-left"><h4 class="font-bold text-red-400 mb-2">❌ Connection Failed. Check these common issues:</h4><ul class="list-disc pl-5 text-sm text-gray-300 space-y-1"><li>Did you set <strong>"Who has access"</strong> to <strong>"Anyone"</strong>?</li><li>Did you click <strong>"New Deployment"</strong> (not Manage)?</li></ul></div>
+              <div id="testResult" class="hidden mt-4 p-4 rounded-lg text-center font-bold"></div>
           </div>
           <div class="flex justify-between pt-6"><button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download →</button></div>
         </div>
@@ -344,36 +305,11 @@
         <div id="step5" class="step-section space-y-10">
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
                 <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Host with Netlify (Free)</h2></div></div>
-                <div class="bg-orange-900/50 border border-orange-500 p-4 rounded mb-6"><h4 class="font-bold text-orange-400 mb-1">⚠️ DON'T LOSE YOUR APP!</h4><p class="text-sm text-gray-300">If you just drag-and-drop without an account, your app will <strong>delete itself after 1 hour</strong>.</p><p class="text-sm text-white font-bold mt-2">✅ YOU MUST CLICK "SIGN UP TO CLAIM SITE" ON NETLIFY.</p></div>
+                <div class="bg-orange-900/50 border border-orange-500 p-4 rounded mb-6"><h4 class="font-bold text-orange-400 mb-1">⚠️ DON'T LOSE YOUR APP!</h4><p class="text-sm text-gray-300">If you just drag-and-drop without an account, your app will <strong>delete itself after 1 hour</strong>.</p></div>
                 <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
                     <li>Go to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/drop</a>.</li>
                     <li>Drag the <strong>WorkerApp</strong> folder from your ZIP into the browser.</li>
-                    <li><strong>IMMEDIATELY</strong> click "Sign up to claim this site".</li>
-                    <li>Click <strong>Site Settings > Change Site Name</strong> to something friendly (e.g. <code>my-org-safety.netlify.app</code>).</li>
-                    <li>Repeat for the <strong>MonitorApp</strong> folder if needed.</li>
                 </ol>
-            </div>
-
-            <div class="bg-indigo-900/30 p-8 rounded-xl border border-indigo-500/50">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">✉️</span><div><h2 class="text-2xl font-bold text-white">2. Launch Pack</h2></div></div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-indigo-300 text-xs font-bold uppercase mb-1">Paste your Worker App URL (from Netlify)</label>
-                        <input type="url" id="workerAppUrl" class="input-field" placeholder="https://my-safety-app.netlify.app" oninput="generateLaunchPack()">
-                    </div>
-                    
-                    <div id="launchPack" class="hidden grid md:grid-cols-3 gap-6">
-                        <div class="md:col-span-2">
-                            <label class="block text-indigo-300 text-xs font-bold uppercase mb-1">Draft Email</label>
-                            <textarea id="launchEmail" class="w-full h-40 bg-gray-900 border border-indigo-500/50 rounded p-4 text-sm text-gray-300 font-mono" readonly></textarea>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('launchEmail').value); alert('Email copied!');" class="mt-2 btn btn-xs bg-indigo-600 hover:bg-indigo-500 text-white text-sm">Copy Email Text</button>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-white p-4 rounded-lg">
-                            <img id="qrImage" src="" class="w-32 h-32 mb-2">
-                            <p class="text-gray-900 text-xs font-bold text-center">Right-Click to Save<br>for Posters</p>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
         </div>
@@ -384,7 +320,6 @@
 
   <script>
     const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QtcQVe0Ppl-mQbN4MOEp2RgncnHv1jyphKB4vCBPe4g/copy"; 
-    
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
     let TEMPLATES = {};
 
@@ -401,13 +336,10 @@
         document.getElementById('mainContent').classList.remove('blur-sm'); 
         document.getElementById('disclaimerModal').style.display = 'none'; 
         loadPersistedData(); 
-        
         if(!document.getElementById('secretKey').value) generateMemorableKey('secretKey');
         if(!document.getElementById('workerKey').value) generateMemorableKey('workerKey');
-        
         updateRegionInfo(); 
         setupDragDrop(); 
-        
         for (const [k, f] of Object.entries(FILES)) {
             try { 
                 const r = await fetch(f); 
@@ -432,8 +364,6 @@
                     document.getElementById('logoText').textContent = "✅ Logo Ready";
                     document.getElementById('logoUrl').value = d;
                     saveInput(document.getElementById('logoUrl'));
-                    
-                    // REFINED: Trigger advanced sampling
                     triggerResample();
                 };
                 img.src = e.target.result;
@@ -445,58 +375,45 @@
     function triggerResample() {
         const img = document.getElementById('logoImg');
         if (!img.src || img.src.length < 100) return;
-        
         const canvas = document.createElement('canvas');
         canvas.width = 192; canvas.height = 192;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, 192, 192);
         
-        // Sampling Area: Middle 60% of logo
-        const data = ctx.getImageData(40, 40, 112, 112).data;
+        const data = ctx.getImageData(30, 30, 132, 132).data;
         const colorMap = {};
 
-        for (let i = 0; i < data.length; i += 16) { // Step to speed up
-            if (data[i + 3] < 150) continue; // Skip transparency
-            
+        for (let i = 0; i < data.length; i += 12) {
+            if (data[i + 3] < 180) continue;
             const r = data[i], g = data[i+1], b = data[i+2];
-            
-            // Skip Neutrals (Whites, Blacks, Greys)
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            const saturation = (max - min) / max;
-            const brightness = max / 255;
-            
-            if (saturation < 0.15 || brightness > 0.95 || brightness < 0.15) continue;
-            
-            // Quantize to group similar colors
-            const key = `${Math.round(r/10)*10},${Math.round(g/10)*10},${Math.round(b/10)*10}`;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const sat = (max - min) / max, bri = max / 255;
+            if (sat < 0.22 || bri > 0.90 || bri < 0.15) continue;
+            const key = `${Math.round(r/25)*25},${Math.round(g/25)*25},${Math.round(b/25)*25}`;
             colorMap[key] = (colorMap[key] || 0) + 1;
         }
 
-        // Sort by frequency
-        const sorted = Object.entries(colorMap).sort((a,b) => b[1] - a[1]);
+        const sorted = Object.entries(colorMap).sort((a,b) => b[1] - a[1]).slice(0, 3);
+        const container = document.getElementById('logoClusterSwatches');
+        container.innerHTML = '';
         
-        let primary = "#1e40af"; // Default
-        let accent = "#3b82f6";
-
         if(sorted.length > 0) {
-            primary = `rgb(${sorted[0][0]})`;
-            // Find an accent that is distinctly different if possible
-            if(sorted.length > 1) {
-                accent = `rgb(${sorted[1][0]})`;
-            } else {
-                accent = primary; // Fallback
-            }
+            sorted.forEach((cluster, idx) => {
+                const primary = rgbToHex(`rgb(${cluster[0]})`);
+                const accent = idx < sorted.length - 1 ? rgbToHex(`rgb(${sorted[idx+1][0]})`) : primary;
+                const swatch = document.createElement('div');
+                swatch.className = "preset-swatch";
+                swatch.innerHTML = `<div class="swatch-half" style="background:${primary}"></div><div class="swatch-half" style="background:${accent}"></div>`;
+                swatch.onclick = () => { applyPreset(primary, accent); };
+                container.appendChild(swatch);
+                if(idx === 0) applyPreset(primary, accent);
+            });
         }
-
-        applyPreset(rgbToHex(primary), rgbToHex(accent));
         document.getElementById('paletteArea').classList.remove('hidden');
     }
 
     function rgbToHex(rgb) {
-        if(rgb.startsWith('#')) return rgb;
         const match = rgb.match(/\d+/g);
-        if(!match) return "#1e40af";
         return "#" + match.slice(0,3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
     }
 
@@ -507,20 +424,6 @@
         localStorage.setItem('otg_theme_accent', accent);
     }
 
-    function generateLaunchPack() {
-        const url = document.getElementById('workerAppUrl').value;
-        if(url.length < 10) return;
-        const org = document.getElementById('orgName').value;
-        const term = selectedConfig.term;
-        document.getElementById('qrImage').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + encodeURIComponent(url);
-        const email = `SUBJECT: IMPORTANT: New Safety App for ${org} Staff\n\nHi Team,\n\nWe are launching a new Lone Worker Safety System.\nPlease install the app on your phone immediately.\n\nINSTALLATION STEPS:\n1. Click this link: ${url}\n2. Important: You must "Add to Home Screen" to make it work offline.\n   - iPhone: Tap 'Share' (Square with arrow) > Scroll down > "Add to Home Screen".\n   - Android: Tap 'Menu' (3 dots) > "Install App" or "Add to Home Screen".\n\nHOW TO USE:\n- Open the app when you arrive at a site.\n- Set your estimated duration.\n- Tap "HOLD TO START".\n- If you go overtime, the app will alert us automatically.\n- Remember to update your ${term} status via the app if prompted.\n\nPRIVACY NOTE:\nThe app only tracks your GPS while a visit timer is running. It does not track you off the clock.\n\nIf you have issues, please reply to this email.\n\nThanks,\nManagement`;
-        document.getElementById('launchEmail').value = email;
-        document.getElementById('launchPack').classList.remove('hidden');
-    }
-
-    function updateCharCount(el) { document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`; }
-    function saveInput(el) { if(el.type === 'checkbox') localStorage.setItem('otg_' + el.id, el.checked); else localStorage.setItem('otg_' + el.id, el.value); }
-    
     function generateMemorableKey(targetId) {
         const adjs = ['Safe','Swift','Blue','Red','Gold','Green','Bright','Firm','Iron','Steel'];
         const nouns = ['Guard','Watch','Shield','Falcon','Eagle','Hawk','Post','Base','Fort','Gate'];
@@ -578,47 +481,27 @@
         const url = document.getElementById('webAppUrl').value;
         const resBox = document.getElementById('testResult');
         resBox.classList.remove('hidden'); resBox.textContent = "Testing..."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-gray-900 text-yellow-400 font-bold";
-        if(!url.includes('/exec')) { resBox.textContent = "❌ Invalid URL."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; document.getElementById('troubleshooter').classList.remove('hidden'); return; }
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(res => res.json()).then(data => { if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error(); }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; document.getElementById('troubleshooter').classList.remove('hidden'); });
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(res => res.json()).then(data => { if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error(); }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; });
     }
 
     function processGuideTemplate(html) { if(!html) return ""; let out = html.replace(/%%ORG_NAME%%/g, document.getElementById('orgName').value).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term); const processBlock = (tag, isActive) => { const regex = new RegExp(`([\\s\\S]*?)`, 'g'); out = out.replace(regex, (m, c) => isActive ? c : ""); }; processBlock('VEHICLE', document.getElementById('chkVehicle').checked); return out; }
 
     function downloadZip() {
-        const zip = new JSZip();
-        const org = document.getElementById('orgName').value;
-        const appName = document.getElementById('appName').value || "Safety";
-        const url = document.getElementById('webAppUrl').value;
-        const secret = document.getElementById('secretKey').value;
-        const worker = document.getElementById('workerKey').value;
-        const logo = document.getElementById('logoUrl').value;
-        const orsKey = document.getElementById('orsKey').value;
-        const checkinEnabled = document.getElementById('chkCheckin').checked;
-        const vehEnabled = document.getElementById('chkVehicle').checked;
-        const escalationMins = document.getElementById('escalationMins').value;
-        const countryPrefix = document.getElementById('countrySelect').value;
-        const reqTravelReport = document.getElementById('chkTravelReport').checked;
-
+        const zip = new JSZip(); const org = document.getElementById('orgName').value; const appName = document.getElementById('appName').value || "Safety"; const url = document.getElementById('webAppUrl').value; const secret = document.getElementById('secretKey').value; const worker = document.getElementById('workerKey').value; const logo = document.getElementById('logoUrl').value;
         const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
         const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
-
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appName).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, worker).replace(/%%CHECKIN_ENABLED%%/g, checkinEnabled).replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value).replace(/%%ESCALATION_MINUTES%%/g, escalationMins).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, orsKey).replace(/%%VEHICLE_ENABLED%%/g, vehEnabled).replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value).replace(/%%COUNTRY_PREFIX%%/g, countryPrefix).replace(/%%REQ_TRAVEL_REPORT%%/g, reqTravelReport).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
+        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appName).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, worker).replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%IS_ADVANCED%%/g, "true").replace(/%%ENABLE_MILEAGE%%/g, "true").replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
-        let bCode = document.getElementById('codeDisplay').textContent;
-        let gHtml = processGuideTemplate(TEMPLATES.guide);
-        let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker);
-
-        const swCode = `const CACHE_NAME = 'otg-safety-v81'; const urlsToCache = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js','https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap']; self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); }); self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response && event.request.url.includes('Tone.js')) return response; return fetch(event.request).catch(() => response); })); });`;
+        const swCode = `const CACHE_NAME = 'otg-v81'; const urlsToCache = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js']; self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); }); self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { return response || fetch(event.request); })); });`;
         const manifest = { name: org, short_name: appName, start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
-
-        zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
+        zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         zip.folder("MonitorApp").file("index.html", mHtml);
-        zip.file("Code.gs", bCode);
-        zip.file("OPERATIONS_MANUAL.html", opHtml);
-
-        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_On-The-Go_Lone_Worker_Apps.zip";a.click()});
+        zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
+        zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker));
+        zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Lone_Worker_Apps.zip";a.click()});
     }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function generateLaunchPack() { const url = document.getElementById('workerAppUrl').value; if(url.length < 10) return; document.getElementById('launchPack').classList.remove('hidden'); }
   </script>
 </body>
 </html>
