@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTG Factory v79.25 (Global)</title>
+  <title>OTG Factory v79.26 (Global)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -29,10 +29,9 @@
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
     .checklist-item { display: flex; align-items: center; gap: 10px; padding: 12px; background: #334155; margin-bottom: 8px; border-radius: 8px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
-    .checklist-item:hover { background: #475569; }
     .checklist-item.checked { background: #064e3b; border-color: #059669; }
     .checklist-checkbox { width: 20px; height: 20px; accent-color: #10b981; cursor: pointer; }
-    .preset-swatch { width: 32px; height: 32px; border-radius: 6px; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: all 0.1s; display: flex; overflow: hidden; }
+    .preset-swatch { width: 36px; height: 36px; border-radius: 8px; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: all 0.1s; display: flex; overflow: hidden; }
     .preset-swatch:hover { transform: scale(1.1); border-color: #3b82f6; }
     .preset-swatch.selected { outline: 4px solid #3b82f6; outline-offset: 2px; transform: scale(1.05); }
     .swatch-half { flex: 1; height: 100%; }
@@ -70,6 +69,9 @@
               <li>Double-click to open the folder.</li>
               <li>Look at the URL bar. Copy the text AFTER <code>folders/</code>.</li>
           </ol>
+          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">
+              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
+          </div>
           <button onclick="document.getElementById('driveHelpModal').style.display='none'" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
       </div>
   </div>
@@ -77,7 +79,7 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-gray-400">v79.25 (Global Edition)</p>
+      <p class="text-gray-400">v79.26 (Global Edition)</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -169,20 +171,20 @@
                   </div>
                   
                   <div class="mb-4">
-                      <span class="block text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 text-left">2. Choose Your Scheme</span>
+                      <span class="block text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 text-left">2. Choose Preferred Scheme</span>
                       <div class="flex gap-3 justify-center mb-2" id="logoClusterSwatches"></div>
-                      <p class="text-[9px] text-gray-500 text-center leading-tight italic">Click on your preferred color scheme to select it. The chosen scheme will be highlighted.</p>
+                      <p class="text-[9px] text-gray-500 text-center leading-tight italic">Click on your preferred color scheme to select it. The selected scheme will be highlighted.</p>
                   </div>
 
                   <div class="pt-3 border-t border-gray-800">
                       <div class="flex gap-4 justify-center items-center mb-4">
                           <div class="flex flex-col items-center gap-1">
                               <div id="primaryColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
-                              <span class="text-[7px] text-gray-500 font-bold uppercase">Primary</span>
+                              <span class="text-[7px] text-gray-500 font-bold uppercase tracking-tighter">Current Primary</span>
                           </div>
                           <div class="flex flex-col items-center gap-1">
                               <div id="accentColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
-                              <span class="text-[7px] text-gray-500 font-bold uppercase">Accent</span>
+                              <span class="text-[7px] text-gray-500 font-bold uppercase tracking-tighter">Current Accent</span>
                           </div>
                       </div>
                       <p class="text-[8px] text-gray-500 font-bold uppercase mb-2">Enterprise Safe Fallbacks</p>
@@ -355,7 +357,7 @@
                     <li>Go to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/drop</a>.</li>
                     <li>Drag the <strong>WorkerApp</strong> folder from your ZIP into the browser.</li>
                     <li><strong>IMMEDIATELY</strong> click "Sign up to claim this site".</li>
-                    <li>Click <strong>Site Settings > Change Site Name</strong>.</li>
+                    <li>Click <strong>Site Settings > Change Site Name</strong> to something friendly (e.g. <code>my-org-safety.netlify.app</code>).</li>
                 </ol>
             </div>
 
@@ -550,14 +552,38 @@
         const zip = new JSZip(); const org = document.getElementById('orgName').value; const appName = document.getElementById('appName').value || "Safety"; const url = document.getElementById('webAppUrl').value; const secret = document.getElementById('secretKey').value; const worker = document.getElementById('workerKey').value; const logo = document.getElementById('logoUrl').value;
         const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
         const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appName).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logo).replace(/%%SECRET_KEY%%/g, worker).replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
+        
+        // CRITICAL INJECTION FIX: Adding all missing placeholders for the Worker App
+        let wHtml = TEMPLATES.worker
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%APP_NAME%%/g, appName)
+            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+            .replace(/%%LOGO_DATA%%/g, logo)
+            .replace(/%%SECRET_KEY%%/g, worker)
+            .replace(/%%IS_ADVANCED%%/g, "true")
+            .replace(/%%ENABLE_MILEAGE%%/g, "true")
+            .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
+            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
+            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
+            .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
+            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
+            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
+            .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
+            .replace(/%%REQ_TRAVEL_REPORT%%/g, document.getElementById('chkTravelReport').checked)
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
+            .replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale)
+            .replace(/#1e40af/g, primaryColor)
+            .replace(/#3b82f6/g, accentColor);
+
         let mHtml = TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logo).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
         const swCode = `const CACHE_NAME = 'otg-v81'; const urlsToCache = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js','https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap']; self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); }); self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response && event.request.url.includes('Tone.js')) return response; return fetch(event.request).catch(() => response); })); });`;
         const manifest = { name: org, short_name: appName, start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
+        
         zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         zip.folder("MonitorApp").file("index.html", mHtml);
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker));
+        
         zip.generateAsync({type:"blob"}).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=org.replace(/[^a-z0-9]/gi, '_') + "_Lone_Worker_Apps.zip";a.click()});
     }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
