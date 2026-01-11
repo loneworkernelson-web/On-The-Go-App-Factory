@@ -32,6 +32,8 @@
     .checklist-item:hover { background: #475569; }
     .checklist-item.checked { background: #064e3b; border-color: #059669; }
     .checklist-checkbox { width: 20px; height: 20px; accent-color: #10b981; cursor: pointer; }
+    .preset-swatch { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
+    .preset-swatch:hover { transform: scale(1.2); }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -148,8 +150,8 @@
             </div>
             
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo & Branding</label>
-              <div id="dropZone" class="drop-zone w-full" onclick="document.getElementById('logoInput').click()">
+              <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">App Logo</label>
+              <div id="dropZone" class="drop-zone w-full mb-4" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-32 w-32 mx-auto rounded-full flex items-center justify-center overflow-hidden">
                     <img id="logoImg" class="hidden h-full w-full object-cover">
                     <span id="logoText" class="text-gray-500 text-sm">Drag & Drop<br>Logo Here</span>
@@ -158,19 +160,31 @@
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
               <input type="hidden" id="logoUrl" oninput="saveInput(this)">
 
-              <div id="colorPreview" class="hidden mt-6 w-full space-y-3">
-                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Logo Sampled Palette</p>
-                <div class="flex gap-2 justify-center">
-                    <div class="flex flex-col items-center gap-1">
-                        <div id="primaryColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
-                        <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-1">
-                        <div id="accentColorBox" class="w-12 h-12 rounded-lg border border-white/20"></div>
-                        <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
-                    </div>
-                </div>
-                <p class="text-[10px] text-blue-400 font-bold">App UI scheme updated!</p>
+              <div id="paletteArea" class="hidden w-full bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                  <div class="flex justify-between items-center mb-3">
+                      <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Theme Colors</span>
+                      <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline">↻ Resample Logo</button>
+                  </div>
+                  <div class="flex gap-4 justify-center items-center mb-4">
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="primaryColorBox" class="w-10 h-10 rounded-lg border border-white/20 shadow-lg"></div>
+                          <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="accentColorBox" class="w-10 h-10 rounded-lg border border-white/20 shadow-lg"></div>
+                          <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
+                      </div>
+                  </div>
+                  <div class="pt-3 border-t border-gray-800">
+                      <p class="text-[8px] text-gray-500 font-bold uppercase mb-2">Safe Presets</p>
+                      <div class="flex gap-2 justify-center">
+                          <div class="preset-swatch bg-[#1e40af]" onclick="applyPreset('#1e40af', '#3b82f6')" title="Corporate Blue"></div>
+                          <div class="preset-swatch bg-[#064e3b]" onclick="applyPreset('#064e3b', '#10b981')" title="Forest Green"></div>
+                          <div class="preset-swatch bg-[#450a0a]" onclick="applyPreset('#450a0a', '#ef4444')" title="Emergency Red"></div>
+                          <div class="preset-swatch bg-[#1e293b]" onclick="applyPreset('#1e293b', '#64748b')" title="Slate Grey"></div>
+                          <div class="preset-swatch bg-[#312e81]" onclick="applyPreset('#312e81', '#6366f1')" title="Indigo"></div>
+                      </div>
+                  </div>
               </div>
             </div>
           </div>
@@ -273,8 +287,8 @@
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Set function to run: <strong>checkOverdueVisits</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Leave "which deployment" as <strong>Head</strong>.</span></div>
                       <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Event Source: <strong>Time-driven</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
-                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Type of time-based trigger: <strong>Minutes timer</strong>.</span></div>
+                      <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Minute interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</span></div>
                   </div>
 
                   <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded text-xs text-gray-300">
@@ -412,41 +426,55 @@
                     c.width = 192; c.height = 192;
                     const ctx = c.getContext('2d');
                     ctx.drawImage(img, 0, 0, 192, 192);
-                    
-                    // SMART COLOR SAMPLING
-                    const pixels = ctx.getImageData(48, 48, 96, 96).data;
-                    let rSum=0, gSum=0, bSum=0, count=0;
-                    for (let i=0; i<pixels.length; i+=16) {
-                        if(pixels[i+3] > 200) { rSum += pixels[i]; gSum += pixels[i+1]; bSum += pixels[i+2]; count++; }
-                    }
-                    
-                    let hex = "#1e40af"; // Default blue
-                    if(count > 0) {
-                        const avgR = Math.round(rSum/count);
-                        const avgG = Math.round(gSum/count);
-                        const avgB = Math.round(bSum/count);
-                        hex = "#" + ((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1);
-                    }
-                    
-                    document.getElementById('colorPreview').classList.remove('hidden');
-                    document.getElementById('primaryColorBox').style.backgroundColor = hex;
-                    const accentHex = hex + "cc";
-                    document.getElementById('accentColorBox').style.backgroundColor = accentHex;
-
-                    localStorage.setItem('otg_theme_primary', hex);
-                    localStorage.setItem('otg_theme_accent', accentHex);
-
                     const d = c.toDataURL('image/png');
                     document.getElementById('logoImg').src = d;
                     document.getElementById('logoImg').classList.remove('hidden');
                     document.getElementById('logoText').textContent = "✅ Logo Ready";
                     document.getElementById('logoUrl').value = d;
                     saveInput(document.getElementById('logoUrl'));
+                    
+                    // Trigger initial resample
+                    triggerResample();
                 };
                 img.src = e.target.result;
             };
             r.readAsDataURL(input.files[0]);
         }
+    }
+
+    function triggerResample() {
+        const img = document.getElementById('logoImg');
+        if (!img.src || img.src.length < 100) return;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 192; canvas.height = 192;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, 192, 192);
+        
+        // Sampling logic
+        const pixels = ctx.getImageData(48, 48, 96, 96).data;
+        let rSum=0, gSum=0, bSum=0, count=0;
+        for (let i=0; i<pixels.length; i+=16) {
+            if(pixels[i+3] > 200) { rSum += pixels[i]; gSum += pixels[i+1]; bSum += pixels[i+2]; count++; }
+        }
+        
+        let hex = "#1e40af"; 
+        if(count > 0) {
+            const avgR = Math.round(rSum/count);
+            const avgG = Math.round(gSum/count);
+            const avgB = Math.round(bSum/count);
+            hex = "#" + ((1 << 24) + (avgR << 16) + (avgG << 8) + avgB).toString(16).slice(1);
+        }
+        
+        applyPreset(hex, hex + "cc");
+        document.getElementById('paletteArea').classList.remove('hidden');
+    }
+
+    function applyPreset(primary, accent) {
+        document.getElementById('primaryColorBox').style.backgroundColor = primary;
+        document.getElementById('accentColorBox').style.backgroundColor = accent;
+        localStorage.setItem('otg_theme_primary', primary);
+        localStorage.setItem('otg_theme_accent', accent);
     }
 
     function generateLaunchPack() {
@@ -550,33 +578,7 @@
         let gHtml = processGuideTemplate(TEMPLATES.guide);
         let opHtml = TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker);
 
-        // UPDATED: ROBUST OFFLINE SERVICE WORKER (CACHES TONE.JS AND FONTS)
-        const swCode = `
-const CACHE_NAME = 'otg-safety-v81';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      // NETWORK FIRST strategy for HTML (to get updates), CACHE FIRST for Tone.js
-      if (response && event.request.url.includes('Tone.js')) return response;
-      return fetch(event.request).catch(() => response);
-    })
-  );
-});
-`;
+        const swCode = `const CACHE_NAME = 'otg-safety-v81'; const urlsToCache = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js','https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap']; self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); }); self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => { if (response && event.request.url.includes('Tone.js')) return response; return fetch(event.request).catch(() => response); })); });`;
         const manifest = { name: org, short_name: appName, start_url: "./index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [ {src: logo, sizes: "192x192", type: "image/png"}, {src: logo, sizes: "512x512", type: "image/png"} ] };
 
         zip.folder("WorkerApp").file("index.html", wHtml).file("sw.js", swCode).file("manifest.json", JSON.stringify(manifest)).file("USER_GUIDE.html", gHtml);
