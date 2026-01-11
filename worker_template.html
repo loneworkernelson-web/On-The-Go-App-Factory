@@ -279,7 +279,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
     <div id="infoModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto"><h2 id="infoTitle" class="text-xl font-bold text-white mb-2">Site Info</h2><div id="siteInfoContent" class="text-gray-300 text-sm space-y-2 mb-4"></div><div class="flex gap-2 mb-4"><a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded text-center font-bold hidden">📞 Call</a><a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded text-center font-bold hidden">✉️ Email</a></div><a id="btnSiteNav" href="#" target="_blank" class="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded text-center mb-2 hidden shadow-lg transform active:scale-95 transition">🗺️ Navigate to Site</a><button onclick="closeModal('info')" class="w-full py-3 bg-gray-600 text-white font-bold rounded">Close</button></div>
-    <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend Visit</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
+    <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
     <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric"><div class="mt-6 flex justify-end space-x-3"><button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
     <div id="templateModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="modalMenuTitle" class="text-xl font-bold mb-4 text-white">Select Report Type</h2><div id="templateList" class="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold text-white">Cancel</button></div>
     <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500"><h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2><p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p><div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div><button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM OK</button></div>
@@ -784,7 +784,6 @@ function warmUpGps() {if(gpsWarm) return; gpsWarm = true; navigator.geolocation.
 function startGPSMonitoring() {
     if (!('geolocation' in navigator)) return;
     
-    // GPS PERMISSION WATCHDOG
     if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions.query({ name: 'geolocation' }).then(result => {
             const handlePermissionChange = () => {
@@ -856,12 +855,14 @@ function enterLockedScreen(){
 function tick(){
     if(!state.activeVisit){clearInterval(timerInt);return;}
     const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
-    const isZeroTolerance = state.activeVisit.highRisk; const escTime = isZeroTolerance ? 0 : (CONFIG.escalationMinutes||15)*60000; const timeUntilEscalation = remaining + escTime;
+    const isCriticalMode = state.activeVisit.highRisk; 
+    const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; 
+    const timeUntilEscalation = remaining + escTime;
     
     if(timeUntilEscalation <= 0) {
         document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe);
         document.getElementById('countdownTimer').innerText="ALARM SENT";
-        if(!state.activeVisit.criticalSent){state.activeVisit.criticalSent=true; saveState(); const alertMsg = isZeroTolerance ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'; triggerAutoAlert(alertMsg);}
+        if(!state.activeVisit.criticalSent){state.activeVisit.criticalSent=true; saveState(); const alertMsg = isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'; triggerAutoAlert(alertMsg);}
     } else if (remaining <= 0) {
         document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden');
         const absRem=Math.abs(remaining); const m=Math.floor(absRem/60000),s=Math.floor((absRem%60000)/1000);
@@ -869,13 +870,13 @@ function tick(){
         
         if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
         
-        // 2 MINUTE WARNING
-        if(timeUntilEscalation<=120000&&timeUntilEscalation>118000){
+        // 2 MINUTE WARNING - SUPPRESSED IN CRITICAL MODE
+        if(!isCriticalMode && timeUntilEscalation<=120000&&timeUntilEscalation>118000){
             playSound('warning'); navigator.vibrate([1000,500,1000]); 
             setTimeout(() => { speakWithAccent("Warning. Safety alarm will activate in two minutes."); }, 1000); 
         }
 
-        // 90 SECOND WARNING (ADDED FIX)
+        // 90 SECOND WARNING - THE ONLY WARNING GIVEN IN CRITICAL MODE
         if(timeUntilEscalation<=90000&&timeUntilEscalation>88000){
             playSound('warning'); navigator.vibrate([1000,500,1000]); 
             setTimeout(() => { speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); }, 1000); 
