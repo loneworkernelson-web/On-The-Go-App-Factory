@@ -731,7 +731,7 @@ function warmUpGps() {if(gpsWarm) return; gpsWarm = true; navigator.geolocation.
 function startGPSMonitoring() {
     if (!('geolocation' in navigator)) return;
     
-    // RESTORE: Permission Watchdog (Audit Compliance)
+    // 1. Permission Watchdog (Audit Compliance)
     if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions.query({ name: 'geolocation' }).then(result => {
             const handlePermissionChange = () => {
@@ -747,6 +747,7 @@ function startGPSMonitoring() {
     }
 
     let lastUpdate = 0;
+    // 2. Signal Lost Heartbeat (Triggers every 5 seconds)
     setInterval(() => { if(Date.now() - lastUpdate > 30000) { updateGPSUI(-1); } }, 5000);
 
     const updateGPSUI = (acc) => {
@@ -764,7 +765,7 @@ function startGPSMonitoring() {
             barContainer.classList.remove('hidden');
             err.classList.add('hidden');
             
-            // CORRECTED: Inverted Logic (Audit Fix 3.1 - Lower meters = Better signal)
+            // CORRECTED: Inverted Logic (Lower accuracy meters = Better signal)
             if(acc <= 15) { 
                 bars.forEach(b => b.classList.add('active-green')); 
             } else if(acc <= 45) { 
@@ -776,12 +777,20 @@ function startGPSMonitoring() {
         }
     };
 
+    // 3. Main GPS Watcher with Audit-Recommended Error Handling
     gpsWatchId = navigator.geolocation.watchPosition(
         (pos) => { updateGPSUI(pos.coords.accuracy); },
-        (err) => { console.warn("GPS Watch Error", err); updateGPSUI(-1); },
+        (err) => { 
+            console.warn("GPS Watch Error", err.code);
+            updateGPSUI(-1); // Triggers the 'NO SIG' UI
+            if(err.code === 1) {
+                showToast("⛔ GPS Permission Denied - Safety Monitoring Disabled");
+            }
+        },
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
     );
     
+    // 4. RESTORED: Background Battery Monitoring (Critical for Safety Alerts)
     if ('getBattery' in navigator) {
         navigator.getBattery().then(function(battery) {
             const updateBat = () => { currentBatteryLevel = Math.round(battery.level * 100) + "%"; };
@@ -982,7 +991,33 @@ function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCou
 function triggerPanic(){state.activeVisit=state.activeVisit||{};state.activeVisit.isPanic=true;saveState();renderPanicState();playSound('panic');processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Pressed"}));setTimeout(()=>showToast('🚨 SOS SENT 🚨'),100);}
 function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
 function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker safe"}));state.activeVisit.isPanic=false;document.getElementById('lockedPage').classList.remove('panic-mode');document.getElementById('btnSafe').classList.add('hidden');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnExtend').classList.remove('hidden');preDepart(true);});}
-function startTravellingPulse(){toggleBatterySaver();travellingInterval=setInterval(()=>{navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":"TRAVELLING","Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));})},300000);}
+function startTravellingPulse(){
+    // Travelling mode often uses more battery, so toggle saver if applicable
+    if(typeof toggleBatterySaver === 'function') toggleBatterySaver();
+    
+    travellingInterval = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+            p => {
+                processUploadQueue(buildPayload({
+                    "Alarm Status": "TRAVELLING",
+                    "Last Known GPS": `${p.coords.latitude},${p.coords.longitude}`,
+                    "Notes": "Routine Travelling Update"
+                }));
+            },
+            err => {
+                console.warn("Background Travel Pulse Failed:", err.message);
+                // Optionally log the failure to the server so the Diocese knows signal was lost
+                if(navigator.onLine) {
+                    processUploadQueue(buildPayload({
+                        "Alarm Status": "TRAVELLING",
+                        "Notes": "Signal Lost: GPS Timeout/Unavailable"
+                    }));
+                }
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
+    }, 300000); // 5 minute pulse
+}
 function toggleBatterySaver(){document.getElementById('batterySaver').classList.toggle('hidden');}
 function buildPayload(d){let dt="";let ln="Unknown";let la="";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Emergency Contact Name':state.settings.emergencyName,'Emergency Contact Number':state.settings.emergencyPhone,'Emergency Contact Email':state.settings.emergencyEmail,'Escalation Contact Name':state.settings.escalationName,'Escalation Contact Number':state.settings.escalationPhone,'Escalation Contact Email':state.settings.escalationEmail,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
 function processUploadQueue(d){
@@ -1038,8 +1073,25 @@ function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms()
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
-function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
-
+function captureGPS(btn){
+    btn.innerText="Locating...";
+    navigator.geolocation.getCurrentPosition(
+        p => {
+            const coords = `${p.coords.latitude},${p.coords.longitude}`;
+            btn.innerText="✅ " + coords;
+            if(btn.nextElementSibling) btn.nextElementSibling.value = coords;
+        },
+        err => {
+            let msg = "GPS Error";
+            if (err.code === 1) msg = "Permission Denied";
+            else if (err.code === 2) msg = "Signal Unavailable";
+            else if (err.code === 3) msg = "Location Timeout";
+            showToast("📍 " + msg);
+            btn.innerText = "❌ " + msg;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
 function initSigPad(c) {
     if (!c) return; 
     const ctx = c.getContext('2d');
@@ -1120,6 +1172,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
