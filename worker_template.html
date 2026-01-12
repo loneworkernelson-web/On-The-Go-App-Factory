@@ -42,10 +42,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
 .gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
 .gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
-/* ADD TO STYLE BLOCK */
-.status-red { background-color: #ef4444 !important; shadow: 0 0 8px #ef4444 !important; animation: pulse 2s infinite; }
-.status-green { background-color: #22c55e !important; shadow: 0 0 5px #22c55e !important; }
-.status-syncing { background-color: #3b82f6 !important; animation: pulse 1s infinite; }
 .menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
 .menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
 .wizard-step { display: none; height: 100%; flex-direction: column; }
@@ -63,29 +59,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-green-500 text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3">
     <div class="text-xl">✅</div>
     <div><p class="font-bold text-sm" id="toastText">Operation Successful</p></div>
-</div>
-
-<div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-4 z-[100] flex items-center justify-between shadow-2xl">
-    <div class="flex items-center gap-3"><span class="text-2xl">📲</span><div><p class="font-bold text-sm">Install App</p><p class="text-[10px] opacity-90">Add to home screen for safety features.</p></div></div>
-    <div class="flex gap-2"><button onclick="dismissInstall('android')" class="px-3 py-1 text-xs font-bold opacity-70">Later</button><button onclick="triggerInstall()" class="bg-white text-blue-600 px-4 py-1 rounded-full text-xs font-black">Install</button></div>
-</div>
-
-<div id="iosInstallModal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-end p-4">
-    <div class="bg-gray-800 w-full rounded-2xl p-6 relative pb-12 shadow-2xl border-t border-gray-700">
-        <button onclick="dismissInstall('ios')" class="absolute top-4 right-4 text-gray-500 text-xl">×</button>
-        <div class="text-center mb-6">
-            <div class="w-16 h-16 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center p-2 shadow-lg">
-                <img src="%%LOGO_DATA%%" class="w-full h-full object-contain">
-            </div>
-            <h3 class="text-xl font-bold">Install Safety App</h3>
-            <p class="text-gray-400 text-sm mt-1">Follow these steps to add to Home Screen</p>
-        </div>
-        <div class="space-y-4 mb-8">
-            <div class="flex items-center gap-4 bg-gray-900/50 p-3 rounded-xl"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold">1</div><p class="text-sm">Tap the <span class="font-bold text-blue-400">Share</span> icon in Safari</p><span class="text-xl ml-auto">⎋</span></div>
-            <div class="flex items-center gap-4 bg-gray-900/50 p-3 rounded-xl"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold">2</div><p class="text-sm">Scroll down and tap <span class="font-bold text-blue-400">Add to Home Screen</span></p><span class="text-xl ml-auto">⊞</span></div>
-        </div>
-        <div class="ios-arrow"></div>
-    </div>
 </div>
 
 <div id="app-container" class="relative h-full w-full">
@@ -119,7 +92,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
             <h3 class="text-purple-400 font-bold mb-1">2. Duress PIN (Silent)</h3>
             <p class="text-xs text-gray-300 mb-3">Secretly sends a high-priority "DURESS" alert.</p>
-            <input id="wiz_duress" type="tel" maxlength="4" class="w-full bg-gray-900 border border-green-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-purple-500" placeholder="9999">
+            <input id="wiz_duress" type="tel" maxlength="4" class="w-full bg-gray-900 border border-purple-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-purple-500" placeholder="9999">
         </div>
         <div class="mt-auto">
             <button onclick="wizNext(2)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Next: Contacts →</button>
@@ -173,83 +146,36 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Re-run the setup wizard to change details?</p><button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button></div>
         <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2"><span class="text-xl">📲</span> Install App to Home Screen</button></div>
         <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
-        <div class="setting-card border-gray-600">
-    <div class="flex justify-between items-center mb-2">
-        <label class="setting-label lbl-blue mb-0">Privacy & Storage</label>
-        <button onclick="alert('Privacy Note: If enabled, all photos and data sent via the -Note to Self- template are immediately purged from the organization server once the email is successfully sent to your work address.')" class="text-[10px] bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full font-bold">Tap for Info</button>
-    </div>
-    <div class="flex items-center justify-between bg-gray-900 p-3 rounded-lg border border-gray-700">
-        <span class="text-xs text-gray-300 font-bold">Auto-Delete 'Note to Self' Files</span>
-        <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="chkAutoDelete" class="sr-only peer" onchange="state.settings.autoDelete = this.checked; saveState();">
-            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-        </label>
-    </div>
-</div>
     </div>
 </div>
 
 <div id="mainPage" class="page active">
     <div class="header-bar">
-        <div class="flex items-center gap-2">
-            <img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> 
-            <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
-        </div>
+        <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
         <div class="flex items-center gap-3">
-            <div id="syncStatus" class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" title="Synced"></div>
-            
-            <div class="flex flex-col items-end gap-0.5" id="gpsContainer">
-                <span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">GPS</span>
-                <div class="flex gap-0.5" id="gpsBars">
-                    <div id="gps1" class="gps-bar"></div>
-                    <div id="gps2" class="gps-bar"></div>
-                    <div id="gps3" class="gps-bar"></div>
-                </div>
-                <div id="gpsError" class="hidden text-red-500 font-bold text-xs animate-pulse">❌ NO SIG</div>
-            </div>
+            <div class="flex flex-col items-end gap-0.5" id="gpsContainer"><span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">GPS</span><div class="flex gap-0.5" id="gpsBars"><div id="gps1" class="gps-bar"></div><div id="gps2" class="gps-bar"></div><div id="gps3" class="gps-bar"></div></div><div id="gpsError" class="hidden text-red-500 font-bold text-xs animate-pulse">❌ NO SIG</div></div>
             <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
         </div>
     </div>
-    
     <div class="content-area">
-        <div class="flex gap-2 mb-4">
-            <button onclick="forceSync()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">↻</button>
-            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">+</button>
-            <div id="travelRow" class="flex-1"></div>
-        </div>
+        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
+        <div class="flex gap-2 mb-4"><button onclick="forceSync()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">↻</button><button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">+</button><div id="travelRow" class="flex-1"></div></div>
         <div class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 ml-1">Sites</div>
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
-
     <div class="footer-bar">
         <div class="flex justify-end items-center gap-2 mb-2">
             <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest" id="lblHighRisk">Critical Timing Mode</span>
             <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
-                <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-red-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+              <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
+              <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full peer-checked:bg-red-600"></div>
             </label>
         </div>
-        
-        <div class="mb-4 bg-gray-800 rounded-xl p-3 border border-gray-700 shadow-inner">
-            <div class="flex justify-between items-center mb-3">
-                <span class="text-gray-400 text-[10px] font-black uppercase tracking-widest">Set Duration</span>
-                <span id="durationDisplay" class="font-bold text-blue-400 text-sm">0 mins</span>
-            </div>
-            
-            <div class="flex gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">
-                <button onclick="quickSetTime(15)" id="btnDur15" class="chip-btn">15m</button>
-                <button onclick="quickSetTime(30)" id="btnDur30" class="chip-btn">30m</button>
-                <button onclick="quickSetTime(60)" id="btnDur60" class="chip-btn">1h</button>
-                <button onclick="quickSetTime(120)" id="btnDur120" class="chip-btn">2h</button>
-            </div>
-
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between mb-2"><span class="text-gray-400 text-sm font-bold">Time</span><span id="durationDisplay" class="font-bold text-blue-400">0 mins</span></div>
+            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
-        
-        <div class="flex gap-2">
-            <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Quick Notes</button>
-            <button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Start</button>
-        </div>
+        <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Quick Notes</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Start</button></div>
     </div>
 </div>
 
@@ -292,7 +218,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="extendModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 class="text-xl font-bold mb-6 text-white">Extend</h2><div class="grid grid-cols-3 gap-3 mb-6"><button onclick="confirmExtension(10)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+10m</button><button onclick="confirmExtension(15)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+15m</button><button onclick="confirmExtension(30)" class="py-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold text-white shadow">+30m</button></div><button onclick="closeModal('extend')" class="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold text-gray-300">Cancel</button></div>
     <div id="pinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-xs p-6 text-center"><h2 class="text-xl font-bold mb-4 text-white">Enter PIN</h2><input type="password" id="pinInput" maxlength="4" class="text-center text-3xl tracking-[1em] w-48 mx-auto bg-gray-900 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-blue-500" inputmode="numeric"><div class="mt-6 flex justify-end space-x-3"><button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Cancel</button><button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Confirm</button></div></div>
     <div id="templateModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="modalMenuTitle" class="text-xl font-bold mb-4 text-white">Select Report Type</h2><div id="templateList" class="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto"></div><button onclick="closeModal('template')" class="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold text-white">Cancel</button></div>
-    <div id="checkinModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center border-4 border-yellow-500"><h2 class="text-2xl font-bold text-yellow-400 mb-4">Are you OK?</h2><p class="text-lg text-gray-300 mb-4">Scheduled safety check.</p><div id="checkinCountdown" class="text-6xl font-bold text-yellow-400 mb-6 font-mono">2:00</div><button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl">HOLD TO CONFIRM OK</button></div>
     <div id="modal-report" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl"><h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Report</h2><div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div><div class="flex gap-3 flex-shrink-0"><button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button><button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button></div></div>
     <div id="alertModal" class="hidden bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 text-center"><h2 id="alertModalTitle" class="text-xl font-bold mb-2 text-white">Alert</h2><p id="alertModalMessage" class="text-gray-300 mb-6"></p><button onclick="closeModal('alert')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-24">OK</button></div>
 </div>
@@ -317,24 +242,16 @@ function showModal(id) {
         if(el) el.classList.add('hidden');
     });
     
-    if(id==='location') document.getElementById('locationModal').classList.remove('hidden');
+    if(id==='report') { document.getElementById('modal-report').classList.remove('hidden'); setTimeout(resizeCanvas, 300); }
     else if(id==='pin') document.getElementById('pinModal').classList.remove('hidden');
-    else if(id==='report') {
-        document.getElementById('modal-report').classList.remove('hidden');
-        setTimeout(resizeCanvas, 300);
-    }
-    else if(id==='checkin') document.getElementById('checkinModal').classList.remove('hidden');
     else if(id==='extend') document.getElementById('extendModal').classList.remove('hidden');
     else if(id==='template') document.getElementById('templateModal').classList.remove('hidden');
-    else if(id==='alert') document.getElementById('alertModal').classList.remove('hidden');
-    else document.getElementById('infoModal').classList.remove('hidden');
+    else if(id==='info') document.getElementById('infoModal').classList.remove('hidden');
 }
 
 function closeModal(id) {
     document.getElementById('modalBackdrop').classList.add('hidden');
     document.getElementById('modalBackdrop').classList.remove('flex');
-    document.querySelectorAll('#modalBackdrop > div').forEach(d=>d.classList.add('hidden'));
-    document.getElementById('locationModal').classList.add('hidden');
 }
 
 function showToast(msg) {
@@ -472,7 +389,7 @@ function navigate(p){
     document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
     document.getElementById(p+'Page').classList.add('active');
     if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer);
-    if(p==='settings'){();}
+    if(p==='settings'){populateSettingsForm();}
 }
 
 function startWizard(){
@@ -506,18 +423,20 @@ function wizNext(current){
 function wizBack(current){wizGoTo(current-1);}
 
 function wizSave(){
-    state.settings.workerName=document.getElementById('wiz_name').value;
-    state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value);
-    state.settings.workerEmail=document.getElementById('wiz_email').value;
-    state.settings.emergencyName=document.getElementById('wiz_emg_name').value;
-    state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value);
-    state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value;
-    state.settings.escalationName=document.getElementById('wiz_esc_name').value;
-    state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value);
-    state.settings.escalationEmail=document.getElementById('wiz_esc_email').value;
-    state.settings.pinCode=document.getElementById('wiz_pin').value;
-    state.settings.duressPin=document.getElementById('wiz_duress').value;
-    state.settings.googleSheetUrl=CONFIG.url;
+    state.settings = {
+        workerName: document.getElementById('wiz_name').value,
+        workerPhone: cleanGlobalPhone(document.getElementById('wiz_phone').value),
+        workerEmail: document.getElementById('wiz_email').value,
+        emergencyName: document.getElementById('wiz_emg_name').value,
+        emergencyPhone: cleanGlobalPhone(document.getElementById('wiz_emg_phone').value),
+        emergencyEmail: document.getElementById('wiz_emg_email').value,
+        escalationName: document.getElementById('wiz_esc_name').value,
+        escalationPhone: cleanGlobalPhone(document.getElementById('wiz_esc_phone').value),
+        escalationEmail: document.getElementById('wiz_esc_email').value,
+        pinCode: document.getElementById('wiz_pin').value,
+        duressPin: document.getElementById('wiz_duress').value,
+        googleSheetUrl: CONFIG.url
+    };
     saveState();
     document.getElementById('setupWizard').classList.add('hidden');
     navigate('main');
@@ -531,7 +450,6 @@ function cleanGlobalPhone(num) {
     if(!prefix) return "+" + n; 
     if (n.startsWith(prefix)) return '+' + n;
     if (n.startsWith('0')) return '+' + prefix + n.substring(1);
-    if (prefix === '1' && n.length === 10) return '+1' + n;
     return '+' + prefix + n;
 }
 
@@ -549,62 +467,67 @@ function populateWizard(){
     document.getElementById('wiz_duress').value=state.settings.duressPin||"";
 }
 
-function populateSettingsForm(){
-    // Update the URL display
-    document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url; 
-    
-    // Sync the Privacy Toggle Visual
-    const autoDelCheck = document.getElementById('chkAutoDelete');
-    if(autoDelCheck) {
-        autoDelCheck.checked = (state.settings.autoDelete !== false);
-    }
-}
-
+function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;}
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(){
-    if(!state.settings.workerName) return;
-    
-    const dot = document.getElementById('syncStatus');
-    if(dot) { dot.className = "w-2 h-2 rounded-full status-syncing"; dot.title = "Syncing..."; }
-    
+    if(!state.settings.workerName)return;
+    document.getElementById('uploadBanner').classList.remove('hidden');
     const dId=getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r=>r.json())
     .then(data=>{
         if(data.status==="error"){
-            if(dot) { dot.className = "w-2 h-2 rounded-full status-red"; dot.title = "Sync Error: " + data.message; }
-            if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n"+data.message); startWizard(); }
-            else { showToast("⚠️ Sync Failed: Check connection"); }
+            document.getElementById('uploadBanner').classList.add('hidden');
+            if(data.message.includes("ACCESS DENIED")){
+                alert("⛔ ACCESS DENIED\n\n"+data.message);
+                startWizard();
+            } else {
+                alert("❌ Sync Error: " + data.message);
+            }
             return;
         }
+        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
         
-        // Process site data (Original Logic Preserved)
-        const existingManual = state.locations.filter(x=>x.id.startsWith('loc_'));
-        const ms = (data.sites || []).map(s=>({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
+        const safeSites = data.sites || [];
+        const ms = safeSites.map(s=>({
+            id:'site_'+s.siteName.replace(/\s/g,''),
+            name:s.siteName,
+            address:s.address,
+            companyName:s.company,
+            templateName:s.template,
+            noReport:false,
+            contactName:s.contactName,
+            contactPhone:s.contactPhone,
+            contactEmail:s.contactEmail,
+            notes:s.notes
+        }));
+        
         if(CONFIG.mileage) ms.unshift({id:'travel',name:'Travel',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
+        state.locations=ms.concat(existingManual);
+        state.globalForms=data.forms||[];
+        state.cachedForms=data.cachedTemplates||{};
+        state.meta=data.meta||{};
+        if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"]) state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
+        state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];
+        if(CONFIG.mileage&&!state.cachedForms['Travel Report']) state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
         
-        state.locations = ms.concat(existingManual);
-        state.globalForms = data.forms || [];
-        state.cachedForms = data.cachedTemplates || {};
-        state.meta = data.meta || {};
+        const tLoc = state.locations.find(x => x.id === 'travel');
+        const userPref = localStorage.getItem('otg_user_travel_pref');
+        if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
         
         saveState();
         renderLocations();
         checkVehicleStatus();
-        
-        // Restore Green status
-        if(dot) { dot.className = "w-2 h-2 rounded-full status-green"; dot.title = "Synced"; }
+        document.getElementById('uploadBanner').classList.add('hidden');
+        showToast("Sync Complete!");
     })
     .catch(e=>{
-        console.warn("Sync Failed", e);
-        if(dot) { dot.className = "w-2 h-2 rounded-full status-red"; dot.title = "Offline: Using Cached Data"; }
-        // Report only if truly unable to sync and no data is cached
-        if(!state.locations || state.locations.length === 0) {
-            showToast("❌ Unable to sync. Please check your data connection.");
-        }
+        document.getElementById('uploadBanner').classList.add('hidden');
+        console.warn("Sync Failed: "+e.message);
     });
 }
+
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return;
     const b=document.getElementById('vehNagBar');let s=false;
@@ -658,24 +581,10 @@ function renderIconGrid(forms, loc) {
         });
     }
 }
-function initLocations(){
-    if(!state.locations) state.locations=[];
-    
-    // Set Privacy Default
-    if (state.settings.autoDelete === undefined) {
-        state.settings.autoDelete = true; 
-    }
 
-    // Standard Form Fallbacks
-    if(!state.cachedForms["Standard Visit Note"]) {
-        state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
-    }
-    
-    if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
-        state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
-    }
-}
-    function renderLocations(){
+function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
+
+function renderLocations(){
     const l=document.getElementById('locationList');
     const tr=document.getElementById('travelRow');
     l.innerHTML='';
@@ -743,48 +652,26 @@ function initLocations(){
 
 function showSiteInfo(id, e){
     if(e) e.stopPropagation();
-    
-    // Manual location handling
-    if(id.startsWith('loc_')) { editManualLocation(id); return; }
-    if(id === 'travel') { editTravelSettings(); return; }
-    
-    // UI Reset
-    document.getElementById('infoTitle').innerText = "";
-    document.getElementById('siteInfoContent').innerHTML = "";
-    document.getElementById('btnSiteCall').classList.add('hidden');
-    document.getElementById('btnSiteEmail').classList.add('hidden');
-    document.getElementById('btnSiteNav').classList.add('hidden');
-
     const l = state.locations.find(x => x.id === id);
-    if(!l) {
-        showModal('info');
-        document.getElementById('infoTitle').innerText = "Unknown Site";
-        return;
-    }
-
+    if(!l) return;
     document.getElementById('infoTitle').innerText = l.name;
     let h = "";
-    
     if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
-    
-    if(l.address) {
+    if(l.address) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
         const nav = document.getElementById('btnSiteNav');
-        /* Universal Navigation Fix */
-        nav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.address)}&travelmode=driving`;
+        nav.href = `http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(l.address)}`;
         nav.classList.remove('hidden');
     }
-    
     if(l.contactName) h += `<p class="mt-4 text-gray-400 text-xs">Contact: <span class="text-white">${l.contactName}</span></p>`;
-    
     if(l.notes) h += `<div class="mt-4 p-3 bg-gray-900 border-l-4 border-yellow-500 rounded text-xs italic">${l.notes}</div>`;
-    
     document.getElementById('siteInfoContent').innerHTML = h;
     
     const bc = document.getElementById('btnSiteCall');
+    if(l.contactPhone) { bc.href = `tel:${l.contactPhone}`; bc.classList.remove('hidden'); } else { bc.classList.add('hidden'); }
+    
     const be = document.getElementById('btnSiteEmail');
-    if(l.contactPhone) { bc.href = `tel:${l.contactPhone}`; bc.classList.remove('hidden'); }
-    if(l.contactEmail) { be.href = `mailto:${l.contactEmail}`; be.classList.remove('hidden'); }
+    if(l.contactEmail) { be.href = `mailto:${l.contactEmail}`; be.classList.remove('hidden'); } else { be.classList.add('hidden'); }
     
     showModal('info');
 }
@@ -829,16 +716,7 @@ function updateArrivedButtonState(){
     }
 }
 
-function quickSetTime(m){
-    // Find the closest index in DURATION_MAP
-    const idx = DURATION_MAP.findIndex(x => x === m);
-    if(idx !== -1) {
-        document.getElementById('durationSlider').value = idx;
-        updateArrivedButtonState();
-        // Haptic feedback if supported
-        if(navigator.vibrate) navigator.vibrate(10);
-    }
-}
+function quickSetTime(m){document.getElementById('durationSlider').value=DURATION_MAP.findIndex(x=>x===m);updateArrivedButtonState();}
 
 function startVisit(){
     warmUpSpeech();
@@ -848,7 +726,7 @@ function startVisit(){
     const isHighRisk = document.getElementById('chkHighRisk').checked;
     state.activeVisit={locationId:s.id, startTime:n, anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000), fiveMinWarned:false, startGPS: "", highRisk: isHighRisk, warn90Sent: false};
     state.lowBatSent=false; saveState(); enterLockedScreen(); 
-    navigator.geolocation.getCurrentPosition((pos) => {if(state.activeVisit) {state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;saveState();let notes = "Started";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes, "Last Known GPS": state.activeVisit.startGPS};processUploadQueue(buildPayload(payload));}}, (err) => { if(state.activeVisit) {let notes = "Started (GPS Timeout)";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes};processUploadQueue(buildPayload(payload));}}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    navigator.geolocation.getCurrentPosition((pos) => {if(state.activeVisit) {state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;saveState();let notes = "Started";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes, "Last Known GPS": state.activeVisit.startGPS};processUploadQueue(buildPayload(payload));}}, (err) => { if(state.activeVisit) {let notes = "Started (No GPS)";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes};processUploadQueue(buildPayload(payload));}}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
 
 function warmUpGps() {if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{},()=>{},{enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000);}
@@ -926,56 +804,44 @@ function enterLockedScreen(){
 
 function tick(){
     if(!state.activeVisit){clearInterval(timerInt);return;}
-    const now=new Date().getTime(); 
-    const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); 
-    const remaining=dueTime-now;
+    const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
     const isCriticalMode = state.activeVisit.highRisk; 
     const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; 
     const timeUntilEscalation = remaining + escTime;
     
-    // 1. Alarm Escalation Logic
     if(timeUntilEscalation <= 0) {
-        document.getElementById('overdueLabel').classList.remove('hidden'); 
-        document.getElementById('btnDepart').classList.add('hidden'); 
-        document.getElementById('btnExtend').classList.add('hidden'); 
-        document.getElementById('btnSafe').classList.remove('hidden'); 
-        setupLongPress(document.getElementById('btnSafe'), iamSafe);
+        document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe);
         document.getElementById('countdownTimer').innerText="ALARM SENT";
-        if(!state.activeVisit.criticalSent){
-            state.activeVisit.criticalSent=true; 
-            saveState(); 
-            triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE');
-        }
-    } 
-    // 2. Overdue Warning Phase
-    else if (remaining <= 0) {
-        document.getElementById('overdueLabel').classList.remove('hidden');
-        const absRem=Math.abs(remaining); 
-        const m=Math.floor(absRem/60000), s=Math.floor((absRem%60000)/1000);
-        document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; 
-        document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
+        if(!state.activeVisit.criticalSent){state.activeVisit.criticalSent=true; saveState(); const alertMsg = isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'; triggerAutoAlert(alertMsg);}
+    } else if (remaining <= 0) {
+        document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden');
+        const absRem=Math.abs(remaining); const m=Math.floor(absRem/60000),s=Math.floor((absRem%60000)/1000);
+        document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         
-        // 90 SECOND CRITICAL WARNING (The only warning in critical mode)
-        if(timeUntilEscalation <= 95000 && timeUntilEscalation > 85000 && !state.activeVisit.warn90Sent){
-            state.activeVisit.warn90Sent = true; 
-            saveState();
-            playSound('warning'); 
+        if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
+        
+        if(!isCriticalMode && timeUntilEscalation<=120000&&timeUntilEscalation>118000){
+            playSound('warning'); navigator.vibrate([1000,500,1000]); 
+            setTimeout(() => { speakWithAccent("Warning. Safety alarm will activate in two minutes."); }, 1000); 
+        }
+
+        if(timeUntilEscalation<=95000 && timeUntilEscalation>85000 && !state.activeVisit.warn90Sent){
+            state.activeVisit.warn90Sent = true; saveState();
+            playSound('warning'); navigator.vibrate([1000,500,1000]); 
             setTimeout(() => { speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); }, 1000); 
         }
-        
-        // standard 2-minute warning (only for non-critical visits)
-        if(!isCriticalMode && timeUntilEscalation <= 125000 && timeUntilEscalation > 115000){
-            speakWithAccent("Warning. Safety alarm will activate in two minutes.");
-        }
-    } 
-    // 3. Normal Countdown Phase
-    else {
-        const m=Math.floor(remaining/60000), s=Math.floor((remaining%60000)/1000);
-        document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`; 
-        document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
-        document.getElementById('overdueLabel').classList.add('hidden');
+
+    } else {
+        const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000);
+        document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); document.getElementById('overdueLabel').classList.add('hidden');
+        if(!state.activeVisit.isPanic) { document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); }
+        const mRem=Math.floor(remaining/60000);
+        if(mRem===5&&!state.activeVisit.fiveMinWarned){state.activeVisit.fiveMinWarned=true; playSound('pre_alert'); document.getElementById('fiveMinBanner').classList.remove('hidden'); setTimeout(()=>document.getElementById('fiveMinBanner').classList.add('hidden'),10000);}
     }
+    if(state.activeVisit.anticipatedDepartureTime)document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true});
+    if(CONFIG.checkinEnabled&&state.activeVisit.nextCheckin&&new Date()>new Date(state.activeVisit.nextCheckin))triggerCheckin();
 }
+
 function warmUpSpeech() { if('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } }
 function speakWithAccent(msg){ if(!'speechSynthesis' in window)return; window.speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(msg); const v=window.speechSynthesis.getVoices(); u.voice = v.find(x=>x.lang.includes(CONFIG.voiceLocale)) || v.find(x=>x.lang.includes('en-GB')) || v.find(x=>x.lang.includes('en-US')); u.rate = 1.0; u.volume = 1.0; window.speechSynthesis.speak(u); }
 async function requestWakeLock(){try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{console.log('Lock Released');});}catch(e){console.warn('Wake Lock Error',e);}}
@@ -1004,7 +870,7 @@ function loadFormAndShow(t){
     document.getElementById('reportTitle').innerText=isMidVisitUpdate?"Update: "+t:"Report"; 
     currentActiveTemplate=t; buildReportForm(t,document.getElementById('reportFields'));
     if(calculatedDist){
-        let di = document.querySelector('[data-key*="Distance"]') || document.querySelector('[data-key*="KM"]') || document.querySelector('[data-key*="Mileage"]');
+        let di = document.querySelector('[data-key*=\"Distance\"]') || document.querySelector('[data-key*=\"KM\"]') || document.querySelector('[data-key*=\"Mileage\"]');
         if(di){ di.value = calculatedDist.km; di.style.border = "2px solid #4ade80"; di.classList.add("bg-green-900/20"); }
     }
     const b=document.getElementById('btnSubmitRep'); const nb=b.cloneNode(true); b.parentNode.replaceChild(nb,b);
@@ -1028,46 +894,41 @@ function submitReport(){
 }
 
 function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.getElementById('sig-canvas');if(c)d.sig=c.toDataURL('image/png');return d;}
-function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText="Photo Saved ✅";});}}
+function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText=\"Photo Saved ✅\";});}}
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(600/i.width,600/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.4));};i.src=e.target.result;};rd.readAsDataURL(f);});}
 
-function initSigPad(c) {
-    if (!c) return; 
-    const ctx = c.getContext('2d');
-    let drawing = false;
+function buildReportForm(n,c){
+    state.photoStore={}; 
+    const sn=n?n.trim():"(Standard)"; 
+    let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
+    
+    c.innerHTML='';
+    if(!t) { 
+        c.innerHTML='<label class=\"block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1\">Notes</label><textarea id=\"rep_notes\" class=\"form-input h-32\" placeholder=\"Visit Notes...\"></textarea>'; 
+        return; 
+    }
 
-    const getPos = (e) => { 
-        const rect = c.getBoundingClientRect(); 
-        const cx = e.clientX || (e.touches && e.touches[0].clientX); 
-        const cy = e.clientY || (e.touches && e.touches[0].clientY); 
-        return { 
-            x: (cx - rect.left) * (c.width / (rect.width * (window.devicePixelRatio || 1))), 
-            y: (cy - rect.top) * (c.height / (rect.height * (window.devicePixelRatio || 1))) 
-        }; 
-    };
-
-    c.addEventListener('pointerdown', (e) => { 
-        drawing = true; 
-        const pos = getPos(e); 
-        ctx.beginPath(); 
-        ctx.moveTo(pos.x, pos.y); 
-        e.preventDefault(); 
-    }, {passive: false});
-
-    c.addEventListener('pointermove', (e) => { 
-        if (!drawing) return; 
-        const pos = getPos(e); 
-        ctx.lineTo(pos.x, pos.y); 
-        ctx.stroke(); 
-        e.preventDefault(); 
-    }, {passive: false});
-
-    window.addEventListener('pointerup', () => { drawing = false; });
+    t.forEach((f,i)=>{
+        let y='input'; let x=f.text||f;
+        if(x.includes('[HEADING]')){ y='header'; x=x.replace('[HEADING]','').trim(); }
+        else if(x.includes('[TEXT]')){ y='text'; x=x.replace('[TEXT]','').trim(); }
+        else if(x.includes('[SIGN]')){ y='signature'; x=x.replace('[SIGN]','').trim(); }
+        else if(x.includes('[PHOTO]')){ y='photo'; x=x.replace('[PHOTO]','').trim(); }
+        else if(x.includes('[YESNO]')){ y='yesno'; x=x.replace('[YESNO]','').trim(); }
+        
+        let h = (y==='header') ? `<div class=\"mt-6 mb-2 border-b border-gray-700 pb-1\"><h3 class=\"text-blue-400 font-bold uppercase text-xs tracking-widest\">\${x}</h3></div>` : `<div><label class=\"block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1\">\${x}</label>`;
+        if(y==='text') h+=`<textarea data-key=\"\${x}\" class=\"form-input h-24\"></textarea></div>`;
+        else if(y==='signature') h+=`<div class=\"border border-gray-600 rounded bg-white relative\" style=\"height:150px\"><canvas id=\"sig-canvas\" class=\"w-full h-full touch-none\"></canvas><button type=\"button\" onclick=\"clearSig()\" class=\"absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold\">Clear</button></div><script>setTimeout(()=>{resizeCanvas();initSigPad(document.getElementById('sig-canvas'));},500);<\/script></div>`;
+        else if(y==='photo') h+=`<input type=\"file\" accept=\"image/*\" capture=\"environment\" onchange=\"handlePhoto(this,'\${x}')\" class=\"hidden\" id=\"cam_\${i}\"><button type=\"button\" onclick=\"document.getElementById('cam_\${i}').click()\" class=\"w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400\">📸 ADD PHOTO</button></div>`;
+        else if(y==='input') h+=`<input type=\"text\" data-key=\"\${x}\" class=\"form-input\"></div>`;
+        else if(y==='yesno') h+=`<div class=\"flex gap-4 p-2 bg-gray-900 rounded-lg\"><label class=\"flex items-center gap-2 cursor-pointer\"><input type=\"radio\" name=\"\${x}\" value=\"Yes\" data-key=\"\${x}\" class=\"w-5 h-5 text-blue-600\"> Yes</label><label class=\"flex items-center gap-2 cursor-pointer\"><input type=\"radio\" name=\"\${x}\" value=\"No\" data-key=\"\${x}\" class=\"w-5 h-5 text-blue-600\"> No</label></div></div>`;
+        c.innerHTML += h;
+    });
 }
 
 function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
-function startReminderTimer(){clearTimeout(mainScreenReminderTimer);mainScreenReminderTimer=setTimeout(()=>{if(!state.activeVisit&&document.getElementById('mainPage').classList.contains('active')){ /* Screen reminder logic here */ }},300000);}
+function startReminderTimer(){clearTimeout(mainScreenReminderTimer);mainScreenReminderTimer=setTimeout(()=>{if(!state.activeVisit&&document.getElementById('mainPage').classList.contains('active')){ /* Screen reminder logic */ }},300000);}
 function triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem===60||rem===30||rem===10)playSound('checkin');if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();playSound('extend');processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
@@ -1088,96 +949,28 @@ async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='pre_alert'){synth.triggerAttackRelease("C6","8n",n);navigator.vibrate([1000,500,1000]);}if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 
-function buildReportForm(n, c) {
-    state.photoStore = {};
-    const sn = n ? n.trim() : "(Standard)";
-    let t = state.globalForms?.find(f => f.name.trim() === sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
-
-    c.innerHTML = '';
-
-    // 1. SPECIAL CASE: Note to Self (Enhanced Layout)
-    if (sn === "Note to Self") {
-        let h = `
-            <div class="mt-2 mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                <h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest mb-1">Personal Memo</h3>
-                <p class="text-[10px] text-gray-400 leading-tight">Sent directly to ${state.settings.workerEmail || 'your email'}.</p>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Memo Text</label>
-                    <textarea data-key="Memo" class="form-input h-32" placeholder="Write your note here..."></textarea>
-                </div>
-                
-                <div>
-                    <label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Location Context</label>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-3 rounded-lg font-bold text-xs shrink-0 shadow-lg transition-all active:scale-95">📍 Pin GPS</button>
-                        <input readonly data-key="Memo GPS" class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 text-xs text-blue-400 font-mono" placeholder="Not captured">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 gap-3 pt-2">
-                    <label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider -mb-1">Photos (Up to 3)</label>
-                    <div>
-                        <input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'Photo 1')" class="hidden" id="cam_note_1">
-                        <button type="button" id="btn_note_1" onclick="document.getElementById('cam_note_1').click()" class="w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl text-xs font-black text-gray-400 transition-all hover:bg-gray-750">📸 ADD PHOTO 1</button>
-                    </div>
-                    <div>
-                        <input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'Photo 2')" class="hidden" id="cam_note_2">
-                        <button type="button" id="btn_note_2" onclick="document.getElementById('cam_note_2').click()" class="w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl text-xs font-black text-gray-400 transition-all hover:bg-gray-750">📸 ADD PHOTO 2</button>
-                    </div>
-                    <div>
-                        <input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'Photo 3')" class="hidden" id="cam_note_3">
-                        <button type="button" id="btn_note_3" onclick="document.getElementById('cam_note_3').click()" class="w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl text-xs font-black text-gray-400 transition-all hover:bg-gray-750">📸 ADD PHOTO 3</button>
-                    </div>
-                </div>
-                
-                <input type="hidden" data-key="autoDelete" value="${state.settings.autoDelete}">
-            </div>`;
-        c.innerHTML = h;
-        return;
-    }
-
-    // 2. STANDARD CASE: Dynamic Parsing
-    if (!t) {
-        c.innerHTML = '<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>';
-        return;
-    }
-
-    t.forEach((f, i) => {
-        let y = 'input'; let x = f.text || f;
-        if (x.includes('[HEADING]')) { y = 'header'; x = x.replace('[HEADING]', '').trim(); }
-        else if (x.includes('[TEXT]')) { y = 'text'; x = x.replace('[TEXT]', '').trim(); }
-        else if (x.includes('[SIGN]')) { y = 'signature'; x = x.replace('[SIGN]', '').trim(); }
-        else if (x.includes('[PHOTO]')) { y = 'photo'; x = x.replace('[PHOTO]', '').trim(); }
-        else if (x.includes('[YESNO]')) { y = 'yesno'; x = x.replace('[YESNO]', '').trim(); }
-
-        let h = (y === 'header') ? `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>` : `<div><label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">${x}</label>`;
-        if (y === 'text') h += `<textarea data-key="${x}" class="form-input h-24"></textarea></div>`;
-        else if (y === 'signature') h += `<div class="border border-gray-600 rounded bg-white relative" style="height:150px"><canvas id="sig-canvas" class="w-full h-full touch-none"></canvas><button type="button" onclick="clearSig()" class="absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Clear</button></div><script>setTimeout(()=>{resizeCanvas();initSigPad(document.getElementById('sig-canvas'));},500);<\/script></div>`;
-        else if (y === 'photo') h += `<input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl text-xs font-black text-gray-400 transition-all hover:bg-gray-750">📸 TAP TO ADD PHOTO</button></div>`;
-        else if (y === 'input') h += `<input type="text" data-key="${x}" class="form-input"></div>`;
-        else if (y === 'yesno') h += `<div class="flex gap-4 p-2 bg-gray-900 rounded-lg"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div></div>`;
-        c.innerHTML += h;
-    });
+function initSigPad(c) {
+    if (!c) return; const ctx = c.getContext('2d');
+    const getPos = (e) => { const rect = c.getBoundingClientRect(); const cx = e.clientX || (e.touches && e.touches[0].clientX); const cy = e.clientY || (e.touches && e.touches[0].clientY); return { x: (cx - rect.left) * (c.width / rect.width), y: (cy - rect.top) * (c.height / rect.height) }; };
+    c.addEventListener('pointerdown', (e) => { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); }, {passive: false});
+    c.addEventListener('pointermove', (e) => { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); e.preventDefault(); }, {passive: false});
+    window.addEventListener('pointerup', () => { isDrawing = false; });
 }
+
 function resizeCanvas() {
-    const c = document.getElementById('sig-canvas'); 
-    if (!c) return; 
-    const ctx = c.getContext('2d');
+    const c = document.getElementById('sig-canvas'); if (!c) return; const ctx = c.getContext('2d');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    
-    // Set internal resolution based on display size
-    c.width = c.offsetWidth * ratio; 
-    c.height = c.offsetHeight * ratio;
-    ctx.scale(ratio, ratio); 
-    
-    // RE-ESTABLISH DRAWING STYLE (Critical Fix)
-    ctx.strokeStyle = "#000000"; 
-    ctx.lineWidth = 3; 
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    c.width = c.offsetWidth * ratio; c.height = c.offsetHeight * ratio;
+    ctx.scale(ratio, ratio); ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+}
+
+function startGPSMonitoring() {
+    if (!('geolocation' in navigator)) return;
+    gpsWatchId = navigator.geolocation.watchPosition(
+        (pos) => { const bars = [document.getElementById('gps1'), document.getElementById('gps2'), document.getElementById('gps3')]; bars.forEach(b => b.className = 'gps-bar'); if(pos.coords.accuracy <= 20) bars.forEach(b => b.classList.add('active-green')); else if(pos.coords.accuracy <= 50) { bars[0].classList.add('active-amber'); bars[1].classList.add('active-amber'); } else bars[0].classList.add('active-red'); },
+        (err) => { console.warn("GPS Watch Error", err); },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
+    );
 }
 
 function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
@@ -1192,39 +985,20 @@ window.addEventListener('load', () => {
             if(state.locations) renderLocations();
             if(state.meta) checkVehicleStatus();
         }
-    } catch(e) { 
-        console.error("Load Error:", e); 
-        state = {settings:{}, locations:[]}; // Fallback for corrupted storage
-    }
-    
+    } catch(e) { console.error(e); }
     initLocations();
-    
-    // UI Label Update for Vehicle Terms
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
-    
-    // HARDENED WIZARD CHECK: Force settings page if data is missing
-    const hasWorker = !!(state.settings && state.settings.workerName && state.settings.workerName.trim().length > 0);
-    
-    if(!hasWorker) { 
-        console.log("No worker profile found. Launching Setup Wizard.");
-        startWizard(); // This opens the settings/wizard overlay
-    } else { 
-        if(state.activeVisit) enterLockedScreen(); 
-        else navigate('main'); 
-        if(navigator.onLine) forceSync(); 
-    }
-    
+    if(!state.settings || !state.settings.workerName) { startWizard(); } 
+    else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(); }
     startGPSMonitoring();
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
-    
-    if('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
-    }
+    if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     checkIosInstall();
 });
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault(); deferredPrompt = e;
   if(!localStorage.getItem('otg_install_dismissed')) { document.getElementById('installBanner').classList.remove('hidden'); }
