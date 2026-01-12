@@ -146,6 +146,19 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200">Re-run the setup wizard to change details?</p><button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button></div>
         <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2"><span class="text-xl">📲</span> Install App to Home Screen</button></div>
         <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold">Reset App</button></div></div>
+        <div class="setting-card border-gray-600">
+    <div class="flex justify-between items-center mb-2">
+        <label class="setting-label lbl-blue mb-0">Privacy & Storage</label>
+        <button onclick="alert('Privacy Note: If enabled, all photos and data sent via the -Note to Self- template are immediately purged from the organization server once the email is successfully sent to your work address.')" class="text-[10px] bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full font-bold">Tap for Info</button>
+    </div>
+    <div class="flex items-center justify-between bg-gray-900 p-3 rounded-lg border border-gray-700">
+        <span class="text-xs text-gray-300 font-bold">Auto-Delete 'Note to Self' Files</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="chkAutoDelete" class="sr-only peer" onchange="state.settings.autoDelete = this.checked; saveState();">
+            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+        </label>
+    </div>
+</div>
     </div>
 </div>
 
@@ -475,7 +488,7 @@ function populateWizard(){
     document.getElementById('wiz_duress').value=state.settings.duressPin||"";
 }
 
-function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;}
+function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url; document.getElementById('chkAutoDelete').checked = (state.settings.autoDelete !== false);}
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(){
@@ -593,10 +606,24 @@ function renderIconGrid(forms, loc) {
         });
     }
 }
+function initLocations(){
+    if(!state.locations) state.locations=[];
+    
+    // Set Privacy Default
+    if (state.settings.autoDelete === undefined) {
+        state.settings.autoDelete = true; 
+    }
 
-function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
-
-function renderLocations(){
+    // Standard Form Fallbacks
+    if(!state.cachedForms["Standard Visit Note"]) {
+        state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
+    }
+    
+    if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
+        state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
+    }
+}
+    function renderLocations(){
     const l=document.getElementById('locationList');
     const tr=document.getElementById('travelRow');
     l.innerHTML='';
@@ -1049,4 +1076,5 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
 
