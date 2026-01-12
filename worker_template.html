@@ -1192,10 +1192,23 @@ window.addEventListener('load', () => {
 });
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault(); deferredPrompt = e;
-  if(!localStorage.getItem('otg_install_dismissed')) { document.getElementById('installBanner').classList.remove('hidden'); }
-  document.getElementById('installAppContainer').classList.remove('hidden');
-  document.getElementById('btnInstallApp').addEventListener('click', () => { document.getElementById('installAppContainer').classList.add('hidden'); deferredPrompt.prompt(); deferredPrompt.userChoice.then((c) => { deferredPrompt = null; }); });
+    e.preventDefault(); 
+    deferredPrompt = e;
+    
+    // Use optional chaining to prevent 'null' property errors
+    if(!localStorage.getItem('otg_install_dismissed')) { 
+        document.getElementById('installBanner')?.classList.remove('hidden'); 
+    }
+    
+    const container = document.getElementById('installAppContainer');
+    if(container) {
+        container.classList.remove('hidden');
+        document.getElementById('btnInstallApp').onclick = () => {
+            container.classList.add('hidden');
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+        };
+    }
 });
 
 function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then((c) => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
@@ -1204,6 +1217,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
