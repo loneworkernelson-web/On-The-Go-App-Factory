@@ -65,6 +65,29 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div><p class="font-bold text-sm" id="toastText">Operation Successful</p></div>
 </div>
 
+<div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-4 z-[100] flex items-center justify-between shadow-2xl">
+    <div class="flex items-center gap-3"><span class="text-2xl">📲</span><div><p class="font-bold text-sm">Install App</p><p class="text-[10px] opacity-90">Add to home screen for safety features.</p></div></div>
+    <div class="flex gap-2"><button onclick="dismissInstall('android')" class="px-3 py-1 text-xs font-bold opacity-70">Later</button><button onclick="triggerInstall()" class="bg-white text-blue-600 px-4 py-1 rounded-full text-xs font-black">Install</button></div>
+</div>
+
+<div id="iosInstallModal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-end p-4">
+    <div class="bg-gray-800 w-full rounded-2xl p-6 relative pb-12 shadow-2xl border-t border-gray-700">
+        <button onclick="dismissInstall('ios')" class="absolute top-4 right-4 text-gray-500 text-xl">×</button>
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center p-2 shadow-lg">
+                <img src="%%LOGO_DATA%%" class="w-full h-full object-contain">
+            </div>
+            <h3 class="text-xl font-bold">Install Safety App</h3>
+            <p class="text-gray-400 text-sm mt-1">Follow these steps to add to Home Screen</p>
+        </div>
+        <div class="space-y-4 mb-8">
+            <div class="flex items-center gap-4 bg-gray-900/50 p-3 rounded-xl"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold">1</div><p class="text-sm">Tap the <span class="font-bold text-blue-400">Share</span> icon in Safari</p><span class="text-xl ml-auto">⎋</span></div>
+            <div class="flex items-center gap-4 bg-gray-900/50 p-3 rounded-xl"><div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold">2</div><p class="text-sm">Scroll down and tap <span class="font-bold text-blue-400">Add to Home Screen</span></p><span class="text-xl ml-auto">⊞</span></div>
+        </div>
+        <div class="ios-arrow"></div>
+    </div>
+</div>
+
 <div id="app-container" class="relative h-full w-full">
 <div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
 <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
@@ -1135,17 +1158,33 @@ window.addEventListener('load', () => {
             if(state.locations) renderLocations();
             if(state.meta) checkVehicleStatus();
         }
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error("Load Error:", e); }
+    
     initLocations();
+    
+    // UI Label Update
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
-    if(!state.settings || !state.settings.workerName) { startWizard(); } 
-    else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(); }
+    
+    // CRITICAL FIX: Ensure Wizard launches if no worker name exists
+    const hasWorker = state.settings && state.settings.workerName && state.settings.workerName.trim().length > 0;
+    
+    if(!hasWorker) { 
+        startWizard(); 
+    } else { 
+        if(state.activeVisit) enterLockedScreen(); 
+        else navigate('main'); 
+        if(navigator.onLine) forceSync(); 
+    }
+    
     startGPSMonitoring();
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
-    if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
+    
+    if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
+    }
     checkIosInstall();
 });
 
@@ -1158,6 +1197,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
 
 
 
