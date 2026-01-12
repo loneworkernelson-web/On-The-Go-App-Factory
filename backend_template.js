@@ -475,7 +475,7 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     // Email Construction Logic
     const inlineImages = {};
     const imgTags = [];
-    const processImg = (key, cidName, title) => {
+    const processImg = (key, cidName, title, url) => {
         if (p[key] && p[key].length > 100) { 
             const blob = dataURItoBlob(p[key]);
             if (blob) {
@@ -485,17 +485,16 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
         }
     };
 
-    processImg('Photo 1', 'photo1', 'Photo 1');
-    processImg('Photo 2', 'photo2', 'Photo 2');
-    processImg('Photo 3', 'photo3', 'Photo 3');
-    processImg('Photo 4', 'photo4', 'Photo 4');
+    processImg('Photo 1', 'photo1', 'Photo 1', p1);
+    processImg('Photo 2', 'photo2', 'Photo 2', p2);
+    processImg('Photo 3', 'photo3', 'Photo 3', p3);
+    processImg('Photo 4', 'photo4', 'Photo 4', p4);
     
     if (p['Signature']) {
         const sigBlob = dataURItoBlob(p['Signature']);
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    // [Email Body HTML logic matches standard v79.21 standard]
     let subject = `[${p['Template Name']}] - ${p['Worker Name']}`;
     let html = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>${p['Template Name']}</h1><p>Worker: ${p['Worker Name']}</p><ul>`;
     for (const [key, value] of Object.entries(reportObj)) {
@@ -505,8 +504,8 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
 
     MailApp.sendEmail({ to: recipientEmail, subject: subject, htmlBody: html, inlineImages: inlineImages });
 
-    /* SURGICAL PRIVACY PURGE: Delete Note to Self files after successful send */
-    if (state.settings.autoDelete && safeTName === 'note to self') {
+    /* CRITICAL FIX: Check p['autoDelete'] parameter instead of non-existent 'state' object */
+    if (p['autoDelete'] === 'true' && safeTName === 'note to self') {
         const urls = [p1, p2, p3, p4, sig];
         urls.forEach(url => {
             if (url && url.includes('id=')) {
@@ -574,7 +573,10 @@ function _cleanPhone(num) {
 
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=${p['Last Known GPS']}` : "No GPS";
+    
+    /* REPAIRED STRING INTERPOLATION FOR GPS LINK */
+    const gpsLink = p['Last Known GPS'] ? "http://googleusercontent.com/maps.google.com/?api=1&query=" + p['Last Known GPS'] : "No GPS";
+    
     const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
@@ -841,6 +843,7 @@ function sendResponse(e, data) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 
 
