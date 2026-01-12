@@ -979,8 +979,7 @@ function buildReportForm(n,c){
                 `<div><label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">${x}</label>`;
         
         if(y==='text') h+=`<textarea data-key="${x}" class="form-input h-24"></textarea></div>`;
-        // Ensure this specific line is in your buildReportForm function:
-else if(y==='signature') h+=`<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative"><canvas id="sig-canvas" height="160" class="w-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" onclick="clearSig()" class="absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-black uppercase">Clear</button></div><script>setTimeout(()=> { const c=document.getElementById('sig-canvas'); resizeCanvas(); initSigPad(c); },600);<\/script>`;
+        else if(y==='signature') h+=`<div class="border border-gray-600 rounded bg-white relative" style="height:150px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" onclick="clearSig('${i}')" class="absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Clear</button></div><script>setTimeout(()=>{ const c=document.getElementById('sig-canvas-${i}'); resizeCanvas(c); initSigPad(c); },600);<\/script></div>`;
         else if(y==='photo') h+=`<input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400">📸 ADD PHOTO</button></div>`;
         else if(y==='gps') h+=`<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold shadow">📍 GPS</button><input readonly data-key="${x}" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 text-xs text-gray-400"></div></div>`;
         else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input"></div>`;
@@ -991,7 +990,11 @@ else if(y==='signature') h+=`<div class="border-2 border-gray-600 rounded-xl bg-
         c.innerHTML += h;
     });
 }
-function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
+function clearSig(id){
+    const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas';
+    const c = document.getElementById(canvasId);
+    if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
 function startReminderTimer(){clearTimeout(mainScreenReminderTimer);mainScreenReminderTimer=setTimeout(()=>{if(!state.activeVisit&&document.getElementById('mainPage').classList.contains('active')){ /* Screen reminder logic */ }},300000);}
 function triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem===60||rem===30||rem===10)playSound('checkin');if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
@@ -1014,13 +1017,13 @@ function processUploadQueue(d){
 
     fetch(CONFIG.url, { method: 'POST', body: fd })
     .then(r => {
-        // Only shift the queue if the server actually received it
+        if (!r.ok) throw new Error("Server error");
         state.pendingUploads.shift();
         saveState();
         if(state.pendingUploads.length > 0) processUploadQueue();
     })
     .catch(e => {
-        console.warn("Upload failed, keeping in queue for retry:", e);
+        console.warn("Upload retry queued:", e);
     });
 }
 function setupLongPress(btn,cb){let t;const start=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1500);};const cancel=(e)=>{clearTimeout(t);btn.classList.remove('pressing');};btn.onmousedown=btn.ontouchstart=start;btn.onmouseup=btn.ontouchend=btn.onmouseleave=cancel;}
@@ -1059,8 +1062,8 @@ function initSigPad(c) {
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
 
-function resizeCanvas() {
-    const c = document.getElementById('sig-canvas'); 
+function resizeCanvas(canvasEl) {
+    const c = canvasEl || document.getElementById('sig-canvas'); 
     if (!c) return; 
     const ctx = c.getContext('2d');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -1107,4 +1110,5 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
