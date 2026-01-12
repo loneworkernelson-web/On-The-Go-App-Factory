@@ -492,49 +492,61 @@ function populateSettingsForm(){document.getElementById('set_url').value=state.s
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(showUi){
-    if(!state.settings.workerName)return;
+    if(!state.settings.workerName) return;
+    
+    // Only show the banner if showUi is true (allows silent background startup sync)
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
-    const dId=getDeviceID();
+    
+    const dId = getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.status==="error"){
+    .then(r => r.json())
+    .then(data => {
+        if(data.status === "error"){
             if(showUi) document.getElementById('uploadBanner').classList.add('hidden');
             if(data.message.includes("ACCESS DENIED")){
-                alert("⛔ ACCESS DENIED\n\n"+data.message);
+                alert("⛔ ACCESS DENIED\n\n" + data.message);
                 startWizard();
             } else {
                 if(showUi) alert("❌ Sync Error: " + data.message);
             }
             return;
         }
-        // RESTORE: Logic to preserve manually added sites
-        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
+
+        // --- FULL RESTORATION: Logic to preserve manually added sites ---
+        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
         
         const safeSites = data.sites || [];
-        const ms = safeSites.map(s=>({
-            id:'site_'+s.siteName.replace(/\s/g,''),
-            name:s.siteName,
-            address:s.address,
-            companyName:s.company,
-            templateName:s.template,
-            noReport:false,
-            contactName:s.contactName,
-            contactPhone:s.contactPhone,
-            contactEmail:s.contactEmail,
-            notes:s.notes
+        const ms = safeSites.map(s => ({
+            id: 'site_' + s.siteName.replace(/\s/g,''),
+            name: s.siteName,
+            address: s.address,
+            companyName: s.company,
+            templateName: s.template,
+            noReport: false,
+            contactName: s.contactName,
+            contactPhone: s.contactPhone,
+            contactEmail: s.contactEmail,
+            notes: s.notes
         }));
         
-        if(CONFIG.mileage) ms.unshift({id:'travel',name:'Travel',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
-        state.locations=ms.concat(existingManual);
-        state.globalForms=data.forms||[];
-        state.cachedForms=data.cachedTemplates||{};
-        state.meta=data.meta||{};
+        if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
-        // RESTORE: Standard form fallbacks
-        if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"]) state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
-        state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];
+        state.locations = ms.concat(existingManual);
+        state.globalForms = data.forms || [];
+        state.cachedForms = data.cachedTemplates || {};
+        state.meta = data.meta || {};
         
+        // --- FULL RESTORATION: Standard form fallbacks ---
+        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
+            state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
+        }
+        state.cachedForms["Note to Self"] = [{type:'text', text:'Note'}, {type:'photo', text:'Attachment'}];
+        
+        if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
+            state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
+        }
+        
+        // Restore user travel preferences
         const tLoc = state.locations.find(x => x.id === 'travel');
         const userPref = localStorage.getItem('otg_user_travel_pref');
         if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
@@ -546,11 +558,12 @@ function forceSync(showUi){
         document.getElementById('uploadBanner').classList.add('hidden');
         if(showUi) showToast("Sync Complete!");
     })
-    .catch(e=>{
+    .catch(e => {
         document.getElementById('uploadBanner').classList.add('hidden');
-        if(showUi) console.warn("Sync Failed: "+e.message);
+        if(showUi) console.warn("Sync Failed: " + e.message);
     });
 }
+    
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return;
     const b=document.getElementById('vehNagBar');let s=false;
@@ -1032,8 +1045,34 @@ function processUploadQueue(d){
     });
 }
 function setupLongPress(btn,cb){let t;const start=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1500);};const cancel=(e)=>{clearTimeout(t);btn.classList.remove('pressing');};btn.onmousedown=btn.ontouchstart=start;btn.onmouseup=btn.ontouchend=btn.onmouseleave=cancel;}
-function withPinVerification(d,c){showModal('pin');const i=document.getElementById('pinInput');i.value='';i.focus();const cf=()=>{const v=i.value;closeModal('pin');if(v===state.settings.pinCode)c();else if(v===state.settings.duressPin){processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm"}));if(d)c();else showToast("PIN Accepted");}else showToast("Incorrect PIN");document.getElementById('confirmPinBtn').removeEventListener('click',cf);};document.getElementById('confirmPinBtn').addEventListener('click',cf);document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin');}
-function clearData(){if(confirm('Reset all data?')){localStorage.clear();location.reload();}}
+function withPinVerification(d,c){
+    showModal('pin');
+    const i=document.getElementById('pinInput');
+    i.value=''; i.focus();
+    const cf=()=>{
+        const v=i.value;
+        closeModal('pin');
+        if(v===state.settings.pinCode){
+            c(); 
+        } else if(v===state.settings.duressPin){
+            // SILENT DURESS ALERT
+            processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered via PIN"}));
+            // SAFETY: Force-end the visit so the timer stops and the app looks "normal"
+            if(state.activeVisit) {
+                state.activeVisit = null;
+                saveState();
+                navigate('main');
+                if(travellingInterval) clearInterval(travellingInterval);
+            }
+            showToast("PIN Accepted"); // Generic message for safety
+        } else {
+            showToast("Incorrect PIN");
+        }
+        document.getElementById('confirmPinBtn').removeEventListener('click',cf);
+    };
+    document.getElementById('confirmPinBtn').addEventListener('click',cf);
+    document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin');
+}function clearData(){if(confirm('Reset all data?')){localStorage.clear();location.reload();}}
 function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Forms Syncing...");}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
@@ -1100,6 +1139,11 @@ window.addEventListener('load', () => {
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
     if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     checkIosInstall();
+
+    // AUDIT FIX: Global Resize listener for Signature Pads
+    window.addEventListener('resize', () => {
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
+    });
 });
 
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -1115,6 +1159,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
