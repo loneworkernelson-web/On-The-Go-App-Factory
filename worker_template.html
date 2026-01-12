@@ -1115,7 +1115,7 @@ function buildReportForm(n, c) {
         return;
     }
 
-    // 2. STANDARD CASE: Dynamic Parsing for all other forms
+    // 2. STANDARD CASE: Dynamic Parsing
     if (!t) {
         c.innerHTML = '<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>';
         return;
@@ -1138,7 +1138,6 @@ function buildReportForm(n, c) {
         c.innerHTML += h;
     });
 }
-
 function resizeCanvas() {
     const c = document.getElementById('sig-canvas'); if (!c) return; const ctx = c.getContext('2d');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -1161,12 +1160,10 @@ window.addEventListener('load', () => {
     } catch(e) { console.error("Load Error:", e); }
     
     initLocations();
-    
-    // UI Label Update
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
     
-    // CRITICAL FIX: Ensure Wizard launches if no worker name exists
+    // CRITICAL WIZARD CHECK (REPAIRED)
     const hasWorker = state.settings && state.settings.workerName && state.settings.workerName.trim().length > 0;
     
     if(!hasWorker) { 
@@ -1181,7 +1178,6 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
-    
     if('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     }
@@ -1197,6 +1193,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
 
 
 
