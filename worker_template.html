@@ -237,7 +237,6 @@ let calculatedDist=null;let gpsWarm=false;let gpsWatchId=null;
 function showModal(id) {
     document.getElementById('modalBackdrop').classList.remove('hidden');
     document.getElementById('modalBackdrop').classList.add('flex');
-    // Match the exact IDs in your HTML: locationModal, pinModal, modal-report, etc.
     const modals = ['locationModal','pinModal','modal-report','checkinModal','extendModal','infoModal','templateModal','alertModal'];
     modals.forEach(m => {
         const el = document.getElementById(m);
@@ -748,7 +747,6 @@ function startGPSMonitoring() {
     }
 
     let lastUpdate = 0;
-    // RESTORE: Signal Lost Heartbeat (Triggers every 5 seconds)
     setInterval(() => { if(Date.now() - lastUpdate > 30000) { updateGPSUI(-1); } }, 5000);
 
     const updateGPSUI = (acc) => {
@@ -766,7 +764,7 @@ function startGPSMonitoring() {
             barContainer.classList.remove('hidden');
             err.classList.add('hidden');
             
-            // CORRECTED: Inverted Logic (Lower numbers = Better signal)
+            // CORRECTED: Inverted Logic (Audit Fix 3.1 - Lower meters = Better signal)
             if(acc <= 15) { 
                 bars.forEach(b => b.classList.add('active-green')); 
             } else if(acc <= 45) { 
@@ -778,14 +776,12 @@ function startGPSMonitoring() {
         }
     };
 
-    // Main GPS Watcher
     gpsWatchId = navigator.geolocation.watchPosition(
         (pos) => { updateGPSUI(pos.coords.accuracy); },
         (err) => { console.warn("GPS Watch Error", err); updateGPSUI(-1); },
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
     );
     
-    // RESTORE: Background Battery Monitoring
     if ('getBattery' in navigator) {
         navigator.getBattery().then(function(battery) {
             const updateBat = () => { currentBatteryLevel = Math.round(battery.level * 100) + "%"; };
@@ -996,13 +992,14 @@ function processUploadQueue(d){
 
     fetch(CONFIG.url, { method: 'POST', body: fd })
     .then(r => {
-        if (!r.ok) throw new Error("Server error");
+        // Audit Fix 2.1: Only shift the queue if the server actually responded with success (200-299)
+        if (!r.ok) throw new Error("Server Error " + r.status);
         state.pendingUploads.shift();
         saveState();
         if(state.pendingUploads.length > 0) processUploadQueue();
     })
     .catch(e => {
-        console.warn("Upload retry queued:", e);
+        console.warn("Upload failed or server error. Data remains in outbox for retry.", e);
     });
 }
 function setupLongPress(btn,cb){let t;const start=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1500);};const cancel=(e)=>{clearTimeout(t);btn.classList.remove('pressing');};btn.onmousedown=btn.ontouchstart=start;btn.onmouseup=btn.ontouchend=btn.onmouseleave=cancel;}
@@ -1101,7 +1098,7 @@ window.addEventListener('load', () => {
     if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     checkIosInstall();
 
-    // GLOBAL ORIENTATION FIX
+    // Audit Fix 2.2: Global listener to fix signature pad scaling on rotation
     window.addEventListener('resize', () => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
     });
@@ -1120,6 +1117,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
