@@ -493,68 +493,43 @@ function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state
 
 function forceSync(showUi){
     if(!state.settings.workerName) return;
-    
-    // Only show the banner if showUi is true (allows silent background startup sync)
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
-    
     const dId = getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r => r.json())
     .then(data => {
         if(data.status === "error"){
-            if(showUi) document.getElementById('uploadBanner').classList.add('hidden');
-            if(data.message.includes("ACCESS DENIED")){
-                alert("⛔ ACCESS DENIED\n\n" + data.message);
-                startWizard();
-            } else {
-                if(showUi) alert("❌ Sync Error: " + data.message);
+            if(showUi) {
+                document.getElementById('uploadBanner').classList.add('hidden');
+                if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n" + data.message); startWizard(); }
+                else { alert("❌ Sync Error: " + data.message); }
             }
             return;
         }
-
-        // --- FULL RESTORATION: Logic to preserve manually added sites ---
+        // PROCESS DATA & PRESERVE MANUAL SITES
         const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-        
-        const safeSites = data.sites || [];
-        const ms = safeSites.map(s => ({
-            id: 'site_' + s.siteName.replace(/\s/g,''),
-            name: s.siteName,
-            address: s.address,
-            companyName: s.company,
-            templateName: s.template,
-            noReport: false,
-            contactName: s.contactName,
-            contactPhone: s.contactPhone,
-            contactEmail: s.contactEmail,
-            notes: s.notes
-        }));
+        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
         if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
-        
         state.locations = ms.concat(existingManual);
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         state.meta = data.meta || {};
         
-        // --- FULL RESTORATION: Standard form fallbacks ---
+        // STANDARD FORM FALLBACKS
         if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
             state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
         }
         state.cachedForms["Note to Self"] = [{type:'text', text:'Note'}, {type:'photo', text:'Attachment'}];
-        
         if(CONFIG.mileage && !state.cachedForms['Travel Report']) {
             state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
         }
-        
-        // Restore user travel preferences
+
         const tLoc = state.locations.find(x => x.id === 'travel');
         const userPref = localStorage.getItem('otg_user_travel_pref');
         if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
         
-        saveState();
-        renderLocations();
-        checkVehicleStatus();
-        
+        saveState(); renderLocations(); checkVehicleStatus();
         document.getElementById('uploadBanner').classList.add('hidden');
         if(showUi) showToast("Sync Complete!");
     })
@@ -1055,16 +1030,14 @@ function withPinVerification(d,c){
         if(v===state.settings.pinCode){
             c(); 
         } else if(v===state.settings.duressPin){
-            // SILENT DURESS ALERT
-            processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered via PIN"}));
-            // SAFETY: Force-end the visit so the timer stops and the app looks "normal"
+            processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"}));
             if(state.activeVisit) {
                 state.activeVisit = null;
                 saveState();
                 navigate('main');
                 if(travellingInterval) clearInterval(travellingInterval);
             }
-            showToast("PIN Accepted"); // Generic message for safety
+            showToast("PIN Accepted");
         } else {
             showToast("Incorrect PIN");
         }
@@ -1072,6 +1045,7 @@ function withPinVerification(d,c){
     };
     document.getElementById('confirmPinBtn').addEventListener('click',cf);
     document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin');
+}
 }function clearData(){if(confirm('Reset all data?')){localStorage.clear();location.reload();}}
 function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Forms Syncing...");}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
@@ -1140,7 +1114,7 @@ window.addEventListener('load', () => {
     if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     checkIosInstall();
 
-    // AUDIT FIX: Global Resize listener for Signature Pads
+    // GLOBAL ORIENTATION FIX
     window.addEventListener('resize', () => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
     });
@@ -1159,6 +1133,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
