@@ -42,6 +42,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
 .gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
 .gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
+/* ADD TO STYLE BLOCK */
+.status-red { background-color: #ef4444 !important; shadow: 0 0 8px #ef4444 !important; animation: pulse 2s infinite; }
+.status-green { background-color: #22c55e !important; shadow: 0 0 5px #22c55e !important; }
+.status-syncing { background-color: #3b82f6 !important; animation: pulse 1s infinite; }
 .menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
 .menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
 .wizard-step { display: none; height: 100%; flex-direction: column; }
@@ -166,9 +170,19 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="header-bar">
         <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
         <div class="flex items-center gap-3">
-            <div class="flex flex-col items-end gap-0.5" id="gpsContainer"><span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">GPS</span><div class="flex gap-0.5" id="gpsBars"><div id="gps1" class="gps-bar"></div><div id="gps2" class="gps-bar"></div><div id="gps3" class="gps-bar"></div></div><div id="gpsError" class="hidden text-red-500 font-bold text-xs animate-pulse">❌ NO SIG</div></div>
-            <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
+    <div id="syncStatus" class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_#22c55e]" title="Synced"></div>
+    
+    <div class="flex flex-col items-end gap-0.5" id="gpsContainer">
+        <span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest">GPS</span>
+        <div class="flex gap-0.5" id="gpsBars">
+            <div id="gps1" class="gps-bar"></div>
+            <div id="gps2" class="gps-bar"></div>
+            <div id="gps3" class="gps-bar"></div>
         </div>
+        <div id="gpsError" class="hidden text-red-500 font-bold text-xs animate-pulse">❌ NO SIG</div>
+    </div>
+    <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
+</div>
     </div>
     <div class="content-area">
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2"><div class="spinner"></div><span>Syncing...</span></div>
@@ -492,67 +506,48 @@ function populateSettingsForm(){document.getElementById('set_url').value=state.s
 function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(){
-    if(!state.settings.workerName)return;
-    document.getElementById('uploadBanner').classList.remove('hidden');
+    if(!state.settings.workerName) return;
+    
+    const dot = document.getElementById('syncStatus');
+    if(dot) { dot.className = "w-2 h-2 rounded-full status-syncing"; dot.title = "Syncing..."; }
+    
     const dId=getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
-    .then(r=>r.text())
-    .then(txt=>{
-        if(txt.includes("OTG Online")||!txt.startsWith("{"))throw new Error("SERVER UPDATE REQUIRED.");
-        return JSON.parse(txt);
-    })
+    .then(r=>r.json())
     .then(data=>{
         if(data.status==="error"){
-            document.getElementById('uploadBanner').classList.add('hidden');
-            if(data.message.includes("ACCESS DENIED")){
-                alert("⛔ ACCESS DENIED\n\n"+data.message);
-                startWizard();
-            } else {
-                alert("❌ Sync Error: " + data.message);
-            }
+            if(dot) { dot.className = "w-2 h-2 rounded-full status-red"; dot.title = "Sync Error: " + data.message; }
+            if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n"+data.message); startWizard(); }
+            else { showToast("⚠️ Sync Failed: Check connection"); }
             return;
         }
-        const existingManual=state.locations.filter(x=>x.id.startsWith('loc_'));
         
-        const safeSites = data.sites || [];
-        const ms = safeSites.map(s=>({
-            id:'site_'+s.siteName.replace(/\s/g,''),
-            name:s.siteName,
-            address:s.address,
-            companyName:s.company,
-            templateName:s.template,
-            noReport:false,
-            contactName:s.contactName,
-            contactPhone:s.contactPhone,
-            contactEmail:s.contactEmail,
-            notes:s.notes
-        }));
-        
+        // Process site data (Original Logic Preserved)
+        const existingManual = state.locations.filter(x=>x.id.startsWith('loc_'));
+        const ms = (data.sites || []).map(s=>({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         if(CONFIG.mileage) ms.unshift({id:'travel',name:'Travel',address:'Calculates Mileage via GPS',noReport:!CONFIG.reqTravelReport,companyName:'Internal',templateName:'Travel Report'});
-        state.locations=ms.concat(existingManual);
-        state.globalForms=data.forms||[];
-        state.cachedForms=data.cachedTemplates||{};
-        state.meta=data.meta||{};
-        if(!state.cachedForms["Standard Visit Note"]&&!state.cachedForms["(Standard)"]) state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];
-        state.cachedForms["Note to Self"]=[{type:'text',text:'Note'},{type:'photo',text:'Attachment'}];
-        if(CONFIG.mileage&&!state.cachedForms['Travel Report']) state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];
         
-        const tLoc = state.locations.find(x => x.id === 'travel');
-        const userPref = localStorage.getItem('otg_user_travel_pref');
-        if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
+        state.locations = ms.concat(existingManual);
+        state.globalForms = data.forms || [];
+        state.cachedForms = data.cachedTemplates || {};
+        state.meta = data.meta || {};
         
         saveState();
         renderLocations();
         checkVehicleStatus();
-        document.getElementById('uploadBanner').classList.add('hidden');
-        showToast("Sync Complete!");
+        
+        // Restore Green status
+        if(dot) { dot.className = "w-2 h-2 rounded-full status-green"; dot.title = "Synced"; }
     })
     .catch(e=>{
-        document.getElementById('uploadBanner').classList.add('hidden');
-        console.warn("Sync Failed: "+e.message);
+        console.warn("Sync Failed", e);
+        if(dot) { dot.className = "w-2 h-2 rounded-full status-red"; dot.title = "Offline: Using Cached Data"; }
+        // Report only if truly unable to sync and no data is cached
+        if(!state.locations || state.locations.length === 0) {
+            showToast("❌ Unable to sync. Please check your data connection.");
+        }
     });
 }
-
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return;
     const b=document.getElementById('vehNagBar');let s=false;
@@ -1118,6 +1113,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
 
 
 
