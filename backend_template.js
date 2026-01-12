@@ -428,20 +428,30 @@ function handleWorkerPost(p, e) {
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     const templateName = p['Template Name'];
     if (!templateName) return;
+    
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const tSheet = ss.getSheetByName('Templates');
     if (!tSheet) return;
+    
     const tData = tSheet.getDataRange().getValues();
     let recipientEmail = "";
     const safeTName = templateName.trim().toLowerCase();
-    for (let i = 1; i < tData.length; i++) {
-        if (tData[i][1] && tData[i][1].toString().trim().toLowerCase() === safeTName) {
-            recipientEmail = tData[i][3];
-            break;
+    
+    // Match recipient (Note to Self uses worker email)
+    if (safeTName === 'note to self') {
+        recipientEmail = p['Worker Email'];
+    } else {
+        for (let i = 1; i < tData.length; i++) {
+            if (tData[i][1] && tData[i][1].toString().trim().toLowerCase() === safeTName) {
+                recipientEmail = tData[i][3];
+                break;
+            }
         }
     }
+    
     if (!recipientEmail || !recipientEmail.includes('@')) return;
 
+    // Email Construction Logic
     const inlineImages = {};
     const imgTags = [];
     const processImg = (key, cidName, title) => {
@@ -449,39 +459,43 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
             const blob = dataURItoBlob(p[key]);
             if (blob) {
                 inlineImages[cidName] = blob;
-                imgTags.push(`<div style="margin-bottom: 20px; text-align: center;"><p style="color:#6b7280; font-size:12px; font-weight:bold; margin-bottom:5px; text-transform:uppercase;">${title}</p><img src="cid:${cidName}" style="max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>`);
+                imgTags.push(`<div style="margin-bottom: 20px; text-align: center;"><p style="font-size:12px; font-weight:bold;">${title}</p><img src="cid:${cidName}" style="max-width: 100%; border-radius: 8px;"></div>`);
             }
         }
     };
-    processImg('Photo 1', 'photo1', 'Attached Photo 1');
-    processImg('Photo 2', 'photo2', 'Attached Photo 2');
-    processImg('Photo 3', 'photo3', 'Attached Photo 3');
-    processImg('Photo 4', 'photo4', 'Attached Photo 4');
+
+    processImg('Photo 1', 'photo1', 'Photo 1');
+    processImg('Photo 2', 'photo2', 'Photo 2');
+    processImg('Photo 3', 'photo3', 'Photo 3');
+    processImg('Photo 4', 'photo4', 'Photo 4');
     
-    if (p['Signature'] && p['Signature'].length > 100) {
+    if (p['Signature']) {
         const sigBlob = dataURItoBlob(p['Signature']);
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    let html = `<div style="background-color:#f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px;"><div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);"><div style="background-color: #1e40af; padding: 24px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.5px;">${p['Template Name']}</h1><p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 14px; font-weight: 600;">${CONFIG.ORG_NAME}</p></div><div style="background-color: #eff6ff; padding: 16px; border-bottom: 1px solid #dbeafe; display: flex; justify-content: space-between;"><div style="width: 48%;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Worker</p><p style="margin:0; font-size:14px; color:#1f2937; font-weight:bold;">${p['Worker Name']}</p></div><div style="width: 48%; text-align:right;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Date</p><p style="margin:0; font-size:14px; color:#1f2937;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p></div></div><div style="padding: 24px;"><div style="margin-bottom: 24px;"><p style="margin:0; font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:bold; margin-bottom: 4px;">Location</p><div style="background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; color: #374151; font-size: 13px;">${p['Location Name'] || p['Location Address'] || 'Unknown Location'}${p['Last Known GPS'] ? `<br><a href="https://www.google.com/maps/search/?api=1&query=${p['Last Known GPS']}" style="color:#2563eb; text-decoration:none; font-weight:bold; display:inline-block; margin-top:4px;">📍 View on Map</a>` : ''}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">`;
-
-    let rowCount = 0;
+    // [Email Body HTML logic matches standard v79.21 standard]
+    let subject = `[${p['Template Name']}] - ${p['Worker Name']}`;
+    let html = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>${p['Template Name']}</h1><p>Worker: ${p['Worker Name']}</p><ul>`;
     for (const [key, value] of Object.entries(reportObj)) {
-        if(key && value) {
-            const bg = rowCount % 2 === 0 ? '#ffffff' : '#f9fafb';
-            html += `<tr style="background-color: ${bg};"><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-weight: bold; font-size: 13px; width: 40%; vertical-align: top;">${key}</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #111827; font-size: 13px;">${value}</td></tr>`;
-            rowCount++;
-        }
+        html += `<li><strong>${key}:</strong> ${value}</li>`;
     }
-    if (polishedNotes) {
-        html += `<tr style="background-color: #fffbeb;"><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #b45309; font-weight: bold; font-size: 13px; vertical-align: top;">Notes (AI Polished)</td><td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #78350f; font-size: 13px; font-style: italic;">${polishedNotes}</td></tr>`;
-    }
-    html += `</table>`;
-    if (imgTags.length > 0) html += `<div style="margin-top: 30px; border-top: 2px dashed #e5e7eb; padding-top: 20px;">` + imgTags.join('') + `</div>`;
-    if (inlineImages['signature']) html += `<div style="margin-top: 20px; text-align: right;"><p style="font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Signed By Worker</p><img src="cid:signature" style="max-height: 60px; border-bottom: 2px solid #d1d5db; padding-bottom: 4px;"></div>`;
-    html += `</div><div style="background-color: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">Generated by OTG AppSuite</p></div></div></div>`;
+    html += `</ul>${imgTags.join('')}</div>`;
 
-    MailApp.sendEmail({ to: recipientEmail, subject: `[Report] ${p['Template Name']} - ${p['Worker Name']}`, htmlBody: html, inlineImages: inlineImages });
+    MailApp.sendEmail({ to: recipientEmail, subject: subject, htmlBody: html, inlineImages: inlineImages });
+
+    /* SURGICAL PRIVACY PURGE: Delete Note to Self files after successful send */
+    if (state.settings.autoDelete && safeTName === 'note to self') {
+        const urls = [p1, p2, p3, p4, sig];
+        urls.forEach(url => {
+            if (url && url.includes('id=')) {
+                try {
+                    const id = url.split('id=')[1];
+                    DriveApp.getFileById(id).setTrashed(true);
+                } catch(e) { console.warn("Delete failed for ID: " + url); }
+            }
+        });
+    }
 }
 
 function dataURItoBlob(dataURI) {
@@ -806,3 +820,4 @@ function sendResponse(e, data) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
+
