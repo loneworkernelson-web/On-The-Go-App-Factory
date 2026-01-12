@@ -201,7 +201,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button id="btnSafe" class="hidden long-press-btn w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg animate-pulse">I AM SAFE</button>
         </div>
     </div>
-    <div id="batterySaver" class="hidden absolute inset-0 bg-black z-50 flex items-center justify-center flex-col cursor-pointer" onclick="toggleBatterySaver()"><div class="text-gray-600 text-sm mb-4">Tap to wake</div><div class="text-gray-800 font-mono text-xl animate-pulse" id="saverClock">00:00</div></div>
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
@@ -423,20 +422,18 @@ function wizNext(current){
 function wizBack(current){wizGoTo(current-1);}
 
 function wizSave(){
-    state.settings = {
-        workerName: document.getElementById('wiz_name').value,
-        workerPhone: cleanGlobalPhone(document.getElementById('wiz_phone').value),
-        workerEmail: document.getElementById('wiz_email').value,
-        emergencyName: document.getElementById('wiz_emg_name').value,
-        emergencyPhone: cleanGlobalPhone(document.getElementById('wiz_emg_phone').value),
-        emergencyEmail: document.getElementById('wiz_emg_email').value,
-        escalationName: document.getElementById('wiz_esc_name').value,
-        escalationPhone: cleanGlobalPhone(document.getElementById('wiz_esc_phone').value),
-        escalationEmail: document.getElementById('wiz_esc_email').value,
-        pinCode: document.getElementById('wiz_pin').value,
-        duressPin: document.getElementById('wiz_duress').value,
-        googleSheetUrl: CONFIG.url
-    };
+    state.settings.workerName=document.getElementById('wiz_name').value;
+    state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value);
+    state.settings.workerEmail=document.getElementById('wiz_email').value;
+    state.settings.emergencyName=document.getElementById('wiz_emg_name').value;
+    state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value);
+    state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value;
+    state.settings.escalationName=document.getElementById('wiz_esc_name').value;
+    state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value);
+    state.settings.escalationEmail=document.getElementById('wiz_esc_email').value;
+    state.settings.pinCode=document.getElementById('wiz_pin').value;
+    state.settings.duressPin=document.getElementById('wiz_duress').value;
+    state.settings.googleSheetUrl=CONFIG.url;
     saveState();
     document.getElementById('setupWizard').classList.add('hidden');
     navigate('main');
@@ -450,6 +447,7 @@ function cleanGlobalPhone(num) {
     if(!prefix) return "+" + n; 
     if (n.startsWith(prefix)) return '+' + n;
     if (n.startsWith('0')) return '+' + prefix + n.substring(1);
+    if (prefix === '1' && n.length === 10) return '+1' + n;
     return '+' + prefix + n;
 }
 
@@ -475,7 +473,11 @@ function forceSync(){
     document.getElementById('uploadBanner').classList.remove('hidden');
     const dId=getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
-    .then(r=>r.json())
+    .then(r=>r.text())
+    .then(txt=>{
+        if(txt.includes("OTG Online")||!txt.startsWith("{"))throw new Error("SERVER UPDATE REQUIRED.");
+        return JSON.parse(txt);
+    })
     .then(data=>{
         if(data.status==="error"){
             document.getElementById('uploadBanner').classList.add('hidden');
@@ -726,7 +728,7 @@ function startVisit(){
     const isHighRisk = document.getElementById('chkHighRisk').checked;
     state.activeVisit={locationId:s.id, startTime:n, anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000), fiveMinWarned:false, startGPS: "", highRisk: isHighRisk, warn90Sent: false};
     state.lowBatSent=false; saveState(); enterLockedScreen(); 
-    navigator.geolocation.getCurrentPosition((pos) => {if(state.activeVisit) {state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;saveState();let notes = "Started";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes, "Last Known GPS": state.activeVisit.startGPS};processUploadQueue(buildPayload(payload));}}, (err) => { if(state.activeVisit) {let notes = "Started (No GPS)";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes};processUploadQueue(buildPayload(payload));}}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    navigator.geolocation.getCurrentPosition((pos) => {if(state.activeVisit) {state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;saveState();let notes = "Started";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes, "Last Known GPS": state.activeVisit.startGPS};processUploadQueue(buildPayload(payload));}}, (err) => { if(state.activeVisit) {let notes = "Started (GPS Timeout)";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes};processUploadQueue(buildPayload(payload));}}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
 
 function warmUpGps() {if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{},()=>{},{enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000);}
@@ -820,11 +822,13 @@ function tick(){
         
         if(timeUntilEscalation<=300000&&timeUntilEscalation>298000){playSound('warning');navigator.vibrate([500,200,500]);}
         
+        // 2 MINUTE WARNING - SUPPRESSED IN CRITICAL MODE
         if(!isCriticalMode && timeUntilEscalation<=120000&&timeUntilEscalation>118000){
             playSound('warning'); navigator.vibrate([1000,500,1000]); 
             setTimeout(() => { speakWithAccent("Warning. Safety alarm will activate in two minutes."); }, 1000); 
         }
 
+        // 90 SECOND WARNING - THE ONLY WARNING GIVEN IN CRITICAL MODE
         if(timeUntilEscalation<=95000 && timeUntilEscalation>85000 && !state.activeVisit.warn90Sent){
             state.activeVisit.warn90Sent = true; saveState();
             playSound('warning'); navigator.vibrate([1000,500,1000]); 
@@ -870,7 +874,7 @@ function loadFormAndShow(t){
     document.getElementById('reportTitle').innerText=isMidVisitUpdate?"Update: "+t:"Report"; 
     currentActiveTemplate=t; buildReportForm(t,document.getElementById('reportFields'));
     if(calculatedDist){
-        let di = document.querySelector('[data-key*=\"Distance\"]') || document.querySelector('[data-key*=\"KM\"]') || document.querySelector('[data-key*=\"Mileage\"]');
+        let di = document.querySelector('[data-key*="Distance"]') || document.querySelector('[data-key*="KM"]') || document.querySelector('[data-key*="Mileage"]');
         if(di){ di.value = calculatedDist.km; di.style.border = "2px solid #4ade80"; di.classList.add("bg-green-900/20"); }
     }
     const b=document.getElementById('btnSubmitRep'); const nb=b.cloneNode(true); b.parentNode.replaceChild(nb,b);
@@ -894,7 +898,7 @@ function submitReport(){
 }
 
 function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.getElementById('sig-canvas');if(c)d.sig=c.toDataURL('image/png');return d;}
-function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText=\"Photo Saved ✅\";});}}
+function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText="Photo Saved ✅";});}}
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(600/i.width,600/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.4));};i.src=e.target.result;};rd.readAsDataURL(f);});}
 
 function buildReportForm(n,c){
@@ -904,7 +908,7 @@ function buildReportForm(n,c){
     
     c.innerHTML='';
     if(!t) { 
-        c.innerHTML='<label class=\"block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1\">Notes</label><textarea id=\"rep_notes\" class=\"form-input h-32\" placeholder=\"Visit Notes...\"></textarea>'; 
+        c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; 
         return; 
     }
 
@@ -916,12 +920,12 @@ function buildReportForm(n,c){
         else if(x.includes('[PHOTO]')){ y='photo'; x=x.replace('[PHOTO]','').trim(); }
         else if(x.includes('[YESNO]')){ y='yesno'; x=x.replace('[YESNO]','').trim(); }
         
-        let h = (y==='header') ? `<div class=\"mt-6 mb-2 border-b border-gray-700 pb-1\"><h3 class=\"text-blue-400 font-bold uppercase text-xs tracking-widest\">\${x}</h3></div>` : `<div><label class=\"block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1\">\${x}</label>`;
-        if(y==='text') h+=`<textarea data-key=\"\${x}\" class=\"form-input h-24\"></textarea></div>`;
-        else if(y==='signature') h+=`<div class=\"border border-gray-600 rounded bg-white relative\" style=\"height:150px\"><canvas id=\"sig-canvas\" class=\"w-full h-full touch-none\"></canvas><button type=\"button\" onclick=\"clearSig()\" class=\"absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold\">Clear</button></div><script>setTimeout(()=>{resizeCanvas();initSigPad(document.getElementById('sig-canvas'));},500);<\/script></div>`;
-        else if(y==='photo') h+=`<input type=\"file\" accept=\"image/*\" capture=\"environment\" onchange=\"handlePhoto(this,'\${x}')\" class=\"hidden\" id=\"cam_\${i}\"><button type=\"button\" onclick=\"document.getElementById('cam_\${i}').click()\" class=\"w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400\">📸 ADD PHOTO</button></div>`;
-        else if(y==='input') h+=`<input type=\"text\" data-key=\"\${x}\" class=\"form-input\"></div>`;
-        else if(y==='yesno') h+=`<div class=\"flex gap-4 p-2 bg-gray-900 rounded-lg\"><label class=\"flex items-center gap-2 cursor-pointer\"><input type=\"radio\" name=\"\${x}\" value=\"Yes\" data-key=\"\${x}\" class=\"w-5 h-5 text-blue-600\"> Yes</label><label class=\"flex items-center gap-2 cursor-pointer\"><input type=\"radio\" name=\"\${x}\" value=\"No\" data-key=\"\${x}\" class=\"w-5 h-5 text-blue-600\"> No</label></div></div>`;
+        let h = (y==='header') ? `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>` : `<div><label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">${x}</label>`;
+        if(y==='text') h+=`<textarea data-key="${x}" class="form-input h-24"></textarea></div>`;
+        else if(y==='signature') h+=`<div class="border border-gray-600 rounded bg-white relative" style="height:150px"><canvas id="sig-canvas" class="w-full h-full touch-none"></canvas><button type="button" onclick="clearSig()" class="absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Clear</button></div><script>setTimeout(()=>{resizeCanvas();initSigPad(document.getElementById('sig-canvas'));},500);<\/script></div>`;
+        else if(y==='photo') h+=`<input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400">📸 ADD PHOTO</button></div>`;
+        else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input"></div>`;
+        else if(y==='yesno') h+=`<div class="flex gap-4 p-2 bg-gray-900 rounded-lg"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div></div>`;
         c.innerHTML += h;
     });
 }
@@ -964,19 +968,6 @@ function resizeCanvas() {
     ctx.scale(ratio, ratio); ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
 }
 
-function startGPSMonitoring() {
-    if (!('geolocation' in navigator)) return;
-    gpsWatchId = navigator.geolocation.watchPosition(
-        (pos) => { const bars = [document.getElementById('gps1'), document.getElementById('gps2'), document.getElementById('gps3')]; bars.forEach(b => b.className = 'gps-bar'); if(pos.coords.accuracy <= 20) bars.forEach(b => b.classList.add('active-green')); else if(pos.coords.accuracy <= 50) { bars[0].classList.add('active-amber'); bars[1].classList.add('active-amber'); } else bars[0].classList.add('active-red'); },
-        (err) => { console.warn("GPS Watch Error", err); },
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
-    );
-}
-
-function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
-function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
-function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then((c) => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
-
 window.addEventListener('load', () => {
     try {
         const saved = localStorage.getItem('loneWorkerState');
@@ -1005,6 +996,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
   document.getElementById('installAppContainer').classList.remove('hidden');
   document.getElementById('btnInstallApp').addEventListener('click', () => { document.getElementById('installAppContainer').classList.add('hidden'); deferredPrompt.prompt(); deferredPrompt.userChoice.then((c) => { deferredPrompt = null; }); });
 });
+
+function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then((c) => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
+function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
+function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
 </script>
 </body>
 </html>
