@@ -1195,19 +1195,23 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault(); 
     deferredPrompt = e;
     
-    // Use optional chaining to prevent 'null' property errors
+    // Audit Fix: Defensive check for the banner
+    const banner = document.getElementById('installBanner');
     if(!localStorage.getItem('otg_install_dismissed')) { 
-        document.getElementById('installBanner')?.classList.remove('hidden'); 
+        banner?.classList.remove('hidden'); 
     }
     
     const container = document.getElementById('installAppContainer');
     if(container) {
         container.classList.remove('hidden');
-        document.getElementById('btnInstallApp').onclick = () => {
-            container.classList.add('hidden');
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-        };
+        const btn = document.getElementById('btnInstallApp');
+        if(btn) {
+            btn.onclick = () => {
+                container.classList.add('hidden');
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+            };
+        }
     }
 });
 
@@ -1217,6 +1221,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
