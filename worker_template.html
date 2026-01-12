@@ -470,67 +470,28 @@ function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state
 
 function forceSync(showUi){
     if(!state.settings.workerName) return;
-    
-    // Only show the syncing banner if showUi is true
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
-    
     const dId = getDeviceID();
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
     .then(r => r.json())
     .then(data => {
         if(data.status === "error"){
             if(showUi) document.getElementById('uploadBanner').classList.add('hidden');
-            if(data.message.includes("ACCESS DENIED")){
-                alert("⛔ ACCESS DENIED\n\n" + data.message);
-                startWizard();
-            } else {
-                if(showUi) alert("❌ Sync Error: " + data.message);
-            }
+            if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n" + data.message); startWizard(); }
             return;
         }
-
-        // --- Data Processing (MUST BE INSIDE THIS BLOCK) ---
         const existingManual = state.locations.filter(x => x.id.startsWith('loc_'));
-        const safeSites = data.sites || [];
-        const ms = safeSites.map(s => ({
-            id: 'site_' + s.siteName.replace(/\s/g,''),
-            name: s.siteName,
-            address: s.address,
-            companyName: s.company,
-            templateName: s.template,
-            noReport: false,
-            contactName: s.contactName,
-            contactPhone: s.contactPhone,
-            contactEmail: s.contactEmail,
-            notes: s.notes
-        }));
-        
+        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
-        
         state.locations = ms.concat(existingManual);
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         state.meta = data.meta || {};
-
-        // Fallbacks for standard forms
-        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
-        state.cachedForms["Note to Self"] = [{type:'text', text:'Note'}, {type:'photo', text:'Attachment'}];
-        if(CONFIG.mileage && !state.cachedForms['Travel Report']) state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}];
-        
-        const tLoc = state.locations.find(x => x.id === 'travel');
-        const userPref = localStorage.getItem('otg_user_travel_pref');
-        if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
-        
-        saveState();
-        renderLocations();
-        checkVehicleStatus();
-
-        // Only hide banner and show toast if showUi is true
+        saveState(); renderLocations(); checkVehicleStatus();
         if(showUi) {
             document.getElementById('uploadBanner').classList.add('hidden');
             showToast("Sync Complete!");
         } else {
-            // Ensure banner is hidden even in silent mode if it was somehow shown
             document.getElementById('uploadBanner').classList.add('hidden');
         }
     })
@@ -703,29 +664,29 @@ function toggleHighRiskUI(){
 }
 
 function updateArrivedButtonState(){
-    const v=DURATION_MAP[document.getElementById('durationSlider').value];
-    document.getElementById('durationDisplay').innerText=v>=60?(Math.floor(v/60)+' hr '+(v%60)+' min'):v+' min';
-    state.visitDurationMinutes=v;
+    const v = DURATION_MAP[document.getElementById('durationSlider').value];
+    document.getElementById('durationDisplay').innerText = v >= 60 ? (Math.floor(v/60) + ' hr ' + (v%60) + ' min') : v + ' min';
+    state.visitDurationMinutes = v;
     
-    // Highlight the matching quick-set chip
+    // Highlight matching quick-set chip
     [15,30,60,120].forEach(m => {
-        const btn = document.getElementById('btnDur'+m); 
+        const btn = document.getElementById('btnDur' + m); 
         if(btn){
-            if(v===m) btn.classList.add('selected');
+            if(v === m) btn.classList.add('selected');
             else btn.classList.remove('selected');
         }
     });
     
-    const b=document.getElementById('btnStart');
-    if(state.selectedLocationId&&v>0){
-        b.disabled=false;
-        b.innerText="Start";
-        b.className="long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all";
-        setupLongPress(b,startVisit);
-    }else{
-        b.disabled=true;
-        b.innerText=state.selectedLocationId?"Set Time":"Start";
-        b.className="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all";
+    const b = document.getElementById('btnStart');
+    if(state.selectedLocationId && v > 0){
+        b.disabled = false;
+        b.innerText = "Start";
+        b.className = "long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all";
+        setupLongPress(b, startVisit);
+    } else {
+        b.disabled = true;
+        b.innerText = state.selectedLocationId ? "Set Time" : "Start";
+        b.className = "long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all";
     }
 }
 
@@ -964,7 +925,8 @@ function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')s
 function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCurrentPosition(p=>{btn.innerText="✅ "+p.coords.latitude+","+p.coords.longitude;btn.nextElementSibling.value=p.coords.latitude+","+p.coords.longitude;});}
 
 function initSigPad(c) {
-    if (!c) return; const ctx = c.getContext('2d');
+    if (!c) return; 
+    const ctx = c.getContext('2d');
     const getPos = (e) => { 
         const rect = c.getBoundingClientRect(); 
         const cx = e.clientX || (e.touches && e.touches[0].clientX); 
@@ -974,8 +936,20 @@ function initSigPad(c) {
             y: (cy - rect.top) * (c.height / rect.height) 
         }; 
     };
-    c.addEventListener('pointerdown', (e) => { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); }, {passive: false});
-    c.addEventListener('pointermove', (e) => { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); e.preventDefault(); }, {passive: false});
+    c.addEventListener('pointerdown', (e) => { 
+        isDrawing = true; 
+        const pos = getPos(e); 
+        ctx.beginPath(); 
+        ctx.moveTo(pos.x, pos.y); 
+        e.preventDefault(); 
+    }, {passive: false});
+    c.addEventListener('pointermove', (e) => { 
+        if (!isDrawing) return; 
+        const pos = getPos(e); 
+        ctx.lineTo(pos.x, pos.y); 
+        ctx.stroke(); 
+        e.preventDefault(); 
+    }, {passive: false});
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
 
@@ -1021,5 +995,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
