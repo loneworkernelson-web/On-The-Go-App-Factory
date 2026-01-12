@@ -902,32 +902,47 @@ function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.inn
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(600/i.width,600/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.4));};i.src=e.target.result;};rd.readAsDataURL(f);});}
 
 function buildReportForm(n,c){
-    state.photoStore={}; 
-    const sn=n?n.trim():"(Standard)"; 
-    let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
-    
+    state.photoStore={}; const sn=n?n.trim():"Standard Visit Note"; let t=null;
+    if(state.globalForms)t=state.globalForms.find(f=>f.name.trim()===sn)?.questions;
+    if(!t&&state.cachedForms)t=state.cachedForms[sn];
+    if(!t)t=state.cachedForms["(Standard)"];
     c.innerHTML='';
-    if(!t) { 
-        c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; 
-        return; 
+    if(!t || t.length===0){ c.innerHTML='<label class="block text-sm text-gray-400">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>'; } 
+    else {
+        t.forEach((f,i)=>{
+            let y='input'; let x=f.text||f;
+            if(typeof f==='string'){
+                if(f.includes('[HEADING]') || f.trim().startsWith('#')){y='header';x=f.replace('[HEADING]','').replace('#','').trim();}
+                else if(f.includes('[NOTE]')){y='note';x=f.replace('[NOTE]','').trim();}
+                else if(f.includes('[TEXT]') || f.trim().startsWith('%')){y='text';x=f.replace('[TEXT]','').replace('%','').trim();}
+                else if(f.includes('[PHOTO]')){y='photo';x=f.replace('[PHOTO]','').trim();}
+                else if(f.includes('[YESNO]')){y='yesno';x=f.replace('[YESNO]','').trim();}
+                else if(f.includes('[CHECK]')){y='checkbox';x=f.replace('[CHECK]','').trim();} 
+                else if(f.includes('[NUMBER]') || f.trim().startsWith('$')){y='number';x=f.replace('[NUMBER]','').replace('$','').trim();}
+                else if(f.includes('[GPS]')){y='gps';x=f.replace('[GPS]','').trim();}
+                else if(f.includes('[SIGN]')){y='signature';x=f.replace('[SIGN]','').trim();}
+                else if(f.includes('[DATE]')){y='date';x=f.replace('[DATE]','').trim();}
+                else { y='input'; }
+            }
+            let h='';
+            if(y==='header') h=`<h3 class="text-blue-400 font-extrabold uppercase text-xs tracking-widest mt-6 mb-2 border-b border-gray-700 pb-1">${x}</h3>`;
+            else if(y==='note') h=`<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic">${x}</div>`;
+            else if(y!=='checkbox') h=`<div><label class="block text-[10px] uppercase font-extrabold text-gray-500 mb-1 tracking-wider">${x}</label>`;
+            
+            if(y==='text') h+=`<textarea data-key="${x}" class="form-input h-24"></textarea>`;
+            else if(y==='number') h+=`<input type="number" data-key="${x}" class="form-input font-mono text-blue-400 font-bold" placeholder="0">`;
+            else if(y==='date') h+=`<input type="date" data-key="${x}" class="form-input">`;
+            else if(y==='yesno') h+=`<div class="flex gap-4 p-2 bg-gray-900 rounded-lg"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div>`;
+            else if(y==='checkbox') h+=`<div class="flex items-center gap-3 p-3 bg-gray-800 rounded border border-gray-600 mb-3 shadow-sm active:bg-gray-700 transition"><input type="checkbox" data-key="${x}" class="w-6 h-6 text-blue-600 rounded bg-gray-700 border-gray-500 focus:ring-blue-500"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
+            else if(y==='photo') h+=`<div><input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-xs font-black text-gray-300 border-2 border-dashed border-gray-500">📸 ADD PHOTO</button></div>`;
+            else if(y==='signature') h+=`<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative"><canvas id="sig-canvas" height="160" class="w-full touch-none"></canvas><button type="button" onclick="clearSig()" class="absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-black uppercase">Clear</button></div><script>setTimeout(()=> { const c=document.getElementById('sig-canvas'); resizeCanvas(); initSigPad(c); },500);<\/script>`;
+            else if(y==='gps') h+=`<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold shadow">📍 GPS</button><input readonly data-key="${x}" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 text-xs text-gray-400"></div>`;
+            else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input">`; 
+            
+            if(y!=='header'&&y!=='checkbox'&&y!=='note') h+='</div>';
+            c.innerHTML+=h;
+        });
     }
-
-    t.forEach((f,i)=>{
-        let y='input'; let x=f.text||f;
-        if(x.includes('[HEADING]')){ y='header'; x=x.replace('[HEADING]','').trim(); }
-        else if(x.includes('[TEXT]')){ y='text'; x=x.replace('[TEXT]','').trim(); }
-        else if(x.includes('[SIGN]')){ y='signature'; x=x.replace('[SIGN]','').trim(); }
-        else if(x.includes('[PHOTO]')){ y='photo'; x=x.replace('[PHOTO]','').trim(); }
-        else if(x.includes('[YESNO]')){ y='yesno'; x=x.replace('[YESNO]','').trim(); }
-        
-        let h = (y==='header') ? `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>` : `<div><label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">${x}</label>`;
-        if(y==='text') h+=`<textarea data-key="${x}" class="form-input h-24"></textarea></div>`;
-        else if(y==='signature') h+=`<div class="border border-gray-600 rounded bg-white relative" style="height:150px"><canvas id="sig-canvas" class="w-full h-full touch-none"></canvas><button type="button" onclick="clearSig()" class="absolute bottom-1 right-1 bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">Clear</button></div><script>setTimeout(()=>{resizeCanvas();initSigPad(document.getElementById('sig-canvas'));},500);<\/script></div>`;
-        else if(y==='photo') h+=`<input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400">📸 ADD PHOTO</button></div>`;
-        else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input"></div>`;
-        else if(y==='yesno') h+=`<div class="flex gap-4 p-2 bg-gray-900 rounded-lg"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div></div>`;
-        c.innerHTML += h;
-    });
 }
 
 function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
@@ -955,7 +970,15 @@ function captureGPS(btn){btn.innerText="Locating...";navigator.geolocation.getCu
 
 function initSigPad(c) {
     if (!c) return; const ctx = c.getContext('2d');
-    const getPos = (e) => { const rect = c.getBoundingClientRect(); const cx = e.clientX || (e.touches && e.touches[0].clientX); const cy = e.clientY || (e.touches && e.touches[0].clientY); return { x: (cx - rect.left) * (c.width / rect.width), y: (cy - rect.top) * (c.height / rect.height) }; };
+    const getPos = (e) => { 
+        const rect = c.getBoundingClientRect(); 
+        const cx = e.clientX || (e.touches && e.touches[0].clientX); 
+        const cy = e.clientY || (e.touches && e.touches[0].clientY); 
+        return { 
+            x: (cx - rect.left) * (c.width / rect.width), 
+            y: (cy - rect.top) * (c.height / rect.height) 
+        }; 
+    };
     c.addEventListener('pointerdown', (e) => { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); }, {passive: false});
     c.addEventListener('pointermove', (e) => { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); e.preventDefault(); }, {passive: false});
     window.addEventListener('pointerup', () => { isDrawing = false; });
@@ -981,7 +1004,7 @@ window.addEventListener('load', () => {
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
     if(!state.settings || !state.settings.workerName) { startWizard(); } 
-    else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(); }
+    else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(false); }
     startGPSMonitoring();
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
@@ -1003,3 +1026,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
