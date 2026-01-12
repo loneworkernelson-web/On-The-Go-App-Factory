@@ -662,11 +662,52 @@ function renderLocations(){
     });
 }
 
-function showSiteInfo(id,e){
-    if(e)e.stopPropagation();
+function showSiteInfo(id, e){
+    if(e) e.stopPropagation();
+    
+    // Maintain existing logic for manual locations and travel settings
     if(id.startsWith('loc_')) { editManualLocation(id); return; }
     if(id === 'travel') { editTravelSettings(); return; }
-    document.getElementById('infoTitle').innerText="";document.getElementById('siteInfoContent').innerHTML="";document.getElementById('btnSiteCall').classList.add('hidden');document.getElementById('btnSiteEmail').classList.add('hidden');document.getElementById('btnSiteNav').classList.add('hidden');const l=state.locations.find(x=>x.id===id);showModal('info');if(!l){document.getElementById('infoTitle').innerText="Unknown Site";return;}document.getElementById('infoTitle').innerText=l.name;let h="";if(l.address){h+=`<p><strong>Address:</strong><br>${l.address}</p>`;const n=document.getElementById('btnSiteNav');n.href=`http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(l.address)}`;n.classList.remove('hidden');}if(l.contactName)h+=`<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;if(l.notes)h+=`<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;document.getElementById('siteInfoContent').innerHTML=h;const bc=document.getElementById('btnSiteCall');const be=document.getElementById('btnSiteEmail');if(l.contactPhone){bc.href=`tel:${l.contactPhone}`;bc.classList.remove('hidden');}if(l.contactEmail){be.href=`mailto:${l.contactEmail}`;be.classList.remove('hidden');}
+    
+    // Reset Modal UI
+    document.getElementById('infoTitle').innerText = "";
+    document.getElementById('siteInfoContent').innerHTML = "";
+    document.getElementById('btnSiteCall').classList.add('hidden');
+    document.getElementById('btnSiteEmail').classList.add('hidden');
+    document.getElementById('btnSiteNav').classList.add('hidden');
+
+    const l = state.locations.find(x => x.id === id);
+    showModal('info');
+    
+    if(!l) {
+        document.getElementById('infoTitle').innerText = "Unknown Site";
+        return;
+    }
+
+    document.getElementById('infoTitle').innerText = l.name;
+    let h = "";
+    
+    if(l.address) {
+        h += `<p><strong>Address:</strong><br>${l.address}</p>`;
+        const n = document.getElementById('btnSiteNav');
+        
+        /* CORRECTED UNIVERSAL GOOGLE MAPS DIR LINK */
+        n.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.address)}&travelmode=driving`;
+        
+        n.classList.remove('hidden');
+    }
+    
+    if(l.contactName) h += `<p class="mt-2"><strong>Contact:</strong> ${l.contactName}</p>`;
+    
+    if(l.notes) h += `<div class="mt-3 bg-gray-700 p-2 rounded text-xs border-l-2 border-yellow-500">${l.notes}</div>`;
+    
+    document.getElementById('siteInfoContent').innerHTML = h;
+    
+    // Restored Phone/Email button logic
+    const bc = document.getElementById('btnSiteCall');
+    const be = document.getElementById('btnSiteEmail');
+    if(l.contactPhone) { bc.href = `tel:${l.contactPhone}`; bc.classList.remove('hidden'); }
+    if(l.contactEmail) { be.href = `mailto:${l.contactEmail}`; be.classList.remove('hidden'); }
 }
 
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
@@ -1008,3 +1049,4 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
