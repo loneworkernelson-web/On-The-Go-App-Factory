@@ -555,11 +555,10 @@
     const url = document.getElementById('webAppUrl').value; 
     const secret = document.getElementById('secretKey').value; 
     const worker = document.getElementById('workerKey').value; 
-    const logoData = document.getElementById('logoUrl').value; // Base64 string
+    const logoData = document.getElementById('logoUrl').value; 
     const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
     const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
     
-    // 1. Process Worker HTML with correct injections
     let wHtml = TEMPLATES.worker
         .replace(/%%ORG_NAME%%/g, org)
         .replace(/%%APP_NAME%%/g, appName)
@@ -581,11 +580,8 @@
         .replace(/#1e40af/g, primaryColor)
         .replace(/#3b82f6/g, accentColor);
 
-    // 2. Create the standalone icon file for Manifest compliance
-    // Browser PWAs prefer physical files over Base64 strings in the manifest
+    // FIX: Convert logo to physical file for Manifest compliance
     const logoBlob = dataURLtoBlob(logoData);
-    
-    // 3. Create Compliant Manifest
     const manifest = { 
         name: org, 
         short_name: appName, 
@@ -599,32 +595,17 @@
         ] 
     };
 
-// 4. Create Service Worker (Audit-Hardened for PWA Installation)
+    // FIX: Service Worker now caches the physical icon and manifest
     const swCode = `const CACHE_NAME = 'otg-v${Date.now()}'; 
-        const urlsToCache = [
-            './',
-            './index.html',
-            './manifest.json',
-            './icon.png',
-            'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js'
-        ]; 
+        const urlsToCache = ['./','./index.html','./manifest.json','./icon.png']; 
+        self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)))); 
+        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));`;
 
-        self.addEventListener('install', e => {
-            e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)));
-        }); 
-
-        self.addEventListener('fetch', e => {
-            e.respondWith(
-                caches.match(e.request).then(r => r || fetch(e.request))
-            );
-        });`;
-
-    // 5. Build ZIP Structure
     const workerFolder = zip.folder("WorkerApp");
     workerFolder.file("index.html", wHtml);
     workerFolder.file("sw.js", swCode);
     workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
-    workerFolder.file("icon.png", logoBlob); // Saving the physical image file
+    workerFolder.file("icon.png", logoBlob);
     workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
 
     zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
@@ -632,14 +613,11 @@
     zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker));
     
     zip.generateAsync({type:"blob"}).then(b => {
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(b); 
-        a.download = org.replace(/[^a-z0-9]/gi, '_') + "_Lone_Worker_Apps.zip"; 
-        a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/[^a-z0-9]/gi, '_') + "_Lone_Worker_Apps.zip"; a.click();
     });
 }
 
-// Helper needed for icon conversion
+// FIX: Helper to convert DataURL to Binary Blob
 function dataURLtoBlob(dataurl) {
     var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
         bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
@@ -651,5 +629,6 @@ function dataURLtoBlob(dataurl) {
   </script>
 </body>
 </html>
+
 
 
