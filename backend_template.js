@@ -385,15 +385,36 @@ function handleWorkerPost(p, e) {
                     }
                     if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
                     if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
-                    if (p['Visit Report Data']) {
-                        sheet.getRange(targetRow, 20).setValue(p['Visit Report Data']);
-                        if(p['Distance']) sheet.getRange(targetRow, 19).setValue(p['Distance']);
-                        if(sig) sheet.getRange(targetRow, 22).setValue(sig);
-                        if(p1) sheet.getRange(targetRow, 18).setValue(p1);
-                        if(p2) sheet.getRange(targetRow, 23).setValue(p2);
-                        if(p3) sheet.getRange(targetRow, 24).setValue(p3);
-                        if(p4) sheet.getRange(targetRow, 25).setValue(p4);
+                   if (p['Visit Report Data']) {
+                        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                        
+                        sheet.getRange(targetRow, headers.indexOf("Visit Report Data") + 1).setValue(p['Visit Report Data']);
+                        
+                        if(p['Distance']) {
+                            const distCol = headers.indexOf("Distance (km)") + 1;
+                            if(distCol > 0) sheet.getRange(targetRow, distCol).setValue(p['Distance']);
+                        }
+                        
+                        // DYNAMIC SIGNATURE PLACEMENT
+                        if(sig) {
+                            const sigCol = headers.indexOf("Signature") + 1;
+                            if(sigCol > 0) sheet.getRange(targetRow, sigCol).setValue(sig);
+                        }
+                        
+                        // DYNAMIC PHOTO PLACEMENT
+                        const p1Col = headers.indexOf("Photo 1") + 1;
+                        if(p1 && p1Col > 0) sheet.getRange(targetRow, p1Col).setValue(p1);
+                        
+                        const p2Col = headers.indexOf("Photo 2") + 1;
+                        if(p2 && p2Col > 0) sheet.getRange(targetRow, p2Col).setValue(p2);
+
+                        const p3Col = headers.indexOf("Photo 3") + 1;
+                        if(p3 && p3Col > 0) sheet.getRange(targetRow, p3Col).setValue(p3);
+
+                        const p4Col = headers.indexOf("Photo 4") + 1;
+                        if(p4 && p4Col > 0) sheet.getRange(targetRow, p4Col).setValue(p4);
                     }
+
                     rowUpdated = true;
                     break;
                 }
@@ -820,5 +841,6 @@ function sendResponse(e, data) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 
