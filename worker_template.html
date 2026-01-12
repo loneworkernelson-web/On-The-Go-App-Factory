@@ -1032,11 +1032,37 @@ function handlePhoto(i,k){if(i.files[0]){const b=i.nextElementSibling;if(b)b.inn
 function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(600/i.width,600/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.4));};i.src=e.target.result;};rd.readAsDataURL(f);});}
 
 function initSigPad(c) {
-    if (!c) return; const ctx = c.getContext('2d');
-    const getPos = (e) => { const rect = c.getBoundingClientRect(); const cx = e.clientX || (e.touches && e.touches[0].clientX); const cy = e.clientY || (e.touches && e.touches[0].clientY); return { x: (cx - rect.left) * (c.width / rect.width), y: (cy - rect.top) * (c.height / rect.height) }; };
-    c.addEventListener('pointerdown', (e) => { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); }, {passive: false});
-    c.addEventListener('pointermove', (e) => { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); e.preventDefault(); }, {passive: false});
-    window.addEventListener('pointerup', () => { isDrawing = false; });
+    if (!c) return; 
+    const ctx = c.getContext('2d');
+    let drawing = false;
+
+    const getPos = (e) => { 
+        const rect = c.getBoundingClientRect(); 
+        const cx = e.clientX || (e.touches && e.touches[0].clientX); 
+        const cy = e.clientY || (e.touches && e.touches[0].clientY); 
+        return { 
+            x: (cx - rect.left) * (c.width / (rect.width * (window.devicePixelRatio || 1))), 
+            y: (cy - rect.top) * (c.height / (rect.height * (window.devicePixelRatio || 1))) 
+        }; 
+    };
+
+    c.addEventListener('pointerdown', (e) => { 
+        drawing = true; 
+        const pos = getPos(e); 
+        ctx.beginPath(); 
+        ctx.moveTo(pos.x, pos.y); 
+        e.preventDefault(); 
+    }, {passive: false});
+
+    c.addEventListener('pointermove', (e) => { 
+        if (!drawing) return; 
+        const pos = getPos(e); 
+        ctx.lineTo(pos.x, pos.y); 
+        ctx.stroke(); 
+        e.preventDefault(); 
+    }, {passive: false});
+
+    window.addEventListener('pointerup', () => { drawing = false; });
 }
 
 function clearSig(){const c=document.getElementById('sig-canvas');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);}
@@ -1202,6 +1228,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
+
 
 
 
