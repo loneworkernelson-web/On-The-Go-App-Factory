@@ -241,11 +241,24 @@ function showModal(id) {
         if(el) el.classList.add('hidden');
     });
     
-    if(id==='report') { document.getElementById('modal-report').classList.remove('hidden'); setTimeout(resizeCanvas, 300); }
-    else if(id==='pin') document.getElementById('pinModal').classList.remove('hidden');
-    else if(id==='extend') document.getElementById('extendModal').classList.remove('hidden');
-    else if(id==='template') document.getElementById('templateModal').classList.remove('hidden');
-    else if(id==='info') document.getElementById('infoModal').classList.remove('hidden');
+    if(id==='location') {
+        document.getElementById('locationModal').classList.remove('hidden');
+    } else if(id==='report') {
+        document.getElementById('modal-report').classList.remove('hidden');
+        setTimeout(resizeCanvas, 300);
+    } else if(id==='pin') {
+        document.getElementById('pinModal').classList.remove('hidden');
+    } else if(id==='info') {
+        document.getElementById('infoModal').classList.remove('hidden');
+    } else if(id==='template') {
+        document.getElementById('templateModal').classList.remove('hidden');
+    } else if(id==='checkin') {
+        document.getElementById('checkinModal').classList.remove('hidden');
+    } else if(id==='extend') {
+        document.getElementById('extendModal').classList.remove('hidden');
+    } else if(id==='alert') {
+        document.getElementById('alertModal').classList.remove('hidden');
+    }
 }
 
 function closeModal(id) {
@@ -480,20 +493,34 @@ function forceSync(showUi){
             if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n" + data.message); startWizard(); }
             return;
         }
+        // PROCESS CLOUD DATA
         const existingManual = state.locations.filter(x => x.id.startsWith('loc_'));
-        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
+        const safeSites = data.sites || [];
+        const ms = safeSites.map(s => ({
+            id: 'site_' + s.siteName.replace(/\s/g,''),
+            name: s.siteName,
+            address: s.address,
+            companyName: s.company,
+            templateName: s.template,
+            noReport: false,
+            contactName: s.contactName,
+            contactPhone: s.contactPhone,
+            contactEmail: s.contactEmail,
+            notes: s.notes
+        }));
+        
         if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         state.locations = ms.concat(existingManual);
         state.globalForms = data.forms || [];
         state.cachedForms = data.cachedTemplates || {};
         state.meta = data.meta || {};
-        saveState(); renderLocations(); checkVehicleStatus();
-        if(showUi) {
-            document.getElementById('uploadBanner').classList.add('hidden');
-            showToast("Sync Complete!");
-        } else {
-            document.getElementById('uploadBanner').classList.add('hidden');
-        }
+        
+        saveState();
+        renderLocations();
+        checkVehicleStatus();
+        
+        document.getElementById('uploadBanner').classList.add('hidden');
+        if(showUi) showToast("Sync Complete!");
     })
     .catch(e => {
         document.getElementById('uploadBanner').classList.add('hidden');
@@ -880,13 +907,16 @@ function buildReportForm(n,c){
     if(!t) { c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; return; }
     t.forEach((f,i)=>{
         let y='input'; let x=f.text||f;
-        if(x.includes('[HEADING]')){ y='header'; x=x.replace('[HEADING]','').trim(); }
+        if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
-        else if(x.includes('[TEXT]')){ y='text'; x=x.replace('[TEXT]','').trim(); }
+        else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
         else if(x.includes('[SIGN]')){ y='signature'; x=x.replace('[SIGN]','').trim(); }
         else if(x.includes('[PHOTO]')){ y='photo'; x=x.replace('[PHOTO]','').trim(); }
         else if(x.includes('[YESNO]')){ y='yesno'; x=x.replace('[YESNO]','').trim(); }
         else if(x.includes('[GPS]')){ y='gps'; x=x.replace('[GPS]','').trim(); }
+        else if(x.includes('[CHECK]')){ y='checkbox'; x=x.replace('[CHECK]','').trim(); }
+        else if(x.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace('[NUMBER]','').replace('$','').trim(); }
+        else if(x.includes('[DATE]')){ y='date'; x=x.replace('[DATE]','').trim(); }
         
         let h = (y==='header') ? `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>` : 
                 (y==='note') ? `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic">${x}</div>` : 
@@ -897,6 +927,9 @@ function buildReportForm(n,c){
         else if(y==='photo') h+=`<input type="file" accept="image/*" capture="environment" onchange="handlePhoto(this,'${x}')" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-3 bg-gray-700 rounded border border-dashed border-gray-500 text-xs font-bold text-gray-400">📸 ADD PHOTO</button></div>`;
         else if(y==='gps') h+=`<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold shadow">📍 GPS</button><input readonly data-key="${x}" class="flex-1 bg-gray-900 border border-gray-700 rounded px-2 text-xs text-gray-400"></div></div>`;
         else if(y==='input') h+=`<input type="text" data-key="${x}" class="form-input"></div>`;
+        else if(y==='number') h+=`<input type="number" data-key="${x}" class="form-input"></div>`;
+        else if(y==='date') h+=`<input type="date" data-key="${x}" class="form-input"></div>`;
+        else if(y==='checkbox') h+=`<div class="flex items-center gap-3 p-3 bg-gray-800 rounded border border-gray-600 mb-3 active:bg-gray-700 transition"><input type="checkbox" data-key="${x}" class="w-6 h-6 text-blue-600"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
         else if(y==='yesno') h+=`<div class="flex gap-4 p-2 bg-gray-900 rounded-lg"><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="Yes" data-key="${x}" class="w-5 h-5 text-blue-600"> Yes</label><label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="${x}" value="No" data-key="${x}" class="w-5 h-5 text-blue-600"> No</label></div></div>`;
         c.innerHTML += h;
     });
@@ -954,10 +987,16 @@ function initSigPad(c) {
 }
 
 function resizeCanvas() {
-    const c = document.getElementById('sig-canvas'); if (!c) return; const ctx = c.getContext('2d');
+    const c = document.getElementById('sig-canvas'); 
+    if (!c) return; 
+    const ctx = c.getContext('2d');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    c.width = c.offsetWidth * ratio; c.height = c.offsetHeight * ratio;
-    ctx.scale(ratio, ratio); ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+    c.width = c.offsetWidth * ratio; 
+    c.height = c.offsetHeight * ratio;
+    ctx.scale(ratio, ratio); 
+    ctx.strokeStyle = "#000000"; 
+    ctx.lineWidth = 2.5; 
+    ctx.lineCap = "round";
 }
 
 window.addEventListener('load', () => {
@@ -995,6 +1034,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
