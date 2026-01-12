@@ -1192,17 +1192,23 @@ window.addEventListener('load', () => {
             if(state.locations) renderLocations();
             if(state.meta) checkVehicleStatus();
         }
-    } catch(e) { console.error("Load Error:", e); }
+    } catch(e) { 
+        console.error("Load Error:", e); 
+        state = {settings:{}, locations:[]}; // Fallback for corrupted storage
+    }
     
     initLocations();
+    
+    // UI Label Update for Vehicle Terms
     const labels = document.querySelectorAll('.dynamic-wof');
     if(CONFIG.vehicleTerm) labels.forEach(l => l.innerText = CONFIG.vehicleTerm);
     
-    // CRITICAL WIZARD CHECK (REPAIRED)
-    const hasWorker = state.settings && state.settings.workerName && state.settings.workerName.trim().length > 0;
+    // HARDENED WIZARD CHECK: Force settings page if data is missing
+    const hasWorker = !!(state.settings && state.settings.workerName && state.settings.workerName.trim().length > 0);
     
     if(!hasWorker) { 
-        startWizard(); 
+        console.log("No worker profile found. Launching Setup Wizard.");
+        startWizard(); // This opens the settings/wizard overlay
     } else { 
         if(state.activeVisit) enterLockedScreen(); 
         else navigate('main'); 
@@ -1213,12 +1219,12 @@ window.addEventListener('load', () => {
     document.body.addEventListener('click',initAudio,{once:true});
     startReminderTimer();
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.activeVisit)requestWakeLock();});
+    
     if('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW Fail',e));
     }
     checkIosInstall();
 });
-
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault(); deferredPrompt = e;
   if(!localStorage.getItem('otg_install_dismissed')) { document.getElementById('installBanner').classList.remove('hidden'); }
@@ -1228,17 +1234,3 @@ window.addEventListener('beforeinstallprompt', (e) => {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
