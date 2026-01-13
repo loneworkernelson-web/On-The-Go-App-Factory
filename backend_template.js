@@ -894,6 +894,25 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+/**
+ * PRIVACY SWEEP: Automatically moves private 'Note to Self' sent emails to the trash.
+ * This should be set to run on a time-based trigger (e.g., every hour).
+ */
+function cleanupPrivateSentNotes() {
+  try {
+    // Search only in the Sent folder for the specific private subject line
+    const threads = GmailApp.search('label:sent subject:"[PRIVATE] Note to Self"');
+    
+    if (threads.length > 0) {
+      for (let i = 0; i < threads.length; i++) {
+        threads[i].moveToTrash();
+      }
+      console.log(`Privacy Sweep: Moved ${threads.length} private threads to trash.`);
+    }
+  } catch (e) {
+    console.warn("Privacy Sweep Error: " + e.toString());
+  }
+}
 
 
 
