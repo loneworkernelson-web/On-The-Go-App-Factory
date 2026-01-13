@@ -572,6 +572,7 @@
     const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
     const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
     
+    // 1. Process Worker HTML (ORS KEY REMOVED FROM INJECTION)
     let wHtml = TEMPLATES.worker
         .replace(/%%ORG_NAME%%/g, org)
         .replace(/%%APP_NAME%%/g, appName)
@@ -583,7 +584,7 @@
         .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
         .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
         .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-        .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value)
+        // ORS_API_KEY injection removed here for worker safety
         .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
         .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
         .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
@@ -593,7 +594,6 @@
         .replace(/#1e40af/g, primaryColor)
         .replace(/#3b82f6/g, accentColor);
 
-    // FIX: Convert logo to physical file for Manifest compliance
     const logoBlob = dataURLtoBlob(logoData);
     const manifest = { 
         name: org, 
@@ -608,7 +608,6 @@
         ] 
     };
 
-    // FIX: Service Worker now caches the physical icon and manifest
     const swCode = `const CACHE_NAME = 'otg-v${Date.now()}'; 
         const urlsToCache = ['./','./index.html','./manifest.json','./icon.png']; 
         self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)))); 
@@ -619,10 +618,12 @@
     workerFolder.file("sw.js", swCode);
     workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
     workerFolder.file("icon.png", logoBlob);
-    workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
-
-    zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
+    
+    // 2. Ensure Backend (Code.gs) RETAINS the Key
     zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
+    
+    zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
+    zip.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
     zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker));
     
     zip.generateAsync({type:"blob"}).then(b => {
@@ -642,6 +643,7 @@ function dataURLtoBlob(dataurl) {
   </script>
 </body>
 </html>
+
 
 
 
