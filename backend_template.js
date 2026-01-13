@@ -439,77 +439,85 @@ function handleWorkerPost(p, e) {
 }
 
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
-    const templateName = p['Template Name'];
+    const templateName = p['Template Name'] || "";
     if (!templateName) return;
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const tSheet = ss.getSheetByName('Templates');
-    if (!tSheet) return;
-    
-    const tData = tSheet.getDataRange().getValues();
-    let recipientEmail = "";
     const safeTName = templateName.trim().toLowerCase();
     
-    // Match recipient (Note to Self uses worker email)
+    let recipientEmail = "";
+    
+    // AUDIT FIX: Mandatory Worker Routing for Private Notes
     if (safeTName === 'note to self') {
-        recipientEmail = p['Worker Email'];
-    } else {
+        recipientEmail = p['Worker Email']; // Pulls from the worker's own profile
+    } else if (tSheet) {
+        const tData = tSheet.getDataRange().getValues();
         for (let i = 1; i < tData.length; i++) {
             if (tData[i][1] && tData[i][1].toString().trim().toLowerCase() === safeTName) {
-                recipientEmail = tData[i][3];
+                recipientEmail = tData[i][3]; // Pulls from the recipient column in Templates
                 break;
             }
         }
     }
     
-    if (!recipientEmail || !recipientEmail.includes('@')) return;
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+        console.warn("No valid recipient found for email routing.");
+        return;
+    }
 
-    // Email Construction Logic
     const inlineImages = {};
     const imgTags = [];
-    const processImg = (key, cidName, title, url) => {
+    const processImg = (key, cidName, title) => {
         if (p[key] && p[key].length > 100) { 
             const blob = dataURItoBlob(p[key]);
             if (blob) {
                 inlineImages[cidName] = blob;
-                imgTags.push(`<div style="margin-bottom: 20px; text-align: center;"><p style="font-size:12px; font-weight:bold;">${title}</p><img src="cid:${cidName}" style="max-width: 100%; border-radius: 8px;"></div>`);
+                imgTags.push(`<div style="margin-bottom: 20px;"><p style="font-size:12px;font-weight:bold;">${title}</p><img src="cid:${cidName}" style="max-width:100%;border-radius:8px;"></div>`);
             }
         }
     };
 
-    processImg('Photo 1', 'photo1', 'Photo 1', p1);
-    processImg('Photo 2', 'photo2', 'Photo 2', p2);
-    processImg('Photo 3', 'photo3', 'Photo 3', p3);
-    processImg('Photo 4', 'photo4', 'Photo 4', p4);
+    processImg('Photo 1', 'photo1', 'Attachment 1');
+    processImg('Photo 2', 'photo2', 'Attachment 2');
+    processImg('Photo 3', 'photo3', 'Attachment 3');
+    processImg('Photo 4', 'photo4', 'Attachment 4');
     
     if (p['Signature']) {
         const sigBlob = dataURItoBlob(p['Signature']);
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    let subject = `[${p['Template Name']}] - ${p['Worker Name']}`;
-    let html = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>${p['Template Name']}</h1><p>Worker: ${p['Worker Name']}</p><ul>`;
+    let subject = (safeTName === 'note to self') ? `[PRIVATE] Note to Self` : `[${templateName}] - ${p['Worker Name']}`;
+    let html = `<div style="font-family:Arial,sans-serif;padding:20px;max-width:600px;border:1px solid #eee;border-radius:12px;">
+        <h2 style="color:#1e40af;">${templateName}</h2>
+        <p style="color:#666;font-size:12px;">Sent: ${new Date().toLocaleString()}</p>
+        <hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
+        <div style="background:#f9fafb;padding:15px;border-radius:8px;margin-bottom:20px;">
+            <p style="white-space:pre-wrap;">${polishedNotes}</p>
+        </div>
+        <ul style="list-style:none;padding:0;">`;
+        
     for (const [key, value] of Object.entries(reportObj)) {
-        html += `<li><strong>${key}:</strong> ${value}</li>`;
+        html += `<li style="margin-bottom:8px;font-size:14px;"><strong>${key}:</strong> ${value}</li>`;
     }
     html += `</ul>${imgTags.join('')}</div>`;
 
     MailApp.sendEmail({ to: recipientEmail, subject: subject, htmlBody: html, inlineImages: inlineImages });
 
-    /* CRITICAL FIX: Check p['autoDelete'] parameter instead of non-existent 'state' object */
+    // PRIVACY ENFORCEMENT: If autoDelete is true, purge the files from Drive now
     if (p['autoDelete'] === 'true' && safeTName === 'note to self') {
-        const urls = [p1, p2, p3, p4, sig];
-        urls.forEach(url => {
+        const fileUrls = [p1, p2, p3, p4, sig];
+        fileUrls.forEach(url => {
             if (url && url.includes('id=')) {
                 try {
                     const id = url.split('id=')[1];
                     DriveApp.getFileById(id).setTrashed(true);
-                } catch(e) { console.warn("Delete failed for ID: " + url); }
+                } catch(e) { console.warn("Privacy Purge Failed for: " + url); }
             }
         });
     }
 }
-
 function dataURItoBlob(dataURI) {
     try {
         if (!dataURI) return null;
@@ -886,6 +894,7 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+
 
 
 
