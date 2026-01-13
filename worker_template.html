@@ -988,7 +988,16 @@ function startGPSMonitoring() {
     
     if ('getBattery' in navigator) {
         navigator.getBattery().then(function(battery) {
-            const updateBat = () => { currentBatteryLevel = Math.round(battery.level * 100) + "%"; };
+            const updateBat = () => { 
+                currentBatteryLevel = Math.round(battery.level * 100) + "%";
+                
+                // AUTO-DIM LOGIC: Trigger battery saver if below 20% and not already active
+                const saver = document.getElementById('batterySaver');
+                if (battery.level <= 0.20 && saver && saver.classList.contains('hidden')) {
+                    toggleBatterySaver();
+                    showToast("🔋 Low Battery: Auto-Dim Active");
+                }
+            };
             updateBat();
             battery.addEventListener('levelchange', updateBat);
         });
@@ -1511,6 +1520,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
