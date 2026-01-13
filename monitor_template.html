@@ -114,6 +114,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Reset Key</button>
+                <button onclick="exportSystemLog()" class="text-xs text-blue-400 hover:text-blue-300 underline">📊 Export Daily Log</button>
                 <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition">🔊 Sound On</button>
                 <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold btn-brand text-white shadow transition">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">📋 All</button></div>
                 <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"><button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 text-white shadow">⊞ Grid</button><button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-xs font-bold text-gray-400 hover:text-white transition">🗺️ Map</button></div>
@@ -514,7 +515,37 @@ function submitResolution() {
     })
     .catch(e => alert("Connection Error: " + e)); 
 }
+function exportSystemLog() {
+    if (allRows.length === 0) return alert("No data available to export.");
+    
+    const headers = ["Timestamp", "Worker Name", "Alarm Status", "Location", "Notes", "Battery", "GPS"];
+    const csvRows = [headers.join(",")];
 
+    allRows.slice().reverse().forEach(r => {
+        const row = [
+            `"${r['Timestamp']}"`,
+            `"${r['Worker Name']}"`,
+            `"${r['Alarm Status']}"`,
+            `"${r['Location Name'] || r['Location Address']}"`,
+            `"${(r['Notes'] || '').replace(/"/g, '""')}"`,
+            `"${r['Battery Level']}"`,
+            `"${r['Last Known GPS']}"`
+        ];
+        csvRows.push(row.join(","));
+    });
+
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Safety_Log_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return isNaN(d) ? "--:--" : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12:true}); }
 </script>
 </body>
