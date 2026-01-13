@@ -287,8 +287,20 @@ function showModal(id) {
 }
 
 function closeModal(id) {
-    document.getElementById('modalBackdrop').classList.add('hidden');
-    document.getElementById('modalBackdrop').classList.remove('flex');
+    const backdrop = document.getElementById('modalBackdrop');
+    if (backdrop) {
+        backdrop.classList.add('hidden');
+        backdrop.classList.remove('flex');
+    }
+    
+    // Specifically hide the targeted modal if an ID was provided
+    if (id) {
+        const modalId = (id === 'location' || id === 'pin' || id === 'info' || id === 'template' || id === 'checkin' || id === 'extend' || id === 'alert') 
+                        ? id + 'Modal' 
+                        : (id === 'report' ? 'reportModal' : id);
+        const el = document.getElementById(modalId);
+        if (el) el.classList.add('hidden');
+    }
 }
 
 function showToast(msg) {
@@ -369,18 +381,25 @@ function saveLoc(){
         closeModal('location');
         return;
     }
-    if(!n)return alert("Site Name is required");
-    const newId=id||'loc_'+Date.now();
-    const loc={id:newId,name:n,companyName:b,address:a,templateName:t,noReport:nr};
+    
+    if(!n) return alert("Site Name is required");
+    
+    const newId = id || 'loc_' + Date.now();
+    const loc = {id: newId, name: n, companyName: b, address: a, templateName: t, noReport: nr};
+    
     if(id){
-        const i=state.locations.findIndex(x=>x.id===id);
-        state.locations[i]=loc;
-    }else{
+        const i = state.locations.findIndex(x => x.id === id);
+        if(i > -1) state.locations[i] = loc;
+    } else {
         state.locations.push(loc);
     }
+    
     saveState();
     renderLocations();
+    
+    // Audit Fix: Explicitly close the location modal and backdrop
     closeModal('location');
+    showToast("Site Saved");
 }
 
 function deleteLoc(){
@@ -1292,3 +1311,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
