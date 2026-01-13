@@ -190,7 +190,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="flex gap-2"><button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-teal-900 text-teal-400 font-bold rounded-xl border border-teal-700/50 shadow-lg active:scale-95 transition">Quick Notes</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all" disabled>Start</button></div>
     </div>
 </div>
-
+<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center pointer-events-none">
+    <div class="text-gray-800 text-sm font-bold animate-pulse">BATTERY SAVER ACTIVE</div>
+    <div class="text-gray-900 text-[10px]">Tap anywhere to wake</div>
+</div>
 <div id="lockedPage" class="page">
     <div class="flex-1 flex flex-col justify-between p-6">
         <div class="flex justify-between items-start">
@@ -1215,7 +1218,24 @@ function startTravellingPulse(){
         );
     }, 300000); // 5 minute pulse
 }
-function toggleBatterySaver(){document.getElementById('batterySaver').classList.toggle('hidden');}
+function toggleBatterySaver() {
+    const saver = document.getElementById('batterySaver');
+    if (!saver) return;
+
+    if (saver.classList.contains('hidden')) {
+        saver.classList.remove('hidden');
+        saver.style.pointerEvents = 'auto'; // Block accidental touches
+        // Ensure the screen stays on but dimmed
+        if (navigator.wakeLock) requestWakeLock();
+        showToast("🌙 Battery Saver Active");
+    } else {
+        saver.classList.add('hidden');
+        saver.style.pointerEvents = 'none';
+    }
+}
+
+// Add global listener to "Wake" the screen if the user taps the black overlay
+document.getElementById('batterySaver').onclick = toggleBatterySaver;
 function buildPayload(d){let dt="";let ln="Unknown";let la="";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Emergency Contact Name':state.settings.emergencyName,'Emergency Contact Number':state.settings.emergencyPhone,'Emergency Contact Email':state.settings.emergencyEmail,'Escalation Contact Name':state.settings.escalationName,'Escalation Contact Number':state.settings.escalationPhone,'Escalation Contact Email':state.settings.escalationEmail,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
 function processUploadQueue(d){
     if(d) { state.pendingUploads.push(d); saveState(); }
@@ -1388,6 +1408,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
