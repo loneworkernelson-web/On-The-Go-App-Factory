@@ -854,3 +854,26 @@ function sendResponse(e, data) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
+
+// SECURE ORS PROXY (Fixes API Key Leakage)
+function getRouteDistance(start, end) {
+  if (!CONFIG.ORS_API_KEY || CONFIG.ORS_API_KEY.length < 5) return null;
+  
+  try {
+    // Reverse coordinates for ORS requirements (lon,lat)
+    const p1 = start.split(',').reverse().join(',');
+    const p2 = end.split(',').reverse().join(',');
+    
+    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${CONFIG.ORS_API_KEY}&start=${p1}&end=${p2}`;
+    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    
+    if (response.getResponseCode() === 200) {
+      const json = JSON.parse(response.getContentText());
+      const meters = json.features[0].properties.segments[0].distance;
+      return (meters / 1000).toFixed(2); // Return km
+    }
+  } catch (e) {
+    console.warn("ORS Proxy Error: " + e.toString());
+  }
+  return null;
+}
