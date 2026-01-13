@@ -99,7 +99,7 @@
               <div>
                   <label class="block text-blue-300 font-bold mb-1 text-xs uppercase tracking-widest">1. Organisation Identity</label>
                   <input type="text" id="orgName" class="input-field" placeholder="e.g. Acme Services" oninput="saveInput(this)">
-                  <p class="text-[10px] text-gray-500 mt-1">This name appears at the top of the worker's app and on all official reports.</p>
+                  <p class="text-[10px] text-gray-500 mt-1">This name appears at the top of the app and on reports.</p>
               </div>
               
               <div>
@@ -108,28 +108,26 @@
                       <span class="text-[10px] text-gray-500" id="charCount">6/12</span>
                   </div>
                   <input type="text" id="appName" maxlength="12" class="input-field text-center font-bold text-green-400 border-green-600/50" value="Safety" oninput="updateCharCount(this); saveInput(this)">
-                  <p class="text-[10px] text-gray-500 mt-1">The short name that appears on the phone's Home Screen. Keep it under 10 letters if possible.</p>
+                  <p class="text-[10px] text-gray-500 mt-1">Short name for the phone Home Screen (Max 12 chars).</p>
               </div>
 
               <div class="p-5 bg-gray-900 rounded-xl border border-gray-700 shadow-inner">
                   <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest">🔐 Safety Connection Keys</h3>
-                  
                   <div class="mb-4">
                       <label class="block text-blue-300 font-bold mb-1 text-xs">Admin Secret Key</label>
                       <div class="flex gap-2">
                           <input type="text" id="secretKey" class="input-field text-yellow-400 font-mono text-sm" oninput="saveInput(this); validateKey();">
                           <button onclick="generateMemorableKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white p-2">🔄</button>
                       </div>
-                      <p class="text-[10px] text-gray-500 mt-1">Protects your database. <strong>Do not share this with workers.</strong></p>
+                      <p class="text-[10px] text-gray-500 mt-1">Keeps your data private. <strong>Do not share with workers.</strong></p>
                   </div>
-
                   <div>
                       <label class="block text-blue-300 font-bold mb-1 text-xs">Worker Access Key</label>
                       <div class="flex gap-2">
                           <input type="text" id="workerKey" class="input-field text-green-400 font-mono text-sm" oninput="saveInput(this)">
                           <button onclick="generateMemorableKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white p-2">🔄</button>
                       </div>
-                      <p class="text-[10px] text-gray-500 mt-1">This key connects the mobile app to your system. Workers will use this once during setup.</p>
+                      <p class="text-[10px] text-gray-500 mt-1">Used once by staff to connect their phone to your system.</p>
                   </div>
               </div>
 
@@ -142,52 +140,57 @@
                       <option value="+1">USA / Canada (+1)</option>
                       <option value="">Other (Universal)</option>
                   </select>
-                  <p class="text-[10px] text-gray-400 mt-2">Sets your timezone and local terms (e.g., <strong><span id="vehTermDisplay">WOF</span></strong>).</p>
+                  <div class="mt-2 bg-gray-900 p-3 rounded text-[10px] text-gray-400 grid grid-cols-2 gap-2 border border-gray-800">
+                      <p>Timezone: <span id="detectedTz" class="text-blue-400">Loading...</span></p>
+                      <p>Term: <span id="vehTermDisplay" class="text-green-400">WOF</span></p>
+                  </div>
                   <input type="hidden" id="timezoneVal">
               </div>
             </div>
             
-            <div class="highlight-box flex flex-col items-center justify-center text-center bg-gray-900/50 border-dashed border-2 border-gray-700">
-              <label class="block text-blue-300 font-bold mb-4 text-xs uppercase tracking-widest">4. Visual Branding</label>
-              
-              <div id="dropZone" class="drop-zone w-48 h-48 mb-4 flex items-center justify-center rounded-full border-4 border-gray-800" onclick="document.getElementById('logoInput').click()">
+            <div class="highlight-box flex flex-col items-center justify-center text-center bg-gray-900/40 border-2 border-gray-700">
+              <label class="block text-blue-300 font-bold mb-4 text-xs uppercase tracking-widest">4. Logo & Branding</label>
+              <div id="dropZone" class="drop-zone w-48 h-48 mb-4 border-4 border-gray-800 rounded-full flex items-center justify-center" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-full w-full rounded-full flex items-center justify-center overflow-hidden">
                     <img id="logoImg" class="hidden h-full w-full object-contain p-4 bg-white">
-                    <div id="logoText" class="text-gray-500">
-                        <span class="text-4xl block mb-2">🖼️</span>
-                        <span class="text-[10px] font-bold uppercase">Click to Upload Logo</span>
-                    </div>
+                    <div id="logoText" class="text-gray-500 text-[10px] font-bold uppercase tracking-tighter">Drag & Drop Logo<br>or Click to Upload</div>
                 </div>
               </div>
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
               <input type="hidden" id="logoUrl" oninput="saveInput(this)">
 
-              <div id="paletteArea" class="hidden w-full space-y-4">
-                  <div class="pt-4 border-t border-gray-800">
-                      <span class="block text-[10px] text-blue-400 font-black uppercase tracking-widest mb-3">Choose Your Accent Colors</span>
-                      <div class="flex flex-wrap gap-3 justify-center" id="logoClusterSwatches"></div>
-                      <p class="text-[9px] text-gray-500 mt-2">We've identified these colors from your logo. Click one to apply it to your app.</p>
-                  </div>
-                  
-                  <div class="flex gap-4 justify-center items-center py-2 bg-gray-800/50 rounded-lg">
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="primaryColorBox" class="w-6 h-6 rounded shadow-lg border border-white/20"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">PRIMARY</span>
+              <div id="paletteArea" class="hidden w-full bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                  <div class="mb-4">
+                      <div class="flex justify-between items-center mb-1">
+                          <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Extract Branding</span>
+                          <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline">↻ Resample</button>
                       </div>
-                      <div class="flex flex-col items-center gap-1">
-                          <div id="accentColorBox" class="w-6 h-6 rounded shadow-lg border border-white/20"></div>
-                          <span class="text-[8px] text-gray-500 font-bold">ACCENT</span>
+                      <p class="text-[9px] text-gray-500 text-left leading-tight">Click a color below to set your app theme.</p>
+                  </div>
+                  <div class="mb-4">
+                      <div class="flex gap-3 justify-center mb-2" id="logoClusterSwatches"></div>
+                  </div>
+                  <div class="pt-3 border-t border-gray-800">
+                      <div class="flex gap-4 justify-center items-center">
+                          <div class="flex flex-col items-center gap-1">
+                              <div id="primaryColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
+                              <span class="text-[7px] text-gray-400 font-bold uppercase">Primary</span>
+                          </div>
+                          <div class="flex flex-col items-center gap-1">
+                              <div id="accentColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
+                              <span class="text-[7px] text-gray-400 font-bold uppercase">Accent</span>
+                          </div>
                       </div>
                   </div>
               </div>
             </div>
           </div>
-
           <div class="flex justify-end pt-6">
-              <button onclick="gotoStep(2)" class="btn btn-primary text-lg px-10">Next: Database Setup →</button>
+              <button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12">Next: Database Setup →</button>
           </div>
         </div>
-<div id="step2" class="step-section space-y-8">
+        
+   <div id="step2" class="step-section space-y-8">
     
     <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
         <h2 class="text-3xl font-bold text-white mb-2">Option A: The Automated Way</h2>
@@ -682,6 +685,7 @@ function dataURLtoBlob(dataurl) {
   </script>
 </body>
 </html>
+
 
 
 
