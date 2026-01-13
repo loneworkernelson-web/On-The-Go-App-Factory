@@ -711,14 +711,25 @@ function showSiteInfo(id, e){
     document.getElementById('infoTitle').innerText = l.name;
     let h = "";
     if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
-    if(l.address) { 
+    
+    const nav = document.getElementById('btnSiteNav');
+    if(l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        const nav = document.getElementById('btnSiteNav');
-        nav.href = `http://googleusercontent.com/maps.google.com/?q=${encodeURIComponent(l.address)}`;
+        // CORRECTED: Public Google Maps URL scheme
+        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
         nav.classList.remove('hidden');
+    } else {
+        nav.classList.add('hidden');
     }
+
     if(l.contactName) h += `<p class="mt-4 text-gray-400 text-xs">Contact: <span class="text-white">${l.contactName}</span></p>`;
     if(l.notes) h += `<div class="mt-4 p-3 bg-gray-900 border-l-4 border-yellow-500 rounded text-xs italic">${l.notes}</div>`;
+    
+    // Check if it's a user-created site to show the Edit/Delete options
+    if(l.id.startsWith('loc_')) {
+        h += `<button onclick="closeModal('info'); editManualLocation('${l.id}')" class="w-full mt-4 py-2 bg-gray-700 text-blue-400 font-bold rounded text-xs border border-gray-600">✏️ Edit or Delete Site</button>`;
+    }
+
     document.getElementById('siteInfoContent').innerHTML = h;
     
     const bc = document.getElementById('btnSiteCall');
@@ -729,7 +740,6 @@ function showSiteInfo(id, e){
     
     showModal('info');
 }
-
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
 
 function toggleHighRiskUI(){
@@ -1338,3 +1348,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
