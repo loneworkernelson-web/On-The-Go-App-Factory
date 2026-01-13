@@ -164,17 +164,33 @@ async function startApp() {
 }
 
 function startPolling() {
+    // Initial fetch
     fetchData(); 
+    
+    // 10-second data refresh
     setInterval(fetchData, 10000); 
+    
+    // 1-second UI refresh (for timers/urgency)
     setInterval(renderGrid, 1000);
+
+    // Audio Keep-Alive: Browsers often suspend audio contexts on inactive tabs.
+    // This "silent oscillation" keeps the hardware channel open.
+    setInterval(() => {
+        if (audioEnabled && synth) {
+            try { 
+                // Play a sub-audible frequency to keep the context "Running"
+                synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); 
+            } catch(e) { console.warn("Audio keep-alive failed", e); }
+        }
+    }, 25000);
+
+    // Connection Watchdog
     setInterval(() => {
         const timeSince = Date.now() - lastHeartbeat;
         const ol = document.getElementById('connectionOverlay');
-        if (timeSince > 300000) { 
+        if (timeSince > 60000) { // Reduced to 60s for tighter admin awareness
             ol.classList.remove('hidden');
-            if(audioEnabled && synth) {
-                try { synth.triggerAttackRelease("C2", "0.5"); } catch(e){} 
-            }
+            if(audioEnabled && synth) playSound('offline');
         } else {
             ol.classList.add('hidden');
         }
@@ -192,10 +208,26 @@ function saveAuthKey() {
 function resetKey() { if(confirm("Reset the Security Key?")) { localStorage.removeItem('otg_monitor_key'); location.reload(); } }
 
 async function toggleAudio() { 
-    if(!synth) { await Tone.start(); synth = new Tone.Synth().toDestination(); } 
+    if(!synth) { 
+        await Tone.start(); 
+        synth = new Tone.Synth().toDestination(); 
+    } 
+    
+    // Ensure the context is 'running' (PC Browser requirement)
+    if (Tone.context.state !== 'running') {
+        await Tone.context.resume();
+    }
+
     audioEnabled = !audioEnabled; 
     const btn = document.getElementById('btnAudio'); 
-    if(audioEnabled) { btn.innerText = "🔊 Sound On"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition"; synth.triggerAttackRelease("C5", "8n"); } else { btn.innerText = "🔇 Sound Off"; btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition"; } 
+    if(audioEnabled) { 
+        btn.innerText = "🔊 Sound On"; 
+        btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500 hover:bg-green-500 transition"; 
+        synth.triggerAttackRelease("C5", "8n"); 
+    } else { 
+        btn.innerText = "🔇 Sound Off"; 
+        btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600 hover:bg-gray-600 transition"; 
+    } 
 }
 
 function startAlertLoop() { 
@@ -213,18 +245,43 @@ function acknowledgeAlert() {
 
 function fetchData() { 
     if(SCRIPT_URL.includes("%%")) {
-        alert("CRITICAL: App not configured. Please use the Factory to generate this file.");
+        console.error("Factory Configuration Missing.");
         return;
     }
+
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
+    
+    // Timeout safety: Remove script tag if no response after 8 seconds
+    const timeout = setTimeout(() => {
+        if (window[cbName]) {
+            console.warn("Fetch Timeout: Checking Connection...");
+            document.body.removeChild(script);
+            delete window[cbName];
+        }
+    }, 8000);
+
     window[cbName] = function(data) { 
+        clearTimeout(timeout);
         lastHeartbeat = Date.now(); 
-        if(data.error) { alert("Security Error: " + data.error); return; } 
+        if(data.error) { 
+            console.error("Auth Error:", data.error);
+            if(data.error.includes("Key")) resetKey();
+            return; 
+        } 
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
-        document.body.removeChild(script); delete window[cbName]; 
+        try { document.body.removeChild(script); } catch(e) {}
+        delete window[cbName]; 
     }; 
+    
+    script.onerror = () => {
+        clearTimeout(timeout);
+        console.error("Network Error: Failed to reach Google Backend.");
+        try { document.body.removeChild(script); } catch(e) {}
+        delete window[cbName];
+    };
+
     script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&t=${Date.now()}`; 
     document.body.appendChild(script); 
 }
