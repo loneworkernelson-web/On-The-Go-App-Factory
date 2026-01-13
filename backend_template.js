@@ -764,15 +764,28 @@ function smartScribe(data, type, notes) {
     if(!CONFIG.GEMINI_API_KEY) return notes;
     let safeNotes = notes || "";
     let safeData = JSON.stringify(data || {});
+    
     if(CONFIG.ENABLE_REDACTION) {
         const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
         safeNotes = safeNotes.replace(emailRegex, "[EMAIL_REDACTED]");
-        safeData = safeData.replace(emailRegex, "[EMAIL_REDACTED]");
-        const phoneRegex = /\b(\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b/g;
+        const phoneRegex = /\b(\+?6[14][\s-]?|0)[289][0-9][\s-]?[0-9]{3}[\s-]?[0-9]{3,4}\b/g;
         safeNotes = safeNotes.replace(phoneRegex, "[PHONE_REDACTED]");
-        safeData = safeData.replace(phoneRegex, "[PHONE_REDACTED]");
     }
-    const prompt = `You are a professional safety officer proofreading a report. Correct spelling and grammar in the following notes. Use New Zealand English. Do NOT add new facts. If notes are empty, return an empty string. Notes: "${safeNotes}".`;
+
+    // THE MASTER EDITOR PROMPT (Universal for all Work Documents)
+    const prompt = `You are the Lead Administrator for ${CONFIG.ORG_NAME}. 
+    Task: Convert the provided raw field data and informal notes into a formal, structured professional report.
+    Format: Professional work documentation.
+    Language: Use formal ${CONFIG.LOCALE} English (e.g., if en-NZ, use 'authorised' instead of 'authorized').
+    Context: This is a "${type}" report.
+    Style: Clear, objective, and professional. 
+    Constraint: Correct all grammar/spelling. Do NOT invent new facts. Maintain technical specificities.
+    
+    RAW DATA: ${safeData}
+    FIELD NOTES: "${safeNotes}"
+    
+    Output only the polished, professional report text.`;
+    
     try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
         const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -781,13 +794,11 @@ function smartScribe(data, type, notes) {
         const json = JSON.parse(response.getContentText());
         
         if (json.candidates && json.candidates.length > 0) {
-            return json.candidates[0].content.parts[0].text.trim();
-        } else {
-            return notes;
-        }
-    } catch (e) { 
-        return notes; 
-    }
+            const aiText = json.candidates[0].content.parts[0].text.trim();
+            if (aiText.length < 5 || aiText.includes("I cannot")) return notes;
+            return aiText;
+        } else { return notes; }
+    } catch (e) { return notes; }
 }
 
 function sendJSON(data) {
@@ -843,6 +854,7 @@ function sendResponse(e, data) {
     return ContentService.createTextOutput(json)
         .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 
 
