@@ -670,17 +670,50 @@ function getDashboardData() {
 
 function getSyncData(workerName, deviceId) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const siteSheet = ss.getSheetByName('Sites');
-    const sites = [];
+    const stSheet = ss.getSheetByName('Staff');
     const wNameSafe = (workerName || "").toString().toLowerCase().trim();
+    
+    // 1. MANDATORY IDENTITY CHECK
+    if (!stSheet) return {status: "error", message: "SYSTEM ERROR: Staff sheet missing."};
+    
+    const stData = stSheet.getDataRange().getValues();
+    let workerFound = false;
+    let meta = {};
 
-    if(siteSheet) {
+    for (let i = 1; i < stData.length; i++) {
+        const sheetName = (stData[i][0] || "").toString().toLowerCase().trim();
+        
+        // Audit Fix: Requirement for EXACT match
+        if (sheetName === wNameSafe) {
+            workerFound = true;
+            const registeredDeviceId = stData[i][4];
+            
+            // Device ID Binding & Verification
+            if (!registeredDeviceId || registeredDeviceId === "") {
+                stSheet.getRange(i + 1, 5).setValue(deviceId); // Bind first-time use
+            } else if (registeredDeviceId !== deviceId) {
+                return {status: "error", message: "DEVICE MISMATCH: This account is locked to another phone."};
+            }
+            
+            meta.lastVehCheck = stData[i][5];
+            meta.wofExpiry = stData[i][6];
+            break; 
+        }
+    }
+
+    if (!workerFound) {
+        return {status: "error", message: "ACCESS DENIED: Name '" + workerName + "' not found in authorized staff list."};
+    }
+
+    // 2. FETCH DATA ONLY AFTER IDENTITY IS VERIFIED
+    const sites = [];
+    const siteSheet = ss.getSheetByName('Sites');
+    if (siteSheet) {
         const sData = siteSheet.getDataRange().getValues();
-        for(let i=1; i<sData.length; i++) {
-            const assignedRaw = sData[i][0];
-            const assignedStr = (assignedRaw || "").toString().toLowerCase();
+        for (let i = 1; i < sData.length; i++) {
+            const assignedStr = (sData[i][0] || "").toString().toLowerCase();
             const allowedUsers = assignedStr.split(',').map(s => s.trim());
-            if(allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
+            if (allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
                 sites.push({ template: sData[i][1], company: sData[i][2], siteName: sData[i][3], address: sData[i][4], contactName: sData[i][5], contactPhone: sData[i][6], contactEmail: sData[i][7], notes: sData[i][8] });
             }
         }
@@ -689,36 +722,20 @@ function getSyncData(workerName, deviceId) {
     const tSheet = ss.getSheetByName('Templates');
     const forms = [];
     const cachedTemplates = {};
-    if(tSheet) {
+    if (tSheet) {
         const tData = tSheet.getDataRange().getValues();
-        for(let i=1; i<tData.length; i++) {
-            const row = tData[i];
-            const assignedRaw = row[2];
-            const assignedStr = (assignedRaw || "").toString().toLowerCase();
+        for (let i = 1; i < tData.length; i++) {
+            const assignedStr = (tData[i][2] || "").toString().toLowerCase();
             const allowedUsers = assignedStr.split(',').map(s => s.trim());
-            
-            if(allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
+            if (allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
                 const questions = [];
-                for(let q=4; q<34; q++) { if(row[q]) questions.push(row[q]); }
-                forms.push({name: row[1], type: row[0], questions: questions});
-                cachedTemplates[row[1]] = questions;
+                for (let q = 4; q < 34; q++) { if (tData[i][q]) questions.push(tData[i][q]); }
+                forms.push({name: tData[i][1], type: tData[i][0], questions: questions});
+                cachedTemplates[tData[i][1]] = questions;
             }
         }
     }
     
-    const meta = {};
-    const stSheet = ss.getSheetByName('Staff');
-    if(stSheet) {
-        const stData = stSheet.getDataRange().getValues();
-        for(let i=1; i<stData.length; i++) {
-            if((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
-                if(!stData[i][4]) stSheet.getRange(i+1, 5).setValue(deviceId);
-                else if(stData[i][4] !== deviceId) return {status:"error", message:"DEVICE MISMATCH. Contact Admin."};
-                meta.lastVehCheck = stData[i][5];
-                meta.wofExpiry = stData[i][6];
-            }
-        }
-    }
     return {sites, forms, cachedTemplates, meta};
 }
 
@@ -882,4 +899,5 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+
 
