@@ -489,16 +489,41 @@ function deleteLoc(){
     showToast("Site Deleted");
 }
 
-function getGpsAddress(){
-    const b=document.getElementById('btnGpsAddr');
-    b.innerText="...";
-    navigator.geolocation.getCurrentPosition(p=>{
-        const lat=p.coords.latitude,lon=p.coords.longitude;
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
-        .then(r=>r.json())
-        .then(d=>{document.getElementById('locAddr').value=d.display_name;b.innerText="📍 GPS";})
-        .catch(()=>{document.getElementById('locAddr').value=`${lat}, ${lon}`;b.innerText="📍 GPS";});
-    });
+function getGpsAddress() {
+    const btn = document.getElementById('btnGpsAddr');
+    const addrInput = document.getElementById('locAddr');
+    if (!btn || !addrInput) return;
+
+    btn.innerText = "...";
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        (p) => {
+            const lat = p.coords.latitude;
+            const lon = p.coords.longitude;
+            
+            // Attempt to get a friendly street address
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                .then(r => r.json())
+                .then(d => {
+                    addrInput.value = d.display_name || `${lat}, ${lon}`;
+                    btn.innerText = "📍 GPS";
+                    btn.disabled = false;
+                })
+                .catch(() => {
+                    // Fallback to raw coordinates if the naming service is offline
+                    addrInput.value = `${lat}, ${lon}`;
+                    btn.innerText = "📍 GPS";
+                    btn.disabled = false;
+                });
+        },
+        (err) => {
+            btn.innerText = "📍 GPS";
+            btn.disabled = false;
+            showToast("📍 GPS Error: " + err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
 }
 
 window.addEventListener('online',updateNetworkStatus);
@@ -1486,6 +1511,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
