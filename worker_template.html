@@ -263,25 +263,27 @@ let calculatedDist=null,gpsWarm=false,gpsWatchId=null,lastAlertTime=0;
 let currentBatteryLevel="100%"; // Declared exactly once
 
 function showModal(id) {
-    document.getElementById('modalBackdrop').classList.remove('hidden');
-    document.getElementById('modalBackdrop').classList.add('flex');
-    const modals = ['locationModal','pinModal','modal-report','checkinModal','extendModal','infoModal','templateModal','alertModal'];
+    const backdrop = document.getElementById('modalBackdrop');
+    if (!backdrop) return;
+    
+    backdrop.classList.remove('hidden');
+    backdrop.classList.add('flex');
+
+    // Sweep all possible modals hidden first
+    const modals = ['locationModal','pinModal','reportModal','modal-report','checkinModal','extendModal','infoModal','templateModal','alertModal'];
+    
     modals.forEach(m => {
         const el = document.getElementById(m);
-        if(el) el.classList.add('hidden');
+        if(el) el.classList.add('hidden'); // The defensive "if" prevents the crash
     });
     
-    if(id==='location') document.getElementById('locationModal').classList.remove('hidden');
-    else if(id==='report') {
-        document.getElementById('modal-report').classList.remove('hidden');
-        // No need to call resize here; buildReportForm handles it now via Patch 1
+    // Open the requested one (with a fallback for the report modal name)
+    const target = (id === 'report') ? (document.getElementById('reportModal') || document.getElementById('modal-report')) : document.getElementById(id + 'Modal');
+    
+    if (target) {
+        target.classList.remove('hidden');
+        if (id === 'report') setTimeout(resizeCanvas, 300);
     }
-    else if(id==='pin') document.getElementById('pinModal').classList.remove('hidden');
-    else if(id==='info') document.getElementById('infoModal').classList.remove('hidden');
-    else if(id==='template') document.getElementById('templateModal').classList.remove('hidden');
-    else if(id==='checkin') document.getElementById('checkinModal').classList.remove('hidden');
-    else if(id==='extend') document.getElementById('extendModal').classList.remove('hidden');
-    else if(id==='alert') document.getElementById('alertModal').classList.remove('hidden');
 }
 
 function closeModal(id) {
@@ -1207,21 +1209,23 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault(); 
     deferredPrompt = e;
     
-    // Audit Fix: Defensive check for the banner
     const banner = document.getElementById('installBanner');
+    const container = document.getElementById('installAppContainer');
+    
     if(!localStorage.getItem('otg_install_dismissed')) { 
-        banner?.classList.remove('hidden'); 
+        if(banner) banner.classList.remove('hidden'); 
     }
     
-    const container = document.getElementById('installAppContainer');
     if(container) {
         container.classList.remove('hidden');
         const btn = document.getElementById('btnInstallApp');
         if(btn) {
             btn.onclick = () => {
                 container.classList.add('hidden');
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+                if(deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+                }
             };
         }
     }
@@ -1233,6 +1237,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
