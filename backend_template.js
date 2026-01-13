@@ -353,12 +353,12 @@ function handleResolvePost(p) {
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
-    if(!sheet) {
-        sheet = ss.insertSheet('Visits');
-        sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
-    }
-
     const workerName = p['Worker Name'];
+    const templateName = p['Template Name'] || "";
+    
+    // NEW: Check for Private Routing
+    const isNoteToSelf = (templateName.trim().toLowerCase() === 'note to self');
+
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1'], workerName);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2'], workerName);
@@ -368,82 +368,69 @@ function handleWorkerPost(p, e) {
 
     const ts = new Date();
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
-    let rowUpdated = false;
-    const lastRow = sheet.getLastRow();
     
-    if (lastRow > 1) {
-        const startRow = Math.max(2, lastRow - 50); 
-        const numRows = lastRow - startRow + 1;
-        const data = sheet.getRange(startRow, 1, numRows, 11).getValues(); 
-        for (let i = data.length - 1; i >= 0; i--) {
-            const rowData = data[i];
-            if (rowData[2] === workerName) {
-                const status = String(rowData[10]);
-                const isClosed = status.includes('DEPARTED') || (status.includes('SAFE') && !status.includes('MANUALLY')) || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
-                if (!isClosed) {
-                    const targetRow = startRow + i;
-                    sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
-                    sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
-                    if (p['Notes'] && p['Notes'] !== rowData[11]) {
-                         const oldNotes = sheet.getRange(targetRow, 12).getValue();
-                         if (!oldNotes.includes(p['Notes'])) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + p['Notes']).trim());
-                    }
-                    if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
-                    if (p['Battery Level']) sheet.getRange(targetRow, 17).setValue(p['Battery Level']);
-                   if (p['Visit Report Data']) {
-                        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                        
-                        sheet.getRange(targetRow, headers.indexOf("Visit Report Data") + 1).setValue(p['Visit Report Data']);
-                        
-                        if(p['Distance']) {
-                            const distCol = headers.indexOf("Distance (km)") + 1;
-                            if(distCol > 0) sheet.getRange(targetRow, distCol).setValue(p['Distance']);
+    let polishedNotes = p['Notes'] || "";
+    const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
+
+    if(hasFormData && CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
+       try {
+           const reportObj = JSON.parse(p['Visit Report Data']);
+           polishedNotes = smartScribe(reportObj, templateName, p['Notes']);
+       } catch(e) { console.error("AI Error: " + e); }
+    }
+    
+    // SKIP SAVING TO SHEET IF NOTE TO SELF
+    if (!isNoteToSelf) {
+        if(!sheet) {
+            sheet = ss.insertSheet('Visits');
+            sheet.appendRow(["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"]);
+        }
+        
+        let rowUpdated = false;
+        const lastRow = sheet.getLastRow();
+        
+        if (lastRow > 1) {
+            const startRow = Math.max(2, lastRow - 50); 
+            const numRows = lastRow - startRow + 1;
+            const data = sheet.getRange(startRow, 1, numRows, 11).getValues(); 
+            for (let i = data.length - 1; i >= 0; i--) {
+                const rowData = data[i];
+                if (rowData[2] === workerName) {
+                    const status = String(rowData[10]);
+                    const isClosed = status.includes('DEPARTED') || (status.includes('SAFE') && !status.includes('MANUALLY')) || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
+                    if (!isClosed) {
+                        const targetRow = startRow + i;
+                        sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
+                        sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
+                        if (polishedNotes && polishedNotes !== rowData[11]) {
+                             const oldNotes = sheet.getRange(targetRow, 12).getValue();
+                             if (!oldNotes.includes(polishedNotes)) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + polishedNotes).trim());
                         }
-                        
-                        // DYNAMIC SIGNATURE PLACEMENT
-                        if(sig) {
-                            const sigCol = headers.indexOf("Signature") + 1;
-                            if(sigCol > 0) sheet.getRange(targetRow, sigCol).setValue(sig);
+                        if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
+                        if (p['Visit Report Data']) {
+                            const h = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+                            sheet.getRange(targetRow, h.indexOf("Visit Report Data") + 1).setValue(p['Visit Report Data']);
                         }
-                        
-                        // DYNAMIC PHOTO PLACEMENT
-                        const p1Col = headers.indexOf("Photo 1") + 1;
-                        if(p1 && p1Col > 0) sheet.getRange(targetRow, p1Col).setValue(p1);
-                        
-                        const p2Col = headers.indexOf("Photo 2") + 1;
-                        if(p2 && p2Col > 0) sheet.getRange(targetRow, p2Col).setValue(p2);
-
-                        const p3Col = headers.indexOf("Photo 3") + 1;
-                        if(p3 && p3Col > 0) sheet.getRange(targetRow, p3Col).setValue(p3);
-
-                        const p4Col = headers.indexOf("Photo 4") + 1;
-                        if(p4 && p4Col > 0) sheet.getRange(targetRow, p4Col).setValue(p4);
+                        rowUpdated = true;
+                        break;
                     }
-
-                    rowUpdated = true;
-                    break;
                 }
             }
         }
+
+        if (!rowUpdated) {
+            const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], polishedNotes, p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, p['Distance'] || "", p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
+            sheet.appendRow(row);
+        }
     }
 
-    if (!rowUpdated) {
-        const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], p['Notes'], p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, p['Distance'] || "", p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
-        sheet.appendRow(row);
-    }
-
+    // UPDATE STATUS AND TRIGGER EMAIL (Works for both Private and Public reports)
     updateStaffStatus(p);
-
-    const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
     if(hasFormData) {
-       try {
-           const reportObj = JSON.parse(p['Visit Report Data']);
-           let polishedNotes = p['Notes'];
-           if(CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
-               polishedNotes = smartScribe(reportObj, p['Template Name'] || "Report", p['Notes']);
-           }
-           processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig);
-       } catch(e) { console.error("Email/AI Error: " + e); }
+        try {
+            const reportObj = JSON.parse(p['Visit Report Data']);
+            processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig);
+        } catch(e) { console.error("Email Error: " + e); }
     }
 
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
@@ -899,5 +886,6 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+
 
 
