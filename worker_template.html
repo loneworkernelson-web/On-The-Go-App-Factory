@@ -1369,28 +1369,41 @@ function captureGPS(btn){
 function initSigPad(c) {
     if (!c) return; 
     const ctx = c.getContext('2d');
+    
+    // IMPROVED: Robust coordinate mapping for scroll and zoom
     const getPos = (e) => { 
         const rect = c.getBoundingClientRect(); 
-        const cx = e.clientX || (e.touches && e.touches[0].clientX); 
-        const cy = e.clientY || (e.touches && e.touches[0].clientY); 
+        // Use touches for mobile, clientX for mouse/pointer
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); 
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); 
+        
+        // Calculate position relative to the element, accounting for scroll
         return { 
-            x: (cx - rect.left) * (c.width / rect.width), 
-            y: (cy - rect.top) * (c.height / rect.height) 
+            x: (clientX - rect.left) * (c.width / rect.width), 
+            y: (clientY - rect.top) * (c.height / rect.height) 
         }; 
     };
+
+    // Event listeners with passive:false to prevent scrolling while signing
     c.addEventListener('pointerdown', (e) => { 
         isDrawing = true; 
         const pos = getPos(e); 
-        ctx.beginPath(); ctx.moveTo(pos.x, pos.y); 
+        ctx.beginPath(); 
+        ctx.moveTo(pos.x, pos.y); 
         e.preventDefault(); 
     }, {passive: false});
+
     c.addEventListener('pointermove', (e) => { 
         if (!isDrawing) return; 
         const pos = getPos(e); 
-        ctx.lineTo(pos.x, pos.y); ctx.stroke(); 
+        ctx.lineTo(pos.x, pos.y); 
+        ctx.stroke(); 
         e.preventDefault(); 
     }, {passive: false});
-    window.addEventListener('pointerup', () => { isDrawing = false; });
+
+    window.addEventListener('pointerup', () => { 
+        isDrawing = false; 
+    });
 }
 
 function resizeCanvas(canvasEl) {
@@ -1465,6 +1478,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
 
