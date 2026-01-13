@@ -766,7 +766,7 @@ function updateArrivedButtonState(){
     document.getElementById('durationDisplay').innerText = v >= 60 ? (Math.floor(v/60) + ' hr ' + (v%60) + ' min') : v + ' min';
     state.visitDurationMinutes = v;
     
-    // Highlight matching quick-set chip
+    // UI feedback for quick-set chips
     [15,30,60,120].forEach(m => {
         const btn = document.getElementById('btnDur' + m); 
         if(btn){
@@ -776,9 +776,10 @@ function updateArrivedButtonState(){
     });
     
     const b = document.getElementById('btnStart');
+    // Audit Fix: Ensure 'travel' is a valid selection for activation
     if(state.selectedLocationId && v > 0){
         b.disabled = false;
-        b.innerText = "Start";
+        b.innerText = (state.selectedLocationId === 'travel') ? "Start Travel" : "Start Visit";
         b.className = "long-press-btn flex-[2] py-4 bg-green-600 text-white font-bold rounded-xl text-xl shadow-lg transition-all";
         setupLongPress(b, startVisit);
     } else {
@@ -792,13 +793,45 @@ function quickSetTime(m){document.getElementById('durationSlider').value=DURATIO
 
 function startVisit(){
     warmUpSpeech();
-    const s=state.locations.find(x=>x.id===state.selectedLocationId);
-    if(s.id==='travel')startTravellingPulse();
-    const n=new Date();
+    const s = state.locations.find(x => x.id === state.selectedLocationId);
+    if(!s) return;
+
+    const n = new Date();
     const isHighRisk = document.getElementById('chkHighRisk').checked;
-    state.activeVisit={locationId:s.id, startTime:n, anticipatedDepartureTime:new Date(n.getTime()+state.visitDurationMinutes*60000), fiveMinWarned:false, startGPS: "", highRisk: isHighRisk, warn90Sent: false};
-    state.lowBatSent=false; saveState(); enterLockedScreen(); 
-    navigator.geolocation.getCurrentPosition((pos) => {if(state.activeVisit) {state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;saveState();let notes = "Started";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes, "Last Known GPS": state.activeVisit.startGPS};processUploadQueue(buildPayload(payload));}}, (err) => { if(state.activeVisit) {let notes = "Started (GPS Timeout)";if(isHighRisk) notes += " [CRITICAL_TIMING]";const payload = {"Alarm Status":s.id==='travel'?"TRAVELLING":"ON SITE","Notes":notes};processUploadQueue(buildPayload(payload));}}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    
+    state.activeVisit = {
+        locationId: s.id, 
+        startTime: n, 
+        anticipatedDepartureTime: new Date(n.getTime() + state.visitDurationMinutes * 60000), 
+        fiveMinWarned: false, 
+        startGPS: "", 
+        highRisk: isHighRisk, 
+        warn90Sent: false
+    };
+    
+    state.lowBatSent = false; 
+    saveState(); 
+    enterLockedScreen(); 
+
+    // Handle Travel specific pulses
+    if(s.id === 'travel') startTravellingPulse();
+
+    navigator.geolocation.getCurrentPosition((pos) => {
+        if(state.activeVisit) {
+            state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
+            saveState();
+            let notes = s.id === 'travel' ? "Commencing Travel" : "Arrived at Site";
+            if(isHighRisk) notes += " [CRITICAL_TIMING]";
+            const payload = {"Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", "Notes": notes, "Last Known GPS": state.activeVisit.startGPS};
+            processUploadQueue(buildPayload(payload));
+        }
+    }, (err) => { 
+        if(state.activeVisit) {
+            let notes = s.id === 'travel' ? "Commencing Travel (No GPS)" : "Arrived (No GPS)";
+            const payload = {"Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", "Notes": notes};
+            processUploadQueue(buildPayload(payload));
+        }
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
 
 function warmUpGps() {
@@ -1355,5 +1388,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
