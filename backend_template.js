@@ -59,6 +59,11 @@ function doGet(e) {
   try {
       if(!e || !e.parameter) return sendResponse(e, {status:"error", message:"No Params"});
       const p = e.parameter;
+     // NEW: Distance Proxy Handler
+      if (p.action === 'getDistance' && p.start && p.end) {
+          const dist = getRouteDistance(p.start, p.end);
+          return sendResponse(e, { status: "success", km: dist });
+      }
       if(p.test) return (p.key === CONFIG.MASTER_KEY) ? sendResponse(e, {status:"success"}) : sendResponse(e, {status:"error"});
       if(p.key === CONFIG.MASTER_KEY && !p.action) return sendResponse(e, getDashboardData());
       if(p.action === 'sync') return (p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) ? sendResponse(e, getSyncData(p.worker, p.deviceId)) : sendResponse(e, {status:"error"});
@@ -877,3 +882,4 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+
