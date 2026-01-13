@@ -994,7 +994,25 @@ function preDepart(){
     else { calculatedDist=null; loadFormAndShow(l.templateName||"(Standard)"); }
 }
 
-async function getDistance(p1,p2){if(!p1||!p2)return{km:0,type:'none'};if(CONFIG.orsKey&&CONFIG.orsKey.length>5){try{const u=`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${CONFIG.orsKey}&start=${p1.split(',').reverse().join(',')}&end=${p2.split(',').reverse().join(',')}`;const r=await fetch(u);const j=await r.json();const m=j.features[0].properties.segments[0].distance;return{km:(m/1000).toFixed(2),type:'road'};}catch(e){console.warn("ORS Fail",e);}}const d=haversine(p1,p2);return{km:d.toFixed(2),type:'crow'};}
+async function getDistance(p1, p2) {
+    if (!p1 || !p2) return { km: 0, type: 'none' };
+    
+    try {
+        // Audit Fix: Proxy through Backend to hide API Key
+        const u = `${CONFIG.url}?action=getDistance&start=${p1}&end=${p2}&key=${CONFIG.key}`;
+        const r = await fetch(u);
+        const j = await r.json();
+        
+        if (j.status === "success" && j.km) {
+            return { km: j.km, type: 'road' };
+        }
+    } catch (e) {
+        console.warn("Proxy Mileage Fail, Falling back to Haversine", e);
+    }
+    
+    const d = haversine(p1, p2);
+    return { km: d.toFixed(2), type: 'crow' };
+}
 function haversine(p1,p2){const[la1,lo1]=p1.split(',').map(Number);const[la2,lo2]=p2.split(',').map(Number);const R=6371;const dLa=(la2-la1)*Math.PI/180;const dLo=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2);return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 
 function loadFormAndShow(t){
@@ -1320,5 +1338,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
 
