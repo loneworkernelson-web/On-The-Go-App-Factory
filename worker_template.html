@@ -403,12 +403,21 @@ function saveLoc(){
 }
 
 function deleteLoc(){
-    const id=document.getElementById('locId').value;
-    if(!confirm("Delete this site?"))return;
-    state.locations=state.locations.filter(x=>x.id!==id);
+    const id = document.getElementById('locId').value;
+    if (!id) return;
+    
+    if (!confirm("Are you sure you want to delete this site?")) return;
+    
+    // Remove the site from the global state
+    state.locations = state.locations.filter(x => x.id !== id);
+    
+    // Save the new state and refresh the UI
     saveState();
     renderLocations();
+    
+    // Audit Fix: Use the hardened close logic to hide the window and backdrop
     closeModal('location');
+    showToast("Site Deleted");
 }
 
 function getGpsAddress(){
@@ -1311,4 +1320,5 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </script>
 </body>
 </html>
+
 
