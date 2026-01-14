@@ -477,9 +477,25 @@ function enterLockedScreen(){
 
 function tick(){
     if(!state.activeVisit){clearInterval(timerInt);return;}
-    const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
-    const isCriticalMode = state.activeVisit.highRisk; const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; const timeUntilEscalation = remaining + escTime;
-    if(timeUntilEscalation <= 0) { document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); document.getElementById('countdownTimer').innerText="ALARM SENT"; if(!state.activeVisit.criticalSent){ state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'); } } 
+    const now=new Date().getTime(); 
+    const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); 
+    const remaining=dueTime-now;
+    const isCriticalMode = state.activeVisit.highRisk; 
+    const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; 
+    const timeUntilEscalation = remaining + escTime;
+    
+    if(timeUntilEscalation <= 0) {
+        document.getElementById('overdueLabel').classList.remove('hidden'); 
+        document.getElementById('btnDepart').classList.add('hidden'); 
+        document.getElementById('btnExtend').classList.add('hidden'); 
+        document.getElementById('btnSafe').classList.remove('hidden'); 
+        setupLongPress(document.getElementById('btnSafe'), iamSafe);
+        document.getElementById('countdownTimer').innerText="ALARM SENT";
+        if(!state.activeVisit.criticalSent){
+            state.activeVisit.criticalSent=true; 
+            saveState(); 
+            triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'); 
+        } 
     } else if (remaining <= 0) {
         document.getElementById('overdueLabel').classList.remove('hidden'); 
         document.getElementById('btnDepart').classList.remove('hidden'); 
@@ -499,7 +515,12 @@ function tick(){
             document.getElementById('countdownTimer').innerHTML = `-${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
         }
         
-        document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse'); if(!isCriticalMode && timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); } if(!isCriticalMode && timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ state.activeVisit.warn2minSent = true; saveState(); playSound('warning'); speakWithAccent("Warning. Safety alarm will activate in two minutes."); } if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ state.activeVisit.warn90Sent = true; saveState(); playSound('warning'); speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); } } 
+        document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
+        
+        if(!isCriticalMode && timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); } 
+        if(!isCriticalMode && timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ state.activeVisit.warn2minSent = true; saveState(); playSound('warning'); speakWithAccent("Warning. Safety alarm will activate in two minutes."); } 
+        if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ state.activeVisit.warn90Sent = true; saveState(); playSound('warning'); speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); }
+
     } else {
         const mTotal = Math.floor(remaining / 60000);
         const s = Math.floor((remaining % 60000) / 1000);
@@ -514,10 +535,13 @@ function tick(){
         }
 
         document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
-        document.getElementById('overdueLabel').classList.add('hidden'); } }
-    if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); }
-}
+        document.getElementById('overdueLabel').classList.add('hidden'); 
+    }
 
+    if(state.activeVisit.anticipatedDepartureTime) { 
+        document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); 
+    }
+}
 function warmUpSpeech() { if('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } }
 function speakWithAccent(msg){ if(!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); const v = window.speechSynthesis.getVoices(); u.voice = v.find(x => x.lang.includes(CONFIG.voiceLocale)) || v.find(x => x.lang.includes('en-NZ')); u.rate = 0.9; u.volume = 1.0; window.speechSynthesis.speak(u); }
 
@@ -656,6 +680,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
