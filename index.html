@@ -44,7 +44,7 @@
           <div class="space-y-4 text-gray-300 text-sm mb-6">
               <p>The <strong>OTG AppSuite</strong> is a "Do-It-Yourself" software solution.</p>
               <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps. Staff must keep the app active.</li>
+                  <li><strong>The "Sleep" Issue:</strong> GPS tracking may stop if the phone sleeps (especially iOS). Staff must keep the app active.</li>
                   <li><strong>Connectivity:</strong> Alerts require data. They will not send in dead zones.</li>
                   <li><strong>No SLA:</strong> This relies on free Google services. No uptime guarantees.</li>
               </ul>
@@ -81,15 +81,6 @@
             <div class="space-y-4">
               <div><label class="block text-blue-300 font-bold mb-2 text-sm uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
               
-              <div>
-                  <div class="flex justify-between items-center mb-2">
-                      <label class="block text-blue-300 font-bold text-sm uppercase">App Icon Label</label>
-                      <span class="text-xs text-gray-500" id="charCount">6/12</span>
-                  </div>
-                  <input type="text" id="appName" maxlength="12" class="input-field text-center font-bold text-green-400 border-green-600/50" value="Safety" oninput="updateCharCount(this); saveInput(this)">
-                  <p class="text-[10px] text-gray-500 mt-1">Short name for the phone Home Screen.</p>
-              </div>
-
               <div class="p-4 bg-gray-900 rounded-lg border border-gray-700 shadow-inner">
                   <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest">🔐 Safety Connection Keys</h3>
                   <div class="mb-4">
@@ -98,7 +89,7 @@
                           <input type="text" id="secretKey" class="input-field text-yellow-400 font-mono text-sm" oninput="saveInput(this); validateKey();">
                           <button onclick="generateMemorableKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white">🔄</button>
                       </div>
-                      <p class="text-[10px] text-gray-500 mt-1">Protects your database. <strong>Admin use only.</strong></p>
+                      <p class="text-[10px] text-gray-500 mt-1">Protects your database. <strong>Do not share with workers.</strong></p>
                   </div>
                   <div>
                       <label class="block text-blue-300 font-bold mb-2 text-sm">Worker Key (App Setup)</label>
@@ -146,16 +137,20 @@
                           <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">1. Extract Branding</span>
                           <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline">↻ Resample</button>
                       </div>
-                      <p class="text-[9px] text-gray-500 leading-tight">Identify colors from your logo. Neutrals are filtered.</p>
+                      <p class="text-[9px] text-gray-500 leading-tight">Clustering engine identifies the 3 most distinct brand colors.</p>
                   </div>
-                  <div class="mb-4"><div class="flex gap-3 justify-center mb-2" id="logoClusterSwatches"></div></div>
-                  <div class="pt-3 border-t border-gray-800">
-                      <p class="text-[8px] text-gray-500 font-bold uppercase mb-2">Enterprise Safe Fallbacks</p>
-                      <div class="flex gap-2 justify-center">
-                          <div class="preset-swatch" onclick="applyPreset('#1e40af', '#3b82f6', this)" title="Blue"><div class="swatch-half bg-[#1e40af]"></div><div class="swatch-half bg-[#3b82f6]"></div></div>
-                          <div class="preset-swatch" onclick="applyPreset('#064e3b', '#10b981', this)" title="Green"><div class="swatch-half bg-[#064e3b]"></div><div class="swatch-half bg-[#10b981]"></div></div>
-                          <div class="preset-swatch" onclick="applyPreset('#450a0a', '#ef4444', this)" title="Red"><div class="swatch-half bg-[#450a0a]"></div><div class="swatch-half bg-[#ef4444]"></div></div>
-                          <div class="preset-swatch" onclick="applyPreset('#1e293b', '#64748b', this)" title="Slate"><div class="swatch-half bg-[#1e293b]"></div><div class="swatch-half bg-[#64748b]"></div></div>
+                  <div class="mb-4">
+                      <span class="block text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2 text-left">2. Choose Preferred Scheme</span>
+                      <div class="flex gap-3 justify-center mb-2" id="logoClusterSwatches"></div>
+                  </div>
+                  <div class="pt-3 border-t border-gray-800 flex gap-4 justify-center items-center">
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="primaryColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
+                          <span class="text-[7px] text-gray-500 font-bold uppercase tracking-tighter">Primary</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-1">
+                          <div id="accentColorBox" class="w-8 h-8 rounded border border-white/20 shadow-lg"></div>
+                          <span class="text-[7px] text-gray-500 font-bold uppercase tracking-tighter">Accent</span>
                       </div>
                   </div>
               </div>
@@ -169,7 +164,7 @@
                      <div>
                          <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Alarm Grace Period (Mins)</label>
                          <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold" oninput="saveInput(this)">
-                         <p class="text-[10px] text-gray-500 mt-1">Extra time for worker to mark "Safe" before alarm.</p>
+                         <p class="text-[10px] text-gray-500 mt-1">Extra time given to a worker to mark themselves "Safe" before the emergency alarm fires.</p>
                      </div>
                      <div>
                         <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Periodic Check-in</label>
@@ -183,44 +178,53 @@
                      </div>
                  </div>
                  <div class="space-y-4">
-                     <div><label class="block text-gray-400 text-xs font-bold uppercase">SMS Key (Textbelt)</label><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
-                     <div><label class="block text-gray-400 text-xs font-bold uppercase">AI Key (Gemini)</label><input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
-                     <div><label class="block text-gray-400 text-xs font-bold uppercase">Mileage Key (ORS)</label><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
+                     <div>
+                         <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">SMS Key (Textbelt)</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div>
+                         <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
+                     </div>
+                     <div>
+                         <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">AI Key (Gemini)</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div>
+                         <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
+                     </div>
+                     <div>
+                         <div class="flex justify-between items-end mb-1"><label class="block text-gray-400 text-xs font-bold uppercase">Mileage Key (ORS)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div>
+                         <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
+                         <p class="text-[10px] text-gray-500 mt-1">Hidden from Worker App for security; used by backend for mileage.</p>
+                     </div>
                  </div>
              </div>
-             <div class="mt-6 pt-6 border-t border-gray-700"><div class="flex items-start gap-3"><input type="checkbox" id="chkVehicle" class="mt-1 w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleVehicle(); saveInput(this)" checked><div><label class="text-white font-bold block">Vehicle Tracking</label><p class="text-xs text-gray-400">Tracks WOF/Rego logic.</p></div></div></div>
           </div>
           <div class="flex justify-end pt-6"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12">Next: Database Setup →</button></div>
         </div>
 
         <div id="step2" class="step-section space-y-8">
             <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
-                <h2 class="text-3xl font-bold text-white mb-2">Option A: Automated Copy</h2>
+                <h2 class="text-3xl font-bold text-white mb-2">Option A: Automated Way</h2>
                 <div class="bg-yellow-900/50 border-l-4 border-yellow-500 p-4 mb-6 text-left max-w-2xl mx-auto rounded-r">
                     <p class="font-bold text-yellow-300 text-sm italic">⭐ Recommended for Beginners</p>
                     <ol class="list-decimal ml-5 mt-2 space-y-2 text-xs text-gray-300">
-                        <li>Be signed into your target Google Account.</li>
+                        <li>Ensure you are signed into the target Google Account.</li>
                         <li>Click "Make a Copy" in the new tab.</li>
                     </ol>
                 </div>
                 <button onclick="openMagicLink()" class="btn btn-success text-xl px-10 py-5">✨ Create Database Copy</button>
             </div>
             <div class="mt-4 p-6 bg-blue-900/20 border border-blue-500/30 rounded-xl">
-                <h4 class="font-bold text-blue-300 text-sm uppercase mb-2 tracking-wider">💡 Crucial: Identity Matching</h4>
-                <p class="text-sm text-gray-300">Staff names in the sheet must match app entry exactly.</p>
+                <h4 class="font-bold text-blue-300 text-sm uppercase mb-2">💡 Crucial: Identity Matching</h4>
+                <p class="text-sm text-gray-300">Names in the 'Staff' sheet must match the app entry exactly (case-sensitive).</p>
             </div>
             <div class="flex justify-between pt-6"><button onclick="gotoStep(1)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg">Next: Cloud System →</button></div>
         </div>
 
         <div id="step3" class="step-section space-y-6">
           <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-              <h3 class="font-bold text-green-400 text-lg">1. Install System "Brain"</h3>
-              <p class="text-xs text-gray-400">Extensions > Apps Script. Delete text and Paste.</p>
+              <h3 class="font-bold text-green-400 text-lg">1. Install the System "Brain"</h3>
+              <p class="text-xs text-gray-400">Extensions > Apps Script. Paste copied code.</p>
               <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full font-bold">📋 COPY SYSTEM CODE</button>
               <div id="codeContainer" class="hidden mt-2"><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
           </div>
           <div class="bg-gray-900 p-6 rounded-xl border border-purple-600/50 space-y-4">
-              <h3 class="font-bold text-purple-400 text-lg">2. Set Watchdog Alarms</h3>
+              <h3 class="font-bold text-purple-400 text-lg">2. Set the Watchdog Alarms</h3>
               <div class="bg-purple-900/30 p-4 rounded-xl border border-purple-500/30">
                   <h4 class="font-bold text-white text-sm mb-2">The Privacy Shredder</h4>
                   <p class="text-xs text-gray-300">Function: <strong>cleanupPrivateSentNotes</strong> | Time: <strong>Every Hour</strong>.</p>
@@ -242,8 +246,8 @@
 
         <div id="step5" class="step-section space-y-10">
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <h2 class="text-2xl font-bold text-white mb-4">1. Host with Netlify</h2>
-                <p class="text-sm text-gray-300">Unzip and Drag <strong>WorkerApp</strong> to Netlify Drop.</p>
+                <h2 class="text-2xl font-bold text-white mb-4">1. Host with Netlify (Free)</h2>
+                <p class="text-sm text-gray-300">Unzip and Drag the <strong>WorkerApp</strong> folder to Netlify Drop.</p>
             </div>
             <div class="bg-indigo-900/30 p-8 rounded-xl border border-indigo-500/50">
                 <h2 class="text-2xl font-bold text-white mb-4">2. Launch Pack</h2>
@@ -253,7 +257,6 @@
                     <div class="bg-white p-4 rounded-lg flex flex-col items-center"><img id="qrImage" src="" class="w-32 h-32 mb-2"><p class="text-gray-900 text-[10px] font-bold">Setup QR Code</p></div>
                 </div>
             </div>
-            <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
         </div>
 
       </div>
@@ -297,7 +300,13 @@
         }
         clusters.sort((a,b) => b.count - a.count);
         const container = document.getElementById('logoClusterSwatches'); container.innerHTML = '';
-        clusters.slice(0, 3).forEach((cluster, idx) => {
+        const distinct = [];
+        for(let c of clusters) {
+            if(distinct.length >= 3) break;
+            const isTooSimilar = distinct.some(d => Math.sqrt(Math.pow(c.rgb[0]-d.rgb[0],2) + Math.pow(c.rgb[1]-d.rgb[1],2) + Math.pow(c.rgb[2]-d.rgb[2],2)) < 60);
+            if(!isTooSimilar) distinct.push(c);
+        }
+        distinct.forEach((cluster, idx) => {
             const primary = rgbToHex(`rgb(${cluster.rgb.join(',')})`);
             const swatch = document.createElement('div'); swatch.className = "preset-swatch";
             swatch.innerHTML = `<div class="swatch-half" style="background:${primary}"></div><div class="swatch-half" style="background:${primary}"></div>`;
@@ -325,14 +334,13 @@
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); showUrlInput(); }
     function showUrlInput() { if(Array.from(document.querySelectorAll('.checklist-checkbox')).every(i => i.checked)) document.getElementById('urlInputSection').classList.remove('hidden'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'checkinMins', 'vehFreq', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'escalationMins', 'countrySelect'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA[""]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() { document.getElementById('btnEnter').disabled = !document.getElementById('chkAccept').checked; }
     function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
     function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++) document.getElementById('tab'+i).classList.toggle('active', i===n); if(n===3) generateScript(); }
     function toggleCheckin() { document.getElementById('checkinOptions').classList.toggle('hidden', !document.getElementById('chkCheckin').checked); }
-    function toggleVehicle() { document.getElementById('vehOptions').classList.toggle('hidden', !document.getElementById('chkVehicle').checked); }
     function copyScript() { generateScript(); navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Copied!"); }
     
     function generateScript() {
@@ -350,18 +358,16 @@
             .replace('%%LOCALE%%', selectedConfig.locale);
     }
 
-    async function testConnection() {
+    function testConnection() {
         const url = document.getElementById('webAppUrl').value;
         const resBox = document.getElementById('testResult');
         resBox.classList.remove('hidden'); resBox.textContent = "Testing...";
-        try {
-            const r = await fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value));
-            const d = await r.json();
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(r => r.json()).then(d => {
             if(d.status === "success") {
                 resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-xl text-center bg-green-900 text-white font-bold";
                 document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50');
             } else throw new Error();
-        } catch(e) { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-bold"; }
+        }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-bold"; });
     }
 
     function downloadZip() {
@@ -369,20 +375,15 @@
         const org = document.getElementById('orgName').value; 
         const logoData = document.getElementById('logoUrl').value;
         const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
-        
         let wHtml = TEMPLATES.worker
             .replace(/%%ORG_NAME%%/g, org)
             .replace(/%%GOOGLE_SHEET_URL%%/g, document.getElementById('webAppUrl').value)
             .replace(/%%LOGO_DATA%%/g, logoData)
             .replace(/%%SECRET_KEY%%/g, document.getElementById('workerKey').value)
-            .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
             .replace(/#1e40af/g, primaryColor);
-
         const logoBlob = dataURLtoBlob(logoData);
-        const manifest = { name: org, short_name: "Safety", start_url: "index.html", display: "standalone", theme_color: primaryColor, icons: [{ src: "icon.png", sizes: "192x192", type: "image/png" }] };
         const workerFolder = zip.folder("WorkerApp");
         workerFolder.file("index.html", wHtml);
-        workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
         workerFolder.file("icon.png", logoBlob);
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.generateAsync({type:"blob"}).then(b => {
@@ -400,7 +401,7 @@
         const url = document.getElementById('workerAppUrl').value;
         if(url.length > 10) {
             document.getElementById('launchPack').classList.remove('hidden');
-            document.getElementById('launchEmail').value = `Hi Team,\n\nSetup your new safety app by following this link on your phone:\n${url}\n\nImportant: Use your name EXACTLY as it appears in our records.`;
+            document.getElementById('launchEmail').value = `Setup your safety app:\n${url}`;
         }
     }
   </script>
