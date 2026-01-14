@@ -592,8 +592,24 @@ function submitReport(){
 
 function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.querySelector('canvas[id^="sig-canvas-"]');if(c)d.sig=c.toDataURL('image/png');return d;}
 function handlePhoto(i,k){if(i.files[0]){const b=document.getElementById(`lbl_${i.id.split('_')[1]}`);if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText="✅ Saved";});}}
-function compressImg(f){return new Promise(r=>{const rd=new FileReader();rd.onload=e=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');const s=Math.min(800/i.width,800/i.height,1);c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',0.5));};i.src=e.target.result;};rd.readAsDataURL(f);});}
-
+function compressImg(f){
+    return new Promise(r=>{
+        const rd=new FileReader();
+        rd.onload=e=>{
+            const i=new Image();
+            i.onload=()=>{
+                const c=document.createElement('canvas');
+                // DIOCESE OPTIMIZATION: 600px ensures strings fit in Google Sheet cells
+                const s=Math.min(600/i.width, 600/i.height, 1);
+                c.width=i.width*s; c.height=i.height*s;
+                c.getContext('2d').drawImage(i,0,0,c.width,c.height);
+                r(c.toDataURL('image/jpeg', 0.4));
+            };
+            i.src=e.target.result;
+        };
+        rd.readAsDataURL(f);
+    });
+}
 function buildReportForm(n,c){
     state.photoStore={}; const sn=n?n.trim():"(Standard)"; 
     let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
@@ -737,6 +753,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
