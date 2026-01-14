@@ -183,8 +183,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <div id="highRiskBadge" class="hidden text-red-500 font-black text-xs uppercase tracking-widest border border-red-500 inline-block px-3 py-1 rounded-lg mb-2">⚡ CRITICAL TIMING MODE</div>
             <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse my-2 tracking-[0.2em] border-2 border-red-500 inline-block px-6 py-2 rounded-xl uppercase">OVERDUE</div>
             <div id="countdownTimer" class="text-8xl font-bold font-mono text-white tracking-tighter">00:00</div>
-            <p class="text-gray-400 mt-2 font-bold uppercase text-[10px] tracking-widest">Due for Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span></p>
-        </div>
+                <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span></p>        </div>
         <div class="space-y-3 w-full">
             <div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">Notes</button></div>
             <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">Hold to END</button>
@@ -481,8 +480,41 @@ function tick(){
     const now=new Date().getTime(); const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); const remaining=dueTime-now;
     const isCriticalMode = state.activeVisit.highRisk; const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; const timeUntilEscalation = remaining + escTime;
     if(timeUntilEscalation <= 0) { document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.add('hidden'); document.getElementById('btnExtend').classList.add('hidden'); document.getElementById('btnSafe').classList.remove('hidden'); setupLongPress(document.getElementById('btnSafe'), iamSafe); document.getElementById('countdownTimer').innerText="ALARM SENT"; if(!state.activeVisit.criticalSent){ state.activeVisit.criticalSent=true; saveState(); triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'); } } 
-    else if (remaining <= 0) { document.getElementById('overdueLabel').classList.remove('hidden'); document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); const absRem=Math.abs(remaining); const m=Math.floor(absRem/60000),s=Math.floor((absRem%60000)/1000); document.getElementById('countdownTimer').innerText=`-${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse'); if(!isCriticalMode && timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); } if(!isCriticalMode && timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ state.activeVisit.warn2minSent = true; saveState(); playSound('warning'); speakWithAccent("Warning. Safety alarm will activate in two minutes."); } if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ state.activeVisit.warn90Sent = true; saveState(); playSound('warning'); speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); } } 
-    else { const m=Math.floor(remaining/60000),s=Math.floor((remaining%60000)/1000); document.getElementById('countdownTimer').innerText=`${m}:${s<10?'0':''}${s}`; document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); document.getElementById('overdueLabel').classList.add('hidden'); if(!state.activeVisit.isPanic) { document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); } }
+    } else if (remaining <= 0) {
+        document.getElementById('overdueLabel').classList.remove('hidden'); 
+        document.getElementById('btnDepart').classList.remove('hidden'); 
+        document.getElementById('btnExtend').classList.remove('hidden'); 
+        document.getElementById('btnSafe').classList.add('hidden');
+        
+        const absRem = Math.abs(remaining); 
+        const mTotal = Math.floor(absRem / 60000);
+        const s = Math.floor((absRem % 60000) / 1000);
+
+        // INTUITIVE FORMATTING: Switch to Hours/Mins if > 60m
+        if (mTotal >= 60) {
+            const h = Math.floor(mTotal / 60);
+            const m = mTotal % 60;
+            document.getElementById('countdownTimer').innerHTML = `-${h}h ${m}m`;
+        } else {
+            document.getElementById('countdownTimer').innerHTML = `-${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
+        }
+        
+        document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse'); if(!isCriticalMode && timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); } if(!isCriticalMode && timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ state.activeVisit.warn2minSent = true; saveState(); playSound('warning'); speakWithAccent("Warning. Safety alarm will activate in two minutes."); } if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ state.activeVisit.warn90Sent = true; saveState(); playSound('warning'); speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."); } } 
+    } else {
+        const mTotal = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        
+        // INTUITIVE FORMATTING: Switch to Hours/Mins if > 60m
+        if (mTotal >= 60) {
+            const h = Math.floor(mTotal / 60);
+            const m = mTotal % 60;
+            document.getElementById('countdownTimer').innerHTML = `${h}h ${m}m`;
+        } else {
+            document.getElementById('countdownTimer').innerHTML = `${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
+        }
+
+        document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
+        document.getElementById('overdueLabel').classList.add('hidden'); } }
     if(state.activeVisit.anticipatedDepartureTime) { document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); }
 }
 
@@ -624,5 +656,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
