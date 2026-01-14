@@ -32,6 +32,7 @@ const CONFIG = {
   ENABLE_REDACTION: %%ENABLE_REDACTION%%,
   VEHICLE_TERM: "%%VEHICLE_TERM%%",
   COUNTRY_CODE: "%%COUNTRY_PREFIX%%" 
+  LOCALE: "%%LOCALE%%"
 };
 
 const sp = PropertiesService.getScriptProperties();
@@ -913,6 +914,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
