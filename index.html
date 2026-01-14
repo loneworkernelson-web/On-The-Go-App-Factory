@@ -521,10 +521,10 @@ function triggerResample() {
             .replace(/#1e40af/g, primary) 
             .replace(/#3b82f6/g, accent);
         
-// Replace the swCode line in your downloadZip function
+
 const swCode = `
-const CACHE_NAME = 'otg-safety-v81';
-const ASSETS = [
+const CACHE_NAME = 'otg-safety-v81.36';
+const CRITICAL_ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -533,16 +533,23 @@ const ASSETS = [
   'https://cdn.tailwindcss.com'
 ];
 
+// 1. INSTALL: Force-cache the logo and safety shell immediately
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      console.log('Finalizing Offline Safety Cache...');
+      return cache.addAll(CRITICAL_ASSETS);
+    }).then(() => self.skipWaiting())
   );
 });
 
+// 2. FETCH: Serve from cache first to ensure branding works in Dead Zones
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
+      // Return cached asset (like icon.png) or fetch from network
       return response || fetch(event.request).catch(() => {
+        // If the whole network is gone, always fall back to the app shell
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
@@ -550,6 +557,15 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// 3. ACTIVATE: Clear old versions when you release a new Factory build
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    )).then(() => self.clients.claim())
+  );
+});`;
 
 self.addEventListener('activate', event => {
   event.waitUntil(
@@ -612,3 +628,4 @@ self.addEventListener('activate', event => {
   </script>
 </body>
 </html>
+
