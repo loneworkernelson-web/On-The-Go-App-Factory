@@ -245,19 +245,16 @@ function acknowledgeAlert() {
 }
 
 function fetchData() { 
-    if(SCRIPT_URL.includes("%%")) {
-        console.error("Factory Configuration Missing.");
-        return;
-    }
+    if(SCRIPT_URL.includes("%%")) return console.error("Configuration Missing.");
 
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
     
-    // Timeout safety: Remove script tag if no response after 8 seconds
+    // Safety Timeout: Cleans up the window object if the network hangs
     const timeout = setTimeout(() => {
         if (window[cbName]) {
             console.warn("Fetch Timeout: Checking Connection...");
-            document.body.removeChild(script);
+            try { document.body.removeChild(script); } catch(e) {}
             delete window[cbName];
         }
     }, 8000);
@@ -266,7 +263,6 @@ function fetchData() {
         clearTimeout(timeout);
         lastHeartbeat = Date.now(); 
         if(data.error) { 
-            console.error("Auth Error:", data.error);
             if(data.error.includes("Key")) resetKey();
             return; 
         } 
@@ -275,7 +271,8 @@ function fetchData() {
         try { document.body.removeChild(script); } catch(e) {}
         delete window[cbName]; 
     }; 
-    
+
+    // Error Handling: Cleans up memory if the Google Backend is unreachable
     script.onerror = () => {
         clearTimeout(timeout);
         console.error("Network Error: Failed to reach Google Backend.");
@@ -283,7 +280,8 @@ function fetchData() {
         delete window[cbName];
     };
 
-    script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&t=${Date.now()}`; 
+    // Cache-busting: Ensures live data is retrieved rather than a browser-cached copy
+    script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`; 
     document.body.appendChild(script); 
 }
 
@@ -294,30 +292,27 @@ function handleData(response) {
         workerData = processWorkers(response.workers); 
         document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:true}); 
         
+        // FIXED: Priority logic - Duress (Silent) always takes visual precedence
         const duressWorkers = workerData.filter(w => w.status.includes("DURESS") && !w.status.includes("SAFE")); 
         const alertWorkers = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !w.status.includes("SAFE")); 
-        const unackedDuress = unackedDuressWorkers = duressWorkers.filter(w => !acknowledgedAlerts.has(w.name)); 
-        const unackedAlert = unackedAlertWorkers = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name)); 
-        const alertBox = document.getElementById('fullScreenAlert'); 
-        const alertTitle = document.getElementById('alertTitle'); 
-        const alertNames = document.getElementById('alertNames'); 
-        const alertIcon = document.getElementById('alertIcon'); 
         
+        const unackedDuress = duressWorkers.filter(w => !acknowledgedAlerts.has(w.name)); 
+        const unackedAlert = alertWorkers.filter(w => !acknowledgedAlerts.has(w.name)); 
+        
+        const alertBox = document.getElementById('fullScreenAlert'); 
         if(unackedDuress.length > 0) { 
             alertBox.classList.remove('hidden'); alertBox.classList.remove('alert-red'); alertBox.classList.add('alert-purple'); 
-            alertTitle.innerText = "DURESS ALARM (SILENT)"; alertIcon.innerText = "🥷"; 
-            alertNames.innerText = unackedDuress.map(w => w.name).join(", "); startAlertLoop(); 
+            document.getElementById('alertTitle').innerText = "DURESS ALARM (SILENT)"; 
+            document.getElementById('alertIcon').innerText = "🥷"; 
+            document.getElementById('alertNames').innerText = unackedDuress.map(w => w.name).join(", "); startAlertLoop(); 
         } else if(unackedAlert.length > 0) { 
             alertBox.classList.remove('hidden'); alertBox.classList.remove('alert-purple'); alertBox.classList.add('alert-red'); 
-            alertTitle.innerText = "EMERGENCY ALERT"; alertIcon.innerText = "🚨"; 
-            alertNames.innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
+            document.getElementById('alertTitle').innerText = "EMERGENCY ALERT"; 
+            document.getElementById('alertIcon').innerText = "🚨"; 
+            document.getElementById('alertNames').innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
         } else { alertBox.classList.add('hidden'); stopAlertLoop(); } 
         
-        if(currentView === 'MAP') {
-             if(typeof renderMap === 'function') renderMap();
-        } else {
-             renderGrid(); 
-        }
+        if(currentView === 'MAP') { if(mapInstance) renderMap(); } else { renderGrid(); }
         renderLog(); 
     } 
 }
@@ -461,7 +456,25 @@ function renderMap() {
 
 function focusWorker(gps) { if(!gps || gps.length < 5) return alert("No GPS data available."); document.getElementById('btnMap').click(); setTimeout(() => { if(!mapInstance) initMap(); const clean = gps.replace(/[^0-9.,-]/g, '').split(','); const lat = parseFloat(clean[0]); const lng = parseFloat(clean[1]); mapInstance._isFocused = true; mapInstance.invalidateSize(); mapInstance.flyTo([lat, lng], 17, {animate: true, duration: 1.5}); setTimeout(() => { mapInstance._isFocused = false; }, 5000); }, 200); }
 function toggleView(view) { currentView = view; const grid = document.getElementById('workerGrid'); const map = document.getElementById('mapView'); const btnG = document.getElementById('btnGrid'); const btnM = document.getElementById('btnMap'); grid.classList.toggle('hidden', view === 'MAP'); map.classList.toggle('hidden', view === 'GRID'); document.getElementById('emptyState').classList.add('hidden'); btnG.classList.toggle('bg-gray-600', view === 'GRID'); btnG.classList.toggle('text-white', view === 'GRID'); btnG.classList.toggle('text-gray-400', view !== 'GRID'); btnM.classList.toggle('bg-gray-600', view === 'MAP'); btnM.classList.toggle('text-white', view === 'MAP'); btnM.classList.toggle('text-gray-400', view !== 'MAP'); if(view === 'MAP') { setTimeout(() => { initMap(); renderMap(); }, 150); } else { renderGrid(); } }
-function renderLog() { const list = document.getElementById('eventLogList'); const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)); const top = sorted.slice(0, 50); let html = ''; top.forEach(r => { const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12:true}); let color = "text-gray-300"; if(r['Alarm Status'].includes("DURESS")) color = "text-purple-400 font-bold"; else if(r['Alarm Status'].includes("EMERGENCY")) color = "text-red-400 font-bold"; else if(r['Alarm Status'].includes("RESOLVED")) color = "text-green-400 font-bold"; html += `<div class="log-item text-[10px] mb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`; }); list.innerHTML = html; }
+function renderLog() { 
+    const list = document.getElementById('eventLogList'); 
+    // FIXED: Strictly limit history to the last 100 rows to prevent memory crashes
+    const sorted = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).reverse(); 
+    const top = sorted.slice(0, 100); 
+    
+    let html = ''; 
+    top.forEach(r => { 
+        const time = new Date(r['Timestamp']).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12:true}); 
+        let color = "text-gray-300"; 
+        const s = r['Alarm Status'];
+        if(s.includes("DURESS")) color = "text-purple-400 font-bold"; 
+        else if(s.includes("EMERGENCY") || s.includes("PANIC")) color = "text-red-400 font-bold"; 
+        else if(s.includes("SAFE")) color = "text-green-400 font-bold"; 
+        
+        html += `<div class="log-item text-[10px] mb-1 border-b border-gray-700/30 pb-1"><span class="text-gray-500 font-mono mr-2">${time}</span><span class="${color}">${escapeHtml(r['Worker Name'])}: ${escapeHtml(s)}</span></div>`; 
+    }); 
+    list.innerHTML = html; 
+}
 function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000; if (w.status.includes('EMERGENCY')) return 1000; const due = new Date(w.dueTime).getTime(); if (!isNaN(due) && due < now && w.status !== 'DEPARTED') return 500 + (now - due); if (w.status === 'ON SITE' || w.status === 'TRAVELLING') return 100; return 0; }
 
 function setFilter(f) { 
