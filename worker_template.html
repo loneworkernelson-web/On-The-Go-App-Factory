@@ -598,12 +598,12 @@ function buildReportForm(n,c){
     state.photoStore={}; const sn=n?n.trim():"(Standard)"; 
     let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
     c.innerHTML='';
-    if(!t) { c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; return; }
+    if(!t) { c.innerHTML='<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>'; return; }
     
     t.forEach((f,i)=>{
         let y='input'; let x=f.text||f;
         
-        // 1. IDENTIFY TYPE (Strict prioritized chain)
+        // 1. TYPE IDENTIFICATION (Prioritized Chain)
         if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
         else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
@@ -615,17 +615,16 @@ function buildReportForm(n,c){
         else if(x.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace('[NUMBER]','').replace('$','').trim(); }
         else if(x.includes('[DATE]')){ y='date'; x=x.replace('[DATE]','').trim(); }
 
-        // 2. GENERATE HTML (Separates layout from inputs to prevent ghost boxes)
+        // 2. SAFE GENERATION (Strictly separates layout from inputs)
         let html = "";
         if(y==='header') {
             html = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
         } else if(y==='note') {
             html = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic font-medium">${x}</div>`;
         } else {
-            // Functioning inputs get a label and wrapper
             html = `<div><label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
+            const safeX = x.replace(/'/g, '&apos;'); // Quote Safety Fix
             
-            const safeX = x.replace(/'/g, '&apos;'); // Fix Grok's quote vulnerability
             if(y==='text') html += `<textarea data-key="${safeX}" class="form-input h-24 font-medium"></textarea></div>`;
             else if(y==='signature') html += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" onclick="clearSig('${i}')" class="absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div></div>`;
             else if(y==='photo') html += `<input type="file" accept="image/*" data-label="${safeX}" onchange="handlePhoto(this, this.getAttribute('data-label'))" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-5 bg-gray-800 rounded-xl border-2 border-dashed border-gray-600 text-xs font-black text-gray-300 flex items-center justify-center gap-2 uppercase tracking-widest shadow-inner">📷 <span id="lbl_${i}">Capture Photo</span></button></div>`;
@@ -738,6 +737,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
