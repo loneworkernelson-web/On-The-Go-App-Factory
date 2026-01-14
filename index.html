@@ -610,8 +610,18 @@ self.addEventListener('activate', event => {
         if(url.length > 10 && url.startsWith('http')) {
             document.getElementById('launchPack').classList.remove('hidden');
             
-const emailBody = `Hello Team,\n\nWe are launching our new Lone-Worker Safety System for ${org}.\n\nPlease install your personal safety app by following these steps on your phone:\n\n1. Open this link: ${url}\n2. Once open, tap the 'Share' or 'Menu' icon and select 'Add to Home Screen'.\n3. Launch the app from your home screen and complete the one-time Setup Wizard.\n\nImportant: Use your full name exactly as it appears in our records to ensure your safety alerts are correctly matched.\n\nStay safe,\nManagement`;            
-            document.getElementById('launchEmail').value = emailBody;
+// Use single quotes and (+) to build the string. This prevents internal quotes from crashing the script.
+const emailBody = 'Hello Team,\n\n' +
+    'We are launching our new Lone-Worker Safety System for ' + (typeof org !== 'undefined' ? org : 'the organisation') + '.\n\n' +
+    'Please install your personal safety app by following these steps on your phone:\n\n' +
+    '1. Open this link: ' + (typeof url !== 'undefined' ? url : '') + '\n' +
+    '2. Once open, tap the \'Share\' or \'Menu\' icon and select \'Add to Home Screen\'.\n' +
+    '3. Launch the app from your home screen and complete the one-time Setup Wizard.\n\n' +
+    'Important: Use your full name exactly as it appears in our records to ensure your safety alerts are correctly matched.\n\n' +
+    'Stay safe,\n' +
+    'Management';
+    
+    document.getElementById('launchEmail').value = emailBody;
             
             // High-resolution QR generation with High Error Correction
             document.getElementById('qrImage').src = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&ecc=H&margin=1&data=" + encodeURIComponent(url);
@@ -627,5 +637,6 @@ const emailBody = `Hello Team,\n\nWe are launching our new Lone-Worker Safety Sy
   </script>
 </body>
 </html>
+
 
 
