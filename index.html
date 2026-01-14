@@ -60,22 +60,6 @@
       </div>
   </div>
 
-  <div id="driveHelpModal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-50">
-      <div class="bg-gray-800 p-8 rounded-xl border border-blue-500 max-w-md">
-          <h2 class="text-xl font-bold text-white mb-4">📂 How to get a Drive Folder ID</h2>
-          <ol class="list-decimal pl-5 space-y-3 text-gray-300 text-sm mb-6">
-              <li>Open Google Drive in your browser.</li>
-              <li>Create a new folder (e.g., "Safety Photos").</li>
-              <li>Double-click to open the folder.</li>
-              <li>Look at the URL bar. Copy the text AFTER <code>folders/</code>.</li>
-          </ol>
-          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all">
-              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
-          </div>
-          <button onclick="document.getElementById('driveHelpModal').style.display='none'" class="w-full py-2 bg-blue-600 text-white font-bold rounded">Got it</button>
-      </div>
-  </div>
-
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
@@ -107,32 +91,27 @@
                   <p class="text-[10px] text-gray-500 mt-1">Short name for the phone Home Screen (Max 12 chars).</p>
               </div>
 
-<div class="p-4 bg-gray-900 rounded-lg border border-gray-700 shadow-inner">
+              <div class="p-4 bg-gray-900 rounded-lg border border-gray-700 shadow-inner">
                   <h3 class="text-white font-bold mb-4 uppercase text-xs tracking-widest">🔐 Safety Connection Keys</h3>
-                  
                   <div class="mb-4">
                       <label class="block text-blue-300 font-bold mb-2 text-sm">Secret Key (Admin Only)</label>
                       <div class="flex gap-2">
                           <input type="text" id="secretKey" class="input-field text-yellow-400 font-mono tracking-wider text-sm" oninput="saveInput(this); validateKey();">
-                          <button onclick="generateMemorableKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white" title="Generate New Key">🔄</button>
+                          <button onclick="generateMemorableKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white">🔄</button>
                       </div>
-                      <p class="text-[10px] text-gray-500 mt-1">Protects your database. <strong>Do not share this with workers.</strong></p>
+                      <p class="text-[10px] text-gray-500 mt-1">Protects your database. <strong>Do not share with workers.</strong></p>
                   </div>
-
                   <div>
                       <label class="block text-blue-300 font-bold mb-2 text-sm">Worker Key (App Setup)</label>
                       <div class="flex gap-2">
                           <input type="text" id="workerKey" class="input-field text-green-400 font-mono tracking-wider text-sm" oninput="saveInput(this)">
-                          <button onclick="generateMemorableKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white" title="Generate New Key">🔄</button>
+                          <button onclick="generateMemorableKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white">🔄</button>
                       </div>
                       <p class="text-[10px] text-gray-500 mt-1">The "Handshake" key. This is baked into the app so workers connect automatically.</p>
-                      <div class="mt-3 text-[10px] bg-orange-900/30 border border-orange-700/50 p-3 rounded text-orange-200">
-                          <strong>💡 UPDATE TIP:</strong> If you are updating an existing system, paste your <u>OLD</u> Worker Key here to keep current staff connected.
-                      </div>
                   </div>
               </div>
 
-<div>
+              <div>
                   <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">3. Regional Logic</label>
                   <select id="countrySelect" class="input-field cursor-pointer" onchange="updateRegionInfo()">
                       <option value="+64">New Zealand (+64)</option>
@@ -147,8 +126,11 @@
                       <p>Voice Locale: <span id="voiceLocaleDisplay" class="text-yellow-400 font-mono">en-NZ</span></p>
                       <p>Safety Format: <span id="phoneFmtDisplay" class="text-purple-400 font-mono">+64...</span></p>
                   </div>
+                  <input type="hidden" id="timezoneVal">
               </div>
-</div> <div class="highlight-box flex flex-col items-center justify-center text-center">
+            </div>
+            
+            <div class="highlight-box flex flex-col items-center justify-center text-center">
               <label class="block text-blue-300 font-bold mb-2 text-sm uppercase">4. App Logo & Branding</label>
               <div id="dropZone" class="drop-zone w-full mb-4" onclick="document.getElementById('logoInput').click()">
                 <div id="logoPreviewArea" class="h-32 w-32 mx-auto rounded-full flex items-center justify-center overflow-hidden">
@@ -179,7 +161,9 @@
                   </div>
               </div>
             </div>
-          </div> <div class="highlight-box border-blue-500/30 mt-8">
+          </div>
+
+          <div class="highlight-box border-blue-500/30 mt-8">
              <div class="flex items-center gap-3 mb-4">
                  <span class="text-2xl">🛡️</span>
                  <h3 class="text-xl font-bold text-white">Safety & Fleet Options</h3>
@@ -190,9 +174,8 @@
                      <div>
                          <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Alarm Grace Period (Mins)</label>
                          <input type="number" id="escalationMins" value="15" min="1" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-bold" oninput="saveInput(this)">
-                         <p class="text-[10px] text-gray-500 mt-1">Extra time given to a worker to mark themselves "Safe" before the emergency alarm fires.</p>
+                         <p class="text-[10px] text-gray-500 mt-1">Extra time given to a worker before the alarm fires.</p>
                      </div>
-                     
                      <div>
                         <label class="block text-gray-400 text-xs font-bold uppercase mb-1">Periodic Check-in</label>
                         <div class="flex items-center gap-2">
@@ -207,38 +190,18 @@
                  </div>
 
                  <div class="space-y-4">
-                     <div>
-                         <div class="flex justify-between items-end mb-1">
-                             <label class="block text-gray-400 text-xs font-bold uppercase">SMS Alert Key (Textbelt)</label>
-                             <a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a>
-                         </div>
-                         <input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
-                     </div>
-                     
-                     <div>
-                         <div class="flex justify-between items-end mb-1">
-                             <label class="block text-gray-400 text-xs font-bold uppercase">AI Report Key (Gemini)</label>
-                             <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a>
-                         </div>
-                         <input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
-                     </div>
-
-                     <div>
-                         <div class="flex justify-between items-end mb-1">
-                             <label class="block text-gray-400 text-xs font-bold uppercase">Mileage Key (ORS)</label>
-                             <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a>
-                         </div>
-                         <input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)">
-                     </div>
+                     <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">SMS Alert Key (Textbelt)</label><input type="text" id="textbeltKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
+                     <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">AI Report Key (Gemini)</label><input type="text" id="geminiKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
+                     <div><label class="block text-gray-400 text-xs font-bold uppercase mb-1">Mileage Key (ORS)</label><input type="text" id="orsKey" class="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full" placeholder="Optional" oninput="saveInput(this)"></div>
                  </div>
              </div>
 
-             <div class="mt-6 pt-6 border-t border-gray-700 space-y-4">
+             <div class="mt-6 pt-6 border-t border-gray-700">
                 <div class="flex items-start gap-3">
                     <input type="checkbox" id="chkVehicle" class="mt-1 w-5 h-5 rounded bg-gray-700 text-blue-600" onchange="toggleVehicle(); saveInput(this)" checked>
                     <div>
                         <label class="text-white font-bold block">Enable Vehicle Safety Tracking</label>
-                        <p class="text-xs text-gray-400">Tracks <span class="dynamic-wof">WOF</span>/Rego and requires periodic safety checks from the driver.</p>
+                        <p class="text-xs text-gray-400">Tracks WOF/Rego and requires safety checks.</p>
                         <div id="vehOptions" class="mt-2 text-sm text-gray-400 flex items-center gap-2">
                             <span>Check Every:</span>
                             <input type="number" id="vehFreq" value="120" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white font-bold" oninput="saveInput(this)">
@@ -252,63 +215,25 @@
           <div class="flex justify-end pt-6">
               <button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12">Next: Database Setup →</button>
           </div>
-        </div>  
-        
-       <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
+        </div>
+
+        <div id="step2" class="step-section space-y-8">
+            <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-8 rounded-2xl border border-blue-500 shadow-xl text-center">
                 <h2 class="text-3xl font-bold text-white mb-2">Option A: The Automated Way</h2>
                 <div class="bg-yellow-900/50 border-l-4 border-yellow-500 p-4 mb-6 text-left max-w-2xl mx-auto rounded-r">
                     <p class="font-bold text-yellow-300 text-sm italic">⭐ Recommended for Beginners</p>
                     <ol class="list-decimal ml-5 mt-2 space-y-2 text-xs text-gray-300">
-                        <li>Ensure you are signed into the <strong>Google Account</strong> you want to own this system.</li>
+                        <li>Ensure you are signed into your target Google Account.</li>
                         <li>Click the <strong>Magic Link</strong> button below.</li>
-                        <li>A new tab opens. Click the blue <strong>"Make a Copy"</strong> button.</li>
-                        <li>Your database is now created! <strong>Keep that tab open</strong> for the next step.</li>
+                        <li>Click <strong>"Make a Copy"</strong> in the new tab.</li>
                     </ol>
                 </div>
-                <button onclick="openMagicLink()" class="btn btn-success text-xl px-10 py-5 shadow-lg transform hover:-translate-y-1 hover:shadow-2xl">✨ Create Database Copy</button>
-                <p id="magicLinkError" class="hidden text-red-400 text-sm mt-4 font-bold bg-red-900/50 p-2 rounded">⚠️ Admin: Please configure MASTER_SHEET_URL in index.html</p>
-            </div>
-
-            <div class="border border-gray-700 rounded-xl p-4">
-                <button onclick="document.getElementById('manualSetup').classList.toggle('hidden')" class="w-full flex justify-between items-center text-gray-400 hover:text-white font-bold">
-                    <span class="text-sm uppercase tracking-widest">Option B: Manual Setup (Advanced)</span>
-                    <span>▼</span>
-                </button>
-                <div id="manualSetup" class="hidden mt-6 space-y-6">
-                    <div class="text-center"><a href="https://sheets.new" target="_blank" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 text-sm">1. Create Blank Sheet</a></div>
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                            <h3 class="font-bold text-blue-400 text-sm">A. 'Visits' Tab</h3>
-                            <button onclick="copyVisitsHeaders()" class="w-full bg-blue-700 text-white py-2 rounded mt-2 text-xs font-bold">Copy Headers</button>
-                        </div>
-                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                            <h3 class="font-bold text-purple-400 text-sm">B. 'Templates' Tab</h3>
-                            <button onclick="copyTemplatesSetup()" class="w-full bg-purple-700 text-white py-2 rounded mt-2 text-xs font-bold">Copy Data</button>
-                        </div>
-                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                            <h3 class="font-bold text-green-400 text-sm">C. 'Sites' Tab</h3>
-                            <button onclick="copySitesSetup()" class="w-full bg-green-700 text-white py-2 rounded mt-2 text-xs font-bold">Copy Data</button>
-                        </div>
-                        <div class="bg-gray-900 p-4 rounded-lg border border-gray-600">
-                            <h3 class="font-bold text-red-400 text-sm">D. 'Staff' Tab</h3>
-                            <button onclick="copyStaffSetup()" class="w-full bg-red-800 text-white py-2 rounded mt-2 text-xs font-bold">Copy Data</button>
-                        </div>
-                    </div>
-                </div>
+                <button onclick="openMagicLink()" class="btn btn-success text-xl px-10 py-5">✨ Create Database Copy</button>
             </div>
 
             <div class="mt-4 p-6 bg-blue-900/20 border border-blue-500/30 rounded-xl">
-                <div class="flex items-center gap-3 mb-3">
-                    <span class="text-2xl">💡</span>
-                    <h4 class="font-bold text-blue-300 text-sm uppercase tracking-wider">Crucial: Strict Identity Matching</h4>
-                </div>
-                <p class="text-sm text-gray-300 leading-relaxed mb-4">
-                    To connect, the worker's name in the <strong>'Staff'</strong> sheet must match what they type into the app <strong>exactly</strong> (case-sensitive).
-                </p>
-                <div class="grid grid-cols-2 gap-4 text-xs font-mono">
-                    <div class="p-2 bg-green-900/30 rounded border border-green-500/30 text-green-400">✅ MATCH: "Jane Doe"</div>
-                    <div class="text-red-400 p-2 bg-red-900/30 rounded border border-red-500/30">❌ FAIL: "jane doe" or "Jane"</div>
-                </div>
+                <h4 class="font-bold text-blue-300 text-sm uppercase tracking-wider mb-2">💡 Crucial: Strict Identity Matching</h4>
+                <p class="text-sm text-gray-300">Staff names in the sheet must match the app entry exactly (e.g., "Jane Doe").</p>
             </div>
 
             <div class="flex justify-between pt-6">
@@ -317,148 +242,58 @@
             </div>
         </div>
 
-
-### **Why this happened**
-In your current file, the Step 1 closing `</div>` was placed before the "Next: Database" button. Because the button was sitting "loose" in the code, the browser didn't know it was part of Step 1 and kept it visible. More importantly, Step 2 was effectively empty because its content was also being rendered outside its hidden container.
-
-### **Verification**
-1. Apply the patch above.
-2. Refresh the Factory; **Step 1** should now only show Branding, Keys, and Safety Options.
-3. Click **"Next: Database Setup"**; the full instructions for the Magic Link and manual setup will now appear correctly.
-
-Would you like me to check the **Step 5 (Deployment)** logic next to ensure the **QR Code** and **Onboarding Email** are working correctly for the trial organizations?
-<div id="step3" class="step-section space-y-6">
-  
-  <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-      <h3 class="font-bold text-green-400 text-lg">1. Install the System "Brain"</h3>
-      <p class="text-xs text-gray-400">This code handles all the safety logic. Follow these exact steps:</p>
-      
-      <div class="space-y-3">
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Click the <strong>Blue Button</strong> below to copy the code.</span>
-          </div>
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Go to your Google Sheet. Click <strong>Extensions</strong>, then <strong>Apps Script</strong>.</span>
-          </div>
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Delete any text already in the window (like <code>function myFunction()</code>).</span>
-          </div>
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm"><strong>Paste</strong> your copied code and click the <strong>Floppy Disk icon</strong> (Save).</span>
-          </div>
-      </div>
-
-      <div class="flex items-center gap-4 mt-4">
-          <button onclick="copyScript()" class="btn bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg flex-1">📋 COPY SYSTEM CODE</button>
-          <button onclick="document.getElementById('codeContainer').classList.toggle('hidden')" class="text-xs text-gray-500 underline">View Code</button>
-      </div>
-      <div id="codeContainer" class="hidden relative mt-2"><pre id="codeDisplay" class="code-scroll h-48">Generating...</pre></div>
-  </div>
-
-  <div class="bg-gray-900 p-6 rounded-xl border border-purple-600/50 space-y-4">
-      <div class="flex items-center gap-3"><span class="text-2xl">⏰</span><div><h3 class="font-bold text-purple-400 text-lg">2. Set the Watchdog Alarms</h3><p class="text-xs text-gray-400">Triggers automate the safety checks so you don't have to watch manually.</p></div></div>
-      
-      <div class="space-y-4">
-          <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30">
-              <h4 class="font-bold text-white text-sm mb-3">A. The Safety Watchdog (Overdue Alarms)</h4>
-              <ol class="list-decimal ml-5 space-y-2 text-xs text-gray-300">
-                  <li>Click the <strong>Alarm Clock icon</strong> (Triggers) on the left sidebar.</li>
-                  <li>Click <strong>+ Add Trigger</strong> (bottom right).</li>
-                  <li>Function: <strong>checkOverdueVisits</strong> | Event: <strong>Time-driven</strong>.</li>
-                  <li>Type: <strong>Minutes timer</strong> | Interval: <strong>Every 10 minutes</strong>. Click <strong>Save</strong>.</li>
-              </ol>
+        <div id="step3" class="step-section space-y-6">
+          <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
+              <h3 class="font-bold text-green-400 text-lg">1. Install the System "Brain"</h3>
+              <div class="space-y-3">
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Extensions > Apps Script.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm">Delete existing text and Paste code.</span></div>
+              </div>
+              <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full">📋 COPY SYSTEM CODE</button>
+              <div id="codeContainer" class="hidden mt-2"><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
           </div>
 
-          <div class="bg-purple-900/30 border border-purple-500/50 p-4 rounded-xl">
-              <h4 class="font-bold text-purple-300 text-sm mb-3">B. The Privacy Shredder (Note to Self)</h4>
-              <ol class="list-decimal ml-5 space-y-2 text-xs text-gray-300">
-                  <li>Click <strong>+ Add Trigger</strong> again.</li>
-                  <li>Choose <strong>cleanupPrivateSentNotes</strong> as the function.</li>
-                  <li>Event: <strong>Time-driven</strong> | Type: <strong>Hour timer</strong>.</li>
-                  <li>Interval: <strong>Every hour</strong>. Click <strong>Save</strong>.</li>
-              </ol>
+          <div class="bg-gray-900 p-6 rounded-xl border border-purple-600/50 space-y-4">
+              <h3 class="font-bold text-purple-400 text-lg">2. Set the Watchdog Alarms</h3>
+              <div class="bg-purple-900/30 p-4 rounded-xl border border-purple-500/30">
+                  <h4 class="font-bold text-white text-sm mb-2">The Privacy Shredder</h4>
+                  <p class="text-xs text-gray-300">Function: <strong>cleanupPrivateSentNotes</strong> | Time: <strong>Every Hour</strong>.</p>
+              </div>
           </div>
 
-          <div class="bg-blue-900/30 border border-blue-500/30 p-4 rounded-xl text-xs text-gray-300">
-              <p class="font-bold text-blue-300 mb-2 italic">🆘 Google Security Warnings</p>
-              <p>When saving, Google will ask to verify your account. <strong>This is normal:</strong></p>
-              <ul class="list-disc ml-5 mt-2 space-y-1">
-                  <li>Click <strong>Advanced</strong> -> <strong>Go to OTG Safety System (unsafe)</strong>.</li>
-                  <li>Scroll down and click <strong>Allow</strong>.</li>
-              </ul>
+          <div id="urlInputSection" class="space-y-4">
+              <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300" placeholder="Paste /exec URL here" oninput="saveInput(this)">
+              <button onclick="testConnection()" class="btn bg-yellow-600 text-white w-full">📡 TEST SYSTEM CONNECTION</button>
+              <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-bold"></div>
           </div>
-      </div>
-  </div>
 
-  <div class="bg-gray-900 p-6 rounded-xl border border-gray-600 space-y-4">
-      <h3 class="font-bold text-yellow-400 text-lg">3. Switch the System "ON"</h3>
-      <div class="space-y-3">
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Click <strong>Deploy > New Deployment</strong> (top right).</span>
+          <div class="flex justify-between pt-6">
+              <button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button>
+              <button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50">Next: Download App →</button>
           </div>
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Select type: <strong>Web App</strong> | Execute as: <strong>Me</strong>.</span>
-          </div>
-          <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm font-bold text-yellow-300 underline">Set "Who has access" to "Anyone".</span>
-          </div>
-          <div class="checklist-item" onclick="toggleCheck(this); showUrlInput()"><input type="checkbox" class="checklist-checkbox">
-            <span class="text-sm">Click <strong>Deploy</strong> and copy the <strong>Web App URL</strong>.</span>
-          </div>
-      </div>
-  </div>
+        </div>
 
-  <div id="urlInputSection" class="hidden opacity-0 transition-opacity duration-500">
-      <label class="block text-green-400 font-bold mb-2 text-lg text-center">Paste the /exec URL here:</label>
-      <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)">
-      <div class="flex justify-center gap-4 mt-6">
-        <button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 px-10 rounded-xl shadow-lg">📡 TEST SYSTEM CONNECTION</button>
-      </div>
-      <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-bold"></div>
-  </div>
-
-  <div class="flex justify-between pt-6">
-      <button onclick="gotoStep(2)" class="text-gray-400 font-bold">Back</button>
-      <button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed">Next: Download App →</button>
-  </div>
-</div>
         <div id="step4" class="step-section text-center space-y-10 py-8">
-          <div><h2 class="text-4xl font-bold text-white mb-2">Ready to Build</h2><p class="text-gray-400">Files generated for: <span id="finalAppName" class="text-blue-400">App</span></p></div>
-          <button onclick="downloadZip()" class="w-full max-w-md mx-auto btn btn-success py-5 text-2xl shadow-xl transform hover:scale-105">Download On-The-Go_Lone_Worker_Apps.zip</button>
-          <div class="flex justify-between pt-6"><button onclick="gotoStep(3)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Next: Deployment Guide →</button></div>
+          <div><h2 class="text-4xl font-bold text-white mb-2">Ready to Build</h2><p class="text-gray-400">Organisation: <span id="finalAppName" class="text-blue-400">...</span></p></div>
+          <button onclick="downloadZip()" class="btn btn-success py-5 text-2xl w-full max-w-md shadow-xl">Download Lone_Worker_Apps.zip</button>
+          <div class="flex justify-between pt-6"><button onclick="gotoStep(3)" class="text-gray-400 font-bold">Back</button><button onclick="gotoStep(5)" class="btn btn-primary">Next: Deployment →</button></div>
         </div>
 
         <div id="step5" class="step-section space-y-10">
             <div class="bg-gray-900 p-8 rounded-xl border border-gray-700">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">🚀</span><div><h2 class="text-2xl font-bold text-white">1. Host with Netlify (Free)</h2></div></div>
-                <div class="bg-orange-900/50 border border-orange-500 p-4 rounded mb-6"><h4 class="font-bold text-orange-400 mb-1">⚠️ DON'T LOSE YOUR APP!</h4><p class="text-sm text-gray-300">If you just drag-and-drop without an account, your app will <strong>delete itself after 1 hour</strong>.</p></div>
-                <ol class="list-decimal pl-6 space-y-4 text-sm text-gray-300">
-                    <li>Go to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-bold">app.netlify.com/drop</a>.</li>
-                    <li>Drag the <strong>WorkerApp</strong> folder from your ZIP into the browser.</li>
-                    <li><strong>IMMEDIATELY</strong> click "Sign up to claim this site".</li>
-                    <li>Click <strong>Site Settings > Change Site Name</strong> to something friendly (e.g. <code>my-org-safety.netlify.app</code>).</li>
+                <h2 class="text-2xl font-bold text-white mb-4">1. Host with Netlify (Free)</h2>
+                <ol class="list-decimal pl-6 space-y-2 text-sm text-gray-300">
+                    <li>Unzip the downloaded file.</li>
+                    <li>Drag <strong>WorkerApp</strong> to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline">Netlify Drop</a>.</li>
                 </ol>
             </div>
 
             <div class="bg-indigo-900/30 p-8 rounded-xl border border-indigo-500/50">
-                <div class="flex items-center gap-4 mb-6"><span class="text-4xl">✉️</span><div><h2 class="text-2xl font-bold text-white">2. Launch Pack</h2></div></div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-indigo-300 text-xs font-bold uppercase mb-1">Paste your Worker App URL (from Netlify)</label>
-                        <input type="url" id="workerAppUrl" class="input-field" placeholder="https://my-safety-app.netlify.app" oninput="generateLaunchPack()">
-                    </div>
-                    
-                    <div id="launchPack" class="hidden grid md:grid-cols-3 gap-6">
-                        <div class="md:col-span-2">
-                            <label class="block text-indigo-300 text-xs font-bold uppercase mb-1">Draft Email</label>
-                            <textarea id="launchEmail" class="w-full h-40 bg-gray-900 border border-indigo-500/50 rounded p-4 text-sm text-gray-300 font-mono" readonly></textarea>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('launchEmail').value); alert('Email copied!');" class="mt-2 btn btn-xs bg-indigo-600 hover:bg-indigo-500 text-white text-sm">Copy Email Text</button>
-                        </div>
-                        <div class="flex flex-col items-center justify-center bg-white p-4 rounded-lg">
-                            <img id="qrImage" src="" class="w-32 h-32 mb-2">
-                            <p class="text-gray-900 text-xs font-bold text-center">Right-Click to Save<br>for Posters</p>
-                        </div>
-                    </div>
+                <h2 class="text-2xl font-bold text-white mb-4">2. Launch Pack</h2>
+                <input type="url" id="workerAppUrl" class="input-field mb-4" placeholder="Paste Netlify URL here" oninput="generateLaunchPack()">
+                <div id="launchPack" class="hidden grid md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2"><textarea id="launchEmail" class="w-full h-40 bg-gray-900 border border-indigo-500/50 rounded p-4 text-xs text-gray-300" readonly></textarea></div>
+                    <div class="bg-white p-4 rounded-lg flex flex-col items-center"><img id="qrImage" src="" class="w-32 h-32 mb-2"><p class="text-gray-900 text-[10px] font-bold">Setup QR Code</p></div>
                 </div>
             </div>
             <div class="flex justify-start pt-6"><button onclick="gotoStep(4)" class="text-gray-400 font-bold">Back</button></div>
@@ -621,7 +456,7 @@ Would you like me to check the **Step 5 (Deployment)** logic next to ensure the 
         .replace('%%ENABLE_REDACTION%%', document.getElementById('chkRedaction').checked)
         .replace('%%VEHICLE_TERM%%', selectedConfig.term)
         .replace('%%COUNTRY_PREFIX%%', document.getElementById('countrySelect').value)
-        .replace('%%LOCALE%%', selectedConfig.locale); // Universal Regional Logic
+        .replace('%%LOCALE%%', selectedConfig.locale); 
     document.getElementById('codeDisplay').textContent = code;
 }
     
@@ -631,13 +466,7 @@ Would you like me to check the **Step 5 (Deployment)** logic next to ensure the 
         const url = document.getElementById('webAppUrl').value;
         const resBox = document.getElementById('testResult');
         resBox.classList.remove('hidden'); resBox.textContent = "Testing..."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-gray-900 text-yellow-400 font-bold";
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(res => res.json()).then(data => { if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error(); }).catch(() => { resBox.textContent = "❌ Connection Failed. Check permissions."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; });
-    }
-
-    function processGuideTemplate(html) {
-        if(!html) return ""; let out = html.replace(/%%ORG_NAME%%/g, document.getElementById('orgName').value).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
-        const processBlock = (tag, isActive) => { const regex = new RegExp(`([\\s\\S]*?)`, 'g'); out = out.replace(regex, (m, c) => isActive ? c : ""); };
-        processBlock('VEHICLE', document.getElementById('chkVehicle').checked); return out;
+        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(res => res.json()).then(data => { if(data.status === "success") { resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-lg text-center bg-green-900 text-white font-bold"; document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50'); document.getElementById('finalAppName').innerText = document.getElementById('orgName').value; } else throw new Error(); }).catch(() => { resBox.textContent = "❌ Connection Failed."; resBox.className = "mt-4 p-4 rounded-lg text-center bg-red-900 text-white font-bold"; });
     }
 
     function downloadZip() {
@@ -658,73 +487,35 @@ Would you like me to check the **Step 5 (Deployment)** logic next to ensure the 
         .replace(/%%LOGO_DATA%%/g, logoData)
         .replace(/%%SECRET_KEY%%/g, worker)
         .replace(/%%IS_ADVANCED%%/g, "true")
-        .replace(/%%ENABLE_MILEAGE%%/g, "true")
         .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
         .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
-        .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
         .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
-        .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
-        .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
-        .replace(/%%REQ_TRAVEL_REPORT%%/g, document.getElementById('chkTravelReport').checked)
         .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
-        .replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale)
         .replace(/#1e40af/g, primaryColor)
         .replace(/#3b82f6/g, accentColor);
 
-    // FIX: Convert logo to physical file for Manifest compliance
     const logoBlob = dataURLtoBlob(logoData);
-    const manifest = { 
-        name: org, 
-        short_name: appName, 
-        start_url: "index.html", 
-        display: "standalone", 
-        background_color: "#111827", 
-        theme_color: primaryColor, 
-        icons: [ 
-            { src: "icon.png", sizes: "192x192", type: "image/png" }, 
-            { src: "icon.png", sizes: "512x512", type: "image/png" } 
-        ] 
-    };
-
-    // FIX: Service Worker now caches the physical icon and manifest
-    const swCode = `const CACHE_NAME = 'otg-v${Date.now()}'; 
-        const urlsToCache = ['./','./index.html','./manifest.json','./icon.png']; 
-        self.addEventListener('install', e => e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)))); 
-        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));`;
-
+    const manifest = { name: org, short_name: appName, start_url: "index.html", display: "standalone", background_color: "#111827", theme_color: primaryColor, icons: [{ src: "icon.png", sizes: "192x192", type: "image/png" }] };
     const workerFolder = zip.folder("WorkerApp");
     workerFolder.file("index.html", wHtml);
-    workerFolder.file("sw.js", swCode);
     workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
     workerFolder.file("icon.png", logoBlob);
-    workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
-
-    zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
-    zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
-    zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, secret).replace(/%%WORKER_KEY%%/g, worker));
     
+    zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
     zip.generateAsync({type:"blob"}).then(b => {
         const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/[^a-z0-9]/gi, '_') + "_Lone_Worker_Apps.zip"; a.click();
     });
 }
 
-// FIX: Helper to convert DataURL to Binary Blob
 function dataURLtoBlob(dataurl) {
-    var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
     while(n--) { u8arr[n] = bstr.charCodeAt(n); }
     return new Blob([u8arr], {type:mime});
 }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function generateLaunchPack() { const url = document.getElementById('workerAppUrl').value; if(url.length < 10) return; document.getElementById('launchPack').classList.remove('hidden'); }
+    function toggleEnterBtn() { document.getElementById('btnEnter').disabled = !document.getElementById('chkAccept').checked; }
+    function generateLaunchPack() { const url = document.getElementById('workerAppUrl').value; if(url.length > 10) document.getElementById('launchPack').classList.remove('hidden'); }
+    function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); }); dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
