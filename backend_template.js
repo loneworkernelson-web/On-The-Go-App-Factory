@@ -31,7 +31,7 @@ const CONFIG = {
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%,
   ENABLE_REDACTION: %%ENABLE_REDACTION%%,
   VEHICLE_TERM: "%%VEHICLE_TERM%%",
-  COUNTRY_CODE: "%%COUNTRY_PREFIX%%" 
+  COUNTRY_CODE: "%%COUNTRY_PREFIX%%", 
   LOCALE: "%%LOCALE%%"
 };
 
@@ -914,6 +914,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
