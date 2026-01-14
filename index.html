@@ -357,37 +357,37 @@
         }
     }
 
-    function triggerResample() {
+function triggerResample() {
         const img = document.getElementById('logoImg'); if (!img.src || img.src.length < 100) return;
         const canvas = document.createElement('canvas'); canvas.width = 192; canvas.height = 192;
         const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
         const data = ctx.getImageData(30, 30, 132, 132).data; const clusters = [];
-        for (let i = 0; i < data.length; i += 12) {
+        for (let i = 0; i < data.length; i += 16) {
             const r = data[i], g = data[i+1], b = data[i+2];
-            const max = Math.max(r, g, b), min = Math.min(r, g, b), sat = (max - min) / max, bri = max / 255;
-            if (sat < 0.22 || bri > 0.90 || bri < 0.15) continue;
-            const key = `${Math.round(r/25)*25},${Math.round(g/25)*25},${Math.round(b/25)*25}`;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), sat = (max - min) / max;
+            if (sat < 0.25 || max < 30 || max > 240) continue;
+            const key = `${Math.round(r/30)*30},${Math.round(g/30)*30},${Math.round(b/30)*30}`;
             let existing = clusters.find(c => c.key === key);
             if(existing) existing.count++; else clusters.push({key, count: 1, rgb: [r,g,b]});
         }
         clusters.sort((a,b) => b.count - a.count);
-        const distinct = [];
-        for(let c of clusters) {
-            if(distinct.length >= 3) break;
-            const isTooSimilar = distinct.some(d => Math.sqrt(Math.pow(c.rgb[0]-d.rgb[0],2) + Math.pow(c.rgb[1]-d.rgb[1],2) + Math.pow(c.rgb[2]-d.rgb[2],2)) < 60);
-            if(!isTooSimilar) distinct.push(c);
-        }
+        const distinct = clusters.slice(0, 4);
         const container = document.getElementById('logoClusterSwatches'); container.innerHTML = '';
+        
         distinct.forEach((c, idx) => {
+            if (idx >= 3) return;
             const primary = "#" + c.rgb.map(x => x.toString(16).padStart(2, '0')).join('');
             const next = distinct[idx+1] || distinct[0] || {rgb: [255,255,255]};
             const accent = "#" + next.rgb.map(x => x.toString(16).padStart(2, '0')).join('');
+            
             const swatch = document.createElement('div'); swatch.className = "preset-swatch";
             swatch.innerHTML = `<div class="swatch-half" style="background:${primary}"></div><div class="swatch-half" style="background:${accent}"></div>`;
-            swatch.onclick = function() { applyPreset(primary, accent, this); };
+            swatch.onclick = () => applyPreset(primary, accent, swatch);
             container.appendChild(swatch);
             if(idx === 0) applyPreset(primary, accent, swatch);
         });
+
+        // RESTORED: This line is required to make the branding section visible!
         document.getElementById('paletteArea').classList.remove('hidden');
     }
 
@@ -440,26 +440,65 @@
     }
 
     function downloadZip() {
-        const zip = new JSZip(); const org = document.getElementById('orgName').value; const appShort = document.getElementById('appName').value || "Safety"; const url = document.getElementById('webAppUrl').value; const logoData = document.getElementById('logoUrl').value;
-        const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
-        const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
+        const zip = new JSZip(); 
+        const org = document.getElementById('orgName').value;
+        const appShort = document.getElementById('appName').value || "Safety";
+        const url = document.getElementById('webAppUrl').value;
+        const logoData = document.getElementById('logoUrl').value;
+        const primary = localStorage.getItem('otg_theme_primary') || "#1e40af";
+        const accent = localStorage.getItem('otg_theme_accent') || "#3b82f6";
         
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appShort).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData).replace(/%%SECRET_KEY%%/g, document.getElementById('workerKey').value).replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
+        // FIX: Re-added all 18 missing injection handlers
+        let wHtml = TEMPLATES.worker
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%ORGANISATION_NAME%%/g, org)
+            .replace(/%%APP_NAME%%/g, appShort)
+            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+            .replace(/%%SECRET_KEY%%/g, document.getElementById('workerKey').value)
+            .replace(/%%IS_ADVANCED%%/g, "true")
+            .replace(/%%ENABLE_MILEAGE%%/g, document.getElementById('orsKey').value ? "true" : "false")
+            .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
+            .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
+            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
+            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
+            .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
+            .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
+            .replace(/%%REQ_TRAVEL_REPORT%%/g, "true")
+            .replace(/%%VEHICLE_TERM%%/g, document.getElementById('vehTermDisplay').innerText)
+            .replace(/%%VOICE_LOCALE%%/g, document.getElementById('voiceLocaleDisplay').innerText)
+            .replace(/%%LOGO_DATA%%/g, logoData)
+            .replace(/#111827/g, primary) // Update background
+            .replace(/#1e40af/g, primary) 
+            .replace(/#3b82f6/g, accent);
         
         const swCode = `const CACHE_NAME = 'otg-v35'; self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js']))); }); self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });`;
         
+        const manifest = { 
+            name: org, 
+            short_name: appShort, 
+            start_url: "./index.html", 
+            display: "standalone", 
+            theme_color: primary, 
+            icons: [
+                { src: "icon.png", sizes: "192x192", type: "image/png" },
+                { src: "icon.png", sizes: "512x512", type: "image/png" }
+            ] 
+        };
+
         const workerFolder = zip.folder("WorkerApp");
         workerFolder.file("index.html", wHtml);
         workerFolder.file("sw.js", swCode);
-        workerFolder.file("manifest.json", JSON.stringify({ name: org, short_name: appShort, start_url: "./index.html", display: "standalone", theme_color: primaryColor, icons: [{ src: "icon.png", sizes: "192x192", type: "image/png" }, { src: "icon.png", sizes: "512x512", type: "image/png" }] }));
+        workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
         workerFolder.file("icon.png", logoData.split(',')[1], {base64:true});
-        workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
+        workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         
         zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData));
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value));
         
-        zip.generateAsync({type:"blob"}).then(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/ /g, '_') + "_AppSuite.zip"; a.click(); });
+        zip.generateAsync({type:"blob"}).then(b => {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/ /g,'_') + "_AppSuite.zip"; a.click();
+        });
     }
 
     function generateLaunchPack() {
@@ -473,3 +512,4 @@
   </script>
 </body>
 </html>
+
