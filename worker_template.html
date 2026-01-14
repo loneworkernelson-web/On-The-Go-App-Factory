@@ -618,7 +618,7 @@ function buildReportForm(n,c){
     t.forEach((f,i)=>{
         let y='input'; let x=f.text||f;
         
-        // 1. TYPE IDENTIFICATION (Prioritized Chain)
+        // IDENTIFY TYPE
         if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
         else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
@@ -630,31 +630,59 @@ function buildReportForm(n,c){
         else if(x.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace('[NUMBER]','').replace('$','').trim(); }
         else if(x.includes('[DATE]')){ y='date'; x=x.replace('[DATE]','').trim(); }
 
-        // 2. SAFE GENERATION (Strictly separates layout from inputs)
-        let html = "";
+        const container = document.createElement('div');
+        
         if(y==='header') {
-            html = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
+            container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
         } else if(y==='note') {
-            html = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic font-medium">${x}</div>`;
+            container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic font-medium">${x}</div>`;
         } else {
-            html = `<div><label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
-            const safeX = x.replace(/'/g, '&apos;'); // Quote Safety Fix
+            container.innerHTML = `<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
             
-            if(y==='text') html += `<textarea data-key="${safeX}" class="form-input h-24 font-medium"></textarea></div>`;
-            else if(y==='signature') html += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" onclick="clearSig('${i}')" class="absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div></div>`;
-            else if(y==='photo') html += `<input type="file" accept="image/*" data-label="${safeX}" onchange="handlePhoto(this, this.getAttribute('data-label'))" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-5 bg-gray-800 rounded-xl border-2 border-dashed border-gray-600 text-xs font-black text-gray-300 flex items-center justify-center gap-2 uppercase tracking-widest shadow-inner">📷 <span id="lbl_${i}">Capture Photo</span></button></div>`;
-            else if(y==='gps') html += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase">📍 Capture GPS</button><input readonly data-key="${safeX}" class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono"></div></div>`;
-            else if(y==='checkbox') html += `<div class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition"><input type="checkbox" data-key="${safeX}" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
-            else if(y==='yesno') html += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${safeX}" value="Yes" data-key="${safeX}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${safeX}" value="No" data-key="${safeX}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label></div></div>`;
-            else html += `<input type="${y}" data-key="${safeX}" class="form-input font-bold"></div>`;
+            if(y==='text'){
+                const el = document.createElement('textarea'); el.className="form-input h-24 font-medium"; el.dataset.key = x;
+                container.appendChild(el);
+            } else if(y==='signature'){
+                container.innerHTML += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" class="sig-clear-btn absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div>`;
+            } else if(y==='photo'){
+                const input = document.createElement('input'); input.type="file"; input.accept="image/*"; input.className="hidden"; input.id=`cam_${i}`;
+                input.addEventListener('change', () => handlePhoto(input, x)); // SAFE: Direct variable reference
+                const btn = document.createElement('button'); btn.type="button"; btn.className="w-full py-5 bg-gray-800 rounded-xl border-2 border-dashed border-gray-600 text-xs font-black text-gray-300 flex items-center justify-center gap-2 uppercase tracking-widest shadow-inner";
+                btn.innerHTML = `📷 <span id="lbl_${i}">Capture Photo</span>`;
+                btn.onclick = () => input.click();
+                container.appendChild(input); container.appendChild(btn);
+            } else if(y==='gps'){
+                const wrap = document.createElement('div'); wrap.className="flex gap-2";
+                const btn = document.createElement('button'); btn.type="button"; btn.className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase"; btn.innerText="📍 GPS";
+                const inp = document.createElement('input'); inp.readOnly=true; inp.dataset.key=x; inp.className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono";
+                btn.onclick = () => captureGPS(btn);
+                wrap.appendChild(btn); wrap.appendChild(inp); container.appendChild(wrap);
+            } else if(y==='checkbox'){
+                const wrap = document.createElement('div'); wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition";
+                wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label>`;
+                wrap.querySelector('input').dataset.key = x;
+                container.appendChild(wrap);
+            } else if(y==='yesno'){
+                const wrap = document.createElement('div'); wrap.className="flex gap-4 p-2 bg-gray-900 rounded-xl";
+                wrap.innerHTML = `<label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="Yes" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="No" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label>`;
+                wrap.querySelectorAll('input').forEach(r => r.dataset.key = x);
+                container.appendChild(wrap);
+            } else {
+                const el = document.createElement('input'); el.type=y; el.className="form-input font-bold"; el.dataset.key = x;
+                container.appendChild(el);
+            }
         }
-        c.innerHTML += html;
+        c.appendChild(container);
     });
 
+    // RE-INIT ASSETS
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
             initSigPad(canvas);
+        });
+        document.querySelectorAll('.sig-clear-btn').forEach((btn, idx) => {
+            btn.onclick = () => clearSig(idx);
         });
     }, 600);
 }
@@ -752,6 +780,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
