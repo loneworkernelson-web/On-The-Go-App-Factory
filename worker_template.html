@@ -598,12 +598,12 @@ function buildReportForm(n,c){
     state.photoStore={}; const sn=n?n.trim():"(Standard)"; 
     let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
     c.innerHTML='';
-    if(!t) { c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; return; }
+    if(!t) { c.innerHTML='<label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-1">Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Visit Notes..."></textarea>'; return; }
     
     t.forEach((f,i)=>{
         let y='input'; let x=f.text||f;
         
-        // 1. STRICT IDENTIFICATION
+        // 1. IDENTIFY TYPE (Strict prioritized chain)
         if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
         else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
@@ -615,23 +615,24 @@ function buildReportForm(n,c){
         else if(x.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace('[NUMBER]','').replace('$','').trim(); }
         else if(x.includes('[DATE]')){ y='date'; x=x.replace('[DATE]','').trim(); }
 
-        // 2. ROBUST GENERATION (No fallthrough to extra inputs)
+        // 2. GENERATE HTML (Separates layout from inputs to prevent ghost boxes)
         let html = "";
         if(y==='header') {
             html = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
         } else if(y==='note') {
             html = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 mb-4 text-xs text-blue-200 italic font-medium">${x}</div>`;
         } else {
-            html = `<div><label class="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">${x}</label>`;
+            // Functioning inputs get a label and wrapper
+            html = `<div><label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
             
-            if(y==='text') html += `<textarea data-key="${x.replace(/'/g, '&apos;')}" class="form-input h-24 font-medium"></textarea></div>`;
+            const safeX = x.replace(/'/g, '&apos;'); // Fix Grok's quote vulnerability
+            if(y==='text') html += `<textarea data-key="${safeX}" class="form-input h-24 font-medium"></textarea></div>`;
             else if(y==='signature') html += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" onclick="clearSig('${i}')" class="absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div></div>`;
-            // FIX: Uses this.getAttribute to handle labels with single quotes safely
-            else if(y==='photo') html += `<input type="file" accept="image/*" data-label="${x.replace(/'/g, '&apos;')}" onchange="handlePhoto(this, this.getAttribute('data-label'))" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-5 bg-gray-800 rounded-xl border-2 border-dashed border-gray-600 text-xs font-black text-gray-300 flex items-center justify-center gap-2 uppercase tracking-widest">📷 <span id="lbl_${i}">Capture Photo</span></button></div>`;
-            else if(y==='gps') html += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase">📍 GPS</button><input readonly data-key="${x.replace(/'/g, '&apos;')}" class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono"></div></div>`;
-            else if(y==='checkbox') html += `<div class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3"><input type="checkbox" data-key="${x.replace(/'/g, '&apos;')}" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
-            else if(y==='yesno') html += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="Yes" data-key="${x.replace(/'/g, '&apos;')}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="No" data-key="${x.replace(/'/g, '&apos;')}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label></div></div>`;
-            else html += `<input type="${y}" data-key="${x.replace(/'/g, '&apos;')}" class="form-input font-bold"></div>`;
+            else if(y==='photo') html += `<input type="file" accept="image/*" data-label="${safeX}" onchange="handlePhoto(this, this.getAttribute('data-label'))" class="hidden" id="cam_${i}"><button type="button" onclick="document.getElementById('cam_${i}').click()" class="w-full py-5 bg-gray-800 rounded-xl border-2 border-dashed border-gray-600 text-xs font-black text-gray-300 flex items-center justify-center gap-2 uppercase tracking-widest shadow-inner">📷 <span id="lbl_${i}">Capture Photo</span></button></div>`;
+            else if(y==='gps') html += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase">📍 Capture GPS</button><input readonly data-key="${safeX}" class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono"></div></div>`;
+            else if(y==='checkbox') html += `<div class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition"><input type="checkbox" data-key="${safeX}" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label></div>`;
+            else if(y==='yesno') html += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${safeX}" value="Yes" data-key="${safeX}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${safeX}" value="No" data-key="${safeX}" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label></div></div>`;
+            else html += `<input type="${y}" data-key="${safeX}" class="form-input font-bold"></div>`;
         }
         c.innerHTML += html;
     });
@@ -667,8 +668,37 @@ function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms()
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
-function captureGPS(btn){ btn.innerText="Locating..."; navigator.geolocation.getCurrentPosition(p => { const coords = `${p.coords.latitude},${p.coords.longitude}`; btn.innerText="✅ " + coords; if(btn.nextElementSibling) btn.nextElementSibling.value = coords; }, err => { showToast("📍 GPS Signal Error"); btn.innerText = "❌ GPS Error"; }, { enableHighAccuracy: true, timeout: 10000 }); }
-
+function captureGPS(btn){
+    btn.innerText="Locating...";
+    btn.disabled = true; // Prevent double-taps
+    
+    const options = { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 };
+    
+    const success = (p) => {
+        const coords = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
+        btn.innerText="✅ " + coords;
+        btn.disabled = false;
+        if(btn.nextElementSibling) btn.nextElementSibling.value = coords;
+    };
+    
+    const error = (err) => {
+        if (err.code === 3) {
+            // INDOOR FALLBACK: If high-accuracy times out, try standard signal
+            btn.innerText = "Retrying (Wide)...";
+            navigator.geolocation.getCurrentPosition(success, (err2) => {
+                btn.innerText = "❌ GPS Error";
+                btn.disabled = false;
+                showToast("📍 Could not lock GPS signal indoors.");
+            }, { enableHighAccuracy: false, timeout: 5000 });
+        } else {
+            btn.innerText = "❌ GPS Error";
+            btn.disabled = false;
+            showToast("📍 GPS: " + (err.code === 1 ? "Permission Denied" : "Signal Unavailable"));
+        }
+    };
+    
+    navigator.geolocation.getCurrentPosition(success, error, options);
+}
 function initSigPad(c) {
     if (!c) return; const ctx = c.getContext('2d'); let lastX, lastY; 
     const getPos = (e) => { const rect = c.getBoundingClientRect(); const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); return { x: (clientX - rect.left) * (c.width / rect.width), y: (clientY - rect.top) * (c.height / rect.height) }; };
@@ -708,6 +738,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
