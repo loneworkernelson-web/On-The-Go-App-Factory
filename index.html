@@ -433,29 +433,55 @@
     }
 
     function downloadZip() {
-        const zip = new JSZip(); const org = document.getElementById('orgName').value; const appShort = document.getElementById('appName').value || "Safety"; const url = document.getElementById('webAppUrl').value; const logoData = document.getElementById('logoUrl').value;
+        const zip = new JSZip(); 
+        const org = document.getElementById('orgName').value; 
+        const appShort = document.getElementById('appName').value || "Safety"; 
+        const url = document.getElementById('webAppUrl').value; 
+        const logoData = document.getElementById('logoUrl').value;
         const primaryColor = localStorage.getItem('otg_theme_primary') || "#1e40af";
         const accentColor = localStorage.getItem('otg_theme_accent') || "#3b82f6";
         
-        let wHtml = TEMPLATES.worker.replace(/%%ORG_NAME%%/g, org).replace(/%%APP_NAME%%/g, appShort).replace(/%%GOOGLE_SHEET_URL%%/g, url).replace(/%%LOGO_DATA%%/g, logoData).replace(/%%SECRET_KEY%%/g, document.getElementById('workerKey').value).replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked).replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%VOICE_LOCALE%%/g, selectedConfig.locale).replace(/#1e40af/g, primaryColor).replace(/#3b82f6/g, accentColor);
+        let wHtml = TEMPLATES.worker
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%APP_NAME%%/g, appShort)
+            .replace(/%%GOOGLE_SHEET_URL%%/g, url)
+            .replace(/%%LOGO_DATA%%/g, logoData)
+            .replace(/%%SECRET_KEY%%/g, document.getElementById('workerKey').value)
+            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
+            .replace(/#1e40af/g, primaryColor)
+            .replace(/#3b82f6/g, accentColor);
         
-        // RESTORE sw.js and User Guide
-        const swCode = `const CACHE_NAME = 'otg-safety-v1'; const urlsToCache = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js']; self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))); }); self.addEventListener('fetch', event => { event.respondWith(caches.match(event.request).then(response => response || fetch(event.request))); });`;
+        // PWA SERVICE WORKER
+        const swCode = `const CACHE_NAME = 'otg-v81'; const u = ['./','./index.html','./manifest.json','https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js']; self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(u))); }); self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });`;
         
+        // MANIFEST WITH BOTH ICON SIZES (REQUIRED FOR BANNER)
+        const manifest = { 
+            name: org, 
+            short_name: appShort, 
+            start_url: "./index.html", 
+            display: "standalone", 
+            theme_color: primaryColor, 
+            icons: [
+                { src: "icon.png", sizes: "192x192", type: "image/png" },
+                { src: "icon.png", sizes: "512x512", type: "image/png" }
+            ] 
+        };
+
         const workerFolder = zip.folder("WorkerApp");
         workerFolder.file("index.html", wHtml);
         workerFolder.file("sw.js", swCode);
-        workerFolder.file("manifest.json", JSON.stringify({ name: org, short_name: appShort, start_url: "index.html", display: "standalone", theme_color: primaryColor, icons: [{ src: "icon.png", sizes: "192x192", type: "image/png" }] }));
+        workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
         workerFolder.file("icon.png", logoData.split(',')[1], {base64:true});
-        workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
+        workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         
         zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData));
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value));
         
-        zip.generateAsync({type:"blob"}).then(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/ /g, '_') + "_AppSuite.zip"; a.click(); });
+        zip.generateAsync({type:"blob"}).then(b => {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/ /g, '_') + "_Lone_Worker_Apps.zip"; a.click();
+        });
     }
-
     function generateLaunchPack() {
         const url = document.getElementById('workerAppUrl').value;
         if(url.length > 10) {
@@ -467,3 +493,4 @@
   </script>
 </body>
 </html>
+
