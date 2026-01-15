@@ -615,18 +615,16 @@ function buildReportForm(n,c){
     
     t.forEach((f,i)=>{
         let y='text'; let x=f.text||f;
+        const upperX = x.toUpperCase(); // Case-insensitive check
         
-        // 1. TYPE IDENTIFICATION
-        if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
-        else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
-        else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
-        else if(x.includes('[SIGN]')){ y='signature'; x=x.replace('[SIGN]','').trim(); }
-        else if(x.includes('[PHOTO]')){ y='photo'; x=x.replace('[PHOTO]','').trim(); }
-        else if(x.includes('[YESNO]')){ y='yesno'; x=x.replace('[YESNO]','').trim(); }
-        else if(x.includes('[GPS]')){ y='gps'; x=x.replace('[GPS]','').trim(); }
-        else if(x.includes('[CHECK]')){ y='checkbox'; x=x.replace('[CHECK]','').trim(); }
-        else if(x.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace('[NUMBER]','').replace('$','').trim(); }
-        else if(x.includes('[DATE]')){ y='date'; x=x.replace('[DATE]','').trim(); }
+        if(upperX.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace(/\[HEADING\]/gi,'').replace('#','').trim(); }
+        else if(upperX.includes('[NOTE]')){ y='note'; x=x.replace(/\[NOTE\]/gi,'').trim(); }
+        else if(upperX.includes('[SIGN]')){ y='signature'; x=x.replace(/\[SIGN\]/gi,'').trim(); }
+        else if(upperX.includes('[PHOTO]')){ y='photo'; x=x.replace(/\[PHOTO\]/gi,'').trim(); }
+        else if(upperX.includes('[YESNO]')){ y='yesno'; x=x.replace(/\[YESNO\]/gi,'').trim(); }
+        else if(upperX.includes('[GPS]')){ y='gps'; x=x.replace(/\[GPS\]/gi,'').trim(); if(!x) x="Location Status"; } // GPS Logic
+        else if(upperX.includes('[CHECK]')){ y='checkbox'; x=x.replace(/\[CHECK\]/gi,'').trim(); }
+        else if(upperX.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace(/\[NUMBER\]/gi,'').replace('$','').trim(); }
 
         const container = document.createElement('div');
         
@@ -649,7 +647,7 @@ function buildReportForm(n,c){
                 btn.innerHTML = `📷 <span id="lbl_${i}">Capture Photo</span>`;
                 btn.onclick = () => input.click();
                 container.appendChild(input); container.appendChild(btn);
-            } else if(y==='gps'){ // FIXED: ADDED GPS RENDERING BLOCK
+            } else if(y==='gps'){ // FIXED GPS BLOCK
                 const wrap = document.createElement('div'); wrap.className="flex gap-2";
                 const btn = document.createElement('button'); btn.type="button"; btn.className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase"; btn.innerText="📍 GPS";
                 const inp = document.createElement('input'); inp.readOnly=true; inp.dataset.key=x; inp.className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono";
@@ -786,6 +784,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
