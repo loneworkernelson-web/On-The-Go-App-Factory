@@ -540,34 +540,32 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log('Finalizing Offline Safety Cache...');
       
-      // Use a "Settled" approach so one failure doesn't kill the whole cache
-      const results = await Promise.allSettled(
-        CRITICAL_ASSETS.map(async (url) => {
-          try {
-            // Use 'no-cors' for third-party CDNs to bypass strict CORS blocks
-            const response = await fetch(url, { 
-                mode: url.includes('http') ? 'no-cors' : 'cors',
-                redirect: 'follow' 
-            });
-            return await cache.put(url, response);
-          } catch (err) {
-            console.warn('Could not cache offline asset:', url, err);
-          }
-        })
-      );
+      // We fetch assets individually so one failure doesn't kill the whole app
+      for (const url of CRITICAL_ASSETS) {
+        try {
+          // Use 'no-cors' for external CDNs to bypass strict security blocks
+          const response = await fetch(url, { 
+            mode: url.includes('http') ? 'no-cors' : 'cors',
+            redirect: 'follow' 
+          });
+          await cache.put(url, response);
+        } catch (err) {
+          console.warn('Could not cache offline asset:', url);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('fetch', event => {
-  // Ignore POST requests (form submissions) - they must go to the network
+  // Only intercept GET requests
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then(response => {
-      // Return from cache OR fetch from network
+      // Serve from cache or fallback to network
       return response || fetch(event.request).catch(() => {
-        // Offline Fallback: If it's a page navigation, show the cached app shell
+        // If offline, always show the app shell
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
@@ -575,27 +573,36 @@ self.addEventListener('fetch', event => {
     })
   );
 });
-// 2. FETCH: Serve from cache first to ensure branding works in Dead Zones
+
+// 2. FETCH: Serve from cache first, then network, then cache the result
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests (POSTs for reports must go to network)
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
     caches.match(event.request).then((response) => {
-      // If found in cache, return it
+      // 1. Return cached version immediately if we have it
       if (response) return response;
 
-      // If not, fetch from network
+      // 2. Otherwise, fetch from the network
       return fetch(event.request).then((networkResponse) => {
-        // Only cache valid responses
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          // If it's a CORS request (like Tailwind), we use 'opaque' caching
+        // FIXED: Only exclude truly broken responses (0 = opaque/offline, 200 = success)
+        if (!networkResponse || (networkResponse.status !== 200 && networkResponse.status !== 0)) {
           return networkResponse;
         }
 
+        // 3. Cache the new response for next time
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
 
         return networkResponse;
+      }).catch(() => {
+        // 4. OFFLINE FALLBACK: If network fails and it's a page, show the shell
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
       });
     })
   );
@@ -673,6 +680,7 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
 
