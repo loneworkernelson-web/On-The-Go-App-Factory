@@ -539,19 +539,42 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log('Finalizing Offline Safety Cache...');
-      // Fetch each asset individually to handle redirects/CORS
-      for (const url of CRITICAL_ASSETS) {
-        try {
-          const response = await fetch(url, { mode: 'cors', redirect: 'follow' });
-          if (response.ok) await cache.put(url, response);
-        } catch (e) {
-          console.warn('Could not cache offline asset:', url);
-        }
-      }
+      
+      // Use a "Settled" approach so one failure doesn't kill the whole cache
+      const results = await Promise.allSettled(
+        CRITICAL_ASSETS.map(async (url) => {
+          try {
+            // Use 'no-cors' for third-party CDNs to bypass strict CORS blocks
+            const response = await fetch(url, { 
+                mode: url.includes('http') ? 'no-cors' : 'cors',
+                redirect: 'follow' 
+            });
+            return await cache.put(url, response);
+          } catch (err) {
+            console.warn('Could not cache offline asset:', url, err);
+          }
+        })
+      );
     }).then(() => self.skipWaiting())
   );
 });
 
+self.addEventListener('fetch', event => {
+  // Ignore POST requests (form submissions) - they must go to the network
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      // Return from cache OR fetch from network
+      return response || fetch(event.request).catch(() => {
+        // Offline Fallback: If it's a page navigation, show the cached app shell
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
+    })
+  );
+});
 // 2. FETCH: Serve from cache first to ensure branding works in Dead Zones
 self.addEventListener('fetch', (event) => {
   event.respondWith(
@@ -650,6 +673,7 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
 
