@@ -735,11 +735,33 @@ function submitReport(){
     const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};
     if(d.custom&&d.custom["Distance (km)"])fd["Distance"]=d.custom["Distance (km)"];
     Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; }); if(d.sig)fd["Signature"]=d.sig;
-    if(!state.activeVisit){processUploadQueue(buildPayload({...fd,"Alarm Status":"DATA_ENTRY_ONLY","Notes":d.notes}));showToast("Report Sent");closeModal('report');return;}
+    
+    if(!state.activeVisit){
+        processUploadQueue(buildPayload({...fd,"Alarm Status":"DATA_ENTRY_ONLY","Notes":d.notes}));
+        showToast("Report Sent"); closeModal('report'); return;
+    }
+    
     let s = isMidVisitUpdate ? (state.activeVisit.locationId==='travel'?"TRAVELLING":"ON SITE") : "DEPARTED";
     processUploadQueue(buildPayload({...fd,"Alarm Status":s,"Notes":d.notes}));
-    if(!isMidVisitUpdate){ state.activeVisit=null; state.photoStore={}; state.visitDurationMinutes=0; navigate('main'); if(travellingInterval)clearInterval(travellingInterval); }
-    saveState(); closeModal('report');}
+    
+    if(!isMidVisitUpdate){ 
+        state.activeVisit = null; 
+        state.photoStore = {}; 
+        state.visitDurationMinutes = 0; 
+        
+        // PATCH: Reset all selection states and refresh UI
+        state.selectedLocationId = null; 
+        travelTargetName = ""; 
+        renderLocations(); 
+        updateArrivedButtonState(); 
+        
+        navigate('main'); 
+        if(travellingInterval) clearInterval(travellingInterval); 
+    }
+    
+    saveState(); 
+    closeModal('report');
+}
 
 function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.querySelector('canvas[id^="sig-canvas-"]');if(c)d.sig=c.toDataURL('image/png');return d;}
 function handlePhoto(i,k){if(i.files[0]){const b=document.getElementById(`lbl_${i.id.split('_')[1]}`);if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText="✅ Saved";});}}
@@ -916,13 +938,14 @@ function initSigPad(c) {
     const ctx = c.getContext('2d'); 
     let lastX, lastY; 
     
+    // PATCH: Simplified coordinate logic to prevent double-scaling
     const getPos = (e) => { 
         const rect = c.getBoundingClientRect(); 
         const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); 
         const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); 
         return { 
-            x: (clientX - rect.left) * (c.width / rect.width), 
-            y: (clientY - rect.top) * (c.height / rect.height) 
+            x: clientX - rect.left, 
+            y: clientY - rect.top 
         }; 
     };
 
@@ -931,7 +954,6 @@ function initSigPad(c) {
         const pos = getPos(e); 
         lastX = pos.x; lastY = pos.y; 
         
-        // RE-INITIALISE PEN PROPERTIES ON TOUCH
         ctx.strokeStyle = "#000000"; 
         ctx.lineWidth = 3; 
         ctx.lineCap = "round";
@@ -1002,5 +1024,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
