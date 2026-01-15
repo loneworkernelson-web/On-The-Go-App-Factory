@@ -672,7 +672,11 @@ function buildReportForm(n,c){
         else if(upperX.includes('[GPS]')){ y='gps'; x=x.replace(/\[GPS\]/gi,'').trim(); if(!x) x="Location Status"; } // GPS Logic
         else if(upperX.includes('[CHECK]')){ y='checkbox'; x=x.replace(/\[CHECK\]/gi,'').trim(); }
         else if(upperX.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace(/\[NUMBER\]/gi,'').replace('$','').trim(); }
-
+// ADD THIS BLOCK into the buildReportForm tag-detection section
+else if(upperX.includes('[TEXT]')){ 
+    y='text'; 
+    x=x.replace(/\[TEXT\]/gi,'').trim(); 
+}
         const container = document.createElement('div');
         
         if(y==='header') {
@@ -793,15 +797,63 @@ function captureGPS(btn){
     navigator.geolocation.getCurrentPosition(success, error, options);
 }
 function initSigPad(c) {
-    if (!c) return; const ctx = c.getContext('2d'); let lastX, lastY; 
-    const getPos = (e) => { const rect = c.getBoundingClientRect(); const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); return { x: (clientX - rect.left) * (c.width / rect.width), y: (clientY - rect.top) * (c.height / rect.height) }; };
-    c.addEventListener('pointerdown', (e) => { isDrawing = true; const pos = getPos(e); lastX = pos.x; lastY = pos.y; ctx.beginPath(); ctx.moveTo(lastX, lastY); e.preventDefault(); }, {passive: false});
-    c.addEventListener('pointermove', (e) => { if (!isDrawing) return; const pos = getPos(e); const midX = (lastX + pos.x) / 2; const midY = (lastY + pos.y) / 2; ctx.quadraticCurveTo(lastX, lastY, midX, midY); ctx.stroke(); lastX = pos.x; lastY = pos.y; e.preventDefault(); }, {passive: false});
+    if (!c) return; 
+    const ctx = c.getContext('2d'); 
+    let lastX, lastY; 
+    
+    const getPos = (e) => { 
+        const rect = c.getBoundingClientRect(); 
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); 
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); 
+        return { 
+            x: (clientX - rect.left) * (c.width / rect.width), 
+            y: (clientY - rect.top) * (c.height / rect.height) 
+        }; 
+    };
+
+    c.addEventListener('pointerdown', (e) => { 
+        isDrawing = true; 
+        const pos = getPos(e); 
+        lastX = pos.x; lastY = pos.y; 
+        
+        // RE-INITIALISE PEN PROPERTIES ON TOUCH
+        ctx.strokeStyle = "#000000"; 
+        ctx.lineWidth = 3; 
+        ctx.lineCap = "round";
+        
+        ctx.beginPath(); 
+        ctx.moveTo(lastX, lastY); 
+        e.preventDefault(); 
+    }, {passive: false});
+
+    c.addEventListener('pointermove', (e) => { 
+        if (!isDrawing) return; 
+        const pos = getPos(e); 
+        const midX = (lastX + pos.x) / 2; 
+        const midY = (lastY + pos.y) / 2; 
+        ctx.quadraticCurveTo(lastX, lastY, midX, midY); 
+        ctx.stroke(); 
+        lastX = pos.x; lastY = pos.y; 
+        e.preventDefault(); 
+    }, {passive: false});
+
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
 
-function resizeCanvas(canvasEl) { const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); if (!c) return; const ctx = c.getContext('2d'); const ratio = Math.max(window.devicePixelRatio || 1, 1); c.width = c.offsetWidth * ratio; c.height = c.offsetHeight * ratio; ctx.scale(ratio, ratio); ctx.strokeStyle = "#000000"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; }
-
+function resizeCanvas(canvasEl) { 
+    const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
+    if (!c) return; 
+    const ctx = c.getContext('2d'); 
+    const ratio = window.devicePixelRatio || 1; 
+    c.width = c.offsetWidth * ratio; 
+    c.height = c.offsetHeight * ratio; 
+    ctx.scale(ratio, ratio); 
+    
+    // RE-ESTABLISH PEN AFTER RESIZE
+    ctx.strokeStyle = "#000000"; 
+    ctx.lineWidth = 3; 
+    ctx.lineCap = "round";
+}
 window.addEventListener('load', () => {
     try { const saved = localStorage.getItem('loneWorkerState'); if(saved) { state = JSON.parse(saved); if(state.locations) renderLocations(); if(state.meta) checkVehicleStatus(); } } catch(e) {}
     initLocations(); if(!state.settings || !state.settings.workerName) { startWizard(); } else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(false); }
@@ -831,6 +883,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
