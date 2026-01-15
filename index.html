@@ -474,32 +474,27 @@ function triggerResample() {
         document.getElementById('paletteArea').classList.remove('hidden');
     }
 
-    function applyPreset(p, a, el) {
-    // 1. Maintain existing logic for the build process
+function applyPreset(p, a, el) {
     document.getElementById('primaryColorBox').style.backgroundColor = p;
     document.getElementById('accentColorBox').style.backgroundColor = a;
     localStorage.setItem('otg_theme_primary', p); 
     localStorage.setItem('otg_theme_accent', a);
     
-    // 2. Drive the Live Preview
+    // Update Mockup UI
     const mockup = document.getElementById('appMockup');
-    const mockHeader = document.getElementById('mockHeader');
-    const mockFooter = document.getElementById('mockFooter');
     const mockAccentCard = document.getElementById('mockAccentCard');
-
-    // Apply primary brand color to backgrounds
-    mockup.style.backgroundColor = p;
-    mockHeader.style.backgroundColor = p;
-    mockFooter.style.backgroundColor = p;
-
-    // Apply accent color to active site cards and borders
-    mockAccentCard.style.borderColor = a;
-    mockAccentCard.style.backgroundColor = a + '33'; // 20% opacity for themed glass effect
-    
+    if(mockup) {
+        mockup.style.backgroundColor = p;
+        document.getElementById('mockHeader').style.backgroundColor = p;
+        document.getElementById('mockFooter').style.backgroundColor = p;
+    }
+    if(mockAccentCard) {
+        mockAccentCard.style.borderColor = a;
+        mockAccentCard.style.backgroundColor = a + '33';
+    }
     document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
     if(el) el.classList.add('selected');
 }
-
     function generateMemorableKey(id) { document.getElementById(id).value = id === 'workerKey' ? "wk_" + Math.random().toString(36).substr(2, 9) : "ADM-" + Math.floor(1000 + Math.random() * 9000); saveInput(document.getElementById(id)); if(id==='secretKey') validateKey(); }
     function saveInput(el) { localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value); }
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
@@ -695,6 +690,7 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
 
