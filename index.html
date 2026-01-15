@@ -540,9 +540,15 @@ self.addEventListener('install', event => {
       console.log('Finalizing Offline Safety Cache...');
       for (const url of CRITICAL_ASSETS) {
         try {
-          const response = await fetch(url, { mode: url.includes('http') ? 'no-cors' : 'cors', redirect: 'follow' });
+          // Use 'no-cors' for external CDNs to ensure they can be cached
+          const response = await fetch(url, { 
+            mode: url.includes('http') ? 'no-cors' : 'cors', 
+            redirect: 'follow' 
+          });
           await cache.put(url, response);
-        } catch (err) { console.warn('Could not cache offline asset:', url); }
+        } catch (err) {
+          console.warn('Could not cache offline asset:', url);
+        }
       }
     }).then(() => self.skipWaiting())
   );
@@ -638,6 +644,7 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
 
