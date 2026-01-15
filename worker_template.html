@@ -686,8 +686,17 @@ function triggerCheckin(){if(!document.getElementById('checkinModal').classList.
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
 function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3){triggerPanic();panicTapCount=0;}}
-function triggerPanic(){ if (Date.now() - lastAlertTime < 60000) return; lastAlertTime = Date.now(); state.activeVisit = state.activeVisit || {}; state.activeVisit.isPanic = true; saveState(); renderPanicState(); playSound('panic'); processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Pressed"})); showToast('🚨 SOS SENT 🚨'); }
-function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
+function triggerPanic(){ 
+    if (Date.now() - lastAlertTime < 60000) return; 
+    lastAlertTime = Date.now(); 
+    state.activeVisit = state.activeVisit || {}; 
+    state.activeVisit.isPanic = true; 
+    saveState(); 
+    renderPanicState(); 
+    // playSound('panic'); // REMOVED to ensure the alert is silent on the device
+    processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Pressed"})); 
+    showToast('🚨 SOS SENT 🚨'); 
+}function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
 function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker safe"}));state.activeVisit.isPanic=false;document.getElementById('lockedPage').classList.remove('panic-mode');document.getElementById('btnSafe').classList.add('hidden');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnExtend').classList.remove('hidden');preDepart();});}
 function startTravellingPulse(){ travellingInterval = setInterval(() => { navigator.geolocation.getCurrentPosition(p => { processUploadQueue(buildPayload({"Alarm Status": "TRAVELLING", "Last Known GPS": `${p.coords.latitude},${p.coords.longitude}`, "Notes": "Routine Travelling Update"})); }, err => {}, { enableHighAccuracy: true, timeout: 15000 }); }, 300000); }
 function toggleBatterySaver() { const saver = document.getElementById('batterySaver'); if (!saver) return; if (saver.classList.contains('hidden')) { saver.classList.remove('hidden'); saver.style.pointerEvents = 'auto'; showToast("🌙 Battery Saver Active"); } else { saver.classList.add('hidden'); saver.style.pointerEvents = 'none'; } }
@@ -772,5 +781,6 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
