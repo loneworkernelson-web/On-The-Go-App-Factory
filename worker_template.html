@@ -180,20 +180,23 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 ml-1">Safety Destinations</div>
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
-    <div class="footer-bar">
-        <div class="flex justify-end items-center gap-2 mb-2">
-            <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest" id="lblHighRisk">Critical Timing Mode</span>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
-              <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
-            </label>
-        </div>
-        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2 font-black uppercase tracking-tighter"><span class="text-gray-400 text-[10px]">Estimated Visit Duration</span><span id="durationDisplay" class="text-xs text-blue-400">0 mins</span></div>
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
-        </div>
-        <button id="btnQuick" onclick="openQuickMenu()" class="flex-1 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl border border-violet-700/50 shadow-lg active:scale-95 transition uppercase text-xs tracking-widest">Forms</button><button type="button" id="btnStart" class="long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all uppercase tracking-[0.1em]" disabled>Start</button></div>
+<div class="footer-bar">
+    <div class="flex justify-end items-center gap-2 mb-2">
+        <span class="text-[10px] font-bold text-gray-500 tracking-widest" id="lblHighRisk">Critical timing mode</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
+          <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+        </label>
     </div>
+    <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+        <div class="flex justify-between mb-2 font-black tracking-tighter"><span class="text-gray-400 text-[10px]">Estimated visit time</span><span id="durationDisplay" class="text-xs text-blue-400">0 mins</span></div>
+        <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+    </div>
+    <div class="flex gap-4">
+        <button id="btnQuick" onclick="openQuickMenu()" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl border border-violet-700/50 shadow-lg active:scale-95 transition text-xs tracking-widest">Forms</button>
+        <button type="button" id="btnStart" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
+    </div>
+</div>
 </div>
 
 <div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center pointer-events-none">
@@ -453,20 +456,25 @@ function renderLocations(){
         if(loc.id === 'travel') {
             const isSel = state.selectedLocationId === 'travel'; const d = document.createElement('div');
             d.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${isSel ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-gray-700 hover:border-white/20'} bg-gradient-to-r from-indigo-600 to-purple-700`;
-            d.innerHTML = `<div class="flex items-center gap-2"><div class="text-xl">🚗</div><div><div class="text-sm font-bold text-white tracking-tight leading-none">Travel</div><div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">Distance Sync</div></div></div><button class="text-white/40 hover:text-white text-xs p-1" onclick="event.stopPropagation(); editTravelSettings();">⚙️</button>`;
+            d.innerHTML = `<div class="flex items-center gap-2"><div class="text-xl">🚗</div><div><div class="text-sm font-bold text-white tracking-tight leading-none">Travel</div><div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">Distance sync</div></div></div><button class="text-white/40 hover:text-white text-xs p-1" onclick="event.stopPropagation(); editTravelSettings();">⚙️</button>`;
+            
             d.onclick = () => { 
-                if(state.meta.wofExpiry){ 
-                    const w=new Date(state.meta.wofExpiry); 
-                    const days = (w.getTime()-Date.now())/(1000*60*60*24); 
-                    if(days < 0) { document.getElementById('wofBlockModal').classList.remove('hidden'); return; } 
-                    else if (days < 14) { 
-                        document.getElementById('wofWarnModal').classList.remove('hidden'); 
-                        document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days`; 
-                        state.selectedLocationId=loc.id; 
-                        warmUpGps(); renderLocations(); updateArrivedButtonState(); return; 
+                if (state.selectedLocationId === 'travel') {
+                    state.selectedLocationId = null; // PATCH: Allow unselecting Travel
+                } else {
+                    if(state.meta.wofExpiry){ 
+                        const w=new Date(state.meta.wofExpiry); 
+                        const days = (w.getTime()-Date.now())/(1000*60*60*24); 
+                        if(days < 0) { document.getElementById('wofBlockModal').classList.remove('hidden'); return; } 
+                        else if (days < 14) { 
+                            document.getElementById('wofWarnModal').classList.remove('hidden'); 
+                            document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days`; 
+                            state.selectedLocationId=loc.id; 
+                            warmUpGps(); renderLocations(); updateArrivedButtonState(); return; 
+                        } 
                     } 
-                } 
-                state.selectedLocationId = 'travel'; 
+                    state.selectedLocationId = 'travel'; 
+                }
                 warmUpGps(); renderLocations(); updateArrivedButtonState(); 
             };
             tr.appendChild(d); return;
@@ -475,15 +483,20 @@ function renderLocations(){
         d.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800 hover:bg-gray-750'}`;
         let icon = "🏢"; if(loc.name.includes("Home")) icon = "🏠";
         d.innerHTML = `<div class="flex justify-between items-start"><span class="text-2xl">${icon}</span>${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) ? `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : ''}</div><div><div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName||''}</div><div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div></div>`;
+        
         d.onclick = () => { 
-            state.selectedLocationId = loc.id; 
-            travelTargetName = loc.name; // PATCH: Inheritance logic
+            // PATCH: Allow tapping active site to unselect
+            if (state.selectedLocationId === loc.id) {
+                state.selectedLocationId = null;
+            } else {
+                state.selectedLocationId = loc.id; 
+                travelTargetName = loc.name; 
+            }
             warmUpGps(); renderLocations(); updateArrivedButtonState(); 
         }; 
         l.appendChild(d);
     });
 }
-
 function showSiteInfo(id, e){
     if(e) e.stopPropagation(); const l = state.locations.find(x => x.id === id); if(!l) return;
     document.getElementById('infoTitle').innerText = l.name; let h = "";
@@ -512,34 +525,78 @@ function updateArrivedButtonState(){
     
     if(state.selectedLocationId && v > 0){ 
         b.disabled = false;
-        
-        // PATCH: Dynamic button label for intuitive travel
         if (state.selectedLocationId === 'travel') {
-            b.innerText = travelTargetName ? "Travel to " + travelTargetName : "Start Travel";
+            b.innerText = travelTargetName ? "Travel to " + travelTargetName : "Start travel";
         } else {
-            b.innerText = "Start Visit";
+            b.innerText = "Start visit";
         }
-        
-        b.className = "long-press-btn flex-[2] py-4 bg-green-600 text-white font-black rounded-xl text-xl shadow-lg transition-all"; 
+        b.className = "long-press-btn flex-1 py-4 bg-green-600 text-white font-black rounded-xl text-xl shadow-lg transition-all"; 
         setupLongPress(b, startVisit); 
     } 
     else { 
         b.disabled = true; 
-        b.innerText = state.selectedLocationId ? "Set Duration" : "Start"; 
-        b.className = "long-press-btn flex-[2] py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl transition-all"; 
+        // IMPROVED CONTRAST: Uses light gray on dark gray for better visibility while disabled
+        b.innerText = state.selectedLocationId ? "Set time" : "Start"; 
+        b.className = "long-press-btn flex-1 py-4 bg-gray-600 text-gray-200 font-bold rounded-xl text-xl transition-all"; 
     }
 }
 
 // VISIT LOGIC
 function startVisit(){
-    warmUpSpeech(); const s = state.locations.find(x => x.id === state.selectedLocationId); if(!s) return;
-    const n = new Date(); const isHighRisk = document.getElementById('chkHighRisk').checked;
-    state.activeVisit = { locationId: s.id, startTime: n, anticipatedDepartureTime: new Date(n.getTime() + state.visitDurationMinutes * 60000), startGPS: "", highRisk: isHighRisk, warn90Sent: false, criticalSent: false };
-    state.lowBatSent = false; saveState(); enterLockedScreen(); 
+    warmUpSpeech(); 
+    const s = state.locations.find(x => x.id === state.selectedLocationId); 
+    if(!s) return;
+    
+    const n = new Date(); 
+    const isHighRisk = document.getElementById('chkHighRisk').checked;
+    
+    state.activeVisit = { 
+        locationId: s.id, 
+        startTime: n, 
+        anticipatedDepartureTime: new Date(n.getTime() + state.visitDurationMinutes * 60000), 
+        startGPS: "", 
+        highRisk: isHighRisk, 
+        warn90Sent: false, 
+        criticalSent: false 
+    };
+    
+    state.lowBatSent = false; 
+    saveState(); 
+    enterLockedScreen(); 
+    
     if(s.id === 'travel') startTravellingPulse();
+    
     navigator.geolocation.getCurrentPosition((pos) => {
-        if(state.activeVisit) { state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`; saveState(); let notes = s.id === 'travel' ? "Commencing Travel" : "Arrived at Site"; if(isHighRisk) notes += " [CRITICAL_TIMING]"; processUploadQueue(buildPayload({"Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", "Notes": notes, "Last Known GPS": state.activeVisit.startGPS})); }
-    }, (err) => { if(state.activeVisit) { let notes = s.id === 'travel' ? "Commencing Travel (No GPS)" : "Arrived (No GPS)"; processUploadQueue(buildPayload({"Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", "Notes": notes})); } }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+        if(state.activeVisit) { 
+            state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`; 
+            saveState(); 
+            
+            // PATCH: Captures 'Travelling to: [Name]' or 'unknown' for the monitor app
+            // Also switches 'Arrived at Site' to mixed-case for better readability
+            let notes = s.id === 'travel' 
+                ? ("Travelling to: " + (travelTargetName || "unknown")) 
+                : "Arrived at site"; 
+            
+            if(isHighRisk) notes += " [CRITICAL_TIMING]"; 
+            processUploadQueue(buildPayload({
+                "Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", 
+                "Notes": notes, 
+                "Last Known GPS": state.activeVisit.startGPS
+            })); 
+        }
+    }, (err) => { 
+        if(state.activeVisit) { 
+            // Fallback notes logic for failed GPS
+            let notes = s.id === 'travel' 
+                ? ("Travelling to: " + (travelTargetName || "unknown") + " (No GPS)") 
+                : "Arrived (No GPS)"; 
+                
+            processUploadQueue(buildPayload({
+                "Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", 
+                "Notes": notes
+            })); 
+        } 
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
 
 function warmUpGps() { if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{}, (err)=>{ if(err.code === 1) showToast("📍 GPS Permission Required"); }, {enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000); }
@@ -945,4 +1002,5 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
