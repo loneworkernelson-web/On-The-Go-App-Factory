@@ -533,76 +533,34 @@ const CRITICAL_ASSETS = [
   'https://cdn.tailwindcss.com'
 ];
 
-// 1. INSTALL: Force-cache the logo and safety shell immediately
-// Robust Install: Handles redirects for Tailwind/ToneJS
+//1. Robust Install: Handles redirects for Tailwind/ToneJS
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
       console.log('Finalizing Offline Safety Cache...');
-      
-      // We fetch assets individually so one failure doesn't kill the whole app
       for (const url of CRITICAL_ASSETS) {
         try {
-          // Use 'no-cors' for external CDNs to bypass strict security blocks
-          const response = await fetch(url, { 
-            mode: url.includes('http') ? 'no-cors' : 'cors',
-            redirect: 'follow' 
-          });
+          const response = await fetch(url, { mode: url.includes('http') ? 'no-cors' : 'cors', redirect: 'follow' });
           await cache.put(url, response);
-        } catch (err) {
-          console.warn('Could not cache offline asset:', url);
-        }
+        } catch (err) { console.warn('Could not cache offline asset:', url); }
       }
     }).then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('fetch', event => {
-  // Only intercept GET requests
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      // Serve from cache or fallback to network
-      return response || fetch(event.request).catch(() => {
-        // If offline, always show the app shell
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
-  );
-});
-
-// 2. FETCH: Serve from cache first, then network, then cache the result
+//2. Robust Fetch: Handles Opaque Responses (Tailwind/ToneJS) and Offline Fallbacks
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests (POSTs for reports must go to network)
   if (event.request.method !== 'GET') return;
-
   event.respondWith(
     caches.match(event.request).then((response) => {
-      // 1. Return cached version immediately if we have it
       if (response) return response;
-
-      // 2. Otherwise, fetch from the network
       return fetch(event.request).then((networkResponse) => {
-        // FIXED: Only exclude truly broken responses (0 = opaque/offline, 200 = success)
-        if (!networkResponse || (networkResponse.status !== 200 && networkResponse.status !== 0)) {
-          return networkResponse;
-        }
-
-        // 3. Cache the new response for next time
+        if (!networkResponse || (networkResponse.status !== 200 && networkResponse.status !== 0)) return networkResponse;
         const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
+        caches.open(CACHE_NAME).then((cache) => { cache.put(event.request, responseToCache); });
         return networkResponse;
       }).catch(() => {
-        // 4. OFFLINE FALLBACK: If network fails and it's a page, show the shell
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
+        if (event.request.mode === 'navigate') return caches.match('./index.html');
       });
     })
   );
@@ -680,6 +638,7 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
 
