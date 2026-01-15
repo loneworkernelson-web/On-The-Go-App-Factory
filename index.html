@@ -544,15 +544,26 @@ self.addEventListener('install', event => {
 });
 
 // 2. FETCH: Serve from cache first to ensure branding works in Dead Zones
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      // Return cached asset (like icon.png) or fetch from network
-      return response || fetch(event.request).catch(() => {
-        // If the whole network is gone, always fall back to the app shell
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+    caches.match(event.request).then((response) => {
+      // If found in cache, return it
+      if (response) return response;
+
+      // If not, fetch from network
+      return fetch(event.request).then((networkResponse) => {
+        // Only cache valid responses
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          // If it's a CORS request (like Tailwind), we use 'opaque' caching
+          return networkResponse;
         }
+
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return networkResponse;
       });
     })
   );
@@ -630,4 +641,5 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
