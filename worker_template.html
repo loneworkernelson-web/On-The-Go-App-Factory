@@ -898,12 +898,16 @@ function resizeCanvas(canvasEl) {
     const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
     if (!c) return; 
     const ctx = c.getContext('2d'); 
-    const ratio = window.devicePixelRatio || 1; 
+    const ratio = Math.max(window.devicePixelRatio || 1, 1); 
+    
+    // RESET coordinates before applying new scale
+    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    
     c.width = c.offsetWidth * ratio; 
     c.height = c.offsetHeight * ratio; 
     ctx.scale(ratio, ratio); 
     
-    // RE-ESTABLISH PEN AFTER RESIZE
+    // Ensure pen is black and thick enough for fingers
     ctx.strokeStyle = "#000000"; 
     ctx.lineWidth = 3; 
     ctx.lineCap = "round";
@@ -937,6 +941,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
