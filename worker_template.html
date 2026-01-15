@@ -616,9 +616,9 @@ function buildReportForm(n,c){
     if(!t) { c.innerHTML='<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>'; return; }
     
     t.forEach((f,i)=>{
-        let y='text'; let x=f.text||f;
+        let y='text'; let x=f.text||f; // Changed 'input' to 'text' for logic safety
         
-        // 1. TYPE IDENTIFICATION
+        // TYPE IDENTIFICATION
         if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
         else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
@@ -651,12 +651,6 @@ function buildReportForm(n,c){
                 btn.innerHTML = `📷 <span id="lbl_${i}">Capture Photo</span>`;
                 btn.onclick = () => input.click();
                 container.appendChild(input); container.appendChild(btn);
-            } else if(y==='gps'){
-                const wrap = document.createElement('div'); wrap.className="flex gap-2";
-                const btn = document.createElement('button'); btn.type="button"; btn.className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase"; btn.innerText="📍 GPS";
-                const inp = document.createElement('input'); inp.readOnly=true; inp.dataset.key=x; inp.className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono";
-                btn.onclick = () => captureGPS(btn);
-                wrap.appendChild(btn); wrap.appendChild(inp); container.appendChild(wrap);
             } else if(y==='checkbox'){
                 const wrap = document.createElement('div'); wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition";
                 wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label>`;
@@ -675,7 +669,7 @@ function buildReportForm(n,c){
         c.appendChild(container); // APPENDED INSIDE THE LOOP
     });
 
-    // RE-INIT ASSETS: MUST BE INSIDE THE FUNCTION
+    // ASSET INITIALIZATION
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
@@ -780,6 +774,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
