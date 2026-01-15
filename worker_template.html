@@ -126,13 +126,46 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <div id="settingsPage" class="page bg-gray-800">
-    <div class="header-bar"><h1 class="text-2xl font-bold text-white">Settings</h1><button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button></div>
-    <div class="content-area pb-24">
-        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4"><p class="text-xs text-blue-200 font-bold">Re-run the setup wizard to change details?</p><button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button></div>
-        <div id="installAppContainer" class="hidden mb-4"><button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2"><span class="text-xl">📲</span> Install App to Home Screen</button></div>
-        <div class="setting-card border-gray-600"><label class="setting-label lbl-gray">System Actions</label><input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%"><div class="flex gap-2"><button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Force Sync</button><button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold uppercase">Reset App</button></div></div>
+    <div class="header-bar">
+        <h1 class="text-2xl font-bold text-white">Settings</h1>
+        <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
-</div>
+    
+    <div class="content-area pb-24">
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
+            <p class="text-xs text-blue-200 font-bold">Re-run the setup wizard to change details?</p>
+            <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button>
+        </div>
+
+        <div id="installAppContainer" class="hidden mb-4">
+            <button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2">
+                <span class="text-xl">📲</span> Install App to Home Screen
+            </button>
+        </div>
+
+        <div class="setting-card border-gray-600">
+            <label class="setting-label lbl-blue">Location Services</label>
+            <label class="flex items-center justify-between cursor-pointer">
+                <div class="flex flex-col">
+                    <span class="text-sm font-bold text-white uppercase tracking-tight">Advanced Monitoring</span>
+                    <span class="text-[10px] text-gray-400 uppercase font-black">Enables high-accuracy GPS & signal bars</span>
+                </div>
+                <div class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="set_adv" class="sr-only peer" onchange="toggleAdvancedMode(this)">
+                    <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+            </label>
+        </div>
+
+        <div class="setting-card border-gray-600">
+            <label class="setting-label lbl-gray">System Actions</label>
+            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%">
+            <div class="flex gap-2">
+                <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Force Sync</button>
+                <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold uppercase">Reset App</button>
+            </div>
+        </div>
+    </div> </div>
 
 <div id="mainPage" class="page active">
     <div class="header-bar">
@@ -352,8 +385,23 @@ function wizBack(current){wizGoTo(current-1);}
 function wizSave(){ state.settings.workerName=document.getElementById('wiz_name').value; state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value); state.settings.workerEmail=document.getElementById('wiz_email').value; state.settings.emergencyName=document.getElementById('wiz_emg_name').value; state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value); state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value; state.settings.escalationName=document.getElementById('wiz_esc_name').value; state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value); state.settings.escalationEmail=document.getElementById('wiz_esc_email').value; state.settings.pinCode=document.getElementById('wiz_pin').value; state.settings.duressPin=document.getElementById('wiz_duress').value; state.settings.googleSheetUrl=CONFIG.url; saveState(); document.getElementById('setupWizard').classList.add('hidden'); navigate('main'); forceSync(); }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
-function populateSettingsForm(){document.getElementById('set_url').value=state.settings.googleSheetUrl||CONFIG.url;}
-function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
+function populateSettingsForm() {
+    document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
+    document.getElementById('set_adv').checked = state.settings.isAdvanced !== false; // Default to ON
+}
+function toggleAdvancedMode(el) {
+    state.settings.isAdvanced = el.checked;
+    saveState();
+    if(el.checked) {
+        startGPSMonitoring();
+        showToast("📍 Advanced Monitoring Active");
+    } else {
+        if(gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+        document.getElementById('gpsBars').classList.add('hidden');
+        showToast("🔋 Battery Saver: GPS Throttled");
+    }
+}
+    function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 // SYNC & FLEET
 function forceSync(showUi){
@@ -784,3 +832,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
