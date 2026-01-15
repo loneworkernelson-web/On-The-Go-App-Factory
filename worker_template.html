@@ -614,9 +614,9 @@ function buildReportForm(n,c){
     if(!t) { c.innerHTML='<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>'; return; }
     
     t.forEach((f,i)=>{
-        let y='text'; let x=f.text||f; // Changed 'input' to 'text' for logic safety
+        let y='text'; let x=f.text||f;
         
-        // TYPE IDENTIFICATION
+        // 1. TYPE IDENTIFICATION
         if(x.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace('[HEADING]','').replace('#','').trim(); }
         else if(x.includes('[NOTE]')){ y='note'; x=x.replace('[NOTE]','').trim(); }
         else if(x.includes('[TEXT]') || x.trim().startsWith('%')){ y='text'; x=x.replace('[TEXT]','').replace('%','').trim(); }
@@ -649,6 +649,12 @@ function buildReportForm(n,c){
                 btn.innerHTML = `📷 <span id="lbl_${i}">Capture Photo</span>`;
                 btn.onclick = () => input.click();
                 container.appendChild(input); container.appendChild(btn);
+            } else if(y==='gps'){ // FIXED: ADDED GPS RENDERING BLOCK
+                const wrap = document.createElement('div'); wrap.className="flex gap-2";
+                const btn = document.createElement('button'); btn.type="button"; btn.className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow uppercase"; btn.innerText="📍 GPS";
+                const inp = document.createElement('input'); inp.readOnly=true; inp.dataset.key=x; inp.className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 text-xs text-gray-500 font-mono";
+                btn.onclick = () => captureGPS(btn);
+                wrap.appendChild(btn); wrap.appendChild(inp); container.appendChild(wrap);
             } else if(y==='checkbox'){
                 const wrap = document.createElement('div'); wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition";
                 wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label>`;
@@ -663,11 +669,10 @@ function buildReportForm(n,c){
                 const el = document.createElement('input'); el.type=y; el.className="form-input font-bold"; el.dataset.key = x;
                 container.appendChild(el);
             }
-        } // End of main if/else chain
-        c.appendChild(container); // Correctly placed INSIDE the loop
-    }); // Correctly closes the t.forEach loop
+        }
+        c.appendChild(container); 
+    });
 
-    // RE-INIT ASSETS: Placed after the loop is complete
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
@@ -677,7 +682,7 @@ function buildReportForm(n,c){
             btn.onclick = () => clearSig(idx);
         });
     }, 600);
-} // Final closing brace for the buildReportForm function
+}
 
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
@@ -781,6 +786,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
