@@ -712,8 +712,9 @@ function buildReportForm(n,c){
     
     t.forEach((f,i)=>{
         let y='text'; let x=f.text||f;
-        const upperX = x.toUpperCase(); // Case-insensitive check
+        const upperX = x.toUpperCase();
         
+        // Tag Detection logic
         if(upperX.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace(/\[HEADING\]/gi,'').replace('#','').trim(); }
         else if(upperX.includes('[NOTE]')){ y='note'; x=x.replace(/\[NOTE\]/gi,'').trim(); }
         else if(upperX.includes('[SIGN]')){ y='signature'; x=x.replace(/\[SIGN\]/gi,'').trim(); }
@@ -721,7 +722,6 @@ function buildReportForm(n,c){
         else if(upperX.includes('[YESNO]')){ y='yesno'; x=x.replace(/\[YESNO\]/gi,'').trim(); }
         else if(upperX.includes('[GPS]')){ y='gps'; x=x.replace(/\[GPS\]/gi,'').trim(); if(!x) x="Location Status"; } 
         else if(upperX.includes('[CHECK]')){ y='checkbox'; x=x.replace(/\[CHECK\]/gi,'').trim(); }
-        // PATCH: Added [DATE], [TEXT], and stripped tag logic
         else if(upperX.includes('[DATE]')){ y='date'; x=x.replace(/\[DATE\]/gi,'').trim(); }
         else if(upperX.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace(/\[NUMBER\]/gi,'').replace('$','').trim(); }
         else if(upperX.includes('[TEXT]')){ y='text'; x=x.replace(/\[TEXT\]/gi,'').trim(); }
@@ -739,7 +739,8 @@ function buildReportForm(n,c){
                 const el = document.createElement('textarea'); el.className="form-input h-24 font-medium"; el.dataset.key = x;
                 container.appendChild(el);
             } else if(y==='signature'){
-                container.innerHTML += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" class="sig-clear-btn absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div>`;
+                // FIX: Added data-index to the clear button for safer event mapping
+                container.innerHTML += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" data-index="${i}" class="sig-clear-btn absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div>`;
             } else if(y==='photo'){
                 const input = document.createElement('input'); input.type="file"; input.accept="image/*"; input.className="hidden"; input.id=`cam_${i}`;
                 input.addEventListener('change', () => handlePhoto(input, x)); 
@@ -754,20 +755,22 @@ function buildReportForm(n,c){
                 btn.onclick = () => captureGPS(btn);
                 wrap.appendChild(btn); wrap.appendChild(inp); container.appendChild(wrap);
             } else if(y==='checkbox'){
-                const wrap = document.createElement('div'); wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition";
-                wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <label class="text-sm font-bold text-gray-200 select-none flex-1">${x}</label>`;
+                // FIX: Wrapped in label for full-width clickability and cursor-pointer
+                const wrap = document.createElement('label'); 
+                wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition cursor-pointer";
+                wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <span class="text-sm font-bold text-gray-200 select-none flex-1">${x}</span>`;
                 wrap.querySelector('input').dataset.key = x;
                 container.appendChild(wrap);
             } else if(y==='yesno'){
+                // FIX: Unique name using index (yesno_${i}) to prevent duplicate radio group collisions
                 const wrap = document.createElement('div'); wrap.className="flex gap-4 p-2 bg-gray-900 rounded-xl";
-                wrap.innerHTML = `<label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="Yes" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="${x}" value="No" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label>`;
+                wrap.innerHTML = `<label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="Yes" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="No" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label>`;
                 wrap.querySelectorAll('input').forEach(r => r.dataset.key = x);
                 container.appendChild(wrap);
             } else {
-                // PATCH: Enhanced input creation for Dates and Numbers
                 const el = document.createElement('input'); 
                 el.type = (y === 'date') ? 'date' : (y === 'number' ? 'number' : 'text');
-                if(y === 'number') el.inputMode = "decimal"; // Forces decimal keypad on mobile
+                if(y === 'number') el.inputMode = "decimal"; 
                 el.className = "form-input font-bold"; 
                 el.dataset.key = x;
                 container.appendChild(el);
@@ -781,8 +784,9 @@ function buildReportForm(n,c){
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-        document.querySelectorAll('.sig-clear-btn').forEach((btn, idx) => {
-            btn.onclick = () => clearSig(idx);
+        // FIX: Re-mapped clear button logic using data-index for reliability
+        document.querySelectorAll('.sig-clear-btn').forEach(btn => {
+            btn.onclick = () => clearSig(btn.dataset.index);
         });
     }, 600);
 }
@@ -941,3 +945,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
