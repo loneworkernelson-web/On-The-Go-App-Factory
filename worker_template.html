@@ -665,11 +665,11 @@ function buildReportForm(n,c){
                 const el = document.createElement('input'); el.type=y; el.className="form-input font-bold"; el.dataset.key = x;
                 container.appendChild(el);
             }
-        }
-        c.appendChild(container); // APPENDED INSIDE THE LOOP
-    });
+        } // End of main if/else chain
+        c.appendChild(container); // Correctly placed INSIDE the loop
+    }); // Correctly closes the t.forEach loop
 
-    // ASSET INITIALIZATION
+    // RE-INIT ASSETS: Placed after the loop is complete
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
@@ -679,7 +679,7 @@ function buildReportForm(n,c){
             btn.onclick = () => clearSig(idx);
         });
     }, 600);
-}
+} // Final closing brace for the buildReportForm function
 
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
@@ -774,6 +774,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
