@@ -534,11 +534,20 @@ const CRITICAL_ASSETS = [
 ];
 
 // 1. INSTALL: Force-cache the logo and safety shell immediately
+// Robust Install: Handles redirects for Tailwind/ToneJS
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
+    caches.open(CACHE_NAME).then(async (cache) => {
       console.log('Finalizing Offline Safety Cache...');
-      return cache.addAll(CRITICAL_ASSETS);
+      // Fetch each asset individually to handle redirects/CORS
+      for (const url of CRITICAL_ASSETS) {
+        try {
+          const response = await fetch(url, { mode: 'cors', redirect: 'follow' });
+          if (response.ok) await cache.put(url, response);
+        } catch (e) {
+          console.warn('Could not cache offline asset:', url);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });
@@ -641,5 +650,6 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
