@@ -51,6 +51,13 @@ function onOpen() {
       .addSeparator()
       .addItem('Force Sync Forms', 'getGlobalForms')
       .addToUi();
+  // Resume audio context on any user interaction
+document.addEventListener('click', async () => {
+    if (Tone.context.state !== 'running') {
+        await Tone.start();
+        console.log("Audio engine resumed via user gesture.");
+    }
+}, { once: true }); // Only needs to happen once per session
 }
 
 // ==========================================
@@ -961,6 +968,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
