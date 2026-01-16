@@ -233,7 +233,21 @@ async function toggleAudio() {
 
 function startAlertLoop() { 
     if(alertLoopInterval) return; 
-    alertLoopInterval = setInterval(() => { if(audioEnabled && synth) { const now = Tone.now(); synth.triggerAttackRelease("C6", "0.1", now); synth.triggerAttackRelease("G5", "0.1", now + 0.15); } }, 1000); 
+    
+    // Safety check: Ensure audio is enabled and engine is running
+    if(audioEnabled && synth) {
+        if (Tone.context.state !== 'running') Tone.context.resume();
+    }
+
+    alertLoopInterval = setInterval(() => { 
+        if(audioEnabled && synth) { 
+            const now = Tone.now(); 
+            // IMPROVED: High-visibility dual-tone siren
+            synth.triggerAttackRelease("A5", "0.2", now); 
+            synth.triggerAttackRelease("E6", "0.2", now + 0.3); 
+        } 
+        document.title = (document.title.includes("🚨")) ? "!! EMERGENCY !!" : "🚨 %%ORG_NAME%% ALERT";
+    }, 1000); 
 }
 
 function stopAlertLoop() { if(alertLoopInterval) { clearInterval(alertLoopInterval); alertLoopInterval = null; } }
