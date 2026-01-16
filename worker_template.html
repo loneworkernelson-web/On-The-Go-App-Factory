@@ -199,9 +199,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 </div>
 
-<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center pointer-events-none">
-    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em]">Battery Saver Active</div>
-    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-2">Tap anywhere to wake screen</div>
+<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center pointer-events-none select-none">
+    <div class="absolute inset-0 bg-white/5 opacity-0 transition-opacity duration-[1500ms]" id="saverProgress"></div>
+    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em] z-10">Battery Saver Active</div>
+    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 z-10 border border-gray-900 px-4 py-2 rounded-full">Hold screen to wake</div>
 </div>
 
 <div id="lockedPage" class="page">
@@ -564,6 +565,14 @@ function startVisit(){
     saveState(); 
     enterLockedScreen(); 
     
+    // NEW: Auto-switch to Dark Mode after 10 seconds
+    setTimeout(() => {
+        // Only dim if the visit is still active and NOT in an emergency state
+        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
+            toggleBatterySaver();
+        }
+    }, 10000);
+
     if(s.id === 'travel') startTravellingPulse();
     
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -571,8 +580,6 @@ function startVisit(){
             state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`; 
             saveState(); 
             
-            // PATCH: Captures 'Travelling to: [Name]' or 'unknown' for the monitor app
-            // Also switches 'Arrived at Site' to mixed-case for better readability
             let notes = s.id === 'travel' 
                 ? ("Travelling to: " + (travelTargetName || "unknown")) 
                 : "Arrived at site"; 
@@ -586,7 +593,6 @@ function startVisit(){
         }
     }, (err) => { 
         if(state.activeVisit) { 
-            // Fallback notes logic for failed GPS
             let notes = s.id === 'travel' 
                 ? ("Travelling to: " + (travelTargetName || "unknown") + " (No GPS)") 
                 : "Arrived (No GPS)"; 
@@ -891,7 +897,42 @@ function triggerPanic(){
 function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
 function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker safe"}));state.activeVisit.isPanic=false;document.getElementById('lockedPage').classList.remove('panic-mode');document.getElementById('btnSafe').classList.add('hidden');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnExtend').classList.remove('hidden');preDepart();});}
 function startTravellingPulse(){ travellingInterval = setInterval(() => { navigator.geolocation.getCurrentPosition(p => { processUploadQueue(buildPayload({"Alarm Status": "TRAVELLING", "Last Known GPS": `${p.coords.latitude},${p.coords.longitude}`, "Notes": "Routine Travelling Update"})); }, err => {}, { enableHighAccuracy: true, timeout: 15000 }); }, 300000); }
-function toggleBatterySaver() { const saver = document.getElementById('batterySaver'); if (!saver) return; if (saver.classList.contains('hidden')) { saver.classList.remove('hidden'); saver.style.pointerEvents = 'auto'; showToast("🌙 Battery Saver Active"); } else { saver.classList.add('hidden'); saver.style.pointerEvents = 'none'; } }
+function toggleBatterySaver() { 
+    const saver = document.getElementById('batterySaver'); 
+    const prog = document.getElementById('saverProgress');
+    if (!saver) return; 
+
+    if (saver.classList.contains('hidden')) { 
+        saver.classList.remove('hidden'); 
+        saver.style.pointerEvents = 'auto'; 
+        showToast("🌙 Battery Saver Active"); 
+        
+        // Use the existing long-press utility to prevent pocket bumping
+        setupLongPress(saver, () => {
+            toggleBatterySaver(); // Deactivates when held for 1.5s
+        });
+    } else { 
+        saver.classList.add('hidden'); 
+        saver.style.pointerEvents = 'none'; 
+        if(prog) prog.style.opacity = "0"; // Reset visual feedback
+    } 
+}
+
+// Add this CSS-like logic to your setupLongPress to handle the visual wake-up
+const originalSetup = setupLongPress;
+setupLongPress = function(btn, cb) {
+    originalSetup(btn, cb);
+    if(btn.id === 'batterySaver') {
+        const prog = document.getElementById('saverProgress');
+        const start = btn.ontouchstart;
+        const end = btn.ontouchend;
+        
+        btn.ontouchstart = (e) => { start(e); if(prog) prog.style.opacity = "1"; };
+        btn.ontouchend = (e) => { end(e); if(prog) prog.style.opacity = "0"; };
+        btn.onmousedown = (e) => { start(e); if(prog) prog.style.opacity = "1"; };
+        btn.onmouseup = (e) => { end(e); if(prog) prog.style.opacity = "0"; };
+    }
+};
 document.getElementById('batterySaver').onclick = toggleBatterySaver;
 
 function buildPayload(d){let dt="";let ln="Unknown Site";let la="No Address Provided";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
@@ -1025,6 +1066,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
