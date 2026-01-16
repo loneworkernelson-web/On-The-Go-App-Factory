@@ -657,41 +657,71 @@ function tick(){
         
         document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         
-        // PATCH: Restore verbal warnings and add audio pulse to wake speaker
+function tick(){
+    if(!state.activeVisit){clearInterval(timerInt);return;}
+    const now=new Date().getTime(); 
+    const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); 
+    const remaining=dueTime-now;
+    const isCriticalMode = state.activeVisit.highRisk; 
+    const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; 
+    const timeUntilEscalation = remaining + escTime;
+    
+    // 1. ALARM ACTIVATION CHECK
+    if(timeUntilEscalation <= 0) {
+        document.getElementById('overdueLabel').classList.remove('hidden'); 
+        document.getElementById('btnDepart').classList.add('hidden'); 
+        document.getElementById('btnExtend').classList.add('hidden'); 
+        document.getElementById('btnSafe').classList.remove('hidden'); 
+        setupLongPress(document.getElementById('btnSafe'), iamSafe);
+        document.getElementById('countdownTimer').innerText="ALARM SENT";
+        if(!state.activeVisit.criticalSent){
+            state.activeVisit.criticalSent=true; 
+            saveState(); 
+            triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'); 
+        } 
+    } else {
+        // 2. VERBAL WARNINGS (Moved here to work in ALL modes)
+        // These now monitor 'timeUntilEscalation' correctly
         if(timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ 
-            state.activeVisit.warn5minSent = true; 
-            saveState();
-            playSound('warning'); 
+            state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); 
         } 
         if(timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ 
-            state.activeVisit.warn2minSent = true; 
-            saveState();
+            state.activeVisit.warn2minSent = true; saveState();
             playSound('arrive'); // Audio pulse to wake up speaker
             setTimeout(() => speakWithAccent("Warning. Safety alarm will activate in two minutes."), 1000); 
         } 
         if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ 
-            state.activeVisit.warn90Sent = true; 
-            saveState();
+            state.activeVisit.warn90Sent = true; saveState();
             playSound('arrive'); 
             setTimeout(() => speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."), 1000); 
         }
 
-    } else {
-        const mTotal = Math.floor(remaining / 60000);
-        const s = Math.floor((remaining % 60000) / 1000);
-        
-        if (mTotal >= 60) {
-            const h = Math.floor(mTotal / 60);
-            const m = mTotal % 60;
-            document.getElementById('countdownTimer').innerHTML = `${h}h ${m}m`;
+        // 3. TIMER DISPLAY LOGIC
+        if (remaining <= 0) {
+            // Overdue UI
+            document.getElementById('overdueLabel').classList.remove('hidden'); 
+            document.getElementById('btnDepart').classList.remove('hidden'); 
+            document.getElementById('btnExtend').classList.remove('hidden'); 
+            document.getElementById('btnSafe').classList.add('hidden');
+            const absRem = Math.abs(remaining); 
+            const mTotal = Math.floor(absRem / 60000);
+            const s = Math.floor((absRem % 60000) / 1000);
+            document.getElementById('countdownTimer').innerHTML = mTotal >= 60 ? `-${Math.floor(mTotal/60)}h ${mTotal%60}m` : `-${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
+            document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
         } else {
-            document.getElementById('countdownTimer').innerHTML = `${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
+            // Active UI
+            const mTotal = Math.floor(remaining / 60000);
+            const s = Math.floor((remaining % 60000) / 1000);
+            document.getElementById('countdownTimer').innerHTML = mTotal >= 60 ? `${Math.floor(mTotal/60)}h ${mTotal%60}m` : `${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
+            document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
+            document.getElementById('overdueLabel').classList.add('hidden'); 
         }
-
-        document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
-        document.getElementById('overdueLabel').classList.add('hidden'); 
     }
 
+    if(state.activeVisit.anticipatedDepartureTime) { 
+        document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); 
+    }
+}
     if(state.activeVisit.anticipatedDepartureTime) { 
         document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); 
     }
@@ -1024,6 +1054,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
