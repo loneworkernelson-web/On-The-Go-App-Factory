@@ -820,7 +820,7 @@ function buildReportForm(n,c){
     if(!t) { c.innerHTML='<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>'; return; }
     
     t.forEach((f,i)=>{
-        let y='text'; let x=f.text||f;
+        let y='text'; let x=f.text||f; let dropOptions = [];
         const upperX = x.toUpperCase();
         
         // Tag Detection logic
@@ -833,6 +833,17 @@ function buildReportForm(n,c){
         else if(upperX.includes('[CHECK]')){ y='checkbox'; x=x.replace(/\[CHECK\]/gi,'').trim(); }
         else if(upperX.includes('[DATE]')){ y='date'; x=x.replace(/\[DATE\]/gi,'').trim(); }
         else if(upperX.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace(/\[NUMBER\]/gi,'').replace('$','').trim(); }
+        // NEW: [1TEXT] for single-line entry
+        else if(upperX.includes('[1TEXT]')){ y='1text'; x=x.replace(/\[1TEXT\]/gi,'').trim(); }
+        // NEW: [DROP] for selection menus (Supports 5+ options)
+        else if(upperX.startsWith('[DROP')){
+            y='drop';
+            const dropMatch = x.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
+            if(dropMatch){
+                dropOptions = dropMatch[1].split(',').map(o => o.trim());
+                x = x.replace(dropMatch[0], '').trim();
+            }
+        }
         else if(upperX.includes('[TEXT]')){ y='text'; x=x.replace(/\[TEXT\]/gi,'').trim(); }
 
         const container = document.createElement('div');
@@ -847,8 +858,17 @@ function buildReportForm(n,c){
             if(y==='text'){
                 const el = document.createElement('textarea'); el.className="form-input h-24 font-medium"; el.dataset.key = x;
                 container.appendChild(el);
+            } else if(y==='1text'){
+                const el = document.createElement('input'); el.type="text"; el.className="form-input font-bold"; el.dataset.key = x;
+                container.appendChild(el);
+            } else if(y==='drop'){
+                const sel = document.createElement('select'); sel.className="form-input font-bold"; sel.dataset.key = x;
+                const def = document.createElement('option'); def.text = "Select " + x + "..."; def.value = ""; sel.appendChild(def);
+                dropOptions.forEach(optText => {
+                    const opt = document.createElement('option'); opt.text = optText; opt.value = optText; sel.appendChild(opt);
+                });
+                container.appendChild(sel);
             } else if(y==='signature'){
-                // FIX: Added data-index to the clear button for safer event mapping
                 container.innerHTML += `<div class="border-2 border-gray-600 rounded-xl bg-white overflow-hidden relative" style="height:160px"><canvas id="sig-canvas-${i}" class="w-full h-full touch-none" style="z-index:100; position:relative;"></canvas><button type="button" data-index="${i}" class="sig-clear-btn absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-[10px] font-bold shadow">Clear</button></div>`;
             } else if(y==='photo'){
                 const input = document.createElement('input'); input.type="file"; input.accept="image/*"; input.className="hidden"; input.id=`cam_${i}`;
@@ -864,14 +884,12 @@ function buildReportForm(n,c){
                 btn.onclick = () => captureGPS(btn);
                 wrap.appendChild(btn); wrap.appendChild(inp); container.appendChild(wrap);
             } else if(y==='checkbox'){
-                // FIX: Wrapped in label for full-width clickability and cursor-pointer
                 const wrap = document.createElement('label'); 
                 wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 mb-3 active:bg-gray-700 transition cursor-pointer";
                 wrap.innerHTML = `<input type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <span class="text-sm font-bold text-gray-200 select-none flex-1">${x}</span>`;
                 wrap.querySelector('input').dataset.key = x;
                 container.appendChild(wrap);
             } else if(y==='yesno'){
-                // FIX: Unique name using index (yesno_${i}) to prevent duplicate radio group collisions
                 const wrap = document.createElement('div'); wrap.className="flex gap-4 p-2 bg-gray-900 rounded-xl";
                 wrap.innerHTML = `<label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="Yes" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="No" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label>`;
                 wrap.querySelectorAll('input').forEach(r => r.dataset.key = x);
@@ -893,7 +911,6 @@ function buildReportForm(n,c){
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-        // FIX: Re-mapped clear button logic using data-index for reliability
         document.querySelectorAll('.sig-clear-btn').forEach(btn => {
             btn.onclick = () => clearSig(btn.dataset.index);
         });
@@ -1054,6 +1071,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
