@@ -15,17 +15,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 <style>
-/* 1. FORCE SYSTEM DIM: Pure black signals the OS to dim the nav bar */
+/* 1. FORCE SYSTEM DIM: Toggling color-scheme is required to dim the OS navigation bar */
 html.system-dim, body.system-dim { 
     background-color: #000000 !important; 
+    color-scheme: dark !important; 
 }
+
 /* 2. BASE STYLES */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }.page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
 .page.active { display: flex; z-index: 10; }
 .header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
 .content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
 
-    /* 3. UPDATED FOOTER: Adds safety padding for the navigation bar */
+/* 3. UPDATED FOOTER: Adds safety padding for the navigation bar */
 .footer-bar { 
     padding: 1rem; 
     padding-bottom: calc(1rem + env(safe-area-inset-bottom)); /* Adds space for system nav bar */
@@ -922,7 +924,7 @@ function toggleBatterySaver() {
         saver.classList.remove('hidden'); 
         saver.style.pointerEvents = 'auto'; 
         
-        // DIM SYSTEM: Signal the OS to black out the bars
+        // DIM SYSTEM: Signal the OS to black out bars and use dark icons
         document.documentElement.classList.add('system-dim');
         document.body.classList.add('system-dim');
         if(themeMeta) themeMeta.setAttribute('content', '#000000');
@@ -930,7 +932,7 @@ function toggleBatterySaver() {
         
         showToast("🌙 Battery Saver Active"); 
         
-        // Use the long-press utility to prevent pocket-bumping
+        // POCKET PROTECTION: Require a 1.5s hold to wake the screen
         setupLongPress(saver, () => {
             toggleBatterySaver(); 
         });
@@ -946,7 +948,6 @@ function toggleBatterySaver() {
         if(appleMeta) appleMeta.setAttribute('content', 'black-translucent');
     } 
 }
-
 // Add this CSS-like logic to your setupLongPress to handle the visual wake-up
 const originalSetup = setupLongPress;
 setupLongPress = function(btn, cb) {
@@ -965,7 +966,31 @@ setupLongPress = function(btn, cb) {
 
 function buildPayload(d){let dt="";let ln="Unknown Site";let la="No Address Provided";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
 function processUploadQueue(d){ if(d) { state.pendingUploads.push(d); saveState(); } if(!navigator.onLine || state.pendingUploads.length === 0) return; const fd = new FormData(); const currentUpload = state.pendingUploads[0]; for(let k in currentUpload) fd.append(k, currentUpload[k]); fetch(CONFIG.url, { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); state.pendingUploads.shift(); saveState(); if(state.pendingUploads.length > 0) processUploadQueue(); }).catch(e => { console.warn("Upload Failed, data queued."); }); }
-function setupLongPress(btn,cb){let t;const start=(e)=>{e.preventDefault();btn.classList.add('pressing');t=setTimeout(()=>{cb();btn.classList.remove('pressing');},1500);};const cancel=(e)=>{clearTimeout(t);btn.classList.remove('pressing');};btn.onmousedown=btn.ontouchstart=start;btn.onmouseup=btn.ontouchend=btn.onmouseleave=cancel;}
+function setupLongPress(btn, cb) {
+    let t;
+    const prog = btn.id === 'batterySaver' ? document.getElementById('saverProgress') : null;
+
+    const start = (e) => {
+        if (e.type === 'touchstart') e.preventDefault();
+        btn.classList.add('pressing');
+        if (prog) prog.style.opacity = "1"; // Show visual wake feedback
+        
+        t = setTimeout(() => {
+            cb();
+            btn.classList.remove('pressing');
+            if (prog) prog.style.opacity = "0";
+        }, 1500);
+    };
+
+    const cancel = () => {
+        clearTimeout(t);
+        btn.classList.remove('pressing');
+        if (prog) prog.style.opacity = "0";
+    };
+
+    btn.onmousedown = btn.ontouchstart = start;
+    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
+}
 function withPinVerification(d,c){ showModal('pin'); const i=document.getElementById('pinInput'); i.value=''; i.focus(); const cf=()=>{ const v=i.value; closeModal('pin'); if(v===state.settings.pinCode){ c(); } else if(v===state.settings.duressPin){ processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"})); if(state.activeVisit) { state.activeVisit = null; saveState(); navigate('main'); } } document.getElementById('confirmPinBtn').removeEventListener('click',cf); }; document.getElementById('confirmPinBtn').addEventListener('click',cf); document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin'); }
 function clearData(){if(confirm('Reset all safety data and restart setup?')){localStorage.clear();location.reload();}}
 function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Syncing Forms...");}
@@ -1094,6 +1119,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
