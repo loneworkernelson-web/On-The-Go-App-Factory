@@ -66,15 +66,26 @@
     </style>
 </head>
 <body>
-    <div id="startOverlay" class="fixed inset-0 z-[100] bg-gray-900 flex items-center justify-center p-4">
-        <div class="text-center">
-            <h1 class="text-3xl font-bold text-white mb-4 text-brand">%%ORG_NAME%% Monitor</h1>
-            <button onclick="startApp()" class="px-8 py-4 btn-brand text-white font-bold rounded-xl shadow-2xl text-xl transition transform hover:scale-105">
-                🔊 CLICK TO START DASHBOARD
-            </button>
-            <p class="text-gray-500 mt-4 text-sm">Interaction required to enable audio alerts.</p>
+    <div id="audioGate" class="fixed inset-0 z-[100] bg-gray-900 flex items-center justify-center p-4">
+    <div class="gate-card bg-gray-800 border-2 border-brand rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+        <h1 class="text-3xl font-bold text-white mb-4 text-brand">%%ORG_NAME%% Monitor</h1>
+        <p class="text-gray-400 mb-6">Interaction is required to enable emergency audio alerts.</p>
+        
+        <button onclick="unlockAudio()" class="w-full btn-brand text-white font-black py-4 rounded-xl shadow-2xl text-xl transition transform hover:scale-105">
+            🔊 ACTIVATE AUDIO & START
+        </button>
+
+        <div class="audio-tip mt-8 text-left border-t border-gray-700 pt-6">
+            <p class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">🔧 Reliability Tip</p>
+            <p class="text-xs text-gray-400 leading-relaxed mb-3">To ensure alarms sound even if the dashboard is left untouched, allow sound permissions in your browser:</p>
+            <ol class="text-[11px] text-gray-500 space-y-2 list-decimal ml-4">
+                <li>Click the <strong>Lock Icon</strong> 🔒 (left of the URL).</li>
+                <li>Select <strong>Site Settings</strong>.</li>
+                <li>Find <strong>Sound</strong> and set it to <strong>Allow</strong>.</li>
+            </ol>
         </div>
     </div>
+</div>
 
     <div id="connectionOverlay" class="hidden fixed inset-0 z-[95] bg-gray-900/90 flex items-center justify-center backdrop-blur-md transition-opacity duration-500">
         <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center max-w-sm mx-4">
@@ -152,24 +163,10 @@ function applyBrandColors() {
     if (accent) document.documentElement.style.setProperty('--brand-accent', accent);
 }
 
-async function startApp() {
-    applyBrandColors(); // Apply colors on start
-    document.getElementById('startOverlay').classList.add('hidden');
-    try {
-        if(typeof Tone !== 'undefined') {
-            await Tone.start(); 
-            synth = new Tone.Synth().toDestination();
-        }
-    } catch(e) {
-        console.warn("Audio Context Failed:", e);
-        audioEnabled = false;
-        document.getElementById('btnAudio').innerText = "🔇 Audio Error";
-        document.getElementById('btnAudio').classList.replace('bg-green-600', 'bg-red-900');
-    }
+function startApp() {
+    applyBrandColors(); 
     if(!API_KEY) { 
         document.getElementById('authModal').classList.remove('hidden'); 
-    } else { 
-        startPolling(); 
     }
 }
 
@@ -614,6 +611,22 @@ async function unlockAudio() {
     
     // Resume the heartbeat/sync process
     if(typeof forceSync === "function") forceSync(); 
+}
+
+async function unlockAudio() {
+    try {
+        if(typeof Tone !== 'undefined') {
+            await Tone.start(); // This fulfills the "User Gesture" requirement
+            synth = new Tone.Synth().toDestination();
+            console.log("Audio Context Started");
+        }
+    } catch(e) {
+        console.warn("Audio Context Failed:", e);
+    }
+    
+    // Hide the gate and start the dashboard polling
+    document.getElementById('audioGate').style.display = 'none';
+    startPolling(); 
 }
 </script>
 </body>
