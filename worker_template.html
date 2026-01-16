@@ -962,7 +962,6 @@ setupLongPress = function(btn, cb) {
         btn.onmouseup = (e) => { end(e); if(prog) prog.style.opacity = "0"; };
     }
 };
-document.getElementById('batterySaver').onclick = toggleBatterySaver;
 
 function buildPayload(d){let dt="";let ln="Unknown Site";let la="No Address Provided";if(state.activeVisit){if(state.activeVisit.anticipatedDepartureTime)dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();const l=state.locations.find(x=>x.id===state.activeVisit.locationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}else if(state.selectedLocationId){const l=state.locations.find(x=>x.id===state.selectedLocationId);if(l){ln=l.companyName?`${l.companyName} - ${l.name}`:l.name;la=l.address;}}let gps=d['Last Known GPS']||"";if(!gps&&state.activeVisit&&state.activeVisit.startGPS){gps=state.activeVisit.startGPS;}return{'key':CONFIG.key,'Worker Name':state.settings.workerName,'Worker Phone Number':state.settings.workerPhone,'Battery Level':currentBatteryLevel,'Location Name':ln,'Location Address':la,'Anticipated Departure Time':dt,'Timestamp':new Date().toISOString(),deviceId:getDeviceID(),'Worker Email':state.settings.workerEmail,'Last Known GPS':gps,...d};}
 function processUploadQueue(d){ if(d) { state.pendingUploads.push(d); saveState(); } if(!navigator.onLine || state.pendingUploads.length === 0) return; const fd = new FormData(); const currentUpload = state.pendingUploads[0]; for(let k in currentUpload) fd.append(k, currentUpload[k]); fetch(CONFIG.url, { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); state.pendingUploads.shift(); saveState(); if(state.pendingUploads.length > 0) processUploadQueue(); }).catch(e => { console.warn("Upload Failed, data queued."); }); }
@@ -1095,6 +1094,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
