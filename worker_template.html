@@ -2,7 +2,7 @@
 <html lang="en" class="h-full">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>%%APP_NAME%%</title>
 <meta name="apple-mobile-web-app-title" content="%%APP_NAME%%">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,7 +20,14 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 .page.active { display: flex; z-index: 10; }
 .header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
 .content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
-.footer-bar { padding: 1rem; background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; z-index: 20; }
+.footer-bar { 
+    padding: 1rem; 
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom)); /* Adds space for system nav bar */
+    background-color: #111827; 
+    border-top: 1px solid #374151; 
+    flex-shrink: 0; 
+    z-index: 20; 
+}
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
 .long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
@@ -900,21 +907,28 @@ function startTravellingPulse(){ travellingInterval = setInterval(() => { naviga
 function toggleBatterySaver() { 
     const saver = document.getElementById('batterySaver'); 
     const prog = document.getElementById('saverProgress');
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
     if (!saver) return; 
 
     if (saver.classList.contains('hidden')) { 
         saver.classList.remove('hidden'); 
         saver.style.pointerEvents = 'auto'; 
+        
+        // DIM SYSTEM BARS: Changes the OS-level theme color to pure black
+        if(themeMeta) themeMeta.setAttribute('content', '#000000');
+        
         showToast("🌙 Battery Saver Active"); 
         
-        // Use the existing long-press utility to prevent pocket bumping
         setupLongPress(saver, () => {
-            toggleBatterySaver(); // Deactivates when held for 1.5s
+            toggleBatterySaver(); 
         });
     } else { 
         saver.classList.add('hidden'); 
         saver.style.pointerEvents = 'none'; 
-        if(prog) prog.style.opacity = "0"; // Reset visual feedback
+        if(prog) prog.style.opacity = "0";
+        
+        // RESTORE SYSTEM BARS: Returns to the default app color
+        if(themeMeta) themeMeta.setAttribute('content', '#111827');
     } 
 }
 
@@ -1066,6 +1080,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
