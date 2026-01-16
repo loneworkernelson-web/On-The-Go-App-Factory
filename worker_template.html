@@ -472,12 +472,45 @@ function openMidVisitMenu(){isMidVisitUpdate=true;calculatedDist=null;showModal(
 
 function renderIconGrid(forms, loc) {
     const l=document.getElementById('templateList'); l.innerHTML='';
-    const addBtn=(name,icon,label)=>{ const b=document.createElement('button'); b.className="menu-icon-btn"; b.innerHTML=`<div class="text-3xl mb-1">${icon}</div><div class="text-xs font-bold leading-tight uppercase tracking-tighter">${label}</div>`; b.onclick=()=>{closeModal('template');loadFormAndShow(name);}; l.appendChild(b); };
-    if(loc&&loc.templateName)addBtn(loc.templateName,"🏢",loc.templateName);
-    else if(loc&&loc.id==='travel')addBtn("Travel Report","🛣️","Travel Log");
-    else if(isMidVisitUpdate)addBtn("(Standard)","⏱️","Update Status");
-    addBtn("Note to Self","📝","Note to Self");
-    if(forms){ forms.forEach(f=>{ if(loc&&loc.templateName===f.name)return; let icon="📋"; const n=f.name.toLowerCase(); if(n.includes('vehicle'))icon="🚗"; else if(n.includes('incident')||n.includes('accident'))icon="⚠️"; else if(n.includes('hazard'))icon="☢️"; else if(n.includes('client'))icon="👤"; addBtn(f.name,icon,f.name); }); }
+    const addBtn=(name,icon,label)=>{ 
+        const b=document.createElement('button'); 
+        b.className="menu-icon-btn"; 
+        b.innerHTML=`<div class="text-3xl mb-1">${icon}</div><div class="text-xs font-bold leading-tight uppercase tracking-tighter">${label}</div>`; 
+        b.onclick=()=>{closeModal('template');loadFormAndShow(name);}; 
+        l.appendChild(b); 
+    };
+
+    // 1. Priority: Site-specific template
+    if(loc&&loc.templateName) addBtn(loc.templateName,"🏢",loc.templateName);
+    else if(loc&&loc.id==='travel') addBtn("Travel Report","🛣️","Travel Log");
+    else if(isMidVisitUpdate) addBtn("(Standard)","⏱️","Update Status");
+
+    // 2. Dynamic Note to Self
+    // Checks if "Note to Self" exists in your spreadsheet templates first
+    const hasNoteTemplate = forms && forms.find(f => f.name.trim().toLowerCase() === 'note to self');
+    if(hasNoteTemplate) {
+        addBtn(hasNoteTemplate.name, "📝", "Note to Self");
+    } else {
+        // Fallback to the hardcoded version if not defined in spreadsheet
+        addBtn("Note to Self", "📝", "Note to Self");
+    }
+
+    // 3. Global Forms
+    if(forms){ 
+        forms.forEach(f=>{ 
+            const n = f.name.toLowerCase();
+            // Skip if already added as a site-specific or Note to Self template
+            if(loc && loc.templateName === f.name) return;
+            if(n === 'note to self') return; 
+
+            let icon="📋"; 
+            if(n.includes('vehicle')) icon="🚗"; 
+            else if(n.includes('incident') || n.includes('accident')) icon="⚠️"; 
+            else if(n.includes('hazard')) icon="☢️"; 
+            else if(n.includes('client')) icon="👤"; 
+            addBtn(f.name, icon, f.name); 
+        }); 
+    }
 }
 
 function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
@@ -1167,6 +1200,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
