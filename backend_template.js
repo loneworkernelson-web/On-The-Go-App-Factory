@@ -449,14 +449,14 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     
     let recipientEmail = "";
     
-    // AUDIT FIX: Mandatory Worker Routing for Private Notes
+    // Audit Fix: Mandatory Worker Routing for Private Notes
     if (safeTName === 'note to self') {
-        recipientEmail = p['Worker Email']; // Pulls from the worker's own profile
+        recipientEmail = p['Worker Email']; 
     } else if (tSheet) {
         const tData = tSheet.getDataRange().getValues();
         for (let i = 1; i < tData.length; i++) {
             if (tData[i][1] && tData[i][1].toString().trim().toLowerCase() === safeTName) {
-                recipientEmail = tData[i][3]; // Pulls from the recipient column in Templates
+                recipientEmail = tData[i][3]; 
                 break;
             }
         }
@@ -489,36 +489,55 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
+    // NEW: Visit Location Intelligence Block
+    let mapHtml = "";
+    if (p['Last Known GPS']) {
+        const gps = p['Last Known GPS'];
+        const mapUrl = `http://googleusercontent.com/maps.google.com/?api=1&query=${gps}`;
+        mapHtml = `
+        <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
+            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase; letter-spacing:1px;">📍 Visit Location Intelligence</p>
+            <p style="margin:0 0 15px 0; font-size:13px; color:#374151;">Coordinates recorded at time of submission: <strong>${gps}</strong></p>
+            <a href="${mapUrl}" style="display:inline-block; padding:12px 24px; background:#1e40af; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold; font-size:13px; shadow: 0 4px 6px rgba(0,0,0,0.1);">View Location on Google Maps</a>
+        </div>`;
+    }
+
     let subject = (safeTName === 'note to self') ? `[PRIVATE] Note to Self` : `[${templateName}] - ${p['Worker Name']}`;
-    let html = `<div style="font-family:Arial,sans-serif;padding:20px;max-width:600px;border:1px solid #eee;border-radius:12px;">
-        <h2 style="color:#1e40af;">${templateName}</h2>
-        <p style="color:#666;font-size:12px;">Sent: ${new Date().toLocaleString()}</p>
+    let html = `<div style="font-family:Arial,sans-serif;padding:20px;max-width:600px;border:1px solid #eee;border-radius:12px;background-color:#ffffff;color:#333;">
+        <h2 style="color:#1e40af;margin-top:0;">${templateName}</h2>
+        <p style="color:#666;font-size:12px;">Worker: ${p['Worker Name']} | Sent: ${new Date().toLocaleString()}</p>
         <hr style="border:0;border-top:1px solid #eee;margin:20px 0;">
-        <div style="background:#f9fafb;padding:15px;border-radius:8px;margin-bottom:20px;">
-            <p style="white-space:pre-wrap;">${polishedNotes}</p>
+        
+        <div style="background:#f9fafb;padding:15px;border-radius:8px;margin-bottom:20px;border-left:4px solid #1e40af;">
+            <p style="white-space:pre-wrap;margin:0;font-size:14px;line-height:1.6;">${polishedNotes}</p>
         </div>
-        <ul style="list-style:none;padding:0;">`;
+        
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <tbody>`;
         
     for (const [key, value] of Object.entries(reportObj)) {
-        html += `<li style="margin-bottom:8px;font-size:14px;"><strong>${key}:</strong> ${value}</li>`;
+        html += `<tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:8px 0;font-size:13px;color:#6b7280;width:40%;">${key}</td><td style="padding:8px 0;font-size:13px;font-weight:600;color:#111827;">${value}</td></tr>`;
     }
-    html += `</ul>${imgTags.join('')}</div>`;
+    
+    html += `</tbody></table>
+        ${mapHtml} 
+        <div style="margin-top:25px;">${imgTags.join('')}</div>
+        ${p['Signature'] ? '<div style="margin-top:20px;padding-top:20px;border-top:1px solid #eee;"><p style="font-size:11px;color:#999;text-transform:uppercase;">Digital Signature</p><img src="cid:signature" style="max-height:80px;"></div>' : ''}
+    </div>`;
 
     MailApp.sendEmail({ to: recipientEmail, subject: subject, htmlBody: html, inlineImages: inlineImages });
 
-    // PRIVACY ENFORCEMENT: If autoDelete is true, purge the files from Drive now
+    // Privacy Purge for Private Notes
     if (p['autoDelete'] === 'true' && safeTName === 'note to self') {
         const fileUrls = [p1, p2, p3, p4, sig];
         fileUrls.forEach(url => {
             if (url && url.includes('id=')) {
-                try {
-                    const id = url.split('id=')[1];
-                    DriveApp.getFileById(id).setTrashed(true);
-                } catch(e) { console.warn("Privacy Purge Failed for: " + url); }
+                try { DriveApp.getFileById(url.split('id=')[1]).setTrashed(true); } catch(e) {}
             }
         });
     }
 }
+
 function dataURItoBlob(dataURI) {
     try {
         if (!dataURI) return null;
@@ -914,6 +933,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
