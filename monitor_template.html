@@ -54,6 +54,15 @@
         .map-icon.green { background: #10b981; }
         .map-icon.amber { background: #f59e0b; }
         .map-icon.grey { background: #64748b; }
+#audioGate {
+    position: fixed; inset: 0; background: #111827; z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: white; font-family: sans-serif; text-align: center; padding: 20px;
+}
+.gate-card { background: #1f2937; padding: 40px; border-radius: 16px; border: 1px solid #374151; max-width: 400px; }
+.btn-unlock { background: #2563eb; color: white; padding: 15px 30px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; margin-top: 20px; font-size: 1.1rem; }
+.btn-unlock:hover { background: #1d4ed8; }
+.audio-tip { margin-top: 30px; font-size: 0.8rem; color: #9ca3af; text-align: left; line-height: 1.4; border-top: 1px solid #374151; pt-4; }
     </style>
 </head>
 <body>
@@ -595,6 +604,17 @@ function exportSystemLog() {
     document.body.removeChild(link);
 }
 function formatTime(t) { if(!t) return "--:--"; const d = new Date(t); return isNaN(d) ? "--:--" : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12:true}); }
+async function unlockAudio() {
+    // Satisfies browser requirement for user gesture
+    await Tone.start();
+    console.log("Audio Context Started");
+    
+    // Hide the gate and show the dashboard
+    document.getElementById('audioGate').style.display = 'none';
+    
+    // Resume the heartbeat/sync process
+    if(typeof forceSync === "function") forceSync(); 
+}
 </script>
 </body>
 </html>
