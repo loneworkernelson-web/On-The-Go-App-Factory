@@ -613,6 +613,23 @@ async function unlockAudio() {
     if(typeof forceSync === "function") forceSync(); 
 }
 
+    // NEW: Helper to play specific UI sounds
+function playSound(type) {
+    if (!audioEnabled || !synth) return;
+    if (Tone.context.state !== 'running') Tone.context.resume();
+
+    const now = Tone.now();
+    if (type === 'offline') {
+        // High-low-high warning for connection loss
+        synth.triggerAttackRelease("A3", "4n", now);
+        synth.triggerAttackRelease("E3", "4n", now + 0.5);
+        synth.triggerAttackRelease("A2", "2n", now + 1.0);
+    } else if (type === 'test') {
+        // Simple chime for the sound-check
+        synth.triggerAttackRelease("C5", "8n");
+    }
+}
+    
 async function unlockAudio() {
     try {
         if(typeof Tone !== 'undefined') {
