@@ -270,29 +270,32 @@ function fetchData() {
     const script = document.createElement('script'); 
     const cbName = 'cb_' + Date.now(); 
     
-    // Safety Timeout: Cleans up the window object if the network hangs
+    // INCREASED TIMEOUT: 15 seconds to allow for slow Google Script wake-ups
     const timeout = setTimeout(() => {
         if (window[cbName]) {
             console.warn("Fetch Timeout: Checking Connection...");
+            // We DON'T delete the callback here; we let it stay in case it arrives late
             try { document.body.removeChild(script); } catch(e) {}
-            delete window[cbName];
         }
-    }, 8000);
+    }, 15000);
 
     window[cbName] = function(data) { 
         clearTimeout(timeout);
         lastHeartbeat = Date.now(); 
+        
         if(data.error) { 
             if(data.error.includes("Key")) resetKey();
             return; 
         } 
+        
         if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
         handleData(data); 
+        
+        // CLEANUP: Only delete once the data has actually been handled
         try { document.body.removeChild(script); } catch(e) {}
-        delete window[cbName]; 
+        setTimeout(() => { delete window[cbName]; }, 1000); 
     }; 
 
-    // Error Handling: Cleans up memory if the Google Backend is unreachable
     script.onerror = () => {
         clearTimeout(timeout);
         console.error("Network Error: Failed to reach Google Backend.");
@@ -300,7 +303,6 @@ function fetchData() {
         delete window[cbName];
     };
 
-    // Cache-busting: Ensures live data is retrieved rather than a browser-cached copy
     script.src = `${SCRIPT_URL}?callback=${cbName}&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`; 
     document.body.appendChild(script); 
 }
