@@ -206,47 +206,31 @@ function triggerResample() {
     }
 
 function applyPreset(p, a, el) {
-    // 1. Update the color indicator boxes
     const pBox = document.getElementById('primaryColorBox');
     const aBox = document.getElementById('accentColorBox');
     if(pBox) pBox.style.backgroundColor = p;
     if(aBox) aBox.style.backgroundColor = a;
     
-    // 2. Save to local storage for the build engine
     localStorage.setItem('otg_theme_primary', p); 
     localStorage.setItem('otg_theme_accent', a);
     
-    // 3. Update Mockup UI with all branded components
+    // Safety check for interactive phone mockup components
     const mockup = document.getElementById('appMockup');
     if(mockup) {
-        mockup.style.backgroundColor = p; // Primary background
-        
-        // Header & Footer primary colors
+        mockup.style.backgroundColor = p;
         const h = document.getElementById('mockHeader');
         const f = document.getElementById('mockFooter');
+        const b = document.getElementById('mockMainBtn');
+        const t = document.getElementById('mockTravelCard');
+        const card = document.getElementById('mockAccentCard');
+
         if(h) h.style.backgroundColor = p;
         if(f) f.style.backgroundColor = p;
-        
-        // NEW: Main Button accent color
-        const b = document.getElementById('mockMainBtn');
         if(b) b.style.backgroundColor = a;
-        
-        // Accent card (20% opacity)
-        const card = document.getElementById('mockAccentCard');
-        if(card) {
-            card.style.borderColor = a;
-            card.style.backgroundColor = a + '33';
-        }
-
-        // NEW: Travel card (30% border, 10% background)
-        const travel = document.getElementById('mockTravelCard');
-        if(travel) {
-            travel.style.borderColor = a + '4d';
-            travel.style.backgroundColor = a + '1a';
-        }
+        if(t) { t.style.borderColor = a + '4d'; t.style.backgroundColor = a + '1a'; }
+        if(card) { card.style.borderColor = a; card.style.backgroundColor = a + '33'; }
     }
-    
-    // 4. Update the selection ring on the swatches
+
     document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
     if(el) el.classList.add('selected');
 }
@@ -257,11 +241,11 @@ function applyPreset(p, a, el) {
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
 function loadPersistedData() {
-    const ids = ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName', 'checkinMins', 'vehFreq'];
+    const ids = ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'textbeltKey', 'escalationMins', 'appName', 'checkinMins', 'vehFreq'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         const val = localStorage.getItem('otg_' + id);
-        // Only set the value if the element actually exists on the page
+        // Only attempt to set value if the element exists in the DOM
         if (el && val !== null) {
             if (el.type === 'checkbox') {
                 el.checked = (val === 'true');
@@ -270,16 +254,21 @@ function loadPersistedData() {
             }
         }
     });
-    updateMockupUI(); // Ensure the preview updates after loading
+    // Trigger UI updates for the branding area
+    if (typeof updateMockupUI === 'function') updateMockupUI();
 }
   function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
-function toggleEnterBtn() {
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if(modal) modal.style.display = 'none';
+    const main = document.getElementById('mainContent');
+    if(main) main.classList.remove('blur-sm');
+}
+  function toggleEnterBtn() {
     const chk = document.getElementById('chkAccept');
     const btn = document.getElementById('btnEnter');
     if (chk && btn) {
         btn.disabled = !chk.checked;
-        // Visual feedback for the button state
         if (chk.checked) {
             btn.classList.replace('bg-gray-700', 'bg-blue-600');
             btn.classList.replace('text-gray-500', 'text-white');
@@ -288,7 +277,7 @@ function toggleEnterBtn() {
             btn.classList.replace('text-white', 'text-gray-500');
         }
     }
-}    
+}
     function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
     function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++) document.getElementById('tab'+i).classList.toggle('active', i===n); if(n===3) generateScript(); }
     function toggleCheckin() { document.getElementById('checkinOptions').classList.toggle('hidden', !document.getElementById('chkCheckin').checked); }
@@ -517,4 +506,5 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
