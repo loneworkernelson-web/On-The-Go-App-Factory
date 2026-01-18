@@ -17,24 +17,15 @@
     .btn { padding: 1rem 2rem; border-radius: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
     .btn-primary { background: linear-gradient(to right, #2563eb, #3b82f6); color: white; }
-    .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
-    .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #94a3b8; border-bottom: 4px solid transparent; transition: all 0.2s; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
-    a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-weight: 700; }
-    .drop-zone { border: 4px dashed #475569; border-radius: 16px; padding: 20px; text-align: center; background: #0f172a; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
-    .drop-zone:hover { border-color: #3b82f6; background: #1e293b; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
-    .checklist-item { display: flex; align-items: center; gap: 10px; padding: 12px; background: #334155; margin-bottom: 8px; border-radius: 8px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
-    .checklist-item.checked { background: #064e3b; border-color: #059669; }
-    .checklist-checkbox { width: 20px; height: 20px; accent-color: #10b981; cursor: pointer; }
     .preset-swatch { width: 56px; height: 56px; border-radius: 12px; cursor: pointer; border: 3px solid rgba(255,255,255,0.2); transition: all 0.1s; display: flex; overflow: hidden; }
     .preset-swatch:hover { transform: scale(1.1); border-color: #3b82f6; }
     .preset-swatch.selected { outline: 4px solid #3b82f6; outline-offset: 3px; transform: scale(1.05); border-color: white; }
     .swatch-half { flex: 1; height: 100%; }
-    .help-text { color: #ffffff !important; font-weight: 800; font-size: 11px; margin-top: 4px; line-height: 1.3; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
@@ -43,152 +34,176 @@
       <div class="modal-content border-yellow-600">
           <h2 class="text-2xl font-extrabold text-white mb-2">⚠️ Safety Notice</h2>
           <div class="space-y-4 text-gray-200 text-sm mb-6 font-bold">
-              <p>The <strong>OTG AppSuite</strong> is a professional serverless safety solution.</p>
-              <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>Active Use:</strong> Tracking requires staff to keep the app active.</li>
-                  <li><strong>Connectivity:</strong> Alerts require internet and valid API keys.</li>
-              </ul>
+              <p>Tracking requires staff to keep the app active and connectivity requires internet and valid API keys.</p>
           </div>
           <div class="pt-4 border-t border-gray-700 font-bold">
               <label class="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5" onchange="toggleEnterBtn()">
-                  <span class="text-sm text-gray-300">I accept these technical requirements.</span>
+                  <span class="text-sm text-gray-300 font-black uppercase">I accept these technical requirements.</span>
               </label>
               <button id="btnEnter" disabled onclick="closeModal('disclaimerModal')" class="mt-4 w-full py-4 bg-gray-700 text-gray-500 font-extrabold rounded-xl transition-all">Enter Factory</button>
           </div>
       </div>
   </div>
 
-  <div id="driveHelpModal" class="modal-backdrop">
-      <div class="modal-content border-blue-500">
-          <h2 class="text-xl font-extrabold text-white mb-4">📂 Drive Folder ID</h2>
-          <p class="text-sm text-white font-bold mb-4">Copy the string at the very end of your folder URL.</p>
-          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all font-bold">
-              drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
-          </div>
-          <button onclick="closeModal('driveHelpModal')" class="w-full py-3 bg-blue-600 text-white font-extrabold rounded-xl">Got it</button>
-      </div>
-  </div>
-
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
-      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-white font-extrabold tracking-widest text-sm uppercase">v79.35 | Master Edition</p>
+      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 uppercase">OTG Factory</h1>
+      <p class="text-white font-extrabold tracking-widest text-sm uppercase">Lone Worker AppSuite Compiler</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
       <div class="flex bg-gray-900 border-b border-gray-700 text-sm">
         <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
         <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Database</button>
-        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Cloud System</button>
-        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Build & Download</button>
-        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
+        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Build & Download</button>
       </div>
 
       <div class="p-6 md:p-10">
-
-        <div id="step1" class="step-section active space-y-8">
-          <div class="grid md:grid-cols-2 gap-8">
+        <div id="step1" class="step-section active">
+          <div class="grid lg:grid-cols-2 gap-12 items-start">
+            
             <div class="space-y-6">
               <div>
-                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase">1. Organisation Name</label>
+                  <label class="block text-blue-300 font-black mb-1 text-xs uppercase">Organisation Name</label>
                   <input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)">
               </div>
-              
-              <div>
-                  <label class="block text-blue-300 font-extrabold text-xs uppercase mb-1">2. App Icon Label</label>
-                  <input type="text" id="appName" maxlength="12" class="input-field text-center font-black text-green-400" value="Safety" oninput="saveInput(this)">
-              </div>
-
-              <div class="p-4 bg-gray-900 rounded-2xl border border-gray-700 shadow-inner">
+              <div class="p-4 bg-gray-900 rounded-2xl border border-gray-700">
                   <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest">🔐 Security Keys</h3>
                   <div class="mb-4">
-                      <label class="block text-blue-300 font-extrabold mb-1 text-xs">Secret Key (Admin)</label>
-                      <input type="text" id="secretKey" class="input-field text-yellow-400 py-2" oninput="saveInput(this)">
-                  </div>
-                  <div>
-                      <label class="block text-blue-300 font-extrabold mb-1 text-xs">Worker Key (App)</label>
-                      <input type="text" id="workerKey" class="input-field text-green-400 py-2" oninput="saveInput(this)">
+                      <label class="block text-blue-300 font-bold mb-1 text-xs uppercase">Secret Admin Key</label>
+                      <input type="text" id="secretKey" class="input-field py-2 text-yellow-400" oninput="saveInput(this)">
                   </div>
               </div>
             </div>
-            
-            <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-extrabold mb-3 text-sm uppercase">4. App Branding</label>
-              <div id="dropZone" class="drop-zone w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-4 border-4" onclick="document.getElementById('logoInput').click()">
-                <img id="logoImg" class="hidden h-full w-full object-cover">
-                <span id="logoText" class="text-white text-[11px] uppercase font-black px-4">Upload Logo</span>
-              </div>
-              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
-              <input type="hidden" id="logoUrl" oninput="saveInput(this)">
 
-              <div id="paletteArea" class="hidden w-full bg-gray-900/50 p-6 rounded-3xl border border-gray-700">
+            <div id="paletteArea" class="space-y-6 bg-gray-900/50 p-6 rounded-3xl border border-gray-700">
                 <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest text-center">📱 Live App Preview</h3>
                 
-                <div id="appMockup" class="mx-auto w-64 h-[450px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative">
-                    <div id="mockHeader" class="h-12 border-b border-gray-700 flex items-center px-4 justify-between bg-[#111827]">
-                        <div class="flex items-center gap-2">
-                            <img id="mockLogo" src="" class="w-5 h-5 rounded-sm bg-white object-contain hidden">
-                            <span id="mockOrgName" class="text-[10px] font-bold text-white truncate max-w-[100px]">Organisation</span>
-                        </div>
-                        <div class="w-3 h-3 rounded-full bg-gray-700"></div>
+                <div id="appMockup" class="mx-auto w-64 h-[400px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative">
+                    <div id="mockHeader" class="h-10 border-b border-gray-700 flex items-center px-4 bg-[#111827]">
+                        <span id="mockOrgName" class="text-[10px] font-bold text-white truncate">Organisation</span>
                     </div>
                     <div class="p-4 space-y-4">
-                        <div class="flex gap-2">
-                            <div class="w-8 h-8 bg-gray-800 rounded-lg border border-gray-700"></div>
-                            <div id="mockTravelCard" class="flex-1 h-8 rounded-lg border border-gray-700"></div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="h-20 bg-gray-800 rounded-lg border border-gray-700"></div>
-                            <div id="mockAccentCard" class="h-20 border-2 rounded-lg p-2 shadow-lg"></div>
-                        </div>
+                        <div id="mockTravelCard" class="h-8 rounded-lg border border-gray-700"></div>
+                        <div id="mockAccentCard" class="h-20 border-2 rounded-lg p-2"></div>
                     </div>
                     <div id="mockFooter" class="absolute bottom-0 w-full p-4 border-t border-gray-700 bg-[#111827]">
-                        <div id="mockMainBtn" class="h-10 w-full rounded-xl flex items-center justify-center font-black text-[10px] text-white uppercase tracking-widest shadow-lg">Start Visit</div>
+                        <div id="mockMainBtn" class="h-10 w-full rounded-xl flex items-center justify-center font-black text-[10px] text-white uppercase shadow-lg">Start Visit</div>
                     </div>
-                </div> <p class="text-[10px] text-gray-400 mt-6 uppercase font-black mb-3 text-center border-t border-gray-800 pt-4">Safe Fallbacks</p>
-                <div class="flex gap-4 justify-center" id="fallbackSwatches">
+                </div>
+
+                <div class="flex gap-4 justify-center mt-6">
                     <div class="preset-swatch" onclick="applyPreset('#1e40af', '#3b82f6', this)"><div class="swatch-half bg-[#1e40af]"></div><div class="swatch-half bg-[#3b82f6]"></div></div>
                     <div class="preset-swatch" onclick="applyPreset('#064e3b', '#10b981', this)"><div class="swatch-half bg-[#064e3b]"></div><div class="swatch-half bg-[#10b981]"></div></div>
                     <div class="preset-swatch" onclick="applyPreset('#450a0a', '#ef4444', this)"><div class="swatch-half bg-[#450a0a]"></div><div class="swatch-half bg-[#ef4444]"></div></div>
                 </div>
-              </div> </div>
-          </div> <div class="highlight-box border-blue-500/30 mt-8">
-            <div class="flex items-center gap-3 mb-6">🛡️<h3 class="text-xl font-black text-white uppercase">Safety & Fleet Options</h3></div>
-            <div class="grid md:grid-cols-2 gap-10">
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-white font-black text-xs uppercase">Alarm Grace Period (Mins)</label>
-                        <input type="number" id="escalationMins" value="15" class="bg-gray-800 border rounded p-2 text-white w-20 text-center font-black text-xl" oninput="saveInput(this)">
-                    </div>
-                    <div class="space-y-4">
-                        <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" onchange="saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Mileage Tracking</span></label>
-                        <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkVehicle" onchange="saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Vehicle Tracking</span></label>
-                    </div>
+            </div> </div> <div class="highlight-box border-blue-500/30 mt-8">
+            <h3 class="text-xl font-black text-white uppercase mb-4">🛡️ Safety & Fleet Options</h3>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <label class="block text-white font-black text-xs uppercase mb-2">Alarm Grace Period (Mins)</label>
+                    <input type="number" id="escalationMins" value="15" class="input-field w-24 text-center" oninput="saveInput(this)">
                 </div>
-                <div class="space-y-6">
-                    <div><label class="text-[11px] font-black text-indigo-300 uppercase">Textbelt Key</label><input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono" oninput="saveInput(this)"></div>
-                    <div><label class="text-[11px] font-black text-indigo-300 uppercase">Gemini AI Key</label><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono" oninput="saveInput(this)"></div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="chkVehicle" onchange="saveInput(this)" checked class="w-6 h-6">
+                    <span class="text-sm font-black text-gray-200 uppercase">Daily Vehicle Check</span>
                 </div>
             </div>
-          </div> <div class="flex justify-end pt-6"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-black uppercase">Next: Database Setup →</button></div>
-        </div> <div id="step2" class="step-section space-y-8">
-            <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-10 rounded-3xl border border-blue-500 shadow-xl text-center">
-                <h2 class="text-3xl font-black text-white mb-2 uppercase">Option A: Automated</h2>
-                <button onclick="openMagicLink()" class="btn btn-success text-xl px-12 py-6 shadow-2xl font-black uppercase">✨ Create Database Copy</button>
+          </div>
+
+          <div class="flex justify-end pt-12">
+            <button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-black uppercase">Next: Database Setup →</button>
+          </div>
+        </div> <div id="step2" class="step-section">
+            <div class="highlight-box border-green-500/30 text-center py-10">
+                <h2 class="text-3xl font-black text-white mb-6 uppercase">Database Setup</h2>
+                <a href="https://docs.google.com/spreadsheets/d/1vN43E8mFwQe_Mv_6h1v0C_3pX0Y6p7lE8x_v_e6r5C4/copy" target="_blank" class="btn bg-green-600 text-white font-black py-6 px-12 text-xl shadow-2xl uppercase">✨ Create Database Copy</a>
             </div>
-            <div class="flex justify-between pt-8"><button onclick="gotoStep(1)" class="text-white font-black uppercase text-xs">Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg shadow-2xl font-black uppercase">Next: Cloud System →</button></div>
+            <div class="flex justify-between pt-12">
+                <button onclick="gotoStep(1)" class="text-white font-black uppercase text-xs">Back</button>
+                <button onclick="gotoStep(3)" class="btn btn-primary font-black uppercase">Next: Build →</button>
+            </div>
         </div>
 
-        <div id="step3" class="step-section">...</div>
-        <div id="step4" class="step-section">...</div>
-        <div id="step5" class="step-section">...</div>
+        <div id="step3" class="step-section text-center">
+            <div class="highlight-box">
+                <h2 class="text-3xl font-black text-white mb-4 uppercase">Ready to Build</h2>
+                <button onclick="buildZip()" class="btn btn-primary text-xl px-16 py-6 shadow-2xl font-black uppercase">🚀 Download Zip Bundle</button>
+            </div>
+        </div>
 
       </div>
     </div>
   </div>
 
 <script>
+    // 1. MODAL LOGIC
+    function toggleEnterBtn() {
+        const chk = document.getElementById('chkAccept');
+        const btn = document.getElementById('btnEnter');
+        if (chk && btn) {
+            btn.disabled = !chk.checked;
+            if (chk.checked) {
+                btn.classList.remove('bg-gray-700', 'text-gray-500');
+                btn.classList.add('bg-blue-600', 'text-white');
+            } else {
+                btn.classList.add('bg-gray-700', 'text-gray-500');
+                btn.classList.remove('bg-blue-600', 'text-white');
+            }
+        }
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById('mainContent').classList.remove('blur-sm');
+    }
+
+    // 2. NAVIGATION
+    function gotoStep(step) {
+        document.querySelectorAll('.step-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('step' + step).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === step));
+        window.scrollTo(0, 0);
+    }
+
+    // 3. BRANDING SYNC
+    function applyPreset(p, a, el) {
+        localStorage.setItem('otg_theme_primary', p); 
+        localStorage.setItem('otg_theme_accent', a);
+        
+        const h = document.getElementById('mockHeader');
+        const f = document.getElementById('mockFooter');
+        const b = document.getElementById('mockMainBtn');
+        const card = document.getElementById('mockAccentCard');
+
+        if(h) h.style.backgroundColor = p;
+        if(f) f.style.backgroundColor = p;
+        if(b) b.style.backgroundColor = a; // Fixed: Use 'a', not 'accent'
+        if(card) {
+            card.style.borderColor = a;
+            card.style.backgroundColor = a + '33';
+        }
+
+        document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
+        if(el) el.classList.add('selected');
+    }
+
+    function saveInput(el) {
+        localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value);
+        if(el.id === 'orgName') document.getElementById('mockOrgName').innerText = el.value;
+    }
+
+    function buildZip() { alert('Building Zip Bundle...'); }
+
+    window.onload = () => {
+        const org = localStorage.getItem('otg_orgName');
+        if(org) {
+            document.getElementById('orgName').value = org;
+            document.getElementById('mockOrgName').innerText = org;
+        }
+    };
+</script>
   
 // 1. NAVIGATION & INITIALIZATION
 function gotoStep(step) {
@@ -304,4 +319,5 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
