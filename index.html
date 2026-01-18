@@ -23,9 +23,15 @@
     .tab-btn { flex: 1; py-4; font-weight: bold; color: #94a3b8; border-bottom: 4px solid transparent; transition: all 0.2s; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-weight: 700; }
+    .drop-zone { border: 4px dashed #475569; border-radius: 16px; padding: 20px; text-align: center; background: #0f172a; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
+    .drop-zone:hover { border-color: #3b82f6; background: #1e293b; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
     .modal-content { background: #1e293b; padding: 2rem; border-radius: 1rem; border: 2px solid #475569; max-width: 600px; width: 90%; }
+    .checklist-item { display: flex; align-items: center; gap: 10px; padding: 12px; background: #334155; margin-bottom: 8px; border-radius: 8px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+    .checklist-item.checked { background: #064e3b; border-color: #059669; }
+    .checklist-checkbox { width: 20px; height: 20px; accent-color: #10b981; cursor: pointer; }
     .preset-swatch { width: 56px; height: 56px; border-radius: 12px; cursor: pointer; border: 3px solid rgba(255,255,255,0.2); transition: all 0.1s; display: flex; overflow: hidden; }
+    .preset-swatch:hover { transform: scale(1.1); border-color: #3b82f6; }
     .preset-swatch.selected { outline: 4px solid #3b82f6; outline-offset: 3px; transform: scale(1.05); border-color: white; }
     .swatch-half { flex: 1; height: 100%; }
     .help-text { color: #ffffff !important; font-weight: 800; font-size: 11px; margin-top: 4px; line-height: 1.3; }
@@ -35,24 +41,33 @@
 
   <div id="disclaimerModal" class="modal-backdrop" style="display: flex;">
       <div class="modal-content border-yellow-600">
-          <h2 class="text-2xl font-extrabold text-white mb-2 uppercase tracking-tighter">⚠️ Safety Notice</h2>
+          <h2 class="text-2xl font-extrabold text-white mb-2 uppercase">⚠️ Safety Notice</h2>
           <div class="space-y-4 text-gray-200 text-sm mb-6 font-bold">
-              <p>Tracking requires staff to keep the app active and alerts require internet and valid API keys.</p>
+              <p>Active Use tracking requires staff to keep the app active on the device. Emergency alerts require internet data and valid API keys.</p>
           </div>
           <div class="pt-4 border-t border-gray-700 font-bold">
               <label class="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5" onchange="toggleEnterBtn()">
-                  <span class="text-sm text-gray-300 uppercase">I accept these technical requirements.</span>
+                  <span class="text-sm text-gray-300">I accept these technical and safety requirements.</span>
               </label>
               <button id="btnEnter" disabled onclick="closeModal('disclaimerModal')" class="mt-4 w-full py-4 bg-gray-700 text-gray-500 font-extrabold rounded-xl transition-all">Enter Factory</button>
           </div>
       </div>
   </div>
 
+  <div id="driveHelpModal" class="modal-backdrop">
+      <div class="modal-content border-blue-500">
+          <h2 class="text-xl font-extrabold text-white mb-4 uppercase">📂 Folder ID Help</h2>
+          <p class="text-sm text-white font-bold mb-4 font-mono leading-relaxed">Copy the letters and numbers at the end of your Drive folder URL.</p>
+          <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all font-bold">drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong></div>
+          <button onclick="closeModal('driveHelpModal')" class="w-full py-3 bg-blue-600 text-white font-extrabold rounded-xl">Got it</button>
+      </div>
+  </div>
+
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 uppercase">OTG AppSuite Factory</h1>
-      <p class="text-white font-extrabold tracking-widest text-sm uppercase">Lone Worker AppSuite Compiler</p>
+      <p class="text-white font-extrabold tracking-widest text-sm uppercase">Lone Worker Compiler v79.35</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
@@ -67,63 +82,123 @@
       <div class="p-6 md:p-10">
 
         <div id="step1" class="step-section active space-y-8">
-          <div class="grid lg:grid-cols-2 gap-12 items-start">
+          <div class="grid md:grid-cols-2 gap-8">
             <div class="space-y-6">
-                <div><label class="block text-blue-300 font-black mb-1 text-xs uppercase">Organisation Name</label><input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)"></div>
-                <div><label class="block text-blue-300 font-black text-xs uppercase mb-1">App Icon Label</label><input type="text" id="appName" maxlength="12" class="input-field text-center font-black text-green-400" value="Safety" oninput="saveInput(this)"></div>
-                <div class="p-4 bg-gray-900 rounded-2xl border border-gray-700"><h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest">🔐 Security Keys</h3><div class="mb-4"><label class="block text-blue-300 font-bold mb-1 text-xs uppercase">Secret Admin Key</label><input type="text" id="secretKey" class="input-field py-2 text-yellow-400" oninput="saveInput(this)"></div><div><label class="block text-blue-300 font-bold mb-1 text-xs uppercase">Worker Key (App)</label><input type="text" id="workerKey" class="input-field py-2 text-green-400" oninput="saveInput(this)"></div></div>
-            </div>
+              <div>
+                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">1. Organisation Name</label>
+                  <input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)">
+              </div>
+              
+              <div>
+                  <label class="block text-blue-300 font-extrabold text-xs uppercase mb-1">2. App Icon Label</label>
+                  <input type="text" id="appName" maxlength="12" class="input-field text-center font-black text-green-400 border-green-600/50" value="Safety" oninput="saveInput(this)">
+              </div>
 
-            <div id="paletteArea" class="space-y-6 bg-gray-900/50 p-6 rounded-3xl border border-gray-700">
+              <div class="p-4 bg-gray-900 rounded-2xl border border-gray-700 shadow-inner">
+                  <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest">🔐 Security Keys</h3>
+                  <div class="mb-4">
+                      <label class="block text-blue-300 font-extrabold mb-1 text-xs">Secret Admin Key</label>
+                      <input type="text" id="secretKey" class="input-field text-yellow-400 py-2" oninput="saveInput(this)">
+                  </div>
+                  <div>
+                      <label class="block text-blue-300 font-extrabold mb-1 text-xs">Worker App Key</label>
+                      <input type="text" id="workerKey" class="input-field text-green-400 py-2" oninput="saveInput(this)">
+                  </div>
+              </div>
+
+              <div>
+                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase">3. Regional Logic</label>
+                  <select id="countrySelect" class="input-field cursor-pointer py-3 text-sm font-black" onchange="updateRegionInfo()">
+                      <option value="+64">New Zealand (+64)</option>
+                      <option value="+61">Australia (+61)</option>
+                      <option value="+44">United Kingdom (+44)</option>
+                      <option value="+1">USA / Canada (+1)</option>
+                  </select>
+                  <input type="hidden" id="timezoneVal">
+              </div>
+            </div>
+            
+            <div class="highlight-box flex flex-col items-center justify-center text-center">
+              <label class="block text-blue-300 font-extrabold mb-3 text-sm uppercase tracking-widest">4. App Branding</label>
+              <div id="dropZone" class="drop-zone w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-4 border-4" onclick="document.getElementById('logoInput').click()">
+                <img id="logoImg" class="hidden h-full w-full object-cover">
+                <span id="logoText" class="text-white text-[11px] uppercase font-black px-4 leading-tight">Click to Upload Logo</span>
+              </div>
+              <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)">
+              <input type="hidden" id="logoUrl" oninput="saveInput(this)">
+
+              <div id="paletteArea" class="hidden w-full bg-gray-900/50 p-6 rounded-3xl border border-gray-700 shadow-inner">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[10px] text-gray-200 font-black uppercase tracking-widest">1. Brand Pairs</span>
+                    <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-black hover:underline">↻ Resample</button>
+                </div>
+                <div class="flex gap-4 justify-center mb-6" id="logoClusterSwatches"></div>
+
+                <div class="pt-6 border-t border-gray-800 flex gap-10 justify-center items-center mb-8">
+                    <div class="flex flex-col items-center gap-2"><div id="primaryColorBox" class="w-10 h-10 rounded-xl border border-white/20"></div><span class="text-[8px] text-gray-400 font-black uppercase">Primary</span></div>
+                    <div class="flex flex-col items-center gap-2"><div id="accentColorBox" class="w-10 h-10 rounded-xl border border-white/20"></div><span class="text-[8px] text-gray-400 font-black uppercase">Accent</span></div>
+                </div>
+
                 <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest text-center">📱 Live App Preview</h3>
                 <div id="appMockup" class="mx-auto w-64 h-[400px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative">
-                    <div id="mockHeader" class="h-10 border-b border-gray-700 flex items-center px-4 bg-[#111827]"><span id="mockOrgName" class="text-[10px] font-bold text-white truncate">Organisation</span></div>
-                    <div class="p-4 space-y-4"><div id="mockTravelCard" class="h-8 rounded-lg border border-gray-700"></div><div id="mockAccentCard" class="h-20 border-2 rounded-lg p-2"></div></div>
+                    <div id="mockHeader" class="h-10 border-b border-gray-700 flex items-center px-4 justify-between bg-[#111827]">
+                        <div class="flex items-center gap-2"><img id="mockLogo" src="" class="w-4 h-4 rounded-sm bg-white object-contain hidden"><span id="mockOrgName" class="text-[10px] font-bold text-white truncate max-w-[100px]">Organisation</span></div>
+                        <div class="w-2 h-2 rounded-full bg-gray-700"></div>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <div id="mockTravelCard" class="h-8 rounded-lg border border-gray-700"></div>
+                        <div id="mockAccentCard" class="h-20 border-2 rounded-lg p-2 shadow-lg"></div>
+                    </div>
                     <div id="mockFooter" class="absolute bottom-0 w-full p-4 border-t border-gray-700 bg-[#111827]"><div id="mockMainBtn" class="h-10 w-full rounded-xl flex items-center justify-center font-black text-[10px] text-white uppercase shadow-lg">Start Visit</div></div>
                 </div>
-                <div class="flex gap-4 justify-center mt-6">
+
+                <p class="text-[10px] text-gray-400 mt-6 uppercase font-black mb-3 text-center border-t border-gray-800 pt-4">Fallback Swatches</p>
+                <div class="flex gap-4 justify-center" id="fallbackSwatches">
                     <div class="preset-swatch" onclick="applyPreset('#1e40af', '#3b82f6', this)"><div class="swatch-half bg-[#1e40af]"></div><div class="swatch-half bg-[#3b82f6]"></div></div>
                     <div class="preset-swatch" onclick="applyPreset('#064e3b', '#10b981', this)"><div class="swatch-half bg-[#064e3b]"></div><div class="swatch-half bg-[#10b981]"></div></div>
+                    <div class="preset-swatch" onclick="applyPreset('#450a0a', '#ef4444', this)"><div class="swatch-half bg-[#450a0a]"></div><div class="swatch-half bg-[#ef4444]"></div></div>
                 </div>
-            </div>
-          </div>
-
-          <div class="highlight-box border-blue-500/30 mt-8">
-            <h3 class="text-xl font-black text-white uppercase mb-4">🛡️ Safety & Fleet Options</h3>
-            <div class="grid md:grid-cols-2 gap-8">
+              </div> </div> </div> <div class="highlight-box border-blue-500/30 mt-8">
+            <div class="flex items-center gap-3 mb-6">🛡️<h3 class="text-xl font-black text-white uppercase tracking-widest">Safety & Fleet Options</h3></div>
+            <div class="grid md:grid-cols-2 gap-10">
                 <div class="space-y-6">
-                    <div><label class="block text-white font-black text-xs uppercase mb-2">Alarm Grace Period (Mins)</label><input type="number" id="escalationMins" value="15" class="input-field w-24 text-center" oninput="saveInput(this)"></div>
-                    <div class="flex items-center gap-3"><input type="checkbox" id="chkVehicle" onchange="saveInput(this)" checked class="w-6 h-6"><span class="text-sm font-black text-gray-200 uppercase">Daily Vehicle Check</span></div>
+                    <div><label class="block text-white font-black text-xs uppercase mb-2">Alarm Grace Period (Mins)</label><input type="number" id="escalationMins" value="15" class="input-field w-24 text-center font-black" oninput="saveInput(this)"></div>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer font-black uppercase text-xs"><input type="checkbox" id="chkMileage" onchange="saveInput(this)" checked> Mileage Tracking</label>
+                        <label class="flex items-center gap-3 cursor-pointer font-black uppercase text-xs"><input type="checkbox" id="chkVehicle" onchange="saveInput(this)" checked> Vehicle Maintenance</label>
+                    </div>
                 </div>
                 <div class="space-y-6">
-                    <div><label class="text-[11px] font-black text-indigo-300 uppercase">Textbelt Key</label><input type="text" id="textbeltKey" class="input-field py-2 text-xs" oninput="saveInput(this)"></div>
-                    <div><label class="text-[11px] font-black text-indigo-300 uppercase">Gemini AI Key</label><input type="text" id="geminiKey" class="input-field py-2 text-xs" oninput="saveInput(this)"></div>
+                    <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase">Textbelt Key</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono font-bold" oninput="saveInput(this)"></div>
+                    <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase">Gemini AI Key</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" oninput="saveInput(this)"></div>
+                    <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase">ORS Key</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" oninput="saveInput(this)"></div>
+                    <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase">Drive Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where?</a></div><input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" oninput="saveInput(this)"></div>
                 </div>
             </div>
           </div>
 
           <div class="flex justify-end pt-12"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-black uppercase">Next: Database Setup →</button></div>
-        </div>
-
-        <div id="step2" class="step-section">
-            <div class="highlight-box border-green-500/30 text-center py-10">
-                <h2 class="text-3xl font-black text-white mb-6 uppercase">Step 2: Database Setup</h2>
-                <a href="https://docs.google.com/spreadsheets/d/1vN43E8mFwQe_Mv_6h1v0C_3pX0Y6p7lE8x_v_e6r5C4/copy" target="_blank" class="btn bg-green-600 text-white font-black py-6 px-12 text-xl shadow-2xl uppercase">✨ Create Database Copy</a>
+        </div> <div id="step2" class="step-section">
+            <div class="highlight-box border-green-500/30 text-center py-12">
+                <h2 class="text-3xl font-black text-white mb-6 uppercase tracking-tighter">Option A: Automated Setup</h2>
+                <button onclick="openMagicLink()" class="btn btn-success text-xl px-16 py-6 shadow-2xl transform hover:-translate-y-1 font-black uppercase tracking-widest">✨ Create Database Copy</button>
             </div>
             <div class="flex justify-between pt-12"><button onclick="gotoStep(1)" class="text-white font-black uppercase text-xs">Back</button><button onclick="gotoStep(3)" class="btn btn-primary font-black uppercase">Next: Cloud System →</button></div>
         </div>
 
         <div id="step3" class="step-section space-y-10">
             <div class="highlight-box border-purple-500/30">
-                <h2 class="text-3xl font-black text-white mb-6 uppercase">Step 3: Cloud Logic</h2>
+                <h2 class="text-3xl font-black text-white mb-8 uppercase tracking-tighter text-center">1. Connect System Brain</h2>
                 <div class="space-y-6">
-                    <div><label class="block text-blue-300 font-black mb-1 text-xs uppercase">Paste Web App URL Here:</label><input type="url" id="webAppUrl" class="input-field font-mono text-yellow-300" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)"></div>
+                    <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full py-4 text-lg font-black shadow-2xl">📋 COPY BACKEND CODE</button>
+                    <div class="mt-8"><label class="block text-green-400 font-black text-center uppercase tracking-widest text-sm mb-4">2. Paste Deployment URL Here:</label><input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)"></div>
                 </div>
             </div>
             <div class="flex justify-between pt-12"><button onclick="gotoStep(2)" class="text-white font-black uppercase text-xs">Back</button><button onclick="gotoStep(4)" class="btn btn-primary font-black uppercase">Next: Build Bundle →</button></div>
         </div>
 
-        <div id="step4" class="step-section text-center"><div class="highlight-box"><h2 class="text-3xl font-black text-white mb-4 uppercase tracking-widest">Step 4: Compiling Bundle</h2><button onclick="buildZip()" class="btn btn-primary text-xl px-16 py-6 shadow-2xl uppercase">🚀 Build AppSuite (.ZIP)</button></div></div>
+        <div id="step4" class="step-section text-center"><div class="highlight-box"><h2 class="text-3xl font-black text-white mb-4 uppercase">Step 4: Compiling</h2><button onclick="downloadZip()" class="btn btn-primary text-xl px-16 py-6 shadow-2xl uppercase font-black">🚀 Build AppSuite (.ZIP)</button></div></div>
+        <div id="step5" class="step-section"><div class="highlight-box"><h2 class="text-3xl font-black text-white mb-8 uppercase text-center">Step 5: Deployment Pack</h2><div id="launchPack" class="grid md:grid-cols-2 gap-8"><div><h4 class="text-xs font-black uppercase text-slate-400 mb-4">Install QR</h4><img id="qrImage" src="" class="mx-auto bg-white p-4 rounded-xl w-44 h-44"></div><div><h4 class="text-xs font-black uppercase text-slate-400 mb-4">Announcement Body</h4><textarea id="launchEmail" class="w-full h-44 bg-slate-900 border border-slate-700 rounded-lg p-4 text-xs text-gray-300" readonly></textarea></div></div></div></div>
 
       </div>
     </div>
@@ -241,11 +316,11 @@ function applyPreset(p, a, el) {
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
 function loadPersistedData() {
-    const ids = ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'textbeltKey', 'escalationMins', 'appName', 'checkinMins', 'vehFreq'];
+    const ids = ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'textbeltKey', 'orsKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         const val = localStorage.getItem('otg_' + id);
-        // Only attempt to set value if the element exists in the DOM
+        // Only attempt to set the value if the field exists on the current page
         if (el && val !== null) {
             if (el.type === 'checkbox') {
                 el.checked = (val === 'true');
@@ -254,7 +329,7 @@ function loadPersistedData() {
             }
         }
     });
-    // Trigger UI updates for the branding area
+    // Safely refresh the mockup after data loads
     if (typeof updateMockupUI === 'function') updateMockupUI();
 }
   function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
@@ -264,7 +339,7 @@ function closeModal(id) {
     const main = document.getElementById('mainContent');
     if(main) main.classList.remove('blur-sm');
 }
-  function toggleEnterBtn() {
+function toggleEnterBtn() {
     const chk = document.getElementById('chkAccept');
     const btn = document.getElementById('btnEnter');
     if (chk && btn) {
@@ -298,38 +373,32 @@ function closeModal(id) {
 
    // NEW: Logic to sync the UI Mockup with user inputs
 function updateMockupUI() {
-    const org = document.getElementById('orgName').value;
-    const logo = document.getElementById('logoUrl').value;
+    const orgEl = document.getElementById('orgName');
+    const logoEl = document.getElementById('logoUrl');
+    if(!orgEl || !logoEl) return; // Exit early if elements are missing
+
+    const org = orgEl.value;
+    const logo = logoEl.value;
     const primary = localStorage.getItem('otg_theme_primary') || "#1e40af";
     const accent = localStorage.getItem('otg_theme_accent') || "#3b82f6";
 
-    // 1. Update Text & Logo
-    document.getElementById('mockOrgName').innerText = org || "My Organisation";
-    const mLogo = document.getElementById('mockLogo');
-    if(logo && mLogo) {
-        mLogo.src = logo;
-        mLogo.classList.remove('hidden');
-    }
+    const mockOrg = document.getElementById('mockOrgName');
+    if(mockOrg) mockOrg.innerText = org || "My Organisation";
+    
+    const mockLogo = document.getElementById('mockLogo');
+    if(mockLogo && logo) { mockLogo.src = logo; mockLogo.classList.remove('hidden'); }
 
-    // 2. Update Themed Components
     const header = document.getElementById('mockHeader');
     const footer = document.getElementById('mockFooter');
-    const mainBtn = document.getElementById('mockMainBtn');
-    const accentCard = document.getElementById('mockAccentCard');
-    const travelCard = document.getElementById('mockTravelCard');
+    const btn = document.getElementById('mockMainBtn');
+    const card = document.getElementById('mockAccentCard');
+    const travel = document.getElementById('mockTravelCard');
 
     if(header) header.style.backgroundColor = primary;
     if(footer) footer.style.backgroundColor = primary;
-    if(mainBtn) mainBtn.style.backgroundColor = accent;
-    
-    if(accentCard) {
-        accentCard.style.borderColor = accent;
-        accentCard.style.backgroundColor = accent + '33'; // 20% opacity
-    }
-    if(travelCard) {
-        travelCard.style.borderColor = accent + '4d'; // 30% opacity
-        travelCard.style.backgroundColor = accent + '1a'; // 10% opacity
-    }
+    if(btn) btn.style.backgroundColor = accent;
+    if(card) { card.style.borderColor = accent; card.style.backgroundColor = accent + '33'; }
+    if(travel) { travel.style.borderColor = accent + '4d'; travel.style.backgroundColor = accent + '1a'; }
 }
 
 // UPDATED: Save input and refresh the mockup
@@ -506,5 +575,6 @@ const emailBody = 'Hello Team,\n\n' +
 </script>
 </body>
 </html>
+
 
 
