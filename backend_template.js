@@ -505,12 +505,12 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     let mapHtml = "";
     if (p['Last Known GPS']) {
         const gps = p['Last Known GPS'];
-        const mapUrl = `http://googleusercontent.com/maps.google.com/?api=1&query=${gps}`;
+        // FIXED: Switched to standard Google Maps Search API
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
-            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase; letter-spacing:1px;">📍 Visit Location Intelligence</p>
-            <p style="margin:0 0 15px 0; font-size:13px; color:#374151;">Coordinates recorded at time of submission: <strong>${gps}</strong></p>
-            <a href="${mapUrl}" style="display:inline-block; padding:12px 24px; background:#1e40af; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold; font-size:13px; shadow: 0 4px 6px rgba(0,0,0,0.1);">View Location on Google Maps</a>
+            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location Intelligence</p>
+            <a href="${mapUrl}" style="display:inline-block; padding:12px 24px; background:#1e40af; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">View Location on Google Maps</a>
         </div>`;
     }
 
@@ -611,8 +611,8 @@ function _cleanPhone(num) {
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
     
-    // FIX: Standardised Google Maps Link Format
-    const gpsLink = p['Last Known GPS'] ? "https://www.google.com/maps/search/?api=1&query=" + p['Last Known GPS'] : "No GPS";
+    // FIXED: Standardised URL format for mobile navigation
+    const gpsLink = p['Last Known GPS'] ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p['Last Known GPS']) : "No GPS";
     
     const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
     
@@ -965,6 +965,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
