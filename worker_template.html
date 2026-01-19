@@ -472,21 +472,28 @@ function forceSync(showUi){
         const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
         const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
-        // RESTORED: Tile is now added unconditionally
         ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
         state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
+        
+        // FINAL ADDITION: Save the backend version and refresh the UI
         state.backendVersion = data.version || "Unknown";
         
         saveState(); 
         renderLocations(); 
         checkVehicleStatus(); 
         document.getElementById('uploadBanner').classList.add('hidden'); 
-        if(showUi) { showToast("Sync Complete!"); populateSettingsForm(); }
+        
+        // FINAL ADDITION: Ensure the Settings page updates immediately
+        if(showUi) { 
+            showToast("Sync Complete!"); 
+            populateSettingsForm(); 
+        }
     });
+}
 }
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return; const b=document.getElementById('vehNagBar');let s=false;
@@ -1275,6 +1282,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
