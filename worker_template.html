@@ -194,9 +194,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold uppercase">Reset App</button>
             </div>
         </div>
-        
-    </div> </div>
-<div class="setting-card border-blue-500/20 bg-blue-900/10">
+  <div class="setting-card border-blue-500/20 bg-blue-900/10">
     <label class="setting-label lbl-blue">System Diagnostics</label>
     <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
         <span class="text-gray-400">App Version:</span>
@@ -207,7 +205,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <span id="cloudVerText" class="text-green-400">...</span>
     </div>
     <button onclick="hardRefreshUpdate()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 rounded text-[10px] uppercase tracking-widest shadow-lg">Hard Refresh & Update App</button>
-</div>
+</div>      
+    </div> </div>
+
 <div id="mainPage" class="page active">
     <div class="header-bar">
         <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
@@ -437,7 +437,6 @@ function populateSettingsForm() {
     document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
     document.getElementById('set_adv').checked = state.settings.isAdvanced !== false;
     
-    // Push versions to UI
     const appVerEl = document.getElementById('appVerText');
     if (appVerEl) appVerEl.innerText = APP_VERSION;
     const cloudVerEl = document.getElementById('cloudVerText');
@@ -472,19 +471,16 @@ function forceSync(showUi){
             return; 
         }
         
-        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
         const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
-        // RESTORED: This unshifts the Travel tile if Mileage is enabled in your CONFIG
-        if(CONFIG.mileage) {
-            ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
-        }
+        // RESTORED: This line unshifts the Travel tile if Mileage is enabled in CONFIG
+        if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
-        state.locations = ms.concat(existingManual); 
+        state.locations = ms.concat(state.locations.filter(x => x.id.startsWith('loc_'))); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
-        state.backendVersion = data.version || "Unknown"; // Store version from backend
+        state.backendVersion = data.version || "Unknown"; // Store backend version
         
         saveState(); renderLocations(); checkVehicleStatus(); 
         document.getElementById('uploadBanner').classList.add('hidden'); 
@@ -638,7 +634,7 @@ function showSiteInfo(id, e){
     const nav = document.getElementById('btnSiteNav');
     if(l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // FIX: Corrected syntax for Google Maps navigation
+        // FIXED: Corrected syntax from '6{' to valid dollar sign
         nav.href = `http://googleusercontent.com/maps.google.com/search/?api=1&query=${encodeURIComponent(l.address)}`; 
         nav.classList.remove('hidden'); 
     } else { nav.classList.add('hidden'); }
@@ -1221,7 +1217,7 @@ function initSigPad(c) {
 }
 // NEW: Kill switch for persistent browser caches
 async function hardRefreshUpdate() {
-    if(!confirm("Clear internal cache and force update?")) return;
+    if(!confirm("Force reload and clear internal app memory?")) return;
     if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         for (let r of regs) { await r.unregister(); }
@@ -1279,6 +1275,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
