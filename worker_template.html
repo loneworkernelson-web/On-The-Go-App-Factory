@@ -456,13 +456,12 @@ function toggleAdvancedMode(el) {
 }
     function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
-// SYNC & FLEET
+// FIXED: Removed CONFIG.mileage check to ensure Travel tile is ALWAYS present
 function forceSync(showUi){
     if(!state.settings.workerName) return; 
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
-    // Cache-buster: v=${Date.now()} forces the server to bypass old caches
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -471,23 +470,25 @@ function forceSync(showUi){
             return; 
         }
         
+        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
         const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
-        // RESTORED: This line unshifts the Travel tile if Mileage is enabled in CONFIG
-        if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
+        // RESTORED: Tile is now added unconditionally
+        ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
-        state.locations = ms.concat(state.locations.filter(x => x.id.startsWith('loc_'))); 
+        state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
-        state.backendVersion = data.version || "Unknown"; // Store backend version
+        state.backendVersion = data.version || "Unknown";
         
-        saveState(); renderLocations(); checkVehicleStatus(); 
+        saveState(); 
+        renderLocations(); 
+        checkVehicleStatus(); 
         document.getElementById('uploadBanner').classList.add('hidden'); 
         if(showUi) { showToast("Sync Complete!"); populateSettingsForm(); }
     });
 }
-
 function checkVehicleStatus(){
     if(!CONFIG.vehEnabled)return; const b=document.getElementById('vehNagBar');let s=false;
     if(CONFIG.vehicleTerm) { document.getElementById('vehNagBar').innerText = `⚠️ ${CONFIG.vehicleTerm} Check Overdue - Tap to Complete`; }
@@ -1275,6 +1276,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
