@@ -362,7 +362,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <script>
 // CONFIG & CONSTANTS
 const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];
-
+const APP_VERSION = "v79.35"; // Diagnostics
 // CORE STATE
 let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};
 let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;
@@ -421,7 +421,10 @@ function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 function populateSettingsForm() {
     document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
-    document.getElementById('set_adv').checked = state.settings.isAdvanced !== false; // Default to ON
+    document.getElementById('set_adv').checked = state.settings.isAdvanced !== false;
+    // Update version displays
+    document.getElementById('appVerText').innerText = APP_VERSION;
+    document.getElementById('cloudVerText').innerText = state.backendVersion || "Not Synced";
 }
 function toggleAdvancedMode(el) {
     state.settings.isAdvanced = el.checked;
@@ -443,7 +446,7 @@ function forceSync(showUi){
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
-    // Added ?v= timestamp to bypass browser caching
+    // Cache-buster: v timestamp forces the browser to fetch fresh data
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -452,19 +455,17 @@ function forceSync(showUi){
             return; 
         }
         
-        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
+        // Update sites and forms
         const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
-        
-        state.locations = ms.concat(existingManual); 
+        state.locations = ms.concat(state.locations.filter(x => x.id.startsWith('loc_'))); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
+        state.backendVersion = data.version || "Unknown"; // Save backend version
         
-        saveState(); 
-        renderLocations(); 
-        checkVehicleStatus(); 
+        saveState(); renderLocations(); checkVehicleStatus(); 
         document.getElementById('uploadBanner').classList.add('hidden'); 
-        if(showUi) showToast("Sync Complete!");
+        if(showUi) { showToast("Sync Complete!"); populateSettingsForm(); }
     });
 }
 
@@ -604,26 +605,20 @@ function forceSync(showUi){
     });
 }
 
-// FIXED: Corrected corrupted navigation string
+// FIXED: Navigation Link Syntax
 function showSiteInfo(id, e){
     if(e) e.stopPropagation(); 
-    const l = state.locations.find(x => x.id === id); 
-    if(!l) return;
-    
+    const l = state.locations.find(x => x.id === id); if(!l) return;
     document.getElementById('infoTitle').innerText = l.name; 
     let h = "";
     if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
-    
     const nav = document.getElementById('btnSiteNav');
     if(l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // RESTORED: Standard Google Maps navigation URL
+        // RESTORED: Fixed corrupted navigation string syntax
         nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`; 
         nav.classList.remove('hidden'); 
-    } else { 
-        nav.classList.add('hidden'); 
-    }
-    
+    } else { nav.classList.add('hidden'); }
     document.getElementById('siteInfoContent').innerHTML = h;
     showModal('info');
 }
@@ -1249,6 +1244,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
