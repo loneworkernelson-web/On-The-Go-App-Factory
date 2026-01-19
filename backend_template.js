@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-  VERSION: "v79.21", // New diagnostic property
+  VERSION: "v79.35", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -965,6 +965,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
