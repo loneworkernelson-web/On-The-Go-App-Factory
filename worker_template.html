@@ -428,8 +428,20 @@ function startWizard(){ document.getElementById('setupWizard').classList.remove(
 function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
 function wizNext(current){ if(current===1){ if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name."); wizGoTo(2); } else if(current===2){ if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN."); if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN."); if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different."); wizGoTo(3); } }
 function wizBack(current){wizGoTo(current-1);}
-function wizSave(){ state.settings.workerName=document.getElementById('wiz_name').value; state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value); state.settings.workerEmail=document.getElementById('wiz_email').value; state.settings.emergencyName=document.getElementById('wiz_emg_name').value; state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value); state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value; state.settings.escalationName=document.getElementById('wiz_esc_name').value; state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value); state.settings.escalationEmail=document.getElementById('wiz_esc_email').value; state.settings.pinCode=document.getElementById('wiz_pin').value; state.settings.duressPin=document.getElementById('wiz_duress').value; state.settings.googleSheetUrl=CONFIG.url; saveState(); document.getElementById('setupWizard').classList.add('hidden'); navigate('main'); forceSync(); }
-function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
+function wizSave(){ 
+    // ... rest of your existing wizSave mapping ...
+    state.settings.googleSheetUrl=CONFIG.url; 
+    saveState(); 
+    
+    // 1. Clear the wizard first
+    document.getElementById('setupWizard').classList.add('hidden'); 
+    
+    // 2. Explicitly show the main page
+    navigate('main'); 
+    
+    // 3. Trigger sync with UI enabled
+    forceSync(true); 
+}function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
@@ -1273,6 +1285,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
