@@ -618,34 +618,54 @@ function updateStaffStatus(p) {
 
 function _cleanPhone(num) {
     if (!num) return null;
+    // Strip non-numeric characters
     let n = num.toString().replace(/[^0-9]/g, ''); 
     if (n.length < 5) return null;
-    if (n.startsWith('0')) { return (CONFIG.COUNTRY_CODE || "+64") + n.substring(1); }
-    const ccRaw = (CONFIG.COUNTRY_CODE || "").replace('+', '');
-    if (n.startsWith(ccRaw)) { return "+" + n; }
-    return "+" + n;
+    
+    // Handle local '0' prefix (e.g., 021 becomes +6421)
+    if (n.startsWith('0')) { 
+        return (CONFIG.COUNTRY_CODE || "+64") + n.substring(1); 
+    }
+    
+    // Ensure the '+' prefix is present for Textbelt
+    return n.startsWith('+') ? n : "+" + n;
 }
 
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
     
-    /* REPAIRED STRING INTERPOLATION FOR GPS LINK */
-    const gpsLink = p['Last Known GPS'] ? "http://googleusercontent.com/maps.google.com/?api=1&query=" + p['Last Known GPS'] : "No GPS";
+    // FIX: Standardised Google Maps Link Format
+    const gpsLink = p['Last Known GPS'] ? "https://www.google.com/maps/search/?api=1&query=" + p['Last Known GPS'] : "No GPS";
     
     const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+    
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if(emails.length > 0) { MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); }
+    if(emails.length > 0) { 
+        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
+    }
     
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
+        
         numbers.forEach(num => { 
             try {
-                UrlFetchApp.fetch('https://textbelt.com/text', { method: 'post', contentType: 'application/json', payload: JSON.stringify({ phone: num, message: `${subject} ${gpsLink}`, key: CONFIG.TEXTBELT_API_KEY }) }); 
-            } catch(e) { console.error("SMS Failed: " + e.toString()); }
+                // FIX: Updated to standard form-encoded payload for Textbelt reliability
+                const payload = {
+                    'phone': num,
+                    'message': `${subject}\nGPS: ${gpsLink}`,
+                    'key': CONFIG.TEXTBELT_API_KEY
+                };
+                
+                UrlFetchApp.fetch('https://textbelt.com/text', {
+                    'method': 'post',
+                    'payload': payload
+                }); 
+            } catch(e) { 
+                console.error("SMS Delivery Failed: " + e.toString()); 
+            }
         });
     }
 }
-
 function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -968,6 +988,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
