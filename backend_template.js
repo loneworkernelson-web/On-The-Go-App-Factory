@@ -4,6 +4,7 @@
  */
 
 const CONFIG = {
+  VERSION: "v79.21", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -34,7 +35,6 @@ function onOpen() {
       .addSeparator()
       .addItem('Force Sync Forms', 'getGlobalForms')
       .addToUi();
-  // FIXED: Removed invalid 'document' code that was crashing the script
 }
 
 // ==========================================
@@ -783,7 +783,7 @@ function getSyncData(workerName, deviceId) {
         }
     }
     
-    return {sites, forms, cachedTemplates, meta};
+    return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
 }
 
 function getGlobalForms() {
@@ -965,6 +965,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
