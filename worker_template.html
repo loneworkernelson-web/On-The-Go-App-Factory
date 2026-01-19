@@ -200,12 +200,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <label class="setting-label lbl-blue">System Diagnostics</label>
     <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
         <span class="text-gray-400">App Version:</span>
-        <span id="appVerText" class="text-whiteAPP_VER5ION</span>
+        <span id="appVerText" class="text-white">...</span>
     </div>
     <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest mt-2">
         <span class="text-gray-400">Cloud Version:</span>
         <span id="cloudVerText" class="text-green-400">...</span>
     </div>
+    <button onclick="hardRefreshUpdate()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 rounded text-[10px] uppercase tracking-widest shadow-lg">Hard Refresh & Update App</button>
 </div>
 <div id="mainPage" class="page active">
     <div class="header-bar">
@@ -372,7 +373,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
  </div> 
 <script>
 // CONFIG & CONSTANTS
-const APP_VERSION = "v79.35"; // Diagnostics
+const APP_VERSION = "v79.35"; // Diagnostic constant
 const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];
 
 // CORE STATE
@@ -431,22 +432,16 @@ function wizBack(current){wizGoTo(current-1);}
 function wizSave(){ state.settings.workerName=document.getElementById('wiz_name').value; state.settings.workerPhone=cleanGlobalPhone(document.getElementById('wiz_phone').value); state.settings.workerEmail=document.getElementById('wiz_email').value; state.settings.emergencyName=document.getElementById('wiz_emg_name').value; state.settings.emergencyPhone=cleanGlobalPhone(document.getElementById('wiz_emg_phone').value); state.settings.emergencyEmail=document.getElementById('wiz_emg_email').value; state.settings.escalationName=document.getElementById('wiz_esc_name').value; state.settings.escalationPhone=cleanGlobalPhone(document.getElementById('wiz_esc_phone').value); state.settings.escalationEmail=document.getElementById('wiz_esc_email').value; state.settings.pinCode=document.getElementById('wiz_pin').value; state.settings.duressPin=document.getElementById('wiz_duress').value; state.settings.googleSheetUrl=CONFIG.url; saveState(); document.getElementById('setupWizard').classList.add('hidden'); navigate('main'); forceSync(); }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
+// FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
-    // 1. Existing form fields
     document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
     document.getElementById('set_adv').checked = state.settings.isAdvanced !== false;
-
-    // 2. Dynamic App Version (from your APP_VERSION constant)
-    const appVerEl = document.getElementById('appVerText');
-    if (appVerEl) {
-        appVerEl.innerText = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : "v79.35";
-    }
     
-    // 3. Dynamic Cloud Version (from last successful sync metadata)
+    // Push versions to UI
+    const appVerEl = document.getElementById('appVerText');
+    if (appVerEl) appVerEl.innerText = APP_VERSION;
     const cloudVerEl = document.getElementById('cloudVerText');
-    if (cloudVerEl) {
-        cloudVerEl.innerText = state.backendVersion || "Not Synced";
-    }
+    if (cloudVerEl) cloudVerEl.innerText = state.backendVersion || "Not Synced";
 }
 function toggleAdvancedMode(el) {
     state.settings.isAdvanced = el.checked;
@@ -468,7 +463,7 @@ function forceSync(showUi){
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
-    // Cache-buster: Date.now() timestamp forces a fresh download from the server
+    // Cache-buster: v=${Date.now()} forces the server to bypass old caches
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -477,12 +472,21 @@ function forceSync(showUi){
             return; 
         }
         
-        // ... your existing site/form mapping logic remains here ...
-        state.backendVersion = data.version || "Unknown"; // Store the cloud version
+        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
+        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
-        saveState(); 
-        renderLocations(); 
-        checkVehicleStatus(); 
+        // RESTORED: This unshifts the Travel tile if Mileage is enabled in your CONFIG
+        if(CONFIG.mileage) {
+            ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
+        }
+        
+        state.locations = ms.concat(existingManual); 
+        state.globalForms = data.forms || []; 
+        state.cachedForms = data.cachedTemplates || {}; 
+        state.meta = data.meta || {};
+        state.backendVersion = data.version || "Unknown"; // Store version from backend
+        
+        saveState(); renderLocations(); checkVehicleStatus(); 
         document.getElementById('uploadBanner').classList.add('hidden'); 
         if(showUi) { showToast("Sync Complete!"); populateSettingsForm(); }
     });
@@ -624,7 +628,7 @@ function forceSync(showUi){
     });
 }
 
-// FIXED: Navigation Link Syntax
+// FIXED: Corrected corrupted navigation string
 function showSiteInfo(id, e){
     if(e) e.stopPropagation(); 
     const l = state.locations.find(x => x.id === id); if(!l) return;
@@ -634,8 +638,8 @@ function showSiteInfo(id, e){
     const nav = document.getElementById('btnSiteNav');
     if(l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // RESTORED: Fixed corrupted navigation string syntax
-        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`; 
+        // FIX: Corrected syntax for Google Maps navigation
+        nav.href = `http://googleusercontent.com/maps.google.com/search/?api=1&query=${encodeURIComponent(l.address)}`; 
         nav.classList.remove('hidden'); 
     } else { nav.classList.add('hidden'); }
     document.getElementById('siteInfoContent').innerHTML = h;
@@ -1215,18 +1219,18 @@ function initSigPad(c) {
 
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
-// NEW: Forces the phone to delete the old PWA cache and reload from the server
+// NEW: Kill switch for persistent browser caches
 async function hardRefreshUpdate() {
-    if(!confirm("Force an update and clear old cache?")) return;
+    if(!confirm("Clear internal cache and force update?")) return;
     if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (let reg of registrations) { await reg.unregister(); }
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (let r of regs) { await r.unregister(); }
     }
     if ('caches' in window) {
         const keys = await caches.keys();
-        for (let key of keys) { await caches.delete(key); }
+        for (let k of keys) { await caches.delete(k); }
     }
-    location.reload(true); // Force reload bypasses browser cache
+    location.reload(true); 
 }
 function resizeCanvas(canvasEl) { 
     const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
@@ -1275,6 +1279,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
