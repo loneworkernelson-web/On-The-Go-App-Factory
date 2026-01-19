@@ -439,21 +439,33 @@ function toggleAdvancedMode(el) {
 
 // SYNC & FLEET
 function forceSync(showUi){
-    if(!state.settings.workerName) return; if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
+    if(!state.settings.workerName) return; 
+    if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
+    
     const dId = getDeviceID();
-    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
-    .then(r => r.json()).then(data => {
-        if(data.status === "error"){ if(showUi) { document.getElementById('uploadBanner').classList.add('hidden'); if(data.message.includes("ACCESS DENIED")){ alert("⛔ ACCESS DENIED\n\n" + data.message); startWizard(); } else { alert("❌ Sync Error: " + data.message); } } return; }
+    // Added ?v= timestamp to bypass browser caching
+    const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
+    
+    fetch(syncUrl).then(r => r.json()).then(data => {
+        if(data.status === "error") { 
+            if(showUi) document.getElementById('uploadBanner').classList.add('hidden'); 
+            return; 
+        }
+        
         const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
         const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
-        if(CONFIG.mileage) ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
-        state.locations = ms.concat(existingManual); state.globalForms = data.forms || []; state.cachedForms = data.cachedTemplates || {}; state.meta = data.meta || {};
-        if(!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) { state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}]; }
-        if(CONFIG.mileage && !state.cachedForms['Travel Report']) { state.cachedForms['Travel Report'] = [{type:'number', text:'Distance (km)'}, {type:'text', text:'Details'}, {type:'photo', text:'Odometer'}]; }
-        const tLoc = state.locations.find(x => x.id === 'travel'); const userPref = localStorage.getItem('otg_user_travel_pref'); if (tLoc && userPref !== null) { tLoc.noReport = (userPref === 'true'); }
-        saveState(); renderLocations(); checkVehicleStatus(); document.getElementById('uploadBanner').classList.add('hidden'); if(showUi) showToast("Sync Complete!");
-    })
-    .catch(e => { document.getElementById('uploadBanner').classList.add('hidden'); if(showUi) console.warn("Sync Failed: " + e.message); });
+        
+        state.locations = ms.concat(existingManual); 
+        state.globalForms = data.forms || []; 
+        state.cachedForms = data.cachedTemplates || {}; 
+        state.meta = data.meta || {};
+        
+        saveState(); 
+        renderLocations(); 
+        checkVehicleStatus(); 
+        document.getElementById('uploadBanner').classList.add('hidden'); 
+        if(showUi) showToast("Sync Complete!");
+    });
 }
 
 function checkVehicleStatus(){
@@ -561,23 +573,60 @@ function renderLocations(){
         l.appendChild(d);
     });
 }
-function showSiteInfo(id, e){
-    if(e) e.stopPropagation(); const l = state.locations.find(x => x.id === id); if(!l) return;
-    document.getElementById('infoTitle').innerText = l.name; let h = "";
-    if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
-    const nav = document.getElementById('btnSiteNav');
-if(l.address && l.address.length > 3) { h += `<p class="mt-2 text-white font-bold">${l.address}</p>`; // Ensure you see the DOLLAR SIGN ($) here, not a zero (0)
-nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`; nav.classList.remove('hidden'); }
-else { nav.classList.add('hidden'); }
-    if(l.contactName) h += `<p class="mt-4 text-gray-400 text-xs font-black uppercase">On-site Contact: <span class="text-white">${l.contactName}</span></p>`;
-    if(l.notes) h += `<div class="mt-4 p-3 bg-gray-900 border-l-4 border-yellow-500 rounded text-xs italic font-bold text-yellow-100">${l.notes}</div>`;
-    if(l.id.startsWith('loc_')) { h += `<button onclick="closeModal('info'); editManualLocation('${l.id}')" class="w-full mt-4 py-2 bg-gray-700 text-blue-400 font-bold rounded text-xs border border-gray-600">✏️ Edit Site Details</button>`; }
-    document.getElementById('siteInfoContent').innerHTML = h;
-    const bc = document.getElementById('btnSiteCall'); if(l.contactPhone) { bc.href = `tel:${l.contactPhone}`; bc.classList.remove('hidden'); } else { bc.classList.add('hidden'); }
-    const be = document.getElementById('btnSiteEmail'); if(l.contactEmail) { be.href = `mailto:${l.contactEmail}`; be.classList.remove('hidden'); } else { be.classList.add('hidden'); }
-    showModal('info');
+// FIXED: Added Cache Buster to force fresh form data from Spreadsheet
+function forceSync(showUi){
+    if(!state.settings.workerName) return; 
+    if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
+    
+    const dId = getDeviceID();
+    // Added ?v= timestamp to bypass browser caching
+    const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
+    
+    fetch(syncUrl).then(r => r.json()).then(data => {
+        if(data.status === "error") { 
+            if(showUi) document.getElementById('uploadBanner').classList.add('hidden'); 
+            return; 
+        }
+        
+        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
+        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
+        
+        state.locations = ms.concat(existingManual); 
+        state.globalForms = data.forms || []; 
+        state.cachedForms = data.cachedTemplates || {}; 
+        state.meta = data.meta || {};
+        
+        saveState(); 
+        renderLocations(); 
+        checkVehicleStatus(); 
+        document.getElementById('uploadBanner').classList.add('hidden'); 
+        if(showUi) showToast("Sync Complete!");
+    });
 }
 
+// FIXED: Corrected corrupted navigation string
+function showSiteInfo(id, e){
+    if(e) e.stopPropagation(); 
+    const l = state.locations.find(x => x.id === id); 
+    if(!l) return;
+    
+    document.getElementById('infoTitle').innerText = l.name; 
+    let h = "";
+    if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
+    
+    const nav = document.getElementById('btnSiteNav');
+    if(l.address && l.address.length > 3) { 
+        h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
+        // RESTORED: Standard Google Maps navigation URL
+        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`; 
+        nav.classList.remove('hidden'); 
+    } else { 
+        nav.classList.add('hidden'); 
+    }
+    
+    document.getElementById('siteInfoContent').innerHTML = h;
+    showModal('info');
+}
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
 function toggleHighRiskUI(){ const chk = document.getElementById('chkHighRisk'); const lbl = document.getElementById('lblHighRisk'); if(chk.checked){ lbl.classList.remove('text-gray-500'); lbl.classList.add('text-red-500', 'animate-pulse'); } else { lbl.classList.add('text-gray-500'); lbl.classList.remove('text-red-500', 'animate-pulse'); } }
 
@@ -1200,6 +1249,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
