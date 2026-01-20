@@ -457,16 +457,28 @@ function wizSave(){
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
-    document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
-    document.getElementById('set_adv').checked = state.settings.isAdvanced !== false;
-    
-// Update Diagnostic Spans
+    // 1. Sync the inputs
+    const urlInput = document.getElementById('set_url');
+    if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
+
+    const advInput = document.getElementById('set_adv');
+    if (advInput) advInput.checked = state.settings.isAdvanced !== false;
+
+    // 2. Update Diagnostic Spans with New IDs
     const diagApp = document.getElementById('diagApp');
     const diagCloud = document.getElementById('diagCloud');
     
+    // CONFIG.version is baked in during build
     if (diagApp) diagApp.innerText = CONFIG.version || "v79.35";
-    if (diagCloud) diagCloud.innerText = state.backendVersion || "Not Synced";
+    
+    // state.backendVersion is updated by forceSync()
+    if (diagCloud) {
+        diagCloud.innerText = state.backendVersion || "Not Synced";
+        if (state.backendVersion) diagCloud.className = "text-green-400";
+    }
 }
+
+// KEEP THIS: It is not replaced by the population function
 function toggleAdvancedMode(el) {
     state.settings.isAdvanced = el.checked;
     saveState();
@@ -1323,6 +1335,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
