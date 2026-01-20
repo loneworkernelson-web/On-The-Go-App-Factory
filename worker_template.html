@@ -1513,7 +1513,12 @@ function setupLongPress(btn, cb) {
     btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
 }
 function withPinVerification(d,c){ showModal('pin'); const i=document.getElementById('pinInput'); i.value=''; i.focus(); const cf=()=>{ const v=i.value; closeModal('pin'); if(checkPin(v)){ c(); } else if(v===state.settings.duressPin){ processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"})); if(state.activeVisit) { state.activeVisit = null; saveState(); navigate('main'); } } document.getElementById('confirmPinBtn').removeEventListener('click',cf); }; document.getElementById('confirmPinBtn').addEventListener('click',cf); document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin'); }
-function clearData(){if(confirm('Reset all safety data and restart setup?')){localStorage.clear();location.reload();}}
+function clearData(){
+    if(confirm('🚨 WARNING: This will permanently delete your identity, PINs, and safety site list. You will need to re-run the setup. Continue?')){
+        localStorage.clear();
+        location.reload();
+    }
+}
 function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Syncing Forms...");}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
@@ -1821,3 +1826,4 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
