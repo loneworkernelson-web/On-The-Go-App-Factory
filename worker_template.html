@@ -765,6 +765,20 @@ function showSiteInfo(id, e){
     document.getElementById('siteInfoContent').innerHTML = h;
     showModal('info');
 }
+let mainScreenReminderTimer; // Must be declared globally
+
+function startReminderTimer() {
+    if (mainScreenReminderTimer) clearTimeout(mainScreenReminderTimer);
+    
+    // Safety check: 30-minute interval
+    mainScreenReminderTimer = setTimeout(() => {
+        const mainPage = document.getElementById('mainPage');
+        if (mainPage && mainPage.classList.contains('active')) {
+            showToast("⚠️ Status Check: Please update your location.");
+            startReminderTimer(); // Repeat cycle
+        }
+    }, 1800000); 
+}
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
 function toggleHighRiskUI(){ const chk = document.getElementById('chkHighRisk'); const lbl = document.getElementById('lblHighRisk'); if(chk.checked){ lbl.classList.remove('text-gray-500'); lbl.classList.add('text-red-500', 'animate-pulse'); } else { lbl.classList.add('text-gray-500'); lbl.classList.remove('text-red-500', 'animate-pulse'); } }
 
@@ -1446,6 +1460,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
