@@ -50,9 +50,38 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
     flex-shrink: 0; 
     z-index: 20; 
 }
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
-.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+/* Optimized Long-Press SOS Styling */
+.long-press-btn {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.1s;
+    user-select: none; /* Prevents text selection during the hold */
+    -webkit-user-select: none;
+}
+
+.long-press-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(255, 255, 255, 0.3);
+    /* Transition for the reset (shrinks back quickly when released) */
+    transition: width 0.2s ease-out; 
+    z-index: 1;
+}
+
+/* When the button is held, the width expands over exactly 3 seconds */
+.long-press-btn.holding::after {
+    width: 100%;
+    transition: width 3s linear;
+}
+
+/* Visual feedback for the initial press */
+.long-press-btn:active {
+    transform: scale(0.96);
+}
 .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -262,7 +291,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="flex-1 flex flex-col justify-between p-6">
         <div class="flex justify-between items-start">
             <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700 shadow-xl">🌙</button>
-            <button onclick="handlePanicTap()" id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none tracking-widest">SOS</button>
+           <button 
+    id="btnPanic" 
+    class="long-press-btn w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none tracking-widest"
+>
+    SOS
+</button>
         </div>
         <div class="text-center">
             <p class="text-gray-500 text-xs uppercase font-black tracking-[0.3em]">Currently Active At</p>
@@ -1438,6 +1472,54 @@ function checkPin(input) {
         return input === state.settings.pinCode;
     }
 }    
+let panicHoldTimer;
+
+function initPanicButton() {
+    const sosBtn = document.getElementById('btnPanic');
+    if (!sosBtn) return;
+
+    const startHold = (e) => {
+        // Prevent context menus on mobile long-press
+        if (e.cancelable) e.preventDefault(); 
+        
+        sosBtn.classList.add('holding');
+
+        // Set timer for 3 seconds
+        panicHoldTimer = setTimeout(() => {
+            sosBtn.classList.remove('holding');
+            executePanicAction(); 
+        }, 3000);
+    };
+
+    const cancelHold = () => {
+        clearTimeout(panicHoldTimer);
+        sosBtn.classList.remove('holding');
+    };
+
+    // Standard Desktop & Mobile Listeners
+    sosBtn.addEventListener('mousedown', startHold);
+    sosBtn.addEventListener('touchstart', startHold);
+
+    sosBtn.addEventListener('mouseup', cancelHold);
+    sosBtn.addEventListener('mouseleave', cancelHold);
+    sosBtn.addEventListener('touchend', cancelHold);
+}
+
+/**
+ * Replaces the old handlePanicTap()
+ */
+function executePanicAction() {
+    // 1. Immediate visual/haptic feedback
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 500]);
+    showToast("🚨 SOS ACTIVATED");
+
+    // 2. Existing upload logic
+    processUploadQueue(buildPayload({
+        "Alarm Status": "PANIC_BUTTON_HELD",
+        "Notes": "Emergency SOS triggered by 3-second hold."
+    }));
+}
+
 function resizeCanvas(canvasEl) { 
     // 1. Selector flexibility: Uses parameter or searches for a signature canvas
     const c = canvasEl || document.getElementById('sigPad') || document.querySelector('canvas[id^="sig-canvas-"]'); 
@@ -1485,24 +1567,27 @@ function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferr
 function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
 function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
 window.onload = () => {
-    // 1. Load the saved data from memory first
+    // 1. Restore app data from local storage
     loadState(); 
 
-    // 2. Control initial view: Show Wizard if no name is set, else go to Main
-    if (!state.settings.workerName) {
-        // Ensure we are on the setup page and show the wizard
+    // 2. Initialize the new 3-second SOS hold listeners
+    initPanicButton();
+
+    // 3. Initial View Logic: Use 'setupPage' to match the new ID system
+    if (!state.settings || !state.settings.workerName) {
+        // Identity unknown: Force the Setup Wizard
         navigate('setup'); 
-        const wiz = document.getElementById('setupPage'); 
-    if (wiz) wiz.classList.remove('hidden');
+        const setupContainer = document.getElementById('setupPage'); 
+        if (setupContainer) setupContainer.classList.remove('hidden');
     } else {
-        // Already registered, go to the main dashboard
+        // Identity known: Enter dashboard and run a silent background sync
         navigate('main');
         
-        // Trigger the silent background sync to update Cloud Version & Sites
+        // 'false' keeps the sync invisible to the worker
         forceSync(false); 
     }
     
-    console.log("OTG AppSuite Initialised");
+    console.log("System Initialised: Operational");
 };
 </script>
  <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
@@ -1521,6 +1606,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
