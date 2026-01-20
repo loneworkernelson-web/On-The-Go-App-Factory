@@ -253,7 +253,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card border-gray-600">
-             <div class="setting-label lbl-gray">System Actions</label>
+             <div class="setting-label lbl-gray">System Actions</div>
             <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%">
             <div class="flex gap-2">
                 <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Force Sync</button>
@@ -545,17 +545,20 @@ function wizSave() {
         return;
     }
 
-    // 3. Update the global state
+    // 3. Update the global state (Preserving all contact fields)
     state.settings = {
         workerName: name,
-        workerPhone: document.getElementById('wiz_phone').value.trim(),
-        workerEmail: document.getElementById('wiz_email').value.trim(),
+        workerPhone: phone,
+        workerEmail: email,
         googleSheetUrl: CONFIG.url, 
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
-        // These keys MUST match the mapping in buildPayload
+        
+        // NEW: Capture the Emergency Contact fields
         emgName: document.getElementById('wiz_emg_name').value.trim(),
         emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
         emgEmail: document.getElementById('wiz_emg_email').value.trim(),
+        
+        // NEW: Capture the Escalation Contact fields
         escName: document.getElementById('wiz_esc_name').value.trim(),
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
@@ -564,10 +567,14 @@ function wizSave() {
     // 4. Persist and Transition
     saveState();
     navigate('main');
+
     const wiz = document.getElementById('setupPage');
     if (wiz) wiz.classList.add('hidden');
+
+    // 5. Trigger sync so the backend sees the new contacts immediately
     forceSync(false);
-    showToast("✅ Setup Complete!");
+
+    showToast("✅ Setup Complete & Contacts Saved!");
 }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
@@ -1707,6 +1714,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
