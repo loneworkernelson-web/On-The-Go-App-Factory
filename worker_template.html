@@ -212,35 +212,32 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
     
-    <div class="content-area pb-24"> <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
+    <div class="content-area pb-24"> 
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
             <p class="text-xs text-blue-200 font-bold">Re-run the setup wizard to change details?</p>
             <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button>
         </div>
+
         <div class="setting-card border-blue-500/20 bg-blue-900/10" id="diag_container">
-<div class="setting-label lbl-blue">System Diagnostics</div>    
-    <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
-        <span class="text-gray-400">App Version:</span>
-        <span id="diagApp" class="text-white">v79.35</span>
-    </div> 
-    
-    <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest mt-2">
-        <span class="text-gray-400">Cloud Version:</span>
-        <span id="diagCloud" class="text-green-400">Not Synced</span>
-    </div>
-    
-    <button onclick="hardRefreshUpdate()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 rounded text-[10px] uppercase tracking-widest shadow-lg">
-        Hard Refresh & Update App
-    </button>
-</div>
-        <div id="installAppContainer" class="hidden mb-4">
-            <button id="btnInstallApp" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg flex items-center justify-center gap-2">
-                <span class="text-xl">📲</span> Install App to Home Screen
+            <div class="setting-label lbl-blue">System Diagnostics</div>    
+            <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
+                <span class="text-gray-400">App Version:</span>
+                <span id="diagApp" class="text-white">v79.35</span>
+            </div> 
+            
+            <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest mt-2">
+                <span class="text-gray-400">Cloud Version:</span>
+                <span id="diagCloud" class="text-green-400">Not Synced</span>
+            </div>
+            
+            <button onclick="hardRefreshUpdate()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 rounded text-[10px] uppercase tracking-widest shadow-lg">
+                Hard Refresh & Update App
             </button>
         </div>
 
         <div class="setting-card border-gray-600">
-            <div class="setting-label lbl-blue">Location Services</label>
-            <div class="flex items-center justify-between cursor-pointer">
+            <div class="setting-label lbl-blue">Location Services</div>
+            <label class="flex items-center justify-between cursor-pointer">
                 <div class="flex flex-col">
                     <span class="text-sm font-bold text-white uppercase tracking-tight">Advanced Monitoring</span>
                     <span class="text-[10px] text-gray-400 uppercase font-black">Enables high-accuracy GPS & signal bars</span>
@@ -252,6 +249,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </label>
         </div>
 
+        <div class="setting-card border-gray-600">
+            <div class="setting-label lbl-gray">System Actions</div>
+            <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%">
+            <div class="flex gap-2">
+                <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Force Sync</button>
+                <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-xs font-bold uppercase">Reset App</button>
+            </div>
+        </div>
+    </div> 
+</div>
         <div class="setting-card border-gray-600">
              <div class="setting-label lbl-gray">System Actions</div>
             <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%">
@@ -305,25 +312,36 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="lockedPage" class="page">
     <div class="flex-1 flex flex-col justify-between p-6">
         <div class="flex justify-between items-start">
-            <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700 shadow-xl">🌙</button>
-           <button 
-    id="btnPanic" 
-    class="long-press-btn w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none tracking-widest"
->
-    SOS
-</button>
+            <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700 shadow-xl" aria-label="Toggle Dark Mode">🌙</button>
+            <button id="btnPanic" class="long-press-btn w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none tracking-widest">
+                SOS
+            </button>
         </div>
+
         <div class="text-center">
-            <p class="text-gray-500 text-xs uppercase font-black tracking-[0.3em]">Currently Active At</p>
+            <div class="setting-label lbl-blue">Active Visit</div>
+            
+            <p class="text-gray-500 text-xs uppercase font-black tracking-[0.3em] mt-2">Currently Active At</p>
             <div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()">
-                <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px] tracking-tight"></h2><span class="text-blue-400 text-xl">ℹ️</span>
+                <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px] tracking-tight"></h2>
+                <span class="text-blue-400 text-xl">ℹ️</span>
             </div>
+            
             <div id="highRiskBadge" class="hidden text-red-500 font-black text-xs uppercase tracking-widest border border-red-500 inline-block px-3 py-1 rounded-lg mb-2">⚡ CRITICAL TIMING MODE</div>
             <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse my-2 tracking-[0.2em] border-2 border-red-500 inline-block px-6 py-2 rounded-xl uppercase">OVERDUE</div>
+            
             <div id="countdownTimer" class="text-8xl font-bold font-mono text-white tracking-tighter">00:00</div>
-                <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span></p>        </div>
+            
+            <div class="setting-label lbl-red mt-4">Manual SOS</div>
+            
+            <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span></p>
+        </div>
+
         <div class="space-y-3 w-full">
-            <div class="flex gap-3"><button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest" onclick="showModal('extend')">Extend</button><button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">Notes</button></div>
+            <div class="flex gap-3">
+                <button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest" onclick="showModal('extend')">Extend</button>
+                <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">Notes</button>
+            </div>
             <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">Hold to END</button>
             <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">I AM SAFE</button>
         </div>
@@ -1714,6 +1732,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
