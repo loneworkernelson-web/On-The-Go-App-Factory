@@ -495,7 +495,26 @@ function toggleAdvancedMode(el) {
         showToast("🔋 Battery Saver: GPS Throttled");
     }
 }
-    function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
+/**
+ * Persists the current app state to local storage. 
+ * Preserves Advanced Mode, branding, and Cloud Version data.
+ */
+function saveState() {
+    try {
+        // 1. Convert the state object to a JSON string
+        const stateString = JSON.stringify(state);
+        
+        // 2. Save to the browser's persistent storage
+        localStorage.setItem('otg_worker_state', stateString);
+        
+        // 3. Optional: Log to console for debugging in development
+        // console.log("State Saved Successfully");
+    } catch (e) {
+        // 4. Error handling (e.g., if storage is full)
+        console.error("Critical: Failed to save app state", e);
+        showToast("⚠️ Storage Error: Progress may not be saved.");
+    }
+}
 
 function forceSync(showUi){
     if(!state.settings.workerName) return; 
@@ -1325,6 +1344,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
