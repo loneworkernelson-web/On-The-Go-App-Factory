@@ -433,8 +433,34 @@ function getGpsAddress() { const btn = document.getElementById('btnGpsAddr'); co
 window.addEventListener('online',updateNetworkStatus); window.addEventListener('offline',updateNetworkStatus);
 function updateNetworkStatus(){ const b=document.getElementById('offlineBanner'); if(navigator.onLine){ b.classList.add('hidden'); if(state.pendingUploads&&state.pendingUploads.length>0) processUploadQueue(); } else { b.classList.remove('hidden'); } }
 function getDeviceID(){ let id=localStorage.getItem('device_uuid'); if(!id){id='dev_'+Math.random().toString(36).substr(2,9)+'_'+Date.now();localStorage.setItem('device_uuid',id);} return id; }
-function navigate(p){ document.querySelectorAll('.page').forEach(e=>e.classList.remove('active')); document.getElementById(p+'Page').classList.add('active'); if(p==='main')startReminderTimer(); else clearTimeout(mainScreenReminderTimer); if(p==='settings'){populateSettingsForm();} }
+function navigate(p) {
+    // 1. Hide all pages by removing 'active'
+    document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
 
+    // 2. Safely find the target page
+    const targetPage = document.getElementById(p + 'Page');
+    
+    // 3. FIXED: Only try to add the class if the page actually exists
+    if (targetPage) {
+        targetPage.classList.add('active');
+    } else {
+        console.error("Navigation Error: Page '" + p + "Page' not found.");
+        return; // Stop here if page is missing to prevent further crashes
+    }
+
+    // 4. PRESERVED: Your original timer and population logic
+    if (p === 'main') {
+        startReminderTimer();
+    } else {
+        if (typeof mainScreenReminderTimer !== 'undefined') {
+            clearTimeout(mainScreenReminderTimer);
+        }
+    }
+
+    if (p === 'settings') {
+        populateSettingsForm();
+    }
+}
 // SETUP WIZARD
 function startWizard(){ document.getElementById('setupWizard').classList.remove('hidden'); wizGoTo(1); if(state.settings.workerName)populateWizard(); }
 function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
@@ -1391,4 +1417,5 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
