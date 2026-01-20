@@ -912,19 +912,27 @@ function handleVehicleCompliance(loc) {
 function renderLocations() {
     const l = document.getElementById('locationList');
     const tr = document.getElementById('travelRow');
+    
+    // 1. DOM Guard: Exit if the UI elements aren't ready
     if (!l || !tr) return;
 
+    // 2. Clear current UI
     l.innerHTML = '';
     tr.innerHTML = '';
 
+    // 3. State Guard: Ensure location array exists
     if (!state.locations) state.locations = [];
 
+    // 4. Distribution Loop
     state.locations.forEach(loc => {
+        // Skip null entries or entries without IDs to prevent script crashes
         if (!loc || !loc.id) return;
 
         if (loc.id === 'travel') {
+            // Sends the travel object to its specialized purple tile builder
             tr.appendChild(createTravelTile(loc));
         } else {
+            // Sends all other sites (Home, Office, Client) to the grid builder
             l.appendChild(createDestinationTile(loc));
         }
     });
@@ -1038,23 +1046,44 @@ function getButtonConfig() {
 }
 // VISIT LOGIC
 function startVisit() {
-    warmUpSpeech(); 
-    const s = state.locations.find(x => x.id === state.selectedLocationId); 
-    if(!s) return;
-    
-    const n = new Date(); 
-    const isHighRisk = document.getElementById('chkHighRisk').checked;
-    
-    state.activeVisit = { 
-        locationId: s.id, 
-        startTime: n, 
-        anticipatedDepartureTime: new Date(n.getTime() + state.visitDurationMinutes * 60000), 
-        startGPS: "", 
-        highRisk: isHighRisk, 
-        warn90Sent: false, 
-        criticalSent: false,
-        isPanic: false // Ensure this is initialized to false for safety
+    const locId = state.selectedLocationId;
+    if (!locId) return;
+
+    // 1. Find the location data
+    const loc = state.locations.find(l => l.id === locId);
+    if (!loc && locId !== 'travel') return;
+
+    // 2. Build the Visit Object
+    const visitData = {
+        locationId: locId,
+        locationName: locId === 'travel' ? 'Travelling' : loc.name,
+        startTime: new Date().toISOString(),
+        travelTarget: (locId === 'travel') ? travelTargetName : null,
+        status: locId === 'travel' ? 'TRAVELLING' : 'ARRIVED'
     };
+
+    // 3. Handle State Transition
+    state.activeVisit = visitData;
+    state.selectedLocationId = null; // Clear selection after starting
+    
+    // 4. Persistence & UI Updates
+    saveState();
+    renderLocations();
+    updateArrivedButtonState();
+    
+    // 5. Trigger Network Sync
+    // We send a "Check-in" payload immediately so the backend knows the worker is active
+    processUploadQueue(buildPayload({
+        "Alarm Status": visitData.status,
+        "Current Site": visitData.locationName,
+        "Notes": visitData.travelTarget ? `To: ${visitTargetName}` : "Started Visit"
+    }));
+
+    // 6. Start the Safety Timers
+    startCheckinTimer();
+    
+    showToast(`✅ ${visitData.status} logged`);
+}
     
     state.lowBatSent = false; 
     saveState(); 
@@ -1888,6 +1917,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
