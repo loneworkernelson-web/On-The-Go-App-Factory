@@ -893,7 +893,7 @@ function updateArrivedButtonState(){
 }
 
 // VISIT LOGIC
-function startVisit(){
+function startVisit() {
     warmUpSpeech(); 
     const s = state.locations.find(x => x.id === state.selectedLocationId); 
     if(!s) return;
@@ -913,49 +913,52 @@ function startVisit(){
     
     state.lowBatSent = false; 
     saveState(); 
-enterLockedScreen(); 
+    enterLockedScreen(); 
     
-    // Clear any existing timer first to prevent duplicates
+    // Auto-switch to Dark Mode after 10 seconds
     if (autoDimTimer) clearTimeout(autoDimTimer);
-
-    // Set the 10-second auto-dim
     autoDimTimer = setTimeout(() => {
-        // Only dim if the visit is STILL active and screen is hidden
         if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
             toggleBatterySaver();
         }
     }, 10000);
+}
 
-    if(s.id === 'travel') startTravellingPulse();
-    
-    navigator.geolocation.getCurrentPosition((pos) => {
-        if(state.activeVisit) { 
-            state.activeVisit.startGPS = `${pos.coords.latitude},${pos.coords.longitude}`; 
-            saveState(); 
-            
-            let notes = s.id === 'travel' 
-                ? ("Travelling to: " + (travelTargetName || "unknown")) 
-                : "Arrived at site"; 
-            
-            if(isHighRisk) notes += " [CRITICAL_TIMING]"; 
-            processUploadQueue(buildPayload({
-                "Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", 
-                "Notes": notes, 
-                "Last Known GPS": state.activeVisit.startGPS
-            })); 
-        }
-    }, (err) => { 
-        if(state.activeVisit) { 
-            let notes = s.id === 'travel' 
-                ? ("Travelling to: " + (travelTargetName || "unknown") + " (No GPS)") 
-                : "Arrived (No GPS)"; 
-                
-            processUploadQueue(buildPayload({
-                "Alarm Status": s.id === 'travel' ? "TRAVELLING" : "ON SITE", 
-                "Notes": notes
-            })); 
-        } 
-    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+function preDepart() {
+    // Kill the auto-dim timer so the report form stays visible
+    if (autoDimTimer) clearTimeout(autoDimTimer);
+
+    isMidVisitUpdate = false; 
+    const l = state.locations.find(x => x.id === state.activeVisit.locationId); 
+    const sg = state.activeVisit.startGPS;
+
+    if (l.id === 'travel') {
+        if (l.noReport) { submitReport(); return; }
+        document.getElementById('btnDepart').innerText = "Syncing...";
+        
+        navigator.geolocation.getCurrentPosition(async(pos) => { 
+            const eg = `${pos.coords.latitude},${pos.coords.longitude}`; 
+            if (navigator.onLine) { 
+                calculatedDist = await getDistance(sg, eg); 
+            } else { 
+                const d = haversine(sg, eg); 
+                calculatedDist = {km: d.toFixed(2), type:'crow', offline: true}; 
+            } 
+            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
+            loadFormAndShow(l.templateName || "(Standard)"); 
+        }, (err) => { 
+            calculatedDist = null; 
+            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
+            loadFormAndShow(l.templateName || "(Standard)"); 
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    } 
+    else if (l.noReport) { 
+        submitReport(); 
+    } 
+    else { 
+        calculatedDist = null;
+        loadFormAndShow(l.templateName || "(Standard)");
+    }
 }
 
 function warmUpGps() { if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{}, (err)=>{ if(err.code === 1) showToast("📍 GPS Permission Required"); }, {enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000); }
@@ -1714,6 +1717,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
