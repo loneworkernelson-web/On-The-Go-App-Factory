@@ -1394,23 +1394,39 @@ async function hardRefreshUpdate() {
     }
 }
     
-    function resizeCanvas(canvasEl) { 
-    const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
+function resizeCanvas(canvasEl) { 
+    // 1. Selector flexibility: Uses parameter or searches for a signature canvas
+    const c = canvasEl || document.getElementById('sigPad') || document.querySelector('canvas[id^="sig-canvas-"]'); 
     if (!c) return; 
+    
     const ctx = c.getContext('2d'); 
+    
+    // 2. Data Persistence: Capture existing drawing before the canvas clears
+    const tempImg = c.toDataURL();
+    
+    // 3. High-DPI Scaling: Calculate ratio for retina/high-resolution displays
     const ratio = Math.max(window.devicePixelRatio || 1, 1); 
     
-    // RESET coordinates before applying new scale
+    // 4. RESET coordinates before applying new scale
     ctx.setTransform(1, 0, 0, 1, 0, 0); 
     
+    // 5. Apply new dimensions (Note: This action clears the canvas)
     c.width = c.offsetWidth * ratio; 
     c.height = c.offsetHeight * ratio; 
-    ctx.scale(ratio, ratio); 
     
-    // Ensure pen is black and thick enough for fingers
+    // 6. Apply scale and restore pen styling (Resizing resets context state)
+    ctx.scale(ratio, ratio); 
     ctx.strokeStyle = "#000000"; 
     ctx.lineWidth = 3; 
     ctx.lineCap = "round";
+
+    // 7. Restore the signature from the temporary image
+    const img = new Image();
+    img.onload = () => {
+        // Draw back at the original display size; the scale(ratio) handles the rest
+        ctx.drawImage(img, 0, 0, c.offsetWidth, c.offsetHeight);
+    };
+    img.src = tempImg;
 }
 window.addEventListener('load', () => {
     try { const saved = localStorage.getItem('loneWorkerState'); if(saved) { state = JSON.parse(saved); if(state.locations) renderLocations(); if(state.meta) checkVehicleStatus(); } } catch(e) {}
@@ -1460,6 +1476,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
