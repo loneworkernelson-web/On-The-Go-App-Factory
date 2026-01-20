@@ -218,20 +218,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button>
         </div>
 
-        <div class="setting-card border-blue-500/20 bg-blue-900/10" id="diag_container">
-            <div class="setting-label lbl-blue">System Diagnostics</div>    
-            <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
-                <span class="text-gray-400">App Version:</span>
-                <span id="diagApp" class="text-white">v79.35</span>
-            </div> 
-            <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest mt-2">
-                <span class="text-gray-400">Cloud Version:</span>
-                <span id="diagCloud" class="text-green-400">Not Synced</span>
-            </div>
-            <button onclick="hardRefreshUpdate()" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 rounded text-[10px] uppercase tracking-widest shadow-lg">
-                Hard Refresh & Update App
-            </button>
-        </div>
+<div class="setting-card border-gray-600">
+    <div class="setting-label lbl-gray">System Actions</div>
+    <input id="set_url" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="%%GOOGLE_SHEET_URL%%">
+    <div class="flex gap-2">
+        <button onclick="forceSync(true)" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-[10px] font-black text-white uppercase tracking-tighter">Force Sync</button>
+        <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-[10px] font-black text-white uppercase tracking-tighter">Clear Cache</button>
+        <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-[10px] font-black uppercase tracking-tighter">Reset App</button>
+    </div>
+</div>
 
         <div class="setting-card border-gray-600">
             <div class="setting-label lbl-blue">Your Identity</div>
@@ -676,7 +671,11 @@ function forceSync(showUi) {
     // 3. Identification: Use your existing device_uuid logic
     const dId = getDeviceID();
     const syncUrl = `${targetUrl}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
-
+    // FEEDBACK: Show the "Syncing..." banner if showUi is true
+    if (showUi) {
+        const banner = document.getElementById('uploadBanner');
+        if (banner) banner.classList.remove('hidden');
+    }
     fetch(syncUrl)
         .then(r => r.json())
         .then(data => {
@@ -1518,7 +1517,19 @@ function clearData(){
         location.reload();
     }
 }
-function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Syncing Forms...");}
+function clearFormsCache() {
+    if (confirm('Clear all synced form templates? (Requires network to re-download)')) {
+        state.cachedForms = {};
+        state.globalForms = [];
+        saveState();
+        
+        // FEEDBACK: Immediate toast to confirm the cache is gone
+        showToast("✅ Cache Cleared. Downloading fresh templates...");
+        
+        // Restart sync with UI enabled
+        forceSync(true);
+    }
+}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
 async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
 function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
@@ -1825,5 +1836,6 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
