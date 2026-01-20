@@ -850,75 +850,83 @@ function renderIconGrid(forms, loc) {
 }
 
 function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
-function renderLocations(){
-    const l=document.getElementById('locationList'); 
-    const tr=document.getElementById('travelRow'); 
-    l.innerHTML=''; 
-    tr.innerHTML=''; 
+function createDestinationTile(loc) {
+    const d = document.createElement('div');
+    const isSel = state.selectedLocationId === loc.id;
     
-    if (!state.locations) state.locations = [];
+    d.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800 hover:bg-gray-750'}`;
     
-    state.locations.forEach(loc => { 
-        if (!loc || !loc.id) return;
-        
-        // 1. SPECIAL CASE: The Travelling Tile
-        if(loc.id === 'travel') {
-            const isSel = state.selectedLocationId === 'travel'; 
-            const d = document.createElement('div');
-            
-            d.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${isSel ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-gray-700 hover:border-white/20'} bg-gradient-to-r from-indigo-600 to-purple-700`;
-            d.innerHTML = `<div class="flex items-center gap-2"><div class="text-xl">🚗</div><div><div class="text-sm font-bold text-white tracking-tight leading-none">Travel</div><div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">Distance sync</div></div></div><button class="text-white/40 hover:text-white text-xs p-1" onclick="event.stopPropagation(); editTravelSettings();">⚙️</button>`;
-            
-            d.onclick = () => { 
-                if (state.selectedLocationId === 'travel') {
-                    state.selectedLocationId = null; // PATCH: Allow unselecting Travel
-                } else {
-                    // Vehicle Compliance Check (WOF/Rego)
-                    if(state.meta && state.meta.wofExpiry){ 
-                        const w=new Date(state.meta.wofExpiry); 
-                        const days = (w.getTime()-Date.now())/(1000*60*60*24); 
-                        
-                        if(days < 0) { 
-                            document.getElementById('wofBlockModal').classList.remove('hidden'); 
-                            return; 
-                        } 
-                        else if (days < 14) { 
-                            document.getElementById('wofWarnModal').classList.remove('hidden'); 
-                            document.getElementById('wofWarnText').innerText = `Expires in ${Math.ceil(days)} days`; 
-                            state.selectedLocationId=loc.id; 
-                            warmUpGps(); renderLocations(); updateArrivedButtonState(); return; 
-                        } 
-                    } 
-                    state.selectedLocationId = 'travel'; 
-                }
-                warmUpGps(); renderLocations(); updateArrivedButtonState(); 
-            };
-            if(tr) tr.appendChild(d); 
-            return;
-        }
+    let icon = "🏢";
+    if (loc.name && loc.name.includes("Home")) icon = "🏠";
 
-        // 2. STANDARD CASE: Safety Destinations
-        const d = document.createElement('div'); 
-        const isSel = state.selectedLocationId === loc.id;
-        
-        d.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800 hover:bg-gray-750'}`;
-        
-        let icon = "🏢"; 
-        if(loc.name && loc.name.includes("Home")) icon = "🏠";
-        
-        d.innerHTML = `<div class="flex justify-between items-start"><span class="text-2xl">${icon}</span>${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) ? `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : ''}</div><div><div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName||''}</div><div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div></div>`;
-        
-        d.onclick = () => { 
-            // PATCH: Allow tapping active site to unselect
-            if (state.selectedLocationId === loc.id) {
-                state.selectedLocationId = null;
-            } else {
-                state.selectedLocationId = loc.id; 
-                travelTargetName = loc.name; 
-            }
-            warmUpGps(); renderLocations(); updateArrivedButtonState(); 
-        }; 
-        if(l) l.appendChild(d);
+    d.innerHTML = `
+        <div class="flex justify-between items-start">
+            <span class="text-2xl">${icon}</span>
+            ${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) ? 
+                `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : ''}
+        </div>
+        <div>
+            <div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName || ''}</div>
+            <div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div>
+        </div>
+    `;
+
+    d.onclick = () => {
+        if (state.selectedLocationId === loc.id) {
+            state.selectedLocationId = null;
+        } else {
+            state.selectedLocationId = loc.id;
+            travelTargetName = loc.name;
+        }
+        warmUpGps();
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    return d;
+}
+function handleVehicleCompliance(loc) {
+    if (!state.meta || !state.meta.wofExpiry) return false;
+
+    const w = new Date(state.meta.wofExpiry);
+    const days = (w.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+
+    if (days < 0) {
+        document.getElementById('wofBlockModal')?.classList.remove('hidden');
+        return true; // Stop execution
+    } else if (days < 14) {
+        const warnModal = document.getElementById('wofWarnModal');
+        const warnText = document.getElementById('wofWarnText');
+        if (warnModal && warnText) {
+            warnModal.classList.remove('hidden');
+            warnText.innerText = `Expires in ${Math.ceil(days)} days`;
+            state.selectedLocationId = loc.id;
+            warmUpGps();
+            renderLocations();
+            updateArrivedButtonState();
+            return true; // Handled by modal
+        }
+    }
+    return false; // All good
+}
+
+function renderLocations() {
+    const l = document.getElementById('locationList');
+    const tr = document.getElementById('travelRow');
+    if (!l || !tr) return;
+
+    l.innerHTML = '';
+    tr.innerHTML = '';
+
+    if (!state.locations) state.locations = [];
+
+    state.locations.forEach(loc => {
+        if (!loc || !loc.id) return;
+
+        if (loc.id === 'travel') {
+            tr.appendChild(createTravelTile(loc));
+        } else {
+            l.appendChild(createDestinationTile(loc));
+        }
     });
 }
 // FIXED: Added Cache Buster to force fresh form data from Spreadsheet
@@ -984,30 +992,50 @@ function startReminderTimer() {
 function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
 function toggleHighRiskUI(){ const chk = document.getElementById('chkHighRisk'); const lbl = document.getElementById('lblHighRisk'); if(chk.checked){ lbl.classList.remove('text-gray-500'); lbl.classList.add('text-red-500', 'animate-pulse'); } else { lbl.classList.add('text-gray-500'); lbl.classList.remove('text-red-500', 'animate-pulse'); } }
 
-function updateArrivedButtonState(){
-    const v = DURATION_MAP[document.getElementById('durationSlider').value];
-    document.getElementById('durationDisplay').innerText = v >= 60 ? (Math.floor(v/60) + ' hr ' + (v%60) + ' min') : v + ' min';
-    state.visitDurationMinutes = v;
-    const b = document.getElementById('btnStart');
-    
-    if(state.selectedLocationId && v > 0){ 
-        b.disabled = false;
-        if (state.selectedLocationId === 'travel') {
-            b.innerText = travelTargetName ? "Travel to " + travelTargetName : "Start travel";
-        } else {
-            b.innerText = "Start visit";
-        }
-        b.className = "long-press-btn flex-1 py-4 bg-green-600 text-white font-black rounded-xl text-xl shadow-lg transition-all"; 
-        setupLongPress(b, startVisit); 
-    } 
-    else { 
-        b.disabled = true; 
-        // IMPROVED CONTRAST: Uses light gray on dark gray for better visibility while disabled
-        b.innerText = state.selectedLocationId ? "Set time" : "Start"; 
-        b.className = "long-press-btn flex-1 py-4 bg-gray-600 text-gray-200 font-bold rounded-xl text-xl transition-all"; 
+function updateArrivedButtonState() {
+    const b = document.getElementById('arrivedBtn');
+    if (!b) return;
+
+    // 1. If a visit is already active, the button stays hidden (or performs a different role)
+    if (state.activeVisit) {
+        b.classList.add('hidden');
+        return;
+    }
+
+    // 2. Determine the button text and style based on selection
+    const config = getButtonConfig();
+
+    if (config) {
+        b.innerText = config.text;
+        b.className = `fixed bottom-6 left-6 right-6 h-16 ${config.color} text-white rounded-2xl font-black text-lg shadow-2xl z-50 transition-all active:scale-95 flex items-center justify-center gap-3`;
+        b.classList.remove('hidden');
+    } else {
+        b.classList.add('hidden');
     }
 }
+function getButtonConfig() {
+    // Case A: Nothing is selected
+    if (!state.selectedLocationId) return null;
 
+    // Case B: Travelling is selected
+    if (state.selectedLocationId === 'travel') {
+        return {
+            text: travelTargetName ? `START TRAVEL TO ${travelTargetName.toUpperCase()}` : "START TRAVELLING",
+            color: "bg-gradient-to-r from-indigo-600 to-purple-600"
+        };
+    }
+
+    // Case C: A specific site is selected
+    const loc = state.locations.find(l => l.id === state.selectedLocationId);
+    if (loc) {
+        return {
+            text: `ARRIVED AT ${loc.name.toUpperCase()}`,
+            color: "bg-blue-600"
+        };
+    }
+
+    return null;
+}
 // VISIT LOGIC
 function startVisit() {
     warmUpSpeech(); 
@@ -1860,6 +1888,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
