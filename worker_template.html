@@ -605,25 +605,30 @@ function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
-    // 1. Existing Logic: Sync the inputs
+    // 1. Sync the Standard Settings
     const urlInput = document.getElementById('set_url');
     if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
 
     const advInput = document.getElementById('set_adv');
     if (advInput) advInput.checked = state.settings.isAdvanced !== false;
 
-    // 2. Existing Logic: Sync the Worker's name
+    // 2. RESTORED: Sync Identity Field
     const nameInput = document.getElementById('set_workerName');
     if (nameInput) nameInput.value = state.settings.workerName || "";
 
-    // 3. Updated Logic: Target the correct Diagnostic IDs
+    // 3. RESTORED: Sync Security PIN (Masked)
+    const pinInput = document.getElementById('set_pinCode');
+    if (pinInput) {
+        // We show dots to indicate a PIN is set without revealing the Base64 string
+        pinInput.value = state.settings.pinCode ? "••••" : "";
+    }
+
+    // 4. Update Diagnostic Information
     const diagApp = document.getElementById('diagApp');
     const diagCloud = document.getElementById('diagCloud');
     
-    // CONFIG.version is baked in during build
-    if (diagApp) diagApp.innerText = CONFIG.version || "v79.35";
+    if (diagApp) diagApp.innerText = APP_VERSION;
     
-    // state.backendVersion is updated by forceSync()
     if (diagCloud) {
         diagCloud.innerText = state.backendVersion || "Not Synced";
         if (state.backendVersion) diagCloud.className = "text-green-400";
@@ -1739,6 +1744,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
