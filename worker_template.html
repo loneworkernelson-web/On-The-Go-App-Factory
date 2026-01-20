@@ -532,40 +532,48 @@ function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.c
 function wizNext(current){ if(current===1){ if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name."); wizGoTo(2); } else if(current===2){ if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN."); if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN."); if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different."); wizGoTo(3); } }
 function wizBack(current){wizGoTo(current-1);}
 function wizSave() {
-    // 1. Collect values from the Setup Wizard IDs
+    // 1. Collect basic info
     const name = document.getElementById('wiz_name').value.trim();
     const phone = document.getElementById('wiz_phone').value.trim();
     const email = document.getElementById('wiz_email').value.trim();
-    const rawPin = document.getElementById('wiz_pin').value;
+    const url = document.getElementById('wiz_url').value.trim();
 
-    // 2. Validation: Ensure the name is present before allowing entry
+    // 2. Validation
     if (!name) {
         showToast("⚠️ Name is required for safety matching.");
         return;
     }
 
-    // 3. Update the global state
-    state.settings.workerName = name;
-    state.settings.workerPhone = phone;
-    state.settings.workerEmail = email;
-    state.settings.pinCode = btoa(document.getElementById('wiz_pin').value.trim());
+    // 3. Update the global state (including Emergency Contacts)
+    state.settings = {
+        workerName: name,
+        workerPhone: phone,
+        workerEmail: email,
+        googleSheetUrl: url,
+        pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
+        
+        // NEW: Capture the Emergency Contact fields
+        emgName: document.getElementById('wiz_emg_name').value.trim(),
+        emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
+        emgEmail: document.getElementById('wiz_emg_email').value.trim(),
+        
+        // NEW: Capture the Escalation Contact fields
+        escName: document.getElementById('wiz_esc_name').value.trim(),
+        escPhone: document.getElementById('wiz_esc_phone').value.trim(),
+        escEmail: document.getElementById('wiz_esc_email').value.trim()
+    };
 
-    // 4. Persist data to localStorage so loadState() can find it later
+    // 4. Persist and Sync
     saveState();
-
-    // 5. Transition to the main dashboard
-    // This also triggers startReminderTimer() via your navigate() logic
     navigate('main');
 
-    // 6. Hide the Wizard Overlay
     const wiz = document.getElementById('setupPage');
     if (wiz) wiz.classList.add('hidden');
 
-    // 7. Trigger the Invisible Sync
-    // 'false' ensures no banner appears during this initial data fetch
+    // Trigger sync so the backend sees the new contacts immediately
     forceSync(false);
 
-    showToast("✅ Setup Complete!");
+    showToast("✅ Setup Complete & Contacts Saved!");
 }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
@@ -1303,42 +1311,61 @@ setupLongPress = function(btn, cb) {
     }
 };
 
-function buildPayload(d){
-    let dt=""; let ln="Unknown Site"; let la="No Address Provided";
-    if(state.activeVisit){
-        if(state.activeVisit.anticipatedDepartureTime) dt=new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
-        const l=state.locations.find(x=>x.id===state.activeVisit.locationId);
-        if(l){ ln=l.companyName?`${l.companyName} - ${l.name}`:l.name; la=l.address; }
-    } else if(state.selectedLocationId){
-        const l=state.locations.find(x=>x.id===state.selectedLocationId);
-        if(l){ ln=l.companyName?`${l.companyName} - ${l.name}`:l.name; la=l.address; }
+function buildPayload(d) {
+    let dt = ""; 
+    let ln = "Unknown Site"; 
+    let la = "No Address Provided";
+
+    // 1. Determine Location and Departure Time
+    if (state.activeVisit) {
+        if (state.activeVisit.anticipatedDepartureTime) {
+            dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
+        }
+        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
+        if (l) { 
+            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
+            la = l.address; 
+        }
+    } else if (state.selectedLocationId) {
+        const l = state.locations.find(x => x.id === state.selectedLocationId);
+        if (l) { 
+            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
+            la = l.address; 
+        }
     }
     
-    let gps=d['Last Known GPS']||"";
-    if(!gps&&state.activeVisit&&state.activeVisit.startGPS){ gps=state.activeVisit.startGPS; }
+    // 2. Determine GPS Coordinates
+    let gps = d['Last Known GPS'] || "";
+    if (!gps && state.activeVisit && state.activeVisit.startGPS) { 
+        gps = state.activeVisit.startGPS; 
+    }
     
-    // PATCH: Explicitly mapping emergency and escalation details to the payload
+    // 3. Assemble and Return the Final Payload
     return {
-        'key':CONFIG.key,
-        'Worker Name':state.settings.workerName,
-        'Worker Phone Number':state.settings.workerPhone,
-        'Worker Email':state.settings.workerEmail,
-        'Emergency Contact Name': state.settings.emergencyName,
-        'Emergency Contact Number': state.settings.emergencyPhone,
-        'Emergency Contact Email': state.settings.emergencyEmail,
-        'Escalation Contact Name': state.settings.escalationName,
-        'Escalation Contact Number': state.settings.escalationPhone,
-        'Escalation Contact Email': state.settings.escalationEmail,
-        'Battery Level':currentBatteryLevel,
-        'Location Name':ln,
-        'Location Address':la,
-        'Anticipated Departure Time':dt,
-        'Timestamp':new Date().toISOString(),
-        'deviceId':getDeviceID(),
-        'Last Known GPS':gps,
+        'key': CONFIG.key,
+        'Worker Name': state.settings.workerName,
+        'Worker Phone Number': state.settings.workerPhone,
+        'Worker Email': state.settings.workerEmail,
+        
+        // Mapped to match the keys used in wizSave
+        'Emergency Contact Name': state.settings.emgName,
+        'Emergency Contact Number': state.settings.emgPhone,
+        'Emergency Contact Email': state.settings.emgEmail,
+        'Escalation Contact Name': state.settings.escName,
+        'Escalation Contact Number': state.settings.escPhone,
+        'Escalation Contact Email': state.settings.escEmail,
+        
+        'Battery Level': currentBatteryLevel,
+        'Location Name': ln,
+        'Location Address': la,
+        'Anticipated Departure Time': dt,
+        'Timestamp': new Date().toISOString(),
+        'deviceId': getDeviceID(),
+        'Last Known GPS': gps,
         ...d
     };
-}function processUploadQueue(d){ if(d) { state.pendingUploads.push(d); saveState(); } if(!navigator.onLine || state.pendingUploads.length === 0) return; const fd = new FormData(); const currentUpload = state.pendingUploads[0]; for(let k in currentUpload) fd.append(k, currentUpload[k]); fetch(CONFIG.url, { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); state.pendingUploads.shift(); saveState(); if(state.pendingUploads.length > 0) processUploadQueue(); }).catch(e => { console.warn("Upload Failed, data queued."); }); }
+}
+function processUploadQueue(d){ if(d) { state.pendingUploads.push(d); saveState(); } if(!navigator.onLine || state.pendingUploads.length === 0) return; const fd = new FormData(); const currentUpload = state.pendingUploads[0]; for(let k in currentUpload) fd.append(k, currentUpload[k]); fetch(CONFIG.url, { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); state.pendingUploads.shift(); saveState(); if(state.pendingUploads.length > 0) processUploadQueue(); }).catch(e => { console.warn("Upload Failed, data queued."); }); }
 function setupLongPress(btn, cb) {
     let t;
     const prog = btn.id === 'batterySaver' ? document.getElementById('saverProgress') : null;
@@ -1673,6 +1700,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
