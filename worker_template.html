@@ -682,13 +682,37 @@ function forceSync(showUi) {
         .then(r => r.json())
         .then(data => {
             if (data.status === "success") {
-                // Update local site data and version info
-                if (data.sites) state.locations = data.sites;
+                // Update local site data
+                const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
+                
+                if (data.sites) {
+                    const ms = (data.sites || []).map(s => ({
+                        id: 'site_' + s.siteName.replace(/\s/g, ''),
+                        name: s.siteName,
+                        address: s.address,
+                        companyName: s.company,
+                        templateName: s.template,
+                        noReport: false,
+                        contactName: s.contactName,
+                        contactPhone: s.contactPhone,
+                        contactEmail: s.contactEmail,
+                        notes: s.notes
+                    }));
+                    state.locations = ms.concat(existingManual);
+                }
+
+                // Sync Global forms and Metadata (WOF/Check intervals)
+                state.globalForms = data.forms || [];
+                state.cachedForms = data.cachedTemplates || {};
+                state.meta = data.meta || {};
+
+                // UPDATE: Store the Cloud Version in state so Settings can see it
                 state.backendVersion = data.version || "Synced";
                 
                 saveState();
                 renderLocations(); // Rebuild the site list UI
-                populateSettingsForm(); // Update the "Cloud Version" display
+                checkVehicleStatus(); // Update the WOF nag bar based on new metadata
+                populateSettingsForm(); // Refresh the "Cloud Version" label in settings
                 
                 console.log("✅ Sync Successful: v" + state.backendVersion);
             } else {
@@ -1797,6 +1821,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
