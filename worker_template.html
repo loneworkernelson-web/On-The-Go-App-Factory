@@ -1253,20 +1253,32 @@ function initSigPad(c) {
 
     window.addEventListener('pointerup', () => { isDrawing = false; });
 }
-// NEW: Kill switch for persistent browser caches
 async function hardRefreshUpdate() {
+    // 1. User confirmation to prevent accidental reloads
     if(!confirm("Force reload and clear internal app memory?")) return;
+    
+    showToast("🧹 Deep cleaning system cache...");
+
+    // 2. Unregister Service Workers
     if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         for (let r of regs) { await r.unregister(); }
     }
+
+    // 3. Delete all named caches (This is the feature missing from the lite version)
     if ('caches' in window) {
         const keys = await caches.keys();
         for (let k of keys) { await caches.delete(k); }
     }
+
+    // 4. Reset diagnostic state so "Not Synced" shows on next load
+    state.backendVersion = null;
+    saveState();
+
+    // 5. Force reload from server bypassing browser cache
     location.reload(true); 
-}
-function resizeCanvas(canvasEl) { 
+    
+}function resizeCanvas(canvasEl) { 
     const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
     if (!c) return; 
     const ctx = c.getContext('2d'); 
@@ -1313,6 +1325,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
