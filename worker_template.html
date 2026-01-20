@@ -1020,6 +1020,8 @@ function warmUpSpeech() { if('speechSynthesis' in window) { const u = new Speech
 function speakWithAccent(msg){ if(!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); const v = window.speechSynthesis.getVoices(); u.voice = v.find(x => x.lang.includes(CONFIG.voiceLocale)) || v.find(x => x.lang.includes('en-NZ')); u.rate = 0.9; u.volume = 1.0; window.speechSynthesis.speak(u); }
 
 function preDepart(){
+    // Kill the timer so the screen stays bright for form filling
+    if (autoDimTimer) clearTimeout(autoDimTimer);
     isMidVisitUpdate=false; const l=state.locations.find(x=>x.id===state.activeVisit.locationId); const sg=state.activeVisit.startGPS;
     if(l.id === 'travel'){
         if(l.noReport) { submitReport(); return; }
@@ -1566,20 +1568,19 @@ function initPanicButton() {
  * Replaces the old handlePanicTap()
  */
 function executePanicAction() {
-    // 1. Debounce check: Prevent sending multiple alerts within 60 seconds
+    // Kill the auto-dim timer immediately on emergency
+    if (autoDimTimer) clearTimeout(autoDimTimer); 
+
     if (Date.now() - lastAlertTime < 60000) return; 
     lastAlertTime = Date.now();
 
-    // 2. Update internal state for UI tracking
     state.activeVisit = state.activeVisit || {};
     state.activeVisit.isPanic = true;
     saveState();
 
-    // 3. Feedback
     if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 500]);
     showToast("🚨 SOS ACTIVATED");
 
-    // 4. Send to Diocese Backend
     processUploadQueue(buildPayload({
         "Alarm Status": "PANIC_BUTTON_HELD",
         "Notes": "Emergency SOS triggered by 3-second hold."
@@ -1672,6 +1673,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
