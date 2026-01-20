@@ -424,7 +424,7 @@ const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHE
 // CORE STATE
 let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};
 let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;
-let tempPhoto=null,sigPad=null,panicTapCount=0,panicTapTimer;
+let tempPhoto=null,sigPad=null;
 let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",isDrawing=false;
 let calculatedDist=null,gpsWarm=false,gpsWatchId=null,lastAlertTime=0;
 let currentBatteryLevel="100%";
@@ -1178,7 +1178,6 @@ function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.acti
 function startReminderTimerfunction triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
-function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3){triggerPanic();panicTapCount=0;}}
 function triggerPanic(){ 
     if (Date.now() - lastAlertTime < 60000) return; 
     lastAlertTime = Date.now(); 
@@ -1509,11 +1508,20 @@ function initPanicButton() {
  * Replaces the old handlePanicTap()
  */
 function executePanicAction() {
-    // 1. Immediate visual/haptic feedback
+    // 1. Debounce check: Prevent sending multiple alerts within 60 seconds
+    if (Date.now() - lastAlertTime < 60000) return; 
+    lastAlertTime = Date.now();
+
+    // 2. Update internal state for UI tracking
+    state.activeVisit = state.activeVisit || {};
+    state.activeVisit.isPanic = true;
+    saveState();
+
+    // 3. Feedback
     if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 500]);
     showToast("🚨 SOS ACTIVATED");
 
-    // 2. Existing upload logic
+    // 4. Send to Diocese Backend
     processUploadQueue(buildPayload({
         "Alarm Status": "PANIC_BUTTON_HELD",
         "Notes": "Emergency SOS triggered by 3-second hold."
@@ -1606,6 +1614,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
