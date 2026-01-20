@@ -1355,6 +1355,25 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); defe
 function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
 function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
 function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
+window.onload = () => {
+    // 1. Load the saved data from memory first
+    loadState(); 
+
+    // 2. Control initial view: Show Wizard if no name is set, else go to Main
+    if (!state.settings.workerName) {
+        // Ensure we are on the setup page and show the wizard
+        navigate('setup'); 
+        document.getElementById('setupWizard').classList.remove('hidden');
+    } else {
+        // Already registered, go to the main dashboard
+        navigate('main');
+        
+        // Trigger the silent background sync to update Cloud Version & Sites
+        forceSync(false); 
+    }
+    
+    console.log("OTG AppSuite Initialised");
+};
 </script>
  <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
     <div class="flex items-start gap-4">
@@ -1372,3 +1391,4 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
