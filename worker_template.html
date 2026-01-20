@@ -559,46 +559,34 @@ function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.c
 function wizNext(current){ if(current===1){ if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name."); wizGoTo(2); } else if(current===2){ if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN."); if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN."); if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different."); wizGoTo(3); } }
 function wizBack(current){wizGoTo(current-1);}
 function wizSave() {
-    // 1. Collect values from the existing HTML IDs
     const name = document.getElementById('wiz_name').value.trim();
     const phone = document.getElementById('wiz_phone').value.trim();
     const email = document.getElementById('wiz_email').value.trim();
 
-    // 2. Validation
     if (!name) {
         showToast("⚠️ Name is required for safety matching.");
         return;
     }
 
-    // 3. Update the global state (Preserving all contact fields)
     state.settings = {
         workerName: name,
         workerPhone: phone,
         workerEmail: email,
         googleSheetUrl: CONFIG.url, 
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
-        
-        // NEW: Capture the Emergency Contact fields
         emgName: document.getElementById('wiz_emg_name').value.trim(),
         emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
         emgEmail: document.getElementById('wiz_emg_email').value.trim(),
-        
-        // NEW: Capture the Escalation Contact fields
         escName: document.getElementById('wiz_esc_name').value.trim(),
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
     };
 
-    // 4. Persist and Transition
     saveState();
     navigate('main');
-
     const wiz = document.getElementById('setupPage');
     if (wiz) wiz.classList.add('hidden');
-
-    // 5. Trigger sync so the backend sees the new contacts immediately
     forceSync(false);
-
     showToast("✅ Setup Complete & Contacts Saved!");
 }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
@@ -717,13 +705,66 @@ function forceSync(showUi) {
             }
         });
 }
-function checkVehicleStatus(){
-    if(!CONFIG.vehEnabled)return; const b=document.getElementById('vehNagBar');let s=false;
-    if(CONFIG.vehicleTerm) { document.getElementById('vehNagBar').innerText = `⚠️ ${CONFIG.vehicleTerm} Check Overdue - Tap to Complete`; }
-    if(state.meta.lastVehCheck){ const l=new Date(state.meta.lastVehCheck);const d=(Date.now()-l.getTime())/(1000*60*60*24); if(d>CONFIG.vehInterval){s=true;} } 
-    else { s=true; document.getElementById('vehNagBar').innerText=`⚠️ ${CONFIG.vehicleTerm} Check Required`; }
-    if(state.meta.wofExpiry){ const w=new Date(state.meta.wofExpiry);const du=(w.getTime()-Date.now())/(1000*60*60*24); if(du<0){s=true;b.innerText=`⛔ ${CONFIG.vehicleTerm} EXPIRED - Vehicle Use Prohibited`;} else if(du<14){s=true;b.innerText=`⚠️ Vehicle Check: ${CONFIG.vehicleTerm} Due in ${Math.ceil(du)} Days`;} }
-    if(s)b.classList.remove('hidden');else b.classList.add('hidden');
+function checkVehicleStatus() {
+    // 1. Exit early if vehicle monitoring is disabled in CONFIG
+    if (!CONFIG.vehEnabled) return; 
+
+    const b = document.getElementById('vehNagBar');
+    if (!b) return;
+
+    let s = false; // Tracks if the "Check Required" state is active
+
+    // 2. Customise banner text based on the organization's terminology
+    if (CONFIG.vehicleTerm) { 
+        b.innerText = `⚠️ ${CONFIG.vehicleTerm} Check Overdue - Tap to Complete`; 
+    }
+
+    // 3. Logic for the Periodic Safety Check (e.g., Weekly/Monthly)
+    if (state.meta.lastVehCheck) { 
+        const l = new Date(state.meta.lastVehCheck);
+        const d = (Date.now() - l.getTime()) / (1000 * 60 * 60 * 24); 
+        // Trigger banner if the days since last check exceed the interval
+        if (d > CONFIG.vehInterval) { s = true; } 
+    } 
+    else { 
+        /**
+         * FIXED: "Day 1" Logic
+         * Instead of triggering the banner immediately on a fresh install,
+         * we set 'today' as the baseline so the first check is due only 
+         * after one full interval (e.g., in 7 days).
+         */
+        state.meta.lastVehCheck = new Date().toISOString();
+        saveState();
+        s = false; 
+    }
+
+    // 4. Logic for Legal Compliance (WOF/Registration/CoF Expiry)
+    if (state.meta.wofExpiry) { 
+        const w = new Date(state.meta.wofExpiry);
+        const du = (w.getTime() - Date.now()) / (1000 * 60 * 60 * 24); 
+
+        if (du < 0) {
+            // Case: Vehicle is legally expired
+            s = true;
+            b.innerText = `⛔ ${CONFIG.vehicleTerm || 'WOF'} EXPIRED - Vehicle Use Prohibited`;
+            b.classList.remove('bg-orange-600');
+            b.classList.add('bg-red-700'); // Visual escalation for illegal vehicle state
+        } 
+        else if (du < 14) { 
+            // Case: Warning zone (within 14 days of expiry)
+            s = true;
+            b.innerText = `⚠️ Vehicle Check: ${CONFIG.vehicleTerm || 'WOF'} Due in ${Math.ceil(du)} Days`;
+            b.classList.add('bg-orange-600');
+            b.classList.remove('bg-red-700');
+        } 
+    }
+
+    // 5. Final UI Update: Show or Hide the Nag Bar
+    if (s) {
+        b.classList.remove('hidden');
+    } else {
+        b.classList.add('hidden');
+    }
 }
 
 // FORM HANDLING & RENDERERS
@@ -1744,6 +1785,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
