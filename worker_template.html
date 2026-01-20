@@ -480,6 +480,7 @@ function wizSave() {
     const name = document.getElementById('wiz_name').value.trim();
     const phone = document.getElementById('wiz_phone').value.trim();
     const email = document.getElementById('wiz_email').value.trim();
+    const rawPin = document.getElementById('wiz_pin').value;
 
     // 2. Validation: Ensure the name is present before allowing entry
     if (!name) {
@@ -491,6 +492,7 @@ function wizSave() {
     state.settings.workerName = name;
     state.settings.workerPhone = phone;
     state.settings.workerEmail = email;
+    state.settings.pinCode = btoa(document.getElementById('wiz_pin').value.trim());
 
     // 4. Persist data to localStorage so loadState() can find it later
     saveState();
@@ -1261,7 +1263,7 @@ function setupLongPress(btn, cb) {
     btn.onmousedown = btn.ontouchstart = start;
     btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
 }
-function withPinVerification(d,c){ showModal('pin'); const i=document.getElementById('pinInput'); i.value=''; i.focus(); const cf=()=>{ const v=i.value; closeModal('pin'); if(v===state.settings.pinCode){ c(); } else if(v===state.settings.duressPin){ processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"})); if(state.activeVisit) { state.activeVisit = null; saveState(); navigate('main'); } } document.getElementById('confirmPinBtn').removeEventListener('click',cf); }; document.getElementById('confirmPinBtn').addEventListener('click',cf); document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin'); }
+function withPinVerification(d,c){ showModal('pin'); const i=document.getElementById('pinInput'); i.value=''; i.focus(); const cf=()=>{ const v=i.value; closeModal('pin'); if(checkPin(v)){ c(); } else if(v===state.settings.duressPin){ processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"})); if(state.activeVisit) { state.activeVisit = null; saveState(); navigate('main'); } } document.getElementById('confirmPinBtn').removeEventListener('click',cf); }; document.getElementById('confirmPinBtn').addEventListener('click',cf); document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin'); }
 function clearData(){if(confirm('Reset all safety data and restart setup?')){localStorage.clear();location.reload();}}
 function clearFormsCache(){state.cachedForms={};state.globalForms=[];syncForms();showToast("Syncing Forms...");}
 function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
@@ -1393,7 +1395,41 @@ async function hardRefreshUpdate() {
         }
     }
 }
+    function saveSettings() {
+    // 1. Collect values from the Settings UI IDs
+    const nameInput = document.getElementById('set_workerName');
+    const pinInput = document.getElementById('set_pinCode');
+    const urlInput = document.getElementById('set_url');
+
+    // 2. Update the global state with trimmed values
+    if (nameInput) state.settings.workerName = nameInput.value.trim();
+    if (urlInput) state.settings.googleSheetUrl = urlInput.value.trim();
+
+    // 3. Obfuscate the PIN using Base64 before saving
+    if (pinInput && pinInput.value) {
+        state.settings.pinCode = btoa(pinInput.value.trim());
+    }
+
+    // 4. Persist the updated state to localStorage
+    saveState();
+
+    // 5. Visual feedback and Manual Sync
+    showToast("✅ Settings Saved Successfully");
     
+    // For manual saves, we pass 'true' so the worker sees the "Syncing" banner
+    forceSync(true); 
+}
+    
+function checkPin(input) {
+    if (!state.settings.pinCode) return false;
+    try {
+        // Decodes the stored string for comparison
+        return input === atob(state.settings.pinCode);
+    } catch (e) {
+        // Fallback for old plain-text pins during transition
+        return input === state.settings.pinCode;
+    }
+}    
 function resizeCanvas(canvasEl) { 
     // 1. Selector flexibility: Uses parameter or searches for a signature canvas
     const c = canvasEl || document.getElementById('sigPad') || document.querySelector('canvas[id^="sig-canvas-"]'); 
@@ -1476,6 +1512,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
