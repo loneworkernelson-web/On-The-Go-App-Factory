@@ -416,7 +416,14 @@ function closeModal(id) {
 }
 
 // UI HELPERS
-function showToast(msg) { const t = document.getElementById('toastMsg'); document.getElementById('toastText').innerText = msg; t.classList.add('show'); setTimeout(() => { t.classList.remove('show'); }, 3000); }
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.innerText = msg;
+    t.classList.remove('hidden');
+    // Hide after 4 seconds
+    setTimeout(() => { t.classList.add('hidden'); }, 4000);
+}
 function toggleWofContinue(){ const chk=document.getElementById('chkWofAck'); const btn=document.getElementById('btnWofContinue'); btn.disabled=!chk.checked; if(chk.checked){ btn.classList.remove('bg-gray-700','text-gray-500'); btn.classList.add('bg-blue-600','text-white'); } else { btn.classList.add('bg-gray-700','text-gray-500'); btn.classList.remove('bg-blue-600','text-white'); } }
 function closeWofBlocker(){document.getElementById('wofBlockModal').classList.add('hidden');}
 function closeWofWarn(){document.getElementById('wofWarnModal').classList.add('hidden');}
@@ -468,20 +475,41 @@ function startWizard(){ document.getElementById('setupWizard').classList.remove(
 function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
 function wizNext(current){ if(current===1){ if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name."); wizGoTo(2); } else if(current===2){ if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN."); if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN."); if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different."); wizGoTo(3); } }
 function wizBack(current){wizGoTo(current-1);}
-function wizSave(){ 
-    // ... rest of your existing wizSave mapping ...
-    state.settings.googleSheetUrl=CONFIG.url; 
-    saveState(); 
-    
-    // 1. Clear the wizard first
-    document.getElementById('setupWizard').classList.add('hidden'); 
-    
-    // 2. Explicitly show the main page
-    navigate('main'); 
-    
-    // 3. Trigger sync with UI enabled
-    forceSync(true); 
-}function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
+function wizSave() {
+    // 1. Collect values from the Setup Wizard IDs
+    const name = document.getElementById('wiz_name').value.trim();
+    const phone = document.getElementById('wiz_phone').value.trim();
+    const email = document.getElementById('wiz_email').value.trim();
+
+    // 2. Validation: Ensure the name is present before allowing entry
+    if (!name) {
+        showToast("⚠️ Name is required for safety matching.");
+        return;
+    }
+
+    // 3. Update the global state
+    state.settings.workerName = name;
+    state.settings.workerPhone = phone;
+    state.settings.workerEmail = email;
+
+    // 4. Persist data to localStorage so loadState() can find it later
+    saveState();
+
+    // 5. Transition to the main dashboard
+    // This also triggers startReminderTimer() via your navigate() logic
+    navigate('main');
+
+    // 6. Hide the Wizard Overlay
+    const wiz = document.getElementById('setupWizard');
+    if (wiz) wiz.classList.add('hidden');
+
+    // 7. Trigger the Invisible Sync
+    // 'false' ensures no banner appears during this initial data fetch
+    forceSync(false);
+
+    showToast("✅ Setup Complete!");
+}
+function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
@@ -1089,8 +1117,7 @@ function buildReportForm(n,c){
 
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
-function startReminderTimer(){clearTimeout(mainScreenReminderTimer);mainScreenReminderTimer=setTimeout(()=>{if(!state.activeVisit&&document.getElementById('mainPage').classList.contains('active')){ /* logic for screen reminder */ }},300000);}
-function triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
+function startReminderTimerfunction triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
 function handlePanicTap(){const n=Date.now();if(n-panicTapTimer>2000)panicTapCount=0;panicTapCount++;panicTapTimer=n;if(panicTapCount>=3){triggerPanic();panicTapCount=0;}}
@@ -1419,6 +1446,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
