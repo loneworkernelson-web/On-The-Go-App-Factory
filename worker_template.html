@@ -448,10 +448,12 @@ function populateSettingsForm() {
     document.getElementById('set_url').value = state.settings.googleSheetUrl || CONFIG.url;
     document.getElementById('set_adv').checked = state.settings.isAdvanced !== false;
     
-    const appVerEl = document.getElementById('appVerText');
-    if (appVerEl) appVerEl.innerText = APP_VERSION;
-    const cloudVerEl = document.getElementById('cloudVerText');
-    if (cloudVerEl) cloudVerEl.innerText = state.backendVersion || "Not Synced";
+// Update Diagnostic Spans
+    const diagApp = document.getElementById('diagApp');
+    const diagCloud = document.getElementById('diagCloud');
+    
+    if (diagApp) diagApp.innerText = CONFIG.version || "v79.35";
+    if (diagCloud) diagCloud.innerText = state.backendVersion || "Not Synced";
 }
 function toggleAdvancedMode(el) {
     state.settings.isAdvanced = el.checked;
@@ -468,11 +470,14 @@ function toggleAdvancedMode(el) {
     function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(showUi){
+    // 1. Prevent sync if setup isn't complete
     if(!state.settings.workerName) return; 
-    // Only show the banner if explicitly requested
+    
+    // 2. Only show the banner if explicitly requested (e.g., from Settings)
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
+    // 3. Cache-busting URL to ensure fresh data from the Nelson Diocese backend
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -481,29 +486,53 @@ function forceSync(showUi){
             return; 
         }
         
+        // 4. Filter and map locations from the spreadsheet
         const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
+        const ms = (data.sites || []).map(s => ({
+            id:'site_'+s.siteName.replace(/\s/g,''), 
+            name:s.siteName, 
+            address:s.address, 
+            companyName:s.company, 
+            templateName:s.template, 
+            noReport:false, 
+            contactName:s.contactName, 
+            contactPhone:s.contactPhone, 
+            contactEmail:s.contactEmail, 
+            notes:s.notes
+        }));
         
-        ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
+        // 5. RESTORED: Add the Travel tile unconditionally
+        ms.unshift({
+            id:'travel', 
+            name:'Travel', 
+            address:'Calculates Mileage via GPS', 
+            noReport:!CONFIG.reqTravelReport, 
+            companyName:'Internal', 
+            templateName:'Travel Report'
+        });
         
-state.locations = ms.concat(existingManual); 
+        // 6. Update global state
+        state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
+        state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
         
-        // 1. Update the background state
+        // 7. Capture the backend version for diagnostics
         state.backendVersion = data.version || "Unknown";
         
+        // 8. Finalise state and trigger UI redraws
         saveState(); 
         renderLocations(); 
         checkVehicleStatus(); 
         
+        // 9. Handle visibility-specific feedback
         if(showUi) {
             document.getElementById('uploadBanner').classList.add('hidden');
             showToast("Sync Complete!");
         }
-        // 2. FIXED: Always refresh the UI to update diagnostics, even if invisible
+
+        // 10. FIXED: Always refresh the Settings UI to update the Cloud Version text
         populateSettingsForm(); 
-        }
     });
 }
 function checkVehicleStatus(){
@@ -1282,6 +1311,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
