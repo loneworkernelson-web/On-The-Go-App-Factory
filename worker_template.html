@@ -532,11 +532,10 @@ function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.c
 function wizNext(current){ if(current===1){ if(!document.getElementById('wiz_name').value)return alert("Please enter your Full Name."); wizGoTo(2); } else if(current===2){ if(document.getElementById('wiz_pin').value.length<4)return alert("Please set a 4-digit Standard PIN."); if(document.getElementById('wiz_duress').value.length<4)return alert("Please set a 4-digit Duress PIN."); if(document.getElementById('wiz_pin').value===document.getElementById('wiz_duress').value)return alert("Codes must be different."); wizGoTo(3); } }
 function wizBack(current){wizGoTo(current-1);}
 function wizSave() {
-    // 1. Collect basic info
+    // 1. Collect values from the existing HTML IDs
     const name = document.getElementById('wiz_name').value.trim();
     const phone = document.getElementById('wiz_phone').value.trim();
     const email = document.getElementById('wiz_email').value.trim();
-    const url = document.getElementById('wiz_url').value.trim();
 
     // 2. Validation
     if (!name) {
@@ -544,25 +543,38 @@ function wizSave() {
         return;
     }
 
-    // 3. Update the global state (including Emergency Contacts)
+    // 3. Update the global state
     state.settings = {
         workerName: name,
         workerPhone: phone,
         workerEmail: email,
-        googleSheetUrl: url,
+        // Use the hardcoded CONFIG url instead of looking for a missing input
+        googleSheetUrl: CONFIG.url, 
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
         
-        // NEW: Capture the Emergency Contact fields
+        // Emergency Contact fields (Patched in Step 3)
         emgName: document.getElementById('wiz_emg_name').value.trim(),
         emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
         emgEmail: document.getElementById('wiz_emg_email').value.trim(),
         
-        // NEW: Capture the Escalation Contact fields
+        // Escalation Contact fields
         escName: document.getElementById('wiz_esc_name').value.trim(),
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
     };
 
+    // 4. Persist and Transition
+    saveState();
+    navigate('main');
+
+    const wiz = document.getElementById('setupPage');
+    if (wiz) wiz.classList.add('hidden');
+
+    // 5. Trigger the Invisible Sync
+    forceSync(false);
+
+    showToast("✅ Setup Complete!");
+}
     // 4. Persist and Sync
     saveState();
     navigate('main');
@@ -1700,6 +1712,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
