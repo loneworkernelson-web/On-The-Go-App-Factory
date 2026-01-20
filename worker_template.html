@@ -457,14 +457,18 @@ function wizSave(){
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
 function populateSettingsForm() {
-    // 1. Sync the inputs
+    // 1. Existing Logic: Sync the inputs
     const urlInput = document.getElementById('set_url');
     if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
 
     const advInput = document.getElementById('set_adv');
     if (advInput) advInput.checked = state.settings.isAdvanced !== false;
 
-    // 2. Update Diagnostic Spans with New IDs
+    // 2. Existing Logic: Sync the Worker's name
+    const nameInput = document.getElementById('set_workerName');
+    if (nameInput) nameInput.value = state.settings.workerName || "";
+
+    // 3. Updated Logic: Target the correct Diagnostic IDs
     const diagApp = document.getElementById('diagApp');
     const diagCloud = document.getElementById('diagCloud');
     
@@ -494,14 +498,10 @@ function toggleAdvancedMode(el) {
     function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
 function forceSync(showUi){
-    // 1. Prevent sync if setup isn't complete
     if(!state.settings.workerName) return; 
-    
-    // 2. Only show the banner if explicitly requested (e.g., from Settings)
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
-    // 3. Cache-busting URL to ensure fresh data from the Nelson Diocese backend
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -510,52 +510,30 @@ function forceSync(showUi){
             return; 
         }
         
-        // 4. Filter and map locations from the spreadsheet
         const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-        const ms = (data.sites || []).map(s => ({
-            id:'site_'+s.siteName.replace(/\s/g,''), 
-            name:s.siteName, 
-            address:s.address, 
-            companyName:s.company, 
-            templateName:s.template, 
-            noReport:false, 
-            contactName:s.contactName, 
-            contactPhone:s.contactPhone, 
-            contactEmail:s.contactEmail, 
-            notes:s.notes
-        }));
+        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
         
-        // 5. RESTORED: Add the Travel tile unconditionally
-        ms.unshift({
-            id:'travel', 
-            name:'Travel', 
-            address:'Calculates Mileage via GPS', 
-            noReport:!CONFIG.reqTravelReport, 
-            companyName:'Internal', 
-            templateName:'Travel Report'
-        });
+        // PRESERVED: Travel tile added unconditionally
+        ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
-        // 6. Update global state
         state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
         
-        // 7. Capture the backend version for diagnostics
+        // PRESERVED: Store backend version
         state.backendVersion = data.version || "Unknown";
         
-        // 8. Finalise state and trigger UI redraws
         saveState(); 
         renderLocations(); 
         checkVehicleStatus(); 
         
-        // 9. Handle visibility-specific feedback
         if(showUi) {
             document.getElementById('uploadBanner').classList.add('hidden');
             showToast("Sync Complete!");
         }
 
-        // 10. FIXED: Always refresh the Settings UI to update the Cloud Version text
+        // UPDATED: Always update Diagnostics, even if invisible
         populateSettingsForm(); 
     });
 }
@@ -1335,6 +1313,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
