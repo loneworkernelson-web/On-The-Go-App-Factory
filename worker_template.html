@@ -768,8 +768,21 @@ function checkVehicleStatus() {
 }
 
 // FORM HANDLING & RENDERERS
-function startVehicleCheck(){loadFormAndShow('Vehicle Safety Check');}
-function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
+function startVehicleCheck() {
+    // 1. Safety Check: Ensure the app logic is actually loaded
+    if (typeof loadFormAndShow !== 'function') {
+        console.error("UI Error: loadFormAndShow is not defined.");
+        showToast("⚠️ System error - please refresh.");
+        return;
+    }
+
+    // 2. Trigger the Safety Form
+    // This matches the name of the template stored in your 'globalForms'
+    loadFormAndShow('Vehicle Safety Check');
+    
+    // 3. User Feedback
+    console.log("Vehicle Check Initiated: Loading Template...");
+}function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
 function openMidVisitMenu(){isMidVisitUpdate=true;calculatedDist=null;showModal('template');const cid=state.activeVisit?state.activeVisit.locationId:null;const loc=state.locations.find(x=>x.id===cid);renderIconGrid(state.globalForms, loc);}
 
 function renderIconGrid(forms, loc) {
@@ -1785,6 +1798,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
