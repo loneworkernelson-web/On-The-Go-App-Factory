@@ -467,13 +467,12 @@ function toggleAdvancedMode(el) {
 }
     function saveState(){localStorage.setItem('loneWorkerState',JSON.stringify(state));}
 
-// FIXED: Removed CONFIG.mileage check to ensure Travel tile is ALWAYS present
 function forceSync(showUi){
     if(!state.settings.workerName) return; 
+    // Only show the banner if explicitly requested
     if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
     
     const dId = getDeviceID();
-    // FIXED: Added backticks around the URL string
     const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
     
     fetch(syncUrl).then(r => r.json()).then(data => {
@@ -487,23 +486,23 @@ function forceSync(showUi){
         
         ms.unshift({id:'travel', name:'Travel', address:'Calculates Mileage via GPS', noReport:!CONFIG.reqTravelReport, companyName:'Internal', templateName:'Travel Report'});
         
-        state.locations = ms.concat(existingManual); 
+state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
-        state.cachedForms = data.cachedTemplates || {}; 
         state.meta = data.meta || {};
         
-        // FINAL ADDITION: Save the backend version and refresh the UI
+        // 1. Update the background state
         state.backendVersion = data.version || "Unknown";
         
         saveState(); 
         renderLocations(); 
         checkVehicleStatus(); 
-        document.getElementById('uploadBanner').classList.add('hidden'); 
         
-        // FINAL ADDITION: Ensure the Settings page updates immediately
-        if(showUi) { 
-            showToast("Sync Complete!"); 
-            populateSettingsForm(); 
+        if(showUi) {
+            document.getElementById('uploadBanner').classList.add('hidden');
+            showToast("Sync Complete!");
+        }
+        // 2. FIXED: Always refresh the UI to update diagnostics, even if invisible
+        populateSettingsForm(); 
         }
     });
 }
@@ -1283,6 +1282,7 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
+
 
 
 
