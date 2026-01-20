@@ -1296,8 +1296,36 @@ async function hardRefreshUpdate() {
 
     // 5. Force reload from server bypassing browser cache
     location.reload(true); 
+}
+
+    function loadState() {
+    const saved = localStorage.getItem('otg_worker_state');
+    if (saved) {
+        try {
+            state = JSON.parse(saved);
+            
+            // Ensure sub-objects exist to prevent crashes
+            if (!state.settings) state.settings = {};
+            if (!state.locations) state.locations = [];
+            if (!state.meta) state.meta = {};
+
+            // Update UI from the loaded data
+            populateSettingsForm();
+            renderLocations();
+            
+            // Restart Advanced GPS if it was active
+            if (state.settings.isAdvanced) {
+                startGPSMonitoring();
+            }
+            
+            console.log("System State Restored");
+        } catch (e) {
+            console.error("Failed to parse saved state", e);
+        }
+    }
+}
     
-}function resizeCanvas(canvasEl) { 
+    function resizeCanvas(canvasEl) { 
     const c = canvasEl || document.querySelector('canvas[id^="sig-canvas-"]'); 
     if (!c) return; 
     const ctx = c.getContext('2d'); 
@@ -1344,43 +1372,3 @@ function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.naviga
 </div>   
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
