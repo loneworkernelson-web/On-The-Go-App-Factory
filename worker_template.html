@@ -1100,7 +1100,82 @@ function startVisit() {
     // IMPORTANT: Reintroduce the pulse for travel visits
     if(s.id === 'travel') startTravellingPulse();
 }
+function startVisit() {
+    const locId = state.selectedLocationId;
+    if (!locId) return;
 
+    // 1. Find the location data
+    const loc = state.locations.find(l => l.id === locId);
+    if (!loc && locId !== 'travel') return;
+
+    // 2. Build the Visit Object
+    const visitData = {
+        locationId: locId,
+        locationName: locId === 'travel' ? 'Travelling' : loc.name,
+        startTime: new Date().toISOString(),
+        travelTarget: (locId === 'travel') ? travelTargetName : null,
+        status: locId === 'travel' ? 'TRAVELLING' : 'ARRIVED'
+    };
+
+    // 3. Handle State Transition
+    state.activeVisit = visitData;
+    state.selectedLocationId = null; // Clear selection after starting
+    
+    // 4. Persistence & UI Updates
+    saveState();
+    renderLocations();
+    updateArrivedButtonState();
+    
+    // 5. Trigger Network Sync
+    // We send a "Check-in" payload immediately so the backend knows the worker is active
+    processUploadQueue(buildPayload({
+        "Alarm Status": visitData.status,
+        "Current Site": visitData.locationName,
+        "Notes": visitData.travelTarget ? `To: ${visitTargetName}` : "Started Visit"
+    }));
+
+    // 6. Start the Safety Timers
+    startCheckinTimer();
+    
+    showToast(`✅ ${visitData.status} logged`);
+}
+    
+    state.lowBatSent = false; 
+    saveState(); 
+    enterLockedScreen(); 
+    
+    // Auto-switch to Dark Mode after 10 seconds
+    if (autoDimTimer) clearTimeout(autoDimTimer);
+    autoDimTimer = setTimeout(() => {
+        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
+            toggleBatterySaver();
+        }
+    }, 10000);
+
+    // IMPORTANT: Reintroduce the pulse for travel visits
+    if(s.id === 'travel') startTravellingPulse();
+}
+function updateTimerDisplay(now, due) {
+    const timerEl = document.getElementById('checkinTimerDisplay');
+    if (!timerEl) return;
+
+    const diff = due - now;
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+
+    // Format as 00:00
+    const display = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    timerEl.innerText = display;
+
+    // Visual Warning: Turn red if under 5 minutes
+    if (mins < 5) {
+        timerEl.classList.remove('text-blue-400');
+        timerEl.classList.add('text-red-500', 'animate-pulse');
+    } else {
+        timerEl.classList.add('text-blue-400');
+        timerEl.classList.remove('text-red-500', 'animate-pulse');
+    }
+}   
 function preDepart() {
     // Kill the auto-dim timer so the report form stays visible
     if (autoDimTimer) clearTimeout(autoDimTimer);
@@ -1404,7 +1479,27 @@ function buildReportForm(n,c){
 
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
-function triggerCheckin() {
+function checkIn() {
+    if (!state.activeVisit) return;
+
+    // 1. Calculate the new due time
+    const interval = CONFIG.checkinInterval || 60;
+    const now = new Date();
+    state.activeVisit.nextCheckinDue = new Date(now.getTime() + interval * 60000).toISOString();
+    
+    // 2. Clear and restart the background monitor
+    startCheckinTimer();
+    
+    // 3. Persist and notify the backend
+    saveState();
+    processUploadQueue(buildPayload({
+        "Alarm Status": "CHECK-IN",
+        "Notes": state.activeVisit.status === 'TRAVELLING' ? "Travel Check-in" : "Site Check-in"
+    }));
+
+    showToast("✅ Check-in Successful");
+}
+    function triggerCheckin() {
     if(!document.getElementById('checkinModal').classList.contains('hidden')) return;
     showModal('checkin');
     document.getElementById('batterySaver').classList.add('hidden');
@@ -1881,20 +1976,25 @@ window.onload = () => {
     // 1. Restore app data from local storage
     loadState(); 
 
-    // 2. Initialize the new 3-second SOS hold listeners
+    // 2. Initialize the SOS hold listeners
     initPanicButton();
 
-    // 3. Initial View Logic: Use 'setupPage' to match the new ID system
+    // 3. Route the user based on state
     if (!state.settings || !state.settings.workerName) {
-        // Identity unknown: Force the Setup Wizard
+        // CASE A: New User -> Setup Wizard
         navigate('setup'); 
         const setupContainer = document.getElementById('setupPage'); 
         if (setupContainer) setupContainer.classList.remove('hidden');
-    } else {
-        // Identity known: Enter dashboard and run a silent background sync
+    } 
+    else if (state.activeVisit) {
+        // CASE B: Existing Visit/Travel -> Resume Active Screen
+        navigate('active'); // Ensure you have an 'activePage' ID in your HTML
+        startCheckinTimer(); // Restart the heartbeat monitor
+        forceSync(false);
+    } 
+    else {
+        // CASE C: Normal Operation -> Dashboard
         navigate('main');
-        
-        // 'false' keeps the sync invisible to the worker
         forceSync(false); 
     }
     
@@ -1917,9 +2017,3 @@ window.onload = () => {
 </div>   
 </body>
 </html>
-
-
-
-
-
-
