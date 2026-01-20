@@ -1194,7 +1194,37 @@ function buildReportForm(n,c){
 
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
-function startReminderTimerfunction triggerCheckin(){if(!document.getElementById('checkinModal').classList.contains('hidden'))return;showModal('checkin');document.getElementById('batterySaver').classList.add('hidden');let rem=120;const el=document.getElementById('checkinCountdown');if(checkinIntervalId)clearInterval(checkinIntervalId);playSound('checkin');const btn=document.getElementById('btnCheckinConfirm');const newBtn=btn.cloneNode(true);btn.parentNode.replaceChild(newBtn,btn);setupLongPress(newBtn,confirmCheckin);checkinIntervalId=setInterval(()=>{rem--;const m=Math.floor(rem/60);const s=rem%60;el.innerText=`${m}:${s<10?'0':''}${s}`;if(rem<=0){clearInterval(checkinIntervalId);closeModal('checkin');processUploadQueue(buildPayload({"Alarm Status":'MISSED_CHECKIN',"Notes":"Worker failed to respond to check-in"}));showToast('MISSED CHECK-IN ALERT SENT');}},1000);}
+function triggerCheckin() {
+    if(!document.getElementById('checkinModal').classList.contains('hidden')) return;
+    showModal('checkin');
+    document.getElementById('batterySaver').classList.add('hidden');
+    let rem = 120;
+    const el = document.getElementById('checkinCountdown');
+    if (checkinIntervalId) clearInterval(checkinIntervalId);
+    playSound('checkin');
+    
+    // Refresh button listeners
+    const btn = document.getElementById('btnCheckinConfirm');
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    setupLongPress(newBtn, confirmCheckin);
+    
+    checkinIntervalId = setInterval(() => {
+        rem--;
+        const m = Math.floor(rem/60);
+        const s = rem % 60;
+        el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (rem <= 0) {
+            clearInterval(checkinIntervalId);
+            closeModal('checkin');
+            processUploadQueue(buildPayload({
+                "Alarm Status": 'MISSED_CHECKIN', 
+                "Notes": "Worker failed to respond to check-in"
+            }));
+            showToast('MISSED CHECK-IN ALERT SENT');
+        }
+    }, 1000);
+}
 function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
 function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
 function triggerPanic(){ 
@@ -1633,6 +1663,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
