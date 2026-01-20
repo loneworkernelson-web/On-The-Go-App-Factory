@@ -217,7 +217,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button>
         </div>
         <div class="setting-card border-blue-500/20 bg-blue-900/10" id="diag_container">
-<label class="setting-label lbl-blue">System Diagnostics</label>    
+<div class="setting-label lbl-blue">System Diagnostics</div>    
     <div class="flex justify-between items-center text-[10px] uppercase font-black tracking-widest">
         <span class="text-gray-400">App Version:</span>
         <span id="diagApp" class="text-white">v79.35</span>
@@ -239,8 +239,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
 
         <div class="setting-card border-gray-600">
-            <label class="setting-label lbl-blue">Location Services</label>
-            <label class="flex items-center justify-between cursor-pointer">
+            <div class="setting-label lbl-blue">Location Services</label>
+            <div class="flex items-center justify-between cursor-pointer">
                 <div class="flex flex-col">
                     <span class="text-sm font-bold text-white uppercase tracking-tight">Advanced Monitoring</span>
                     <span class="text-[10px] text-gray-400 uppercase font-black">Enables high-accuracy GPS & signal bars</span>
@@ -548,18 +548,14 @@ function wizSave() {
     // 3. Update the global state
     state.settings = {
         workerName: name,
-        workerPhone: phone,
-        workerEmail: email,
-        // Use the hardcoded CONFIG url instead of looking for a missing input
+        workerPhone: document.getElementById('wiz_phone').value.trim(),
+        workerEmail: document.getElementById('wiz_email').value.trim(),
         googleSheetUrl: CONFIG.url, 
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
-        
-        // Emergency Contact fields (Patched in Step 3)
+        // These keys MUST match the mapping in buildPayload
         emgName: document.getElementById('wiz_emg_name').value.trim(),
         emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
         emgEmail: document.getElementById('wiz_emg_email').value.trim(),
-        
-        // Escalation Contact fields
         escName: document.getElementById('wiz_esc_name').value.trim(),
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
@@ -568,26 +564,10 @@ function wizSave() {
     // 4. Persist and Transition
     saveState();
     navigate('main');
-
     const wiz = document.getElementById('setupPage');
     if (wiz) wiz.classList.add('hidden');
-
-    // 5. Trigger the Invisible Sync
     forceSync(false);
-
     showToast("✅ Setup Complete!");
-}
-    // 4. Persist and Sync
-    saveState();
-    navigate('main');
-
-    const wiz = document.getElementById('setupPage');
-    if (wiz) wiz.classList.add('hidden');
-
-    // Trigger sync so the backend sees the new contacts immediately
-    forceSync(false);
-
-    showToast("✅ Setup Complete & Contacts Saved!");
 }
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
@@ -908,7 +888,8 @@ function startVisit() {
         startGPS: "", 
         highRisk: isHighRisk, 
         warn90Sent: false, 
-        criticalSent: false 
+        criticalSent: false,
+        isPanic: false // Ensure this is initialized to false for safety
     };
     
     state.lowBatSent = false; 
@@ -922,6 +903,9 @@ function startVisit() {
             toggleBatterySaver();
         }
     }, 10000);
+
+    // IMPORTANT: Reintroduce the pulse for travel visits
+    if(s.id === 'travel') startTravellingPulse();
 }
 
 function preDepart() {
@@ -1334,6 +1318,7 @@ function buildPayload(d) {
     let la = "No Address Provided";
 
     // 1. Determine Location and Departure Time
+    // Priority 1: Current Active Visit data
     if (state.activeVisit) {
         if (state.activeVisit.anticipatedDepartureTime) {
             dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
@@ -1343,7 +1328,9 @@ function buildPayload(d) {
             ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
             la = l.address; 
         }
-    } else if (state.selectedLocationId) {
+    } 
+    // Priority 2: Selected location (if visit hasn't officially started)
+    else if (state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         if (l) { 
             ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
@@ -1352,6 +1339,7 @@ function buildPayload(d) {
     }
     
     // 2. Determine GPS Coordinates
+    // Uses fresh coordinates from the argument 'd' or falls back to visit start coordinates
     let gps = d['Last Known GPS'] || "";
     if (!gps && state.activeVisit && state.activeVisit.startGPS) { 
         gps = state.activeVisit.startGPS; 
@@ -1364,7 +1352,7 @@ function buildPayload(d) {
         'Worker Phone Number': state.settings.workerPhone,
         'Worker Email': state.settings.workerEmail,
         
-        // Mapped to match the keys used in wizSave
+        // Maps the Wizard IDs (emgName/escName) to the Sheet headers
         'Emergency Contact Name': state.settings.emgName,
         'Emergency Contact Number': state.settings.emgPhone,
         'Emergency Contact Email': state.settings.emgEmail,
@@ -1379,6 +1367,8 @@ function buildPayload(d) {
         'Timestamp': new Date().toISOString(),
         'deviceId': getDeviceID(),
         'Last Known GPS': gps,
+        
+        // Merges specific alert data (e.g., "Alarm Status": "PANIC")
         ...d
     };
 }
@@ -1717,6 +1707,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
