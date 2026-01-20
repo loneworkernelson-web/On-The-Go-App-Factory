@@ -437,6 +437,7 @@ const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHE
 // CORE STATE
 let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};
 let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;
+let autoDimTimer; // Tracks the 10s auto-dark-mode countdown
 let tempPhoto=null,sigPad=null;
 let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",isDrawing=false;
 let calculatedDist=null,gpsWarm=false,gpsWatchId=null,lastAlertTime=0;
@@ -890,11 +891,14 @@ function startVisit(){
     
     state.lowBatSent = false; 
     saveState(); 
-    enterLockedScreen(); 
+enterLockedScreen(); 
     
-    // NEW: Auto-switch to Dark Mode after 10 seconds
-    setTimeout(() => {
-        // Only dim if the visit is still active and NOT in an emergency state
+    // Clear any existing timer first to prevent duplicates
+    if (autoDimTimer) clearTimeout(autoDimTimer);
+
+    // Set the 10-second auto-dim
+    autoDimTimer = setTimeout(() => {
+        // Only dim if the visit is STILL active and screen is hidden
         if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
             toggleBatterySaver();
         }
@@ -1046,6 +1050,8 @@ function loadFormAndShow(t){
     else { nb.innerText="HOLD TO SUBMIT & END"; nb.classList.add('long-press-btn'); setupLongPress(nb,submitReport); }
 }
 function submitReport(){
+    // Kill the auto-dim timer so the report form stays visible
+    if (autoDimTimer) clearTimeout(autoDimTimer);
     const d=gatherFormData(); let photoCount = 0; const photoMap = {};
     Object.keys(state.photoStore).forEach((key, index) => { photoCount++; const token = `{{PHOTO_${photoCount}}}`; photoMap[`Photo ${photoCount}`] = state.photoStore[key]; if(d.custom[key] !== undefined) { d.custom[key] = token; d.jsonPayload[key] = token; } });
     const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};
@@ -1262,8 +1268,11 @@ function toggleBatterySaver() {
         
         // POCKET PROTECTION: Require a 1.5s hold to wake the screen
         setupLongPress(saver, () => {
-            toggleBatterySaver(); 
-        });
+        // User has manually woken the screen
+    if (autoDimTimer) clearTimeout(autoDimTimer); 
+    
+    toggleBatterySaver(); // This turns dark mode OFF
+});
     } else { 
         saver.classList.add('hidden'); 
         saver.style.pointerEvents = 'none'; 
@@ -1663,6 +1672,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
