@@ -608,15 +608,17 @@ function populateSettingsForm() {
     }
 
     // 4. Update Diagnostic Information
-const diagApp = document.getElementById('diagApp');
+    const diagApp = document.getElementById('diagApp');
     const diagCloud = document.getElementById('diagCloud');
     
     if (diagApp) diagApp.innerText = APP_VERSION;
     
-   // Standardize to use state.meta.backendVersion
+    // Pull from state.meta to show the cloud version
     if (diagCloud) {
         diagCloud.innerText = state.meta.backendVersion || "Not Synced";
-        if (state.meta.backendVersion) diagCloud.className = "text-green-400 font-bold text-xs";
+        if (state.meta.backendVersion) {
+            diagCloud.className = "text-green-400 font-bold text-xs";
+        }
     }
 }
 // KEEP THIS: It is not replaced by the population function
@@ -724,7 +726,8 @@ function startVehicleCheck() {
     
     // 3. User Feedback
     console.log("Vehicle Check Initiated: Loading Template...");
-}function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
+}
+function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
 function openMidVisitMenu(){isMidVisitUpdate=true;calculatedDist=null;showModal('template');const cid=state.activeVisit?state.activeVisit.locationId:null;const loc=state.locations.find(x=>x.id===cid);renderIconGrid(state.globalForms, loc);}
 
 function renderIconGrid(forms, loc) {
@@ -769,7 +772,6 @@ function renderIconGrid(forms, loc) {
         }); 
     }
 }
-
 function initLocations() {
     if (!state.locations) state.locations = [];
     
@@ -950,12 +952,6 @@ populateSettingsForm(); // ADD THIS LINE: Refreshes the versioning text
 document.getElementById('uploadBanner').classList.add('hidden');
         if(showUi) showToast("Sync Complete!");
     });
-// DIAGNOSTICS: Ensure it pulls from state.meta
-const diagCloud = document.getElementById('diagCloud');
-if (diagCloud) {
-    diagCloud.innerText = state.meta.backendVersion || "Not Synced";
-    if (state.meta.backendVersion) diagCloud.className = "text-green-400 font-bold";
-}}
 
 // FIXED: Corrected corrupted navigation string
 function showSiteInfo(id, e){
@@ -2004,3 +2000,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
