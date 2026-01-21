@@ -210,7 +210,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="header-bar">
         <h1 class="text-2xl font-bold text-white">Settings</h1>
         <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
+        <div class="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center px-2">
+    <div class="flex flex-col">
+        <span class="text-[10px] text-gray-500 uppercase font-black tracking-widest">App Version</span>
+        <span id="diagApp" class="text-xs text-gray-400 font-bold">---</span>
     </div>
+    <div class="flex flex-col items-end">
+        <span class="text-[10px] text-gray-500 uppercase font-black tracking-widest">Cloud Version</span>
+        <span id="diagCloud" class="text-xs text-gray-400 font-bold">---</span>
+    </div>
+</div>
     
     <div class="content-area pb-24"> 
         <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
@@ -818,6 +827,41 @@ function createDestinationTile(loc) {
             travelTargetName = loc.name;
         }
         warmUpGps();
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    return d;
+}
+/**
+ * Creates the specialized purple 'Travel' tile.
+ */
+function createTravelTile(loc) {
+    const d = document.createElement('div');
+    const isSel = state.selectedLocationId === 'travel';
+    
+    // Safety check for user preferences (noReport)
+    const isNoReport = loc.noReport || localStorage.getItem('otg_user_travel_pref') === 'true';
+
+    d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-purple-500 bg-purple-900/40 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
+    
+    d.innerHTML = `
+        <div class="text-3xl">🛣️</div>
+        <div class="flex-1">
+            <div class="flex justify-between items-center">
+                <span class="text-[10px] font-black text-purple-400 uppercase tracking-widest">In-Transit Mode</span>
+                <button class="text-gray-500 hover:text-white" onclick="editTravelSettings(event)">⚙️</button>
+            </div>
+            <div class="text-lg font-black text-white leading-tight">Travel Safety Check</div>
+            ${isNoReport ? '<span class="text-[9px] text-gray-500 uppercase font-bold">Fast-Sync (No Report)</span>' : ''}
+        </div>
+    `;
+
+    d.onclick = (e) => {
+        // Prevent clicking the gear icon from selecting the tile
+        if (e.target.tagName === 'BUTTON') return;
+        
+        state.selectedLocationId = isSel ? null : 'travel';
+        travelTargetName = ""; // Reset target for general travel
         renderLocations();
         updateArrivedButtonState();
     };
@@ -1952,6 +1996,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
