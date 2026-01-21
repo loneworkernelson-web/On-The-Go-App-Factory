@@ -1944,37 +1944,39 @@ function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferr
 function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
 function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
 window.onload = () => {
-    // 1. Restore app data from local storage
-    loadState(); 
+    // 1. Standardized data restoration
+    try {
+        loadState(); 
+    } catch (e) {
+        console.error("Critical: Initialization aborted - ", e);
+    }
 
-    // 2. Initialize the SOS hold listeners
+    // 2. Initialize UI components
     initPanicButton();
 
-    // 3. Route the user based on state
+    // 3. Robust Routing
     if (!state.settings || !state.settings.workerName) {
-        // CASE A: New User -> Setup Wizard
+        // Force show setup if identity is missing
         navigate('setup'); 
         const setupContainer = document.getElementById('setupPage'); 
         if (setupContainer) setupContainer.classList.remove('hidden');
     } 
     else if (state.activeVisit) {
-        // CASE B: Existing Visit/Travel -> Resume Active Screen
-        navigate('active'); 
-        startCheckinTimer(); // Restart the safety countdown
-        
-        // RESUME PULSE: If the worker was mid-travel, restart the GPS heartbeat
+        // Resume active session
+        const activePage = state.activeVisit.status === 'TRAVELLING' ? 'locked' : 'locked';
+        navigate(activePage); 
+        startCheckinTimer();
         if (state.activeVisit.status === 'TRAVELLING') {
             startTravellingPulse();
         }
         forceSync(false);
     } 
     else {
-        // CASE C: Normal Operation -> Dashboard
         navigate('main');
         forceSync(false); 
     }
 
-    console.log("🚀 System Initialised: Operational Mode");
+    console.log("🚀 System Initialised: All libraries synced.");
 };
 </script>
  <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
@@ -1993,6 +1995,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
