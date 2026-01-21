@@ -650,82 +650,7 @@ function saveState() {
     }
 }
 
-function forceSync(showUi) {
-    // 1. Logic Check: Ensure we have a name and a valid URL before starting
-    const targetUrl = state.settings.googleSheetUrl || CONFIG.url;
-    
-    if (!state.settings || !state.settings.workerName) {
-        console.warn("Sync Aborted: Worker Name is missing.");
-        return;
-    }
 
-    // 2. Placeholder Check: If the URL hasn't been deployed yet, stop here.
-    if (targetUrl.includes("%%G_SHEET_URL%%")) {
-        console.error("Sync Error: Google Sheet URL is not configured.");
-        if (showUi) showToast("⚠️ App not configured (URL missing)");
-        return;
-    }
-
-    if (showUi) document.getElementById('uploadBanner')?.classList.remove('hidden');
-
-    // 3. Identification: Use your existing device_uuid logic
-    const dId = getDeviceID();
-    const syncUrl = `${targetUrl}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
-    // FEEDBACK: Show the "Syncing..." banner if showUi is true
-    if (showUi) {
-        const banner = document.getElementById('uploadBanner');
-        if (banner) banner.classList.remove('hidden');
-    }
-    fetch(syncUrl)
-        .then(r => r.json())
-        .then(data => {
-            if (data.status === "success") {
-                // Update local site data
-                const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-                
-                if (data.sites) {
-                    const ms = (data.sites || []).map(s => ({
-                        id: 'site_' + s.siteName.replace(/\s/g, ''),
-                        name: s.siteName,
-                        address: s.address,
-                        companyName: s.company,
-                        templateName: s.template,
-                        noReport: false,
-                        contactName: s.contactName,
-                        contactPhone: s.contactPhone,
-                        contactEmail: s.contactEmail,
-                        notes: s.notes
-                    }));
-                    state.locations = ms.concat(existingManual);
-                }
-
-                // Sync Global forms and Metadata (WOF/Check intervals)
-                state.globalForms = data.forms || [];
-                state.cachedForms = data.cachedTemplates || {};
-                state.meta = data.meta || {};
-
-                // UPDATE: Store the Cloud Version in state so Settings can see it
-                state.backendVersion = data.version || "Synced";
-                
-                saveState();
-                renderLocations(); // Rebuild the site list UI
-                checkVehicleStatus(); // Update the WOF nag bar based on new metadata
-                populateSettingsForm(); // Refresh the "Cloud Version" label in settings
-                
-                console.log("✅ Sync Successful: v" + state.backendVersion);
-            } else {
-                console.error("❌ Backend Error:", data.message);
-            }
-            if (showUi) document.getElementById('uploadBanner')?.classList.add('hidden');
-        })
-        .catch(err => {
-            console.error("❌ Connection Error:", err);
-            if (showUi) {
-                document.getElementById('uploadBanner')?.classList.add('hidden');
-                showToast("Connection Failed");
-            }
-        });
-}
 function checkVehicleStatus() {
     // 1. Exit early if vehicle monitoring is disabled in CONFIG
     if (!CONFIG.vehEnabled) return; 
@@ -1045,61 +970,6 @@ function getButtonConfig() {
     return null;
 }
 // VISIT LOGIC
-function startVisit() {
-    const locId = state.selectedLocationId;
-    if (!locId) return;
-
-    // 1. Find the location data
-    const loc = state.locations.find(l => l.id === locId);
-    if (!loc && locId !== 'travel') return;
-
-    // 2. Build the Visit Object
-    const visitData = {
-        locationId: locId,
-        locationName: locId === 'travel' ? 'Travelling' : loc.name,
-        startTime: new Date().toISOString(),
-        travelTarget: (locId === 'travel') ? travelTargetName : null,
-        status: locId === 'travel' ? 'TRAVELLING' : 'ARRIVED'
-    };
-
-    // 3. Handle State Transition
-    state.activeVisit = visitData;
-    state.selectedLocationId = null; // Clear selection after starting
-    
-    // 4. Persistence & UI Updates
-    saveState();
-    renderLocations();
-    updateArrivedButtonState();
-    
-    // 5. Trigger Network Sync
-    // We send a "Check-in" payload immediately so the backend knows the worker is active
-    processUploadQueue(buildPayload({
-        "Alarm Status": visitData.status,
-        "Current Site": visitData.locationName,
-        "Notes": visitData.travelTarget ? `To: ${visitTargetName}` : "Started Visit"
-    }));
-
-    // 6. Start the Safety Timers
-    startCheckinTimer();
-    
-    showToast(`✅ ${visitData.status} logged`);
-}
-    
-    state.lowBatSent = false; 
-    saveState(); 
-    enterLockedScreen(); 
-    
-    // Auto-switch to Dark Mode after 10 seconds
-    if (autoDimTimer) clearTimeout(autoDimTimer);
-    autoDimTimer = setTimeout(() => {
-        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
-            toggleBatterySaver();
-        }
-    }, 10000);
-
-    // IMPORTANT: Reintroduce the pulse for travel visits
-    if(s.id === 'travel') startTravellingPulse();
-}
 function startVisit() {
     const locId = state.selectedLocationId;
     if (!locId) return;
@@ -2017,3 +1887,4 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
