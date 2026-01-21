@@ -465,12 +465,10 @@ let currentBatteryLevel="100%";
 let travelTargetName = ""; // PATCH: Tracks intended travel destination;
 // --- WIZARD NAVIGATION (Must be Global) ---
 function wizNext(step) {
-    console.log("Attempting navigation to step:", step + 1);
-    
-    // 1. Validation for the first step
+    // 1. Validation for Step 1
     if (step === 1) {
-        const nameInput = document.getElementById('wiz_name');
-        if (!nameInput || !nameInput.value.trim()) {
+        const name = document.getElementById('wiz_name').value.trim();
+        if (!name) {
             showToast("⚠️ Name is required.");
             return;
         }
@@ -478,26 +476,25 @@ function wizNext(step) {
 
     // 2. Identify the current and next containers
     // Ensure your HTML divs have exactly these IDs: wiz_step1, wiz_step2, etc.
-    const current = document.getElementById(`wiz_step${step}`);
-    const next = document.getElementById(`wiz_step${step + 1}`);
+const current = document.getElementById(`wizStep${step}`);
+const next = document.getElementById(`wizStep${step + 1}`);
 
-    if (current && next) {
+if (current && next) {
         current.classList.add('hidden');
+        current.classList.remove('active');
         next.classList.remove('hidden');
-        console.log("Navigation successful");
-    } else {
-        console.error("Navigation failed: Could not find wiz_step" + step + " or wiz_step" + (step + 1));
-        showToast("Configuration Error: Step containers not found.");
+        next.classList.add('active');
     }
 }
 
 function wizSave() {
+    // Collect all data from your 3 steps
     state.settings = {
         workerName: document.getElementById('wiz_name').value.trim(),
         workerPhone: document.getElementById('wiz_phone').value.trim(),
         workerEmail: document.getElementById('wiz_email').value.trim(),
-        googleSheetUrl: CONFIG.scriptUrl,
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
+        duressPin: btoa(document.getElementById('wiz_duress').value.trim()),
         emgName: document.getElementById('wiz_emg_name').value.trim(),
         emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
         emgEmail: document.getElementById('wiz_emg_email').value.trim(),
@@ -505,11 +502,15 @@ function wizSave() {
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
     };
+
     saveState();
     navigate('main');
-    document.getElementById('setupPage')?.classList.add('hidden');
+    
+    const wizOverlay = document.getElementById('setupPage');
+    if (wizOverlay) wizOverlay.classList.add('hidden');
+    
     forceSync(false);
-    showToast("✅ Setup Complete");
+    showToast("✅ Setup Complete!");
 }
 // MODAL CONTROLLERS
 function showModal(id) {
@@ -596,8 +597,17 @@ function startWizard(){
     if(state.settings.workerName) populateWizard(); 
 }
 function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
-function wizBack(current){wizGoTo(current-1);}
+function wizBack(step) {
+    const current = document.getElementById(`wizStep${step}`);
+    const prev = document.getElementById(`wizStep${step - 1}`);
 
+    if (current && prev) {
+        current.classList.add('hidden');
+        current.classList.remove('active');
+        prev.classList.remove('hidden');
+        prev.classList.add('active');
+    }
+}
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
 function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
 // FIXED: Now populates the diagnostic version text
@@ -1010,20 +1020,12 @@ function startVisit() {
     processUploadQueue(buildPayload({
         "Alarm Status": visitData.status,
         "Current Site": visitData.locationName,
-        "Notes": visitData.travelTarget ? `To: ${visitData.travelTarget}` : "Started Visit"
+        "Notes": visitData.travelTarget ? `Heading to: ${visitData.travelTarget}` : "Started Visit"
     }));
 
     startCheckinTimer();
     state.lowBatSent = false;
     enterLockedScreen();
-
-    // Auto-dim logic
-    if (window.autoDimTimer) clearTimeout(window.autoDimTimer);
-    window.autoDimTimer = setTimeout(() => {
-        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver')?.classList.contains('hidden')) {
-            toggleBatterySaver();
-        }
-    }, 10000);
 
     // Pulse Logic
     if (locId === 'travel') {
@@ -1533,7 +1535,6 @@ const MAX_QUEUE_SIZE = 50;
 async function processUploadQueue(payload = null) {
     if (payload) {
         uploadQueue.push(payload);
-        // Memory Protection: Limit queue to 50 items
         if (uploadQueue.length > MAX_QUEUE_SIZE) uploadQueue.shift();
         saveState();
     }
@@ -1544,7 +1545,7 @@ async function processUploadQueue(payload = null) {
     try {
         const item = uploadQueue[0];
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeout = setTimeout(() => controller.abort(), 10000);
 
         await fetch(CONFIG.scriptUrl, {
             method: 'POST',
@@ -1556,16 +1557,13 @@ async function processUploadQueue(payload = null) {
         clearTimeout(timeout);
         uploadQueue.shift();
         saveState();
-        
-        uploadRetryDelay = 1000; // Reset delay on success
+        uploadRetryDelay = 1000; 
         isUploading = false;
         if (uploadQueue.length > 0) processUploadQueue();
-        
     } catch (err) {
         isUploading = false;
-        // Exponential Backoff: 1s, 2s, 4s... up to 5 minutes
+        // Exponentially increase wait time up to 5 minutes
         uploadRetryDelay = Math.min(uploadRetryDelay * 2, 300000);
-        console.warn(`Connection offline. Retrying in ${uploadRetryDelay / 1000}s`);
         setTimeout(() => processUploadQueue(), uploadRetryDelay);
     }
 }
@@ -1836,21 +1834,22 @@ function executePanicAction() {
 
 function startTravellingPulse() {
     if (travellingInterval) clearInterval(travellingInterval);
-    
-    // Frequency: 5 Minutes
+    const frequency = 300000; // 5 Minutes
+
     travellingInterval = setInterval(() => {
         if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
             stopTravellingPulse();
             return;
         }
+
         navigator.geolocation.getCurrentPosition(pos => {
             processUploadQueue(buildPayload({
                 "Alarm Status": "TRAVELLING",
                 "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`,
-                "Notes": state.activeVisit.travelTarget ? `To: ${state.activeVisit.travelTarget}` : "Transit"
+                "Notes": state.activeVisit.travelTarget ? `En route to: ${state.activeVisit.travelTarget}` : "Transit"
             }));
         }, null, { enableHighAccuracy: true });
-    }, 300000); 
+    }, frequency);
 }
 function updateTimerDisplay(now, due) {
     const timerEl = document.getElementById('checkinTimerDisplay');
@@ -1965,6 +1964,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
