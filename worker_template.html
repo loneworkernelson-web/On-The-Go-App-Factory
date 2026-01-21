@@ -465,34 +465,26 @@ let currentBatteryLevel="100%";
 let travelTargetName = ""; // PATCH: Tracks intended travel destination;
 // --- WIZARD NAVIGATION (Must be Global) ---
 function wizNext(step) {
-    // 1. Validation for Step 1
     if (step === 1) {
         const name = document.getElementById('wiz_name').value.trim();
-        if (!name) {
-            showToast("⚠️ Name is required.");
-            return;
-        }
+        if (!name) { showToast("⚠️ Name is required."); return; }
     }
-
-    // 2. Identify the current and next containers
-    // Ensure your HTML divs have exactly these IDs: wiz_step1, wiz_step2, etc.
-const current = document.getElementById(`wizStep${step}`);
-const next = document.getElementById(`wizStep${step + 1}`);
-
-if (current && next) {
+    const current = document.getElementById(`wizStep${step}`);
+    const next = document.getElementById(`wizStep${step + 1}`);
+    if (current && next) {
         current.classList.add('hidden');
         current.classList.remove('active');
         next.classList.remove('hidden');
         next.classList.add('active');
     }
 }
-
 function wizSave() {
-    // Collect all data from your 3 steps
     state.settings = {
         workerName: document.getElementById('wiz_name').value.trim(),
         workerPhone: document.getElementById('wiz_phone').value.trim(),
         workerEmail: document.getElementById('wiz_email').value.trim(),
+        // Use the new wiz_url ID here if you need to capture it
+        googleSheetUrl: CONFIG.scriptUrl, 
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
         duressPin: btoa(document.getElementById('wiz_duress').value.trim()),
         emgName: document.getElementById('wiz_emg_name').value.trim(),
@@ -502,15 +494,11 @@ function wizSave() {
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
     };
-
     saveState();
     navigate('main');
-    
-    const wizOverlay = document.getElementById('setupPage');
-    if (wizOverlay) wizOverlay.classList.add('hidden');
-    
+    document.getElementById('setupPage')?.classList.add('hidden');
     forceSync(false);
-    showToast("✅ Setup Complete!");
+    showToast("✅ Settings Saved");
 }
 // MODAL CONTROLLERS
 function showModal(id) {
@@ -1964,6 +1952,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
