@@ -465,22 +465,29 @@ let currentBatteryLevel="100%";
 let travelTargetName = ""; // PATCH: Tracks intended travel destination;
 // --- WIZARD NAVIGATION (Must be Global) ---
 function wizNext(step) {
-    console.log("Navigating to step:", step + 1);
-    const current = document.getElementById(`wiz_step${step}`);
-    const next = document.getElementById(`wiz_step${step + 1}`);
+    console.log("Attempting navigation to step:", step + 1);
     
-    // Validation for Step 1
+    // 1. Validation for the first step
     if (step === 1) {
-        const name = document.getElementById('wiz_name').value.trim();
-        if (!name) {
+        const nameInput = document.getElementById('wiz_name');
+        if (!nameInput || !nameInput.value.trim()) {
             showToast("⚠️ Name is required.");
             return;
         }
     }
 
+    // 2. Identify the current and next containers
+    // Ensure your HTML divs have exactly these IDs: wiz_step1, wiz_step2, etc.
+    const current = document.getElementById(`wiz_step${step}`);
+    const next = document.getElementById(`wiz_step${step + 1}`);
+
     if (current && next) {
         current.classList.add('hidden');
         next.classList.remove('hidden');
+        console.log("Navigation successful");
+    } else {
+        console.error("Navigation failed: Could not find wiz_step" + step + " or wiz_step" + (step + 1));
+        showToast("Configuration Error: Step containers not found.");
     }
 }
 
@@ -491,6 +498,9 @@ function wizSave() {
         workerEmail: document.getElementById('wiz_email').value.trim(),
         googleSheetUrl: CONFIG.scriptUrl,
         pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
+        emgName: document.getElementById('wiz_emg_name').value.trim(),
+        emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
+        emgEmail: document.getElementById('wiz_emg_email').value.trim(),
         escName: document.getElementById('wiz_esc_name').value.trim(),
         escPhone: document.getElementById('wiz_esc_phone').value.trim(),
         escEmail: document.getElementById('wiz_esc_email').value.trim()
@@ -499,7 +509,7 @@ function wizSave() {
     navigate('main');
     document.getElementById('setupPage')?.classList.add('hidden');
     forceSync(false);
-    showToast("✅ Settings Saved");
+    showToast("✅ Setup Complete");
 }
 // MODAL CONTROLLERS
 function showModal(id) {
@@ -1007,7 +1017,15 @@ function startVisit() {
     state.lowBatSent = false;
     enterLockedScreen();
 
-    // Start the 5-minute pulse if travelling
+    // Auto-dim logic
+    if (window.autoDimTimer) clearTimeout(window.autoDimTimer);
+    window.autoDimTimer = setTimeout(() => {
+        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver')?.classList.contains('hidden')) {
+            toggleBatterySaver();
+        }
+    }, 10000);
+
+    // Pulse Logic
     if (locId === 'travel') {
         startTravellingPulse();
     }
@@ -1819,7 +1837,7 @@ function executePanicAction() {
 function startTravellingPulse() {
     if (travellingInterval) clearInterval(travellingInterval);
     
-    // Set to 5 minutes (300,000ms)
+    // Frequency: 5 Minutes
     travellingInterval = setInterval(() => {
         if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
             stopTravellingPulse();
@@ -1947,6 +1965,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
