@@ -575,16 +575,27 @@ function createTravelTile(loc) {
     return d;
 }
 
-// --- 4. DYNAMIC FORM BUILDER (ACCESSIBILITY PATCHED) ---
-
+/**
+ * Dynamically builds form fields based on template tags.
+ * Resolves accessibility warnings and specialized rendering for GPS, Photos, and Signatures.
+ */
 function buildReportForm(n, c) {
     state.photoStore = {};
     const sn = n ? n.trim() : "(Standard)";
-    let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
+    
+    // 1. Resolve Question Source
+    let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || 
+                    state.cachedForms[sn] || 
+                    state.cachedForms["(Standard)"];
+    
     c.innerHTML = '';
     
+    // Fallback if no template is found
     if (!questions) {
-        c.innerHTML = '<label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
+        c.innerHTML = `
+            <label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label>
+            <textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>
+        `;
         return;
     }
 
@@ -593,15 +604,43 @@ function buildReportForm(n, c) {
         let labelText = f.text || f; 
         let dropOptions = [];
         const upper = labelText.toUpperCase();
-        const fieldId = `dyn_field_${i}`;
+        const fieldId = `dyn_field_${i}`; // Unique ID for accessibility association
 
-        // Tag Detection Logic
-        if (upper.includes('[HEADING]') || labelText.trim().startsWith('#')) { type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').replace('#','').trim(); }
-        else if (upper.includes('[SIGN]')) { type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); }
-        else if (upper.includes('[PHOTO]')) { type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); }
-        else if (upper.includes('[GPS]')) { type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); if (!labelText) labelText = "Location Status"; }
-        else if (upper.includes('[YESNO]')) { type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); }
-        else if (upper.includes('[$]')) { type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); }
+        // 2. Tag Detection Logic
+        if (upper.includes('[HEADING]') || labelText.trim().startsWith('#')) { 
+            type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').replace('#','').trim(); 
+        }
+        else if (upper.includes('[NOTE]')) { 
+            type = 'note'; labelText = labelText.replace(/\[NOTE\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[SIGN]')) { 
+            type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[PHOTO]')) { 
+            type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[GPS]')) { 
+            type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); 
+            if (!labelText) labelText = "Location Status"; 
+        }
+        else if (upper.includes('[YESNO]')) { 
+            type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[CHECK]')) { 
+            type = 'checkbox'; labelText = labelText.replace(/\[CHECK\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[DATE]')) { 
+            type = 'date'; labelText = labelText.replace(/\[DATE\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[NUMBER]')) { 
+            type = 'number'; labelText = labelText.replace(/\[NUMBER\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[$]')) { 
+            type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); 
+        }
+        else if (upper.includes('[1TEXT]')) { 
+            type = '1text'; labelText = labelText.replace(/\[1TEXT\]/gi, '').trim(); 
+        }
         else if (upper.startsWith('[DROP')) {
             type = 'drop';
             const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
@@ -614,37 +653,118 @@ function buildReportForm(n, c) {
         const container = document.createElement('div');
         container.className = "mb-4";
 
+        // 3. Render Element Based on Type
         if (type === 'header') {
             container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${labelText}</h3></div>`;
-        } else {
-            // FIXED: accessibility label association
-            container.innerHTML = `<label for="${fieldId}" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${labelText}</label>`;
+        } 
+        else if (type === 'note') {
+            container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${labelText}</div>`;
+        } 
+        else {
+            // Standard Label (Fixes accessibility warning)
+            const label = document.createElement('label');
+            label.setAttribute('for', fieldId);
+            label.className = "block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1";
+            label.innerText = labelText;
+            container.appendChild(label);
 
             if (type === 'photo') {
-                container.innerHTML += `<div class="flex items-center gap-3"><label for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')"></div>`;
-            } else if (type === 'gps') {
-                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${labelText}"></div>`;
-            } else if (type === 'currency') {
-                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${labelText}"></div>`;
-            } else if (type === 'drop') {
-                const sel = document.createElement('select'); sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = labelText;
-                const def = document.createElement('option'); def.text = `Select ${labelText}...`; def.value = ""; sel.appendChild(def);
-                dropOptions.forEach(opt => { const o = document.createElement('option'); o.text = opt; o.value = opt; sel.appendChild(o); });
+                const wrap = document.createElement('div');
+                wrap.className = "flex items-center gap-3";
+                wrap.innerHTML = `
+                    <label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer transition active:scale-95">📸 Tap to Take Photo</label>
+                    <input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">
+                `;
+                container.appendChild(wrap);
+            } 
+            else if (type === 'gps') {
+                const wrap = document.createElement('div');
+                wrap.className = "flex gap-2";
+                wrap.innerHTML = `
+                    <button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase transition active:scale-95">GPS</button>
+                    <input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${labelText}" placeholder="Not captured">
+                `;
+                container.appendChild(wrap);
+            } 
+            else if (type === 'signature') {
+                container.innerHTML += `
+                    <div class="bg-white rounded-xl p-1 mb-2">
+                        <canvas id="sig-canvas-${i}" class="w-full h-40 border border-gray-200"></canvas>
+                    </div>
+                    <button type="button" class="text-[10px] font-bold text-gray-500 uppercase sig-clear-btn" data-index="${i}">Clear Signature</button>
+                `;
+            } 
+            else if (type === 'drop') {
+                const sel = document.createElement('select');
+                sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = labelText;
+                const def = document.createElement('option');
+                def.text = `Select ${labelText}...`; def.value = "";
+                sel.appendChild(def);
+                dropOptions.forEach(optText => {
+                    const opt = document.createElement('option');
+                    opt.text = optText; opt.value = optText;
+                    sel.appendChild(opt);
+                });
                 container.appendChild(sel);
-            } else if (type === 'yesno') {
-                container.innerHTML += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_y" value="Yes" class="w-5 h-5" data-key="${labelText}"> <span class="text-sm font-black text-white">YES</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_n" value="No" class="w-5 h-5" data-key="${labelText}"> <span class="text-sm font-black text-white">NO</span></label></div>`;
-            } else {
-                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${labelText}"></textarea>`;
+            } 
+            else if (type === 'currency') {
+                const wrap = document.createElement('div');
+                wrap.className = "relative";
+                wrap.innerHTML = `
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                    <input type="number" step="0.01" inputmode="decimal" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${labelText}">
+                `;
+                container.appendChild(wrap);
+            } 
+            else if (type === 'yesno') {
+                // Radio buttons need unique IDs for each option to link labels
+                const wrap = document.createElement('div');
+                wrap.className = "flex gap-4 p-2 bg-gray-900 rounded-xl";
+                wrap.innerHTML = `
+                    <label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 active:bg-blue-900 transition">
+                        <input type="radio" name="yn_${i}" id="${fieldId}_yes" value="Yes" class="w-5 h-5" data-key="${labelText}"> 
+                        <span class="text-sm font-black text-white">YES</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 active:bg-blue-900 transition">
+                        <input type="radio" name="yn_${i}" id="${fieldId}_no" value="No" class="w-5 h-5" data-key="${labelText}"> 
+                        <span class="text-sm font-black text-white">NO</span>
+                    </label>
+                `;
+                container.appendChild(wrap);
+            } 
+            else if (type === 'checkbox') {
+                const wrap = document.createElement('label');
+                wrap.className = "flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 active:bg-gray-700 transition cursor-pointer";
+                wrap.innerHTML = `
+                    <input id="${fieldId}" type="checkbox" class="w-7 h-7 text-blue-600 rounded"> 
+                    <span class="text-sm font-bold text-gray-200 select-none flex-1">${labelText}</span>
+                `;
+                wrap.querySelector('input').dataset.key = labelText;
+                container.appendChild(wrap);
+            }
+            else if (type === '1text' || type === 'date' || type === 'number') {
+                const el = document.createElement('input');
+                el.id = fieldId; el.type = (type === '1text') ? 'text' : type;
+                el.className = "form-input font-bold"; el.dataset.key = labelText;
+                container.appendChild(el);
+            }
+            else {
+                const el = document.createElement('textarea');
+                el.id = fieldId; el.className = "form-input h-24 font-medium"; el.dataset.key = labelText;
+                container.appendChild(el);
             }
         }
         c.appendChild(container);
     });
 
+    // 4. Initialize Signature Pads (Post-Render)
     setTimeout(() => {
-        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
+            if (typeof resizeCanvas === 'function') resizeCanvas(canvas);
+            if (typeof initSigPad === 'function') initSigPad(canvas);
+        });
     }, 600);
 }
-
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
 function populateSettingsForm() {
@@ -733,6 +853,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
