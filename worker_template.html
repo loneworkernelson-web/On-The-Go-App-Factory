@@ -787,10 +787,10 @@ function renderIconGrid(forms, loc) {
 function initLocations() {
     if (!state.locations) state.locations = [];
     
-    // 1. Ensure the 'travel' object exists in the array
+    // Ensure the 'travel' object exists exactly once at the top of the list
     const hasTravel = state.locations.find(l => l.id === 'travel');
     if (!hasTravel) {
-        state.locations.push({
+        state.locations.unshift({
             id: 'travel',
             name: 'Travelling',
             noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
@@ -809,8 +809,10 @@ function initLocations() {
         ];
     }
     
-    // Refresh the UI to show the new card
+    // Refresh UI Components
     renderLocations();
+    checkVehicleStatus(); 
+    populateSettingsForm(); 
 }
 function createDestinationTile(loc) {
     const d = document.createElement('div');
@@ -962,7 +964,12 @@ populateSettingsForm(); // ADD THIS LINE: Refreshes the versioning text
 document.getElementById('uploadBanner').classList.add('hidden');
         if(showUi) showToast("Sync Complete!");
     });
-}
+// DIAGNOSTICS: Ensure it pulls from state.meta
+const diagCloud = document.getElementById('diagCloud');
+if (diagCloud) {
+    diagCloud.innerText = state.meta.backendVersion || "Not Synced";
+    if (state.meta.backendVersion) diagCloud.className = "text-green-400 font-bold";
+}}
 
 // FIXED: Corrected corrupted navigation string
 function showSiteInfo(id, e){
@@ -1301,99 +1308,85 @@ function compressImg(f){
         rd.readAsDataURL(f);
     });
 }
-function buildReportForm(n,c){
-    state.photoStore={}; const sn=n?n.trim():"(Standard)"; 
-    let t = state.globalForms?.find(f=>f.name.trim()===sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
-    c.innerHTML='';
-    if(!t) { 
-        c.innerHTML='<label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>'; 
-        return; 
-    }
+function buildReportForm(n, c) {
+    state.photoStore = {};
+    const sn = n ? n.trim() : "(Standard)";
+    let t = state.globalForms?.find(f => f.name.trim() === sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
+    c.innerHTML = '';
     
-    t.forEach((f,i)=>{
-        let y='text'; let x=f.text||f; let dropOptions = [];
+    if (!t) {
+        c.innerHTML = '<label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
+        return;
+    }
+
+    t.forEach((f, i) => {
+        let y = 'text'; let x = f.text || f; let dropOptions = [];
         const upperX = x.toUpperCase();
-        const fieldId = `dyn_field_${i}`; // FIXED: Unique ID for each field
-        
-        // Tag Detection logic
-        if(upperX.includes('[HEADING]') || x.trim().startsWith('#')){ y='header'; x=x.replace(/\[HEADING\]/gi,'').replace('#','').trim(); }
-        else if(upperX.includes('[NOTE]')){ y='note'; x=x.replace(/\[NOTE\]/gi,'').trim(); }
-        else if(upperX.includes('[SIGN]')){ y='signature'; x=x.replace(/\[SIGN\]/gi,'').trim(); }
-        else if(upperX.includes('[PHOTO]')){ y='photo'; x=x.replace(/\[PHOTO\]/gi,'').trim(); }
-        else if(upperX.includes('[YESNO]')){ y='yesno'; x=x.replace(/\[YESNO\]/gi,'').trim(); }
-        else if(upperX.includes('[GPS]')){ y='gps'; x=x.replace(/\[GPS\]/gi,'').trim(); if(!x) x="Location Status"; } 
-        else if(upperX.includes('[CHECK]')){ y='checkbox'; x=x.replace(/\[CHECK\]/gi,'').trim(); }
-        else if(upperX.includes('[DATE]')){ y='date'; x=x.replace(/\[DATE\]/gi,'').trim(); }
-        else if(upperX.includes('[NUMBER]') || x.trim().startsWith('$')){ y='number'; x=x.replace(/\[NUMBER\]/gi,'').replace('$','').trim(); }
-        // NEW: [1TEXT] for single-line entry
-        else if(upperX.includes('[1TEXT]')){ y='1text'; x=x.replace(/\[1TEXT\]/gi,'').trim(); }
-        // NEW: [DROP] for selection menus (Supports 5+ options)
-        else if(upperX.startsWith('[DROP')){
-            y='drop';
+        const fieldId = `dyn_field_${i}`;
+
+        // 1. TAG DETECTION LOGIC
+        if (upperX.includes('[HEADING]') || x.trim().startsWith('#')) { y = 'header'; x = x.replace(/\[HEADING\]/gi, '').replace('#', '').trim(); }
+        else if (upperX.includes('[NOTE]')) { y = 'note'; x = x.replace(/\[NOTE\]/gi, '').trim(); }
+        else if (upperX.includes('[SIGN]')) { y = 'signature'; x = x.replace(/\[SIGN\]/gi, '').trim(); }
+        else if (upperX.includes('[PHOTO]')) { y = 'photo'; x = x.replace(/\[PHOTO\]/gi, '').trim(); }
+        else if (upperX.includes('[GPS]')) { y = 'gps'; x = x.replace(/\[GPS\]/gi, '').trim(); if (!x) x = "Location Status"; }
+        else if (upperX.includes('[YESNO]')) { y = 'yesno'; x = x.replace(/\[YESNO\]/gi, '').trim(); }
+        else if (upperX.includes('[CHECK]')) { y = 'checkbox'; x = x.replace(/\[CHECK\]/gi, '').trim(); }
+        else if (upperX.includes('[DATE]')) { y = 'date'; x = x.replace(/\[DATE\]/gi, '').trim(); }
+        else if (upperX.includes('[NUMBER]')) { y = 'number'; x = x.replace(/\[NUMBER\]/gi, '').trim(); }
+        else if (upperX.includes('[$]')) { y = 'currency'; x = x.replace(/\[\$\]/gi, '').trim(); } // Currency
+        else if (upperX.includes('[1TEXT]')) { y = '1text'; x = x.replace(/\[1TEXT\]/gi, '').trim(); }
+        else if (upperX.startsWith('[DROP')) { // Dropdown
+            y = 'drop';
             const dropMatch = x.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-            if(dropMatch){
+            if (dropMatch) {
                 dropOptions = dropMatch[1].split(',').map(o => o.trim());
                 x = x.replace(dropMatch[0], '').trim();
             }
         }
-        else if(upperX.includes('[TEXT]')){ y='text'; x=x.replace(/\[TEXT\]/gi,'').trim(); }
 
         const container = document.createElement('div');
-        container.className = "mb-4"; // Ensure consistent spacing
-        
-        if(y==='header') {
+        container.className = "mb-4";
+
+        if (y === 'header') {
             container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
-        } else if(y==='note') {
+        } else if (y === 'note') {
             container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${x}</div>`;
         } else {
-            // FIXED: Added 'for' attribute linking to fieldId
             container.innerHTML = `<label for="${fieldId}" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
-            
-            if(y==='text'){
-                const el = document.createElement('textarea'); el.id = fieldId; el.className="form-input h-24 font-medium"; el.dataset.key = x;
-                container.appendChild(el);
-            } else if(y==='1text'){
-                const el = document.createElement('input'); el.id = fieldId; el.type="text"; el.className="form-input font-bold"; el.dataset.key = x;
-                container.appendChild(el);
-            } else if(y==='drop'){
-                const sel = document.createElement('select'); sel.id = fieldId; sel.className="form-input font-bold"; sel.dataset.key = x;
-                const def = document.createElement('option'); def.text = "Select " + x + "..."; def.value = ""; sel.appendChild(def);
+
+            // 2. ELEMENT GENERATION
+            if (y === 'photo') {
+                container.innerHTML += `<div class="flex items-center gap-3"><label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Tap to Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${x}')"></div>`;
+            } else if (y === 'signature') {
+                container.innerHTML += `<div class="bg-white rounded-xl p-1 mb-2"><canvas id="sig-canvas-${i}" class="w-full h-40 border border-gray-200"></canvas></div><button type="button" class="text-[10px] font-bold text-gray-500 uppercase sig-clear-btn" data-index="${i}">Clear Signature</button>`;
+            } else if (y === 'gps') {
+                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">Capture GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${x}"></div>`;
+            } else if (y === 'drop') {
+                const sel = document.createElement('select'); sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = x;
+                const def = document.createElement('option'); def.text = `Select ${x}...`; def.value = ""; sel.appendChild(def);
                 dropOptions.forEach(optText => { const opt = document.createElement('option'); opt.text = optText; opt.value = optText; sel.appendChild(opt); });
                 container.appendChild(sel);
-            } else if(y==='checkbox'){
-                const wrap = document.createElement('label'); 
-                wrap.className="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 active:bg-gray-700 transition cursor-pointer";
-                wrap.innerHTML = `<input id="${fieldId}" type="checkbox" class="w-7 h-7 text-blue-600 rounded"> <span class="text-sm font-bold text-gray-200 select-none flex-1">${x}</span>`;
-                wrap.querySelector('input').dataset.key = x;
-                container.appendChild(wrap);
-            } else if(y==='yesno'){
-                const wrap = document.createElement('div'); wrap.id = fieldId; wrap.className="flex gap-4 p-2 bg-gray-900 rounded-xl";
-                wrap.innerHTML = `<label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="Yes" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">Yes</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yesno_${i}" value="No" class="w-5 h-5 text-blue-600"> <span class="text-sm font-black uppercase">No</span></label>`;
-                wrap.querySelectorAll('input').forEach(r => r.dataset.key = x);
-                container.appendChild(wrap);
+            } else if (y === 'currency') {
+                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" inputmode="decimal" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${x}"></div>`;
+            } else if (y === 'yesno') {
+                container.innerHTML += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" value="Yes" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">YES</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" value="No" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">NO</span></label></div>`;
+            } else if (y === 'text') {
+                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${x}"></textarea>`;
             } else {
-                const el = document.createElement('input'); el.id = fieldId;
-                el.type = (y === 'date') ? 'date' : (y === 'number' ? 'number' : 'text');
-                if(y === 'number') el.inputMode = "decimal"; 
-                el.className = "form-input font-bold"; el.dataset.key = x;
-                container.appendChild(el);
+                container.innerHTML += `<input type="${y === 'date' ? 'date' : (y === 'number' ? 'number' : 'text')}" id="${fieldId}" class="form-input font-bold" data-key="${x}">`;
             }
-            // ... (keep Photo, GPS, and Signature logic as they are, but ensure inputs have IDs matching labels)
         }
-        c.appendChild(container); 
+        c.appendChild(container);
     });
-    // ... (keep the setTimeout and sigPad logic below)
+
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-        document.querySelectorAll('.sig-clear-btn').forEach(btn => {
-            btn.onclick = () => clearSig(btn.dataset.index);
-        });
-    }, 600);
+    }, 500);
 }
-
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
 function checkIn() {
@@ -2025,6 +2018,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
