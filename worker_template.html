@@ -1543,7 +1543,58 @@ function buildPayload(d) {
         ...d
     };
 }
-function processUploadQueue(d){ if(d) { state.pendingUploads.push(d); saveState(); } if(!navigator.onLine || state.pendingUploads.length === 0) return; const fd = new FormData(); const currentUpload = state.pendingUploads[0]; for(let k in currentUpload) fd.append(k, currentUpload[k]); fetch(CONFIG.url, { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); state.pendingUploads.shift(); saveState(); if(state.pendingUploads.length > 0) processUploadQueue(); }).catch(e => { console.warn("Upload Failed, data queued."); }); }
+let isUploading = false;
+let uploadRetryDelay = 1000; // Initial 1s retry
+const MAX_QUEUE_SIZE = 50;
+
+async function processUploadQueue(payload = null) {
+    // 1. Add new items to queue and enforce limit
+    if (payload) {
+        uploadQueue.push(payload);
+        // If queue exceeds 50, drop the oldest entry to save memory
+        if (uploadQueue.length > MAX_QUEUE_SIZE) uploadQueue.shift();
+        saveState();
+    }
+
+    if (isUploading || uploadQueue.length === 0) return;
+    isUploading = true;
+
+    try {
+        const item = uploadQueue[0];
+        
+        // Use a 10s timeout for the fetch itself
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        await fetch(CONFIG.scriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(item),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+        
+        // Success: Reset backoff and move to next
+        uploadQueue.shift();
+        saveState();
+        uploadRetryDelay = 1000; 
+        isUploading = false;
+        
+        if (uploadQueue.length > 0) processUploadQueue();
+        
+    } catch (err) {
+        isUploading = false;
+        
+        // FAIL: Exponential Backoff (1s, 2s, 4s... up to 5 minutes)
+        uploadRetryDelay = Math.min(uploadRetryDelay * 2, 300000);
+        
+        console.warn(`Offline. Retrying in ${uploadRetryDelay / 1000}s. Queue: ${uploadQueue.length}`);
+        
+        // Wait and try again
+        setTimeout(() => processUploadQueue(), uploadRetryDelay);
+    }
+}
 function setupLongPress(btn, cb) {
     let t;
     const prog = btn.id === 'batterySaver' ? document.getElementById('saverProgress') : null;
@@ -1814,7 +1865,7 @@ function startTravellingPulse() {
     if (travellingInterval) clearInterval(travellingInterval);
 
     console.log("🛣️ Travel Tracking Active");
-    const frequency = 120000; // 2 minutes
+    const frequency = 300000; // 5 minutes (300,000ms)
 
     travellingInterval = setInterval(() => {
         if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
@@ -1935,6 +1986,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
