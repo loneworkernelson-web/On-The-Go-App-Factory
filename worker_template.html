@@ -1795,7 +1795,46 @@ function executePanicAction() {
         "Notes": "Emergency SOS triggered by 3-second hold."
     }));
 }
+let travellingInterval;
 
+function startTravellingPulse() {
+    // 1. Clear any existing pulse to prevent multiple loops
+    if (travellingInterval) clearInterval(travellingInterval);
+
+    console.log("🛣️ Travel Pulse Started");
+
+    // 2. Set the pulse interval (e.g., every 2 minutes)
+    // You can also use CONFIG.vehInterval if you have that defined
+    const pulseFrequency = 120000; 
+
+    travellingInterval = setInterval(() => {
+        if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
+            stopTravellingPulse();
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(position => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // 3. Send the "PULSE" to the Google Sheet
+            processUploadQueue(buildPayload({
+                "Alarm Status": "TRAVELLING",
+                "Last Known GPS": `${lat},${lng}`,
+                "Notes": state.activeVisit.travelTarget ? `En route to: ${state.activeVisit.travelTarget}` : "In Transit"
+            }));
+        }, err => console.error("GPS Pulse Error:", err), { enableHighAccuracy: true });
+
+    }, pulseFrequency);
+}
+
+function stopTravellingPulse() {
+    if (travellingInterval) {
+        clearInterval(travellingInterval);
+        travellingInterval = null;
+        console.log("🛑 Travel Pulse Stopped");
+    }
+}
 function resizeCanvas(canvasEl) { 
     // 1. Selector flexibility: Uses parameter or searches for a signature canvas
     const c = canvasEl || document.getElementById('sigPad') || document.querySelector('canvas[id^="sig-canvas-"]'); 
@@ -1858,8 +1897,13 @@ window.onload = () => {
     } 
     else if (state.activeVisit) {
         // CASE B: Existing Visit/Travel -> Resume Active Screen
-        navigate('active'); // Ensure you have an 'activePage' ID in your HTML
-        startCheckinTimer(); // Restart the heartbeat monitor
+        navigate('active'); 
+        startCheckinTimer(); // Restart the safety countdown
+        
+        // RESUME PULSE: If the worker was mid-travel, restart the GPS heartbeat
+        if (state.activeVisit.status === 'TRAVELLING') {
+            startTravellingPulse();
+        }
         forceSync(false);
     } 
     else {
@@ -1867,8 +1911,8 @@ window.onload = () => {
         navigate('main');
         forceSync(false); 
     }
-    
-    console.log("System Initialised: Operational");
+
+    console.log("🚀 System Initialised: Operational Mode");
 };
 </script>
  <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
@@ -1887,4 +1931,5 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
