@@ -639,23 +639,27 @@ function toggleAdvancedMode(el) {
 /**
  * Persists the current app state using standardized navigator.storage.
  */
+/**
+ * Modern Standard: Persists app state and requests standard persistent storage.
+ */
 async function saveState() {
     try {
-        // 1. Modern Standard: Request persistent storage if supported
+        // 1. Request persistent storage using standardized API
         if (navigator.storage && navigator.storage.persist) {
-            const isPersisted = await navigator.storage.persist();
-            console.log(`Standardized Storage Persisted: ${isPersisted}`);
+            const persisted = await navigator.storage.persist();
+            if (persisted) {
+                console.log("✅ Offline Safety Cache Finalized: Persistent Storage Active");
+            }
         }
 
-        // 2. Core Persistence
+        // 2. Persist the current state to LocalStorage
         const stateString = JSON.stringify(state);
         localStorage.setItem('otg_worker_state', stateString);
     } catch (e) {
-        console.error("Critical: Failed to save app state", e);
-        showToast("⚠️ Storage Error: Progress may not be saved.");
+        console.error("Critical: Failed to finalize safety cache", e);
+        showToast("⚠️ Storage Error: Progression not saved.");
     }
 }
-
 
 function checkVehicleStatus() {
     // 1. Exit early if vehicle monitoring is disabled in CONFIG
@@ -1995,6 +1999,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
