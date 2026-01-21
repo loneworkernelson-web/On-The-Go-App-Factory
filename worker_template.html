@@ -463,7 +463,44 @@ let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",isDrawing=fal
 let calculatedDist=null,gpsWarm=false,gpsWatchId=null,lastAlertTime=0;
 let currentBatteryLevel="100%";
 let travelTargetName = ""; // PATCH: Tracks intended travel destination;
+// --- WIZARD NAVIGATION (Must be Global) ---
+function wizNext(step) {
+    console.log("Navigating to step:", step + 1);
+    const current = document.getElementById(`wiz_step${step}`);
+    const next = document.getElementById(`wiz_step${step + 1}`);
+    
+    // Validation for Step 1
+    if (step === 1) {
+        const name = document.getElementById('wiz_name').value.trim();
+        if (!name) {
+            showToast("⚠️ Name is required.");
+            return;
+        }
+    }
 
+    if (current && next) {
+        current.classList.add('hidden');
+        next.classList.remove('hidden');
+    }
+}
+
+function wizSave() {
+    state.settings = {
+        workerName: document.getElementById('wiz_name').value.trim(),
+        workerPhone: document.getElementById('wiz_phone').value.trim(),
+        workerEmail: document.getElementById('wiz_email').value.trim(),
+        googleSheetUrl: CONFIG.scriptUrl,
+        pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
+        escName: document.getElementById('wiz_esc_name').value.trim(),
+        escPhone: document.getElementById('wiz_esc_phone').value.trim(),
+        escEmail: document.getElementById('wiz_esc_email').value.trim()
+    };
+    saveState();
+    navigate('main');
+    document.getElementById('setupPage')?.classList.add('hidden');
+    forceSync(false);
+    showToast("✅ Settings Saved");
+}
 // MODAL CONTROLLERS
 function showModal(id) {
     const backdrop = document.getElementById('modalBackdrop'); if (!backdrop) return;
@@ -549,49 +586,6 @@ function startWizard(){
     if(state.settings.workerName) populateWizard(); 
 }
 function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
-function wizNext(currentStep) {
-    // 1. Validate Identity before moving to Security
-    if (currentStep === 1) {
-        const name = document.getElementById('wiz_name').value.trim();
-        if (!name) {
-            showToast("⚠️ Name is required for safety matching.");
-            return;
-        }
-    }
-    
-    // 2. Transition steps
-    const nextStep = currentStep + 1;
-    const currentEl = document.getElementById(`wiz_step${currentStep}`);
-    const nextEl = document.getElementById(`wiz_step${nextStep}`);
-    
-    if (currentEl && nextEl) {
-        currentEl.classList.add('hidden');
-        nextEl.classList.remove('hidden');
-    }
-}
-
-function wizSave() {
-    state.settings = {
-        workerName: document.getElementById('wiz_name').value.trim(),
-        workerPhone: document.getElementById('wiz_phone').value.trim(),
-        workerEmail: document.getElementById('wiz_email').value.trim(),
-        googleSheetUrl: CONFIG.scriptUrl,
-        pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
-        emgName: document.getElementById('wiz_emg_name').value.trim(),
-        emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
-        emgEmail: document.getElementById('wiz_emg_email').value.trim(),
-        escName: document.getElementById('wiz_esc_name').value.trim(),
-        escPhone: document.getElementById('wiz_esc_phone').value.trim(),
-        escEmail: document.getElementById('wiz_esc_email').value.trim()
-    };
-    saveState();
-    navigate('main');
-    const wiz = document.getElementById('setupPage');
-    if (wiz) wiz.classList.add('hidden');
-    forceSync(false);
-    showToast("✅ Settings Saved Successfully");
-}
-
 function wizBack(current){wizGoTo(current-1);}
 
 function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
@@ -986,11 +980,9 @@ function startVisit() {
     const locId = state.selectedLocationId;
     if (!locId) return;
 
-    // 1. Find the location data
     const loc = state.locations.find(l => l.id === locId);
     if (!loc && locId !== 'travel') return;
 
-    // 2. Build the Visit Object
     const visitData = {
         locationId: locId,
         locationName: locId === 'travel' ? 'Travelling' : loc.name,
@@ -999,39 +991,23 @@ function startVisit() {
         status: locId === 'travel' ? 'TRAVELLING' : 'ARRIVED'
     };
 
-    // 3. Handle State Transition
     state.activeVisit = visitData;
-    state.selectedLocationId = null; // Clear selection after starting
-    
-    // 4. Persistence & UI Updates
+    state.selectedLocationId = null;
     saveState();
     renderLocations();
     updateArrivedButtonState();
     
-    // 5. Trigger Network Sync
     processUploadQueue(buildPayload({
         "Alarm Status": visitData.status,
         "Current Site": visitData.locationName,
         "Notes": visitData.travelTarget ? `To: ${visitData.travelTarget}` : "Started Visit"
     }));
 
-    // 6. Start the Safety Timers
     startCheckinTimer();
-    
-    // 7. Battery Saver & UI Lock Logic
-    state.lowBatSent = false; 
-    saveState(); 
-    enterLockedScreen(); 
-    
-    // Auto-switch to Dark Mode after 10 seconds
-    if (window.autoDimTimer) clearTimeout(window.autoDimTimer);
-    window.autoDimTimer = setTimeout(() => {
-        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver')?.classList.contains('hidden')) {
-            toggleBatterySaver();
-        }
-    }, 10000);
+    state.lowBatSent = false;
+    enterLockedScreen();
 
-    // 8. Start Background GPS Pulse if Travelling
+    // Start the 5-minute pulse if travelling
     if (locId === 'travel') {
         startTravellingPulse();
     }
@@ -1841,30 +1817,23 @@ function executePanicAction() {
 }
 
 function startTravellingPulse() {
-    // 1. Clear existing timer to prevent battery drain
     if (travellingInterval) clearInterval(travellingInterval);
-
-    console.log("🛣️ Travel Pulse Active: 5-minute interval");
-    const frequency = 300000; // 5 Minutes (300,000ms)
-
+    
+    // Set to 5 minutes (300,000ms)
     travellingInterval = setInterval(() => {
-        // Safety check: stop if not travelling
         if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
             stopTravellingPulse();
             return;
         }
-
         navigator.geolocation.getCurrentPosition(pos => {
-            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
             processUploadQueue(buildPayload({
                 "Alarm Status": "TRAVELLING",
-                "Last Known GPS": coords,
-                "Notes": state.activeVisit.travelTarget ? `To: ${state.activeVisit.travelTarget}` : "In Transit"
+                "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`,
+                "Notes": state.activeVisit.travelTarget ? `To: ${state.activeVisit.travelTarget}` : "Transit"
             }));
         }, null, { enableHighAccuracy: true });
-    }, frequency);
+    }, 300000); 
 }
-
 function updateTimerDisplay(now, due) {
     const timerEl = document.getElementById('checkinTimerDisplay');
     if (!timerEl) return;
@@ -1978,6 +1947,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
