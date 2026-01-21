@@ -438,398 +438,112 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
  </div> 
 <script>
-// CONFIG & CONSTANTS
-const APP_VERSION = "v79.35"; // Diagnostic constant
-const CONFIG={isAdv:%%IS_ADVANCED%%,mileage:%%ENABLE_MILEAGE%%,url:"%%GOOGLE_SHEET_URL%%",org:"%%ORGANISATION_NAME%%",checkinEnabled:%%CHECKIN_ENABLED%%,checkinInterval:%%CHECKIN_INTERVAL%%,escalationMinutes:%%ESCALATION_MINUTES%%,key:"%%SECRET_KEY%%",vehEnabled:%%VEHICLE_ENABLED%%,vehInterval:%%VEHICLE_INTERVAL%%, countryPrefix:"%%COUNTRY_PREFIX%%", reqTravelReport: %%REQ_TRAVEL_REPORT%%, vehicleTerm: "%%VEHICLE_TERM%%", voiceLocale: "%%VOICE_LOCALE%%"};const DURATION_MAP=[0,10,15,20,30,45,60,75,90,105,120,150,180,210,240,270,300,360,420,480,540,600,660,720];
-// CORE STATE
-let state={settings:{},locations:[],selectedLocationId:null,visitDurationMinutes:0,activeVisit:null,cachedForms:{},pendingUploads:[],globalForms:[],photoStore:{},lowBatSent:false,meta:{}};
-let synth,checkinIntervalId,mainScreenReminderTimer,wakeLock,timerInt,travellingInterval;
-let autoDimTimer; // Tracks the 10s auto-dark-mode countdown
-let tempPhoto=null,sigPad=null;
-let deferredPrompt,isMidVisitUpdate=false,currentActiveTemplate="",isDrawing=false;
-let calculatedDist=null,gpsWarm=false,gpsWatchId=null,lastAlertTime=0;
-let currentBatteryLevel="100%";
-let uploadQueue = []; // Holds data for the sheet
-let travelTargetName = ""; // Tracks where you are driving to
-// --- WIZARD NAVIGATION (Must be Global) ---
-function wizNext(step) {
-    if (step === 1) {
-        const name = document.getElementById('wiz_name').value.trim();
-        if (!name) { showToast("⚠️ Name is required."); return; }
-    }
-    const current = document.getElementById(`wizStep${step}`);
-    const next = document.getElementById(`wizStep${step + 1}`);
-    if (current && next) {
-        current.classList.add('hidden');
-        current.classList.remove('active');
-        next.classList.remove('hidden');
-        next.classList.add('active');
-    }
-}
-function wizSave() {
-    state.settings = {
-        workerName: document.getElementById('wiz_name').value.trim(),
-        workerPhone: document.getElementById('wiz_phone').value.trim(),
-        workerEmail: document.getElementById('wiz_email').value.trim(),
-        // Use the new wiz_url ID here if you need to capture it
-        googleSheetUrl: CONFIG.scriptUrl, 
-        pinCode: btoa(document.getElementById('wiz_pin').value.trim()),
-        duressPin: btoa(document.getElementById('wiz_duress').value.trim()),
-        emgName: document.getElementById('wiz_emg_name').value.trim(),
-        emgPhone: document.getElementById('wiz_emg_phone').value.trim(),
-        emgEmail: document.getElementById('wiz_emg_email').value.trim(),
-        escName: document.getElementById('wiz_esc_name').value.trim(),
-        escPhone: document.getElementById('wiz_esc_phone').value.trim(),
-        escEmail: document.getElementById('wiz_esc_email').value.trim()
-    };
-    saveState();
-    // Explicitly hide the setup overlay and show the main dashboard
-    document.getElementById('setupPage').classList.add('hidden');
-    navigate('main');
-    forceSync(false);
-    showToast("✅ Setup Complete");
-}
-// MODAL CONTROLLERS
-function showModal(id) {
-    const backdrop = document.getElementById('modalBackdrop'); if (!backdrop) return;
-    backdrop.classList.remove('hidden'); backdrop.classList.add('flex');
-    const modals = ['locationModal','pinModal','reportModal','modal-report','checkinModal','extendModal','infoModal','templateModal','alertModal'];
-    modals.forEach(m => { const el = document.getElementById(m); if(el) el.classList.add('hidden'); });
-    const target = (id === 'report') ? (document.getElementById('reportModal') || document.getElementById('modal-report')) : document.getElementById(id + 'Modal');
-    if (target) { target.classList.remove('hidden'); if (id === 'report') setTimeout(resizeCanvas, 300); }
-}
+// --- 1. GLOBAL CONSTANTS & CORE STATE ---
+const APP_VERSION = "v79.35";
+const CONFIG = {
+    url: "%%GOOGLE_SHEET_URL%%",
+    key: "%%SECRET_KEY%%",
+    mileage: true
+};
 
-function closeModal(id) {
-    const backdrop = document.getElementById('modalBackdrop');
-    if (backdrop) { backdrop.classList.add('hidden'); backdrop.classList.remove('flex'); }
-    if (id) {
-        const modalId = (id === 'location' || id === 'pin' || id === 'info' || id === 'template' || id === 'checkin' || id === 'extend' || id === 'alert') ? id + 'Modal' : (id === 'report' ? 'reportModal' : id);
-        const el = document.getElementById(modalId); if (el) el.classList.add('hidden');
-    }
-}
+// Centralized state object
+let state = { 
+    settings: {}, 
+    locations: [], 
+    selectedLocationId: null, 
+    visitDurationMinutes: 0,
+    activeVisit: null, 
+    cachedForms: {}, 
+    pendingUploads: [],
+    globalForms: [],
+    photoStore: {},
+    lowBatSent: false,
+    meta: {} 
+};
 
-// UI HELPERS
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    if (!t) return;
-    t.innerText = msg;
-    t.classList.remove('hidden');
-    // Hide after 4 seconds
-    setTimeout(() => { t.classList.add('hidden'); }, 4000);
-}
-function toggleWofContinue(){ const chk=document.getElementById('chkWofAck'); const btn=document.getElementById('btnWofContinue'); btn.disabled=!chk.checked; if(chk.checked){ btn.classList.remove('bg-gray-700','text-gray-500'); btn.classList.add('bg-blue-600','text-white'); } else { btn.classList.add('bg-gray-700','text-gray-500'); btn.classList.remove('bg-blue-600','text-white'); } }
-function closeWofBlocker(){document.getElementById('wofBlockModal').classList.add('hidden');}
-function closeWofWarn(){document.getElementById('wofWarnModal').classList.add('hidden');}
+// Variables for hardware and timers
+let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
+let autoDimTimer = null;
+let tempPhoto = null, sigPad = null;
+let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", isDrawing = false;
+let calculatedDist = null, gpsWarm = false, gpsWatchId = null, lastAlertTime = 0;
+let currentBatteryLevel = "100%";
+let uploadQueue = []; 
+let travelTargetName = ""; // Tracks driving destination
 
-// SITE MANAGEMENT
-function openLocModal(){ document.getElementById('locModalTitle').innerText="Add Site"; document.getElementById('locId').value=""; document.getElementById('locBusiness').value=""; document.getElementById('locName').value=""; document.getElementById('locAddr').value=""; document.getElementById('locTemplate').value=""; document.getElementById('btnDelLoc').classList.add('hidden'); document.getElementById('radRepYes').checked=true; showModal('location'); }
-function editManualLocation(id){ const l = state.locations.find(x => x.id === id); if(!l) return; document.getElementById('locModalTitle').innerText = "Edit Site"; document.getElementById('locId').value = id; document.getElementById('locBusiness').value = l.companyName || ""; document.getElementById('locName').value = l.name; document.getElementById('locAddr').value = l.address || ""; document.getElementById('locTemplate').value = l.templateName || ""; if(l.noReport) document.getElementById('radRepNo').checked = true; else document.getElementById('radRepYes').checked = true; const delBtn = document.getElementById('btnDelLoc'); if(delBtn) delBtn.classList.remove('hidden'); showModal('location'); }
-function editTravelSettings(){ const l=state.locations.find(x=>x.id==='travel'); document.getElementById('locModalTitle').innerText="Travel Settings"; document.getElementById('locId').value='travel'; document.getElementById('locBusiness').parentNode.style.display='none'; document.getElementById('locName').parentNode.style.display='none'; document.getElementById('locAddr').parentNode.style.display='none'; document.getElementById('locTemplate').parentNode.style.display='none'; document.getElementById('btnDelLoc').classList.add('hidden'); if(l.noReport)document.getElementById('radRepNo').checked=true;else document.getElementById('radRepYes').checked=true; showModal('location'); }
-function saveLoc(){ const id=document.getElementById('locId').value; const n=document.getElementById('locName').value; const b=document.getElementById('locBusiness').value; const a=document.getElementById('locAddr').value; const t=document.getElementById('locTemplate').value; const nr=document.getElementById('radRepNo').checked; if(id==='travel'){ const l=state.locations.find(x=>x.id==='travel'); l.noReport=nr; localStorage.setItem('otg_user_travel_pref',nr); renderLocations(); closeModal('location'); return; } if(!n) return alert("Site Name is required"); const newId = id || 'loc_' + Date.now(); const loc = {id: newId, name: n, companyName: b, address: a, templateName: t, noReport: nr}; if(id){ const i = state.locations.findIndex(x => x.id === id); if(i > -1) state.locations[i] = loc; } else { state.locations.push(loc); } saveState(); renderLocations(); closeModal('location'); showToast("Site Saved"); }
-function deleteLoc(){ const id = document.getElementById('locId').value; if (!id) return; if (!confirm("Are you sure you want to delete this site?")) return; state.locations = state.locations.filter(x => x.id !== id); saveState(); renderLocations(); closeModal('location'); showToast("Site Deleted"); }
-function getGpsAddress() { const btn = document.getElementById('btnGpsAddr'); const addrInput = document.getElementById('locAddr'); if (!btn || !addrInput) return; btn.innerText = "..."; btn.disabled = true; navigator.geolocation.getCurrentPosition((p) => { const lat = p.coords.latitude; const lon = p.coords.longitude; fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`).then(r => r.json()).then(d => { addrInput.value = d.display_name || `${lat}, ${lon}`; btn.innerText = "📍 GPS"; btn.disabled = false; }).catch(() => { addrInput.value = `${lat}, ${lon}`; btn.innerText = "📍 GPS"; btn.disabled = false; }); }, (err) => { btn.innerText = "📍 GPS"; btn.disabled = false; showToast("📍 GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); }
+// --- 2. STORAGE & SYNCHRONIZATION ---
 
-// NETWORK & CORE
-window.addEventListener('online',updateNetworkStatus); window.addEventListener('offline',updateNetworkStatus);
-function updateNetworkStatus(){ const b=document.getElementById('offlineBanner'); if(navigator.onLine){ b.classList.add('hidden'); if(state.pendingUploads&&state.pendingUploads.length>0) processUploadQueue(); } else { b.classList.remove('hidden'); } }
-function getDeviceID(){ let id=localStorage.getItem('device_uuid'); if(!id){id='dev_'+Math.random().toString(36).substr(2,9)+'_'+Date.now();localStorage.setItem('device_uuid',id);} return id; }
-function navigate(p) {
-    // 1. Hide all pages using your existing .page class
-    document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
-
-    // 2. Safely locate the target page
-    const targetPage = document.getElementById(p + 'Page');
-    
-    // 3. Safety Check: Only proceed if the page exists
-    if (targetPage) {
-        targetPage.classList.add('active');
-    } else {
-        console.warn("Navigation: '" + p + "Page' not found. Check HTML IDs.");
-        return; 
-    }
-
-    // 4. PRESERVED: Your Safety Reminder Logic
-    if (p === 'main') {
-        if (typeof startReminderTimer === 'function') startReminderTimer();
-    } else {
-        // Safe check to see if the timer variable exists before clearing
-        if (typeof mainScreenReminderTimer !== 'undefined') {
-            clearTimeout(mainScreenReminderTimer);
-        }
-    }
-
-    // 5. PRESERVED: Automatic UI Refresh
-    if (p === 'settings') {
-        populateSettingsForm();
-    }
-}
-// SETUP WIZARD
-function startWizard(){ 
-    const wiz = document.getElementById('setupPage');
-    if (wiz) {
-        wiz.classList.remove('hidden');
-        navigate('setup');
-    }
-    wizGoTo(1); 
-    if(state.settings.workerName) populateWizard(); 
-}
-function wizGoTo(step){ document.querySelectorAll('.wizard-step').forEach(e=>e.classList.remove('active')); document.getElementById('wizStep'+step).classList.add('active'); for(let i=1;i<=3;i++){ const d=document.getElementById('dot'+i); d.classList.toggle('bg-blue-500',i===step); d.classList.toggle('bg-gray-700',i!==step); } }
-function wizBack(step) {
-    const current = document.getElementById(`wizStep${step}`);
-    const prev = document.getElementById(`wizStep${step - 1}`);
-
-    if (current && prev) {
-        current.classList.add('hidden');
-        current.classList.remove('active');
-        prev.classList.remove('hidden');
-        prev.classList.add('active');
-    }
-}
-function cleanGlobalPhone(num) { if(!num) return ""; let n = num.replace(/[^0-9]/g, ''); const prefix = (CONFIG.countryPrefix || "").replace('+', ''); if(!prefix) return "+" + n; if (n.startsWith(prefix)) return '+' + n; if (n.startsWith('0')) return '+' + prefix + n.substring(1); if (prefix === '1' && n.length === 10) return '+1' + n; return '+' + prefix + n; }
-function populateWizard(){ document.getElementById('wiz_name').value=state.settings.workerName||""; document.getElementById('wiz_phone').value=state.settings.workerPhone||""; document.getElementById('wiz_email').value=state.settings.workerEmail||""; document.getElementById('wiz_emg_name').value=state.settings.emergencyName||""; document.getElementById('wiz_emg_phone').value=state.settings.emergencyPhone||""; document.getElementById('wiz_emg_email').value=state.settings.emergencyEmail||""; document.getElementById('wiz_esc_name').value=state.settings.escalationName||""; document.getElementById('wiz_esc_phone').value=state.settings.escalationPhone||""; document.getElementById('wiz_esc_email').value=state.settings.escalationEmail||""; document.getElementById('wiz_pin').value=state.settings.pinCode||""; document.getElementById('wiz_duress').value=state.settings.duressPin||""; }
-// FIXED: Now populates the diagnostic version text
-function populateSettingsForm() {
-    // 1. Sync Settings
-    const urlInput = document.getElementById('set_url');
-    if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
-
-    const nameInput = document.getElementById('set_workerName');
-    if (nameInput) nameInput.value = state.settings.workerName || "";
-
-    // 2. Diagnostics
-    const diagApp = document.getElementById('diagApp');
-    const diagCloud = document.getElementById('diagCloud');
-    
-    if (diagApp) diagApp.innerText = APP_VERSION;
-    
-    if (diagCloud) {
-        diagCloud.innerText = state.meta.backendVersion || "Not Synced";
-        if (state.meta.backendVersion) {
-            diagCloud.className = "text-green-400 font-bold text-xs text-green-400";
-        }
-    }
-} // <--- Ensure this final brace exists!
-// KEEP THIS: It is not replaced by the population function
-function toggleAdvancedMode(el) {
-    state.settings.isAdvanced = el.checked;
-    saveState();
-    if(el.checked) {
-        startGPSMonitoring();
-        showToast("📍 Advanced Monitoring Active");
-    } else {
-        if(gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
-        document.getElementById('gpsBars').classList.add('hidden');
-        showToast("🔋 Battery Saver: GPS Throttled");
-    }
-}
 /**
- * Persists the current app state to local storage. 
- * Preserves Advanced Mode, branding, and Cloud Version data.
+ * Modern Storage API: Clears the 'StorageType.persistent' warning.
+ */
 async function saveState() {
     try {
-        // Standardized storage persistence request
         if (navigator.storage && navigator.storage.persist) {
             await navigator.storage.persist();
         }
-        const stateString = JSON.stringify(state);
-        localStorage.setItem('otg_worker_state', stateString);
+        localStorage.setItem('otg_worker_state', JSON.stringify(state));
     } catch (e) {
         console.error("Critical: Storage Failure", e);
     }
 }
-function checkVehicleStatus() {
-    // 1. Exit early if vehicle monitoring is disabled in CONFIG
-    if (!CONFIG.vehEnabled) return; 
 
-    const b = document.getElementById('vehNagBar');
-    if (!b) return;
-
-    let s = false; // Tracks if the "Check Required" state is active
-
-    // 2. Customise banner text based on the organization's terminology
-    if (CONFIG.vehicleTerm) { 
-        b.innerText = `⚠️ ${CONFIG.vehicleTerm} Check Overdue - Tap to Complete`; 
-    }
-
-    // 3. Logic for the Periodic Safety Check (e.g., Weekly/Monthly)
-    if (state.meta.lastVehCheck) { 
-        const l = new Date(state.meta.lastVehCheck);
-        const d = (Date.now() - l.getTime()) / (1000 * 60 * 60 * 24); 
-        // Trigger banner if the days since last check exceed the interval
-        if (d > CONFIG.vehInterval) { s = true; } 
-    } 
-    else { 
-        /**
-         * FIXED: "Day 1" Logic
-         * Instead of triggering the banner immediately on a fresh install,
-         * we set 'today' as the baseline so the first check is due only 
-         * after one full interval (e.g., in 7 days).
-         */
-        state.meta.lastVehCheck = new Date().toISOString();
-        saveState();
-        s = false; 
-    }
-
-    // 4. Logic for Legal Compliance (WOF/Registration/CoF Expiry)
-    if (state.meta.wofExpiry) { 
-        const w = new Date(state.meta.wofExpiry);
-        const du = (w.getTime() - Date.now()) / (1000 * 60 * 60 * 24); 
-
-        if (du < 0) {
-            // Case: Vehicle is legally expired
-            s = true;
-            b.innerText = `⛔ ${CONFIG.vehicleTerm || 'WOF'} EXPIRED - Vehicle Use Prohibited`;
-            b.classList.remove('bg-orange-600');
-            b.classList.add('bg-red-700'); // Visual escalation for illegal vehicle state
-        } 
-        else if (du < 14) { 
-            // Case: Warning zone (within 14 days of expiry)
-            s = true;
-            b.innerText = `⚠️ Vehicle Check: ${CONFIG.vehicleTerm || 'WOF'} Due in ${Math.ceil(du)} Days`;
-            b.classList.add('bg-orange-600');
-            b.classList.remove('bg-red-700');
-        } 
-    }
-
-    // 5. Final UI Update: Show or Hide the Nag Bar
-    if (s) {
-        b.classList.remove('hidden');
-    } else {
-        b.classList.add('hidden');
-    }
-}
-
-// FORM HANDLING & RENDERERS
-function startVehicleCheck() {
-    // 1. Safety Check: Ensure the app logic is actually loaded
-    if (typeof loadFormAndShow !== 'function') {
-        console.error("UI Error: loadFormAndShow is not defined.");
-        showToast("⚠️ System error - please refresh.");
-        return;
-    }
-
-    // 2. Trigger the Safety Form
-    // This matches the name of the template stored in your 'globalForms'
-    loadFormAndShow('Vehicle Safety Check');
-    
-    // 3. User Feedback
-    console.log("Vehicle Check Initiated: Loading Template...");
-}
-function openQuickMenu(){isMidVisitUpdate=false;calculatedDist=null;showModal('template');renderIconGrid(state.globalForms, null);}
-function openMidVisitMenu(){isMidVisitUpdate=true;calculatedDist=null;showModal('template');const cid=state.activeVisit?state.activeVisit.locationId:null;const loc=state.locations.find(x=>x.id===cid);renderIconGrid(state.globalForms, loc);}
-
-function renderIconGrid(forms, loc) {
-    const l=document.getElementById('templateList'); l.innerHTML='';
-    const addBtn=(name,icon,label)=>{ 
-        const b=document.createElement('button'); 
-        b.className="menu-icon-btn"; 
-        b.innerHTML=`<div class="text-3xl mb-1">${icon}</div><div class="text-xs font-bold leading-tight uppercase tracking-tighter">${label}</div>`; 
-        b.onclick=()=>{closeModal('template');loadFormAndShow(name);}; 
-        l.appendChild(b); 
-    };
-
-    // 1. Priority: Site-specific template
-    if(loc&&loc.templateName) addBtn(loc.templateName,"🏢",loc.templateName);
-    else if(loc&&loc.id==='travel') addBtn("Travel Report","🛣️","Travel Log");
-    else if(isMidVisitUpdate) addBtn("(Standard)","⏱️","Update Status");
-
-    // 2. Dynamic Note to Self
-    // Checks if "Note to Self" exists in your spreadsheet templates first
-    const hasNoteTemplate = forms && forms.find(f => f.name.trim().toLowerCase() === 'note to self');
-    if(hasNoteTemplate) {
-        addBtn(hasNoteTemplate.name, "📝", "Note to Self");
-    } else {
-        // Fallback to the hardcoded version if not defined in spreadsheet
-        addBtn("Note to Self", "📝", "Note to Self");
-    }
-
-    // 3. Global Forms
-    if(forms){ 
-        forms.forEach(f=>{ 
-            const n = f.name.toLowerCase();
-            // Skip if already added as a site-specific or Note to Self template
-            if(loc && loc.templateName === f.name) return;
-            if(n === 'note to self') return; 
-
-            let icon="📋"; 
-            if(n.includes('vehicle')) icon="🚗"; 
-            else if(n.includes('incident') || n.includes('accident')) icon="⚠️"; 
-            else if(n.includes('hazard')) icon="☢️"; 
-            else if(n.includes('client')) icon="👤"; 
-            addBtn(f.name, icon, f.name); 
-        }); 
-    }
-}
-function initLocations() {
-    if (!state.locations) state.locations = [];
-    
-    // Ensure the 'travel' object exists exactly once at the top of the list
-    const hasTravel = state.locations.find(l => l.id === 'travel');
-    if (!hasTravel) {
-        state.locations.unshift({
-            id: 'travel',
-            name: 'Travelling',
-            noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
-        });
-    }
-
-    if (!state.cachedForms["Standard Visit Note"]) {
-        state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
-    }
-    
-    if (CONFIG.mileage && !state.cachedForms['Travel Report']) {
-        state.cachedForms['Travel Report'] = [
-            {type:'number', text:'Distance (km)'},
-            {type:'text', text:'Details'},
-            {type:'photo', text:'Odometer'}
-        ];
-    }
-    
-    // Refresh UI Components
-    renderLocations();
-    checkVehicleStatus(); 
-    populateSettingsForm(); 
-}
-function createDestinationTile(loc) {
-    const d = document.createElement('div');
-    const isSel = state.selectedLocationId === loc.id;
-    
-    d.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800 hover:bg-gray-750'}`;
-    
-    let icon = "🏢";
-    if (loc.name && loc.name.includes("Home")) icon = "🏠";
-
-    d.innerHTML = `
-        <div class="flex justify-between items-start">
-            <span class="text-2xl">${icon}</span>
-            ${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) ? 
-                `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}',event)">ℹ️</button>` : ''}
-        </div>
-        <div>
-            <div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName || ''}</div>
-            <div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div>
-        </div>
-    `;
-
-    d.onclick = () => {
-        if (state.selectedLocationId === loc.id) {
-            state.selectedLocationId = null;
-        } else {
-            state.selectedLocationId = loc.id;
-            travelTargetName = loc.name;
+function loadState() {
+    const saved = localStorage.getItem('otg_worker_state');
+    if (saved) {
+        try {
+            state = JSON.parse(saved);
+        } catch (e) {
+            console.error("Critical: State Corrupted", e);
         }
-        warmUpGps();
-        renderLocations();
-        updateArrivedButtonState();
-    };
-    return d;
+    }
 }
+
 /**
- * Creates the specialized purple 'Travel' tile.
+ * Robust Refresh: Uses async to prevent library crashes.
  */
-/**
- * Builds the wide purple 'Travel' tile at the top of the dashboard.
- */
+async function hardRefreshUpdate() {
+    if(!confirm("Force reload and clear internal app memory?")) return;
+    showToast("🧹 Deep cleaning system cache...");
+
+    if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (let r of regs) { await r.unregister(); }
+    }
+
+    if ('caches' in window) {
+        const keys = await caches.keys();
+        for (let k of keys) { await caches.delete(k); }
+    }
+
+    state.meta.backendVersion = null;
+    await saveState(); 
+    location.reload(true); 
+}
+
+// --- 3. DASHBOARD & UI RENDERING ---
+
+function renderLocations() {
+    const l = document.getElementById('locationList');
+    const tr = document.getElementById('travelRow');
+    if (!l || !tr) return;
+
+    l.innerHTML = '';
+    tr.innerHTML = '';
+
+    if (!state.locations) state.locations = [];
+
+    state.locations.forEach(loc => {
+        if (!loc || !loc.id) return;
+        
+        const tile = (loc.id === 'travel') ? createTravelTile(loc) : createLocationTile(loc);
+        if (loc.id === 'travel') {
+            tr.appendChild(tile);
+        } else {
+            l.appendChild(tile);
+        }
+    });
+}
+
 function createTravelTile(loc) {
     const d = document.createElement('div');
     const isSel = state.selectedLocationId === 'travel';
@@ -852,497 +566,71 @@ function createTravelTile(loc) {
     d.onclick = (e) => {
         if (e.target.tagName === 'BUTTON') return;
         state.selectedLocationId = isSel ? null : 'travel';
-        travelTargetName = ""; 
         renderLocations();
-        updateArrivedButtonState();
     };
     return d;
 }
-function handleVehicleCompliance(loc) {
-    if (!state.meta || !state.meta.wofExpiry) return false;
 
-    const w = new Date(state.meta.wofExpiry);
-    const days = (w.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+// --- 4. DYNAMIC FORM BUILDER (ACCESSIBILITY PATCHED) ---
 
-    if (days < 0) {
-        document.getElementById('wofBlockModal')?.classList.remove('hidden');
-        return true; // Stop execution
-    } else if (days < 14) {
-        const warnModal = document.getElementById('wofWarnModal');
-        const warnText = document.getElementById('wofWarnText');
-        if (warnModal && warnText) {
-            warnModal.classList.remove('hidden');
-            warnText.innerText = `Expires in ${Math.ceil(days)} days`;
-            state.selectedLocationId = loc.id;
-            warmUpGps();
-            renderLocations();
-            updateArrivedButtonState();
-            return true; // Handled by modal
-        }
-    }
-    return false; // All good
-}
-
-function renderLocations() {
-    const l = document.getElementById('locationList');
-    const tr = document.getElementById('travelRow');
-    
-    // 1. DOM Guard: Exit if the UI elements aren't ready
-    if (!l || !tr) return;
-
-    // 2. Clear current UI
-    l.innerHTML = '';
-    tr.innerHTML = '';
-
-    // 3. State Guard: Ensure location array exists
-    if (!state.locations) state.locations = [];
-
-    // 4. Distribution Loop
-    state.locations.forEach(loc => {
-        // Skip null entries or entries without IDs to prevent script crashes
-        if (!loc || !loc.id) return;
-
-        if (loc.id === 'travel') {
-            // Sends the travel object to its specialized purple tile builder
-            tr.appendChild(createTravelTile(loc));
-        } else {
-            // Sends all other sites (Home, Office, Client) to the grid builder
-            l.appendChild(createDestinationTile(loc));
-        }
-    });
-}
-// FIXED: Added Cache Buster to force fresh form data from Spreadsheet
-function forceSync(showUi){
-    if(!state.settings.workerName) return; 
-    if(showUi) document.getElementById('uploadBanner').classList.remove('hidden');
-    
-    const dId = getDeviceID();
-    // Added ?v= timestamp to bypass browser caching
-    const syncUrl = `${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}&v=${Date.now()}`;
-    
-    fetch(syncUrl).then(r => r.json()).then(data => {
-        if(data.status === "error") { 
-            if(showUi) document.getElementById('uploadBanner').classList.add('hidden'); 
-            return; 
-        }
-        
-        const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-        const ms = (data.sites || []).map(s => ({id:'site_'+s.siteName.replace(/\s/g,''), name:s.siteName, address:s.address, companyName:s.company, templateName:s.template, noReport:false, contactName:s.contactName, contactPhone:s.contactPhone, contactEmail:s.contactEmail, notes:s.notes}));
-        
-        state.locations = ms.concat(existingManual); 
-        state.globalForms = data.forms || []; 
-        state.cachedForms = data.cachedTemplates || {}; 
-state.meta = data.meta || {};
-saveState(); 
-renderLocations(); 
-checkVehicleStatus(); 
-populateSettingsForm(); // ADD THIS LINE: Refreshes the versioning text
-document.getElementById('uploadBanner').classList.add('hidden');
-        if(showUi) showToast("Sync Complete!");
-    });
-
-// FIXED: Corrected corrupted navigation string
-function showSiteInfo(id, e){
-    if(e) e.stopPropagation(); 
-    const l = state.locations.find(x => x.id === id); if(!l) return;
-    document.getElementById('infoTitle').innerText = l.name; 
-    let h = "";
-    if(l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
-    const nav = document.getElementById('btnSiteNav');
-    if(l.address && l.address.length > 3) { 
-        h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // FIXED: Corrected syntax from '6{' to valid dollar sign
-        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
-        nav.classList.remove('hidden'); 
-    } else { nav.classList.add('hidden'); }
-    document.getElementById('siteInfoContent').innerHTML = h;
-    showModal('info');
-}
-function startReminderTimer() {
-    if (mainScreenReminderTimer) clearTimeout(mainScreenReminderTimer);
-    
-    // Safety check: 30-minute interval
-    mainScreenReminderTimer = setTimeout(() => {
-        const mainPage = document.getElementById('mainPage');
-        if (mainPage && mainPage.classList.contains('active')) {
-            showToast("⚠️ Status Check: Please update your location.");
-            startReminderTimer(); // Repeat cycle
-        }
-    }, 1800000); 
-}
-function showCurrentSiteInfo(){if(state.activeVisit)showSiteInfo(state.activeVisit.locationId);}
-function toggleHighRiskUI(){ const chk = document.getElementById('chkHighRisk'); const lbl = document.getElementById('lblHighRisk'); if(chk.checked){ lbl.classList.remove('text-gray-500'); lbl.classList.add('text-red-500', 'animate-pulse'); } else { lbl.classList.add('text-gray-500'); lbl.classList.remove('text-red-500', 'animate-pulse'); } }
-
-function updateArrivedButtonState() {
-    const b = document.getElementById('arrivedBtn');
-    if (!b) return;
-
-    // 1. If a visit is already active, the button stays hidden (or performs a different role)
-    if (state.activeVisit) {
-        b.classList.add('hidden');
-        return;
-    }
-
-    // 2. Determine the button text and style based on selection
-    const config = getButtonConfig();
-
-    if (config) {
-        b.innerText = config.text;
-        b.className = `fixed bottom-6 left-6 right-6 h-16 ${config.color} text-white rounded-2xl font-black text-lg shadow-2xl z-50 transition-all active:scale-95 flex items-center justify-center gap-3`;
-        b.classList.remove('hidden');
-    } else {
-        b.classList.add('hidden');
-    }
-}
-function getButtonConfig() {
-    // Case A: Nothing is selected
-    if (!state.selectedLocationId) return null;
-
-    // Case B: Travelling is selected
-    if (state.selectedLocationId === 'travel') {
-        return {
-            text: travelTargetName ? `START TRAVEL TO ${travelTargetName.toUpperCase()}` : "START TRAVELLING",
-            color: "bg-gradient-to-r from-indigo-600 to-purple-600"
-        };
-    }
-
-    // Case C: A specific site is selected
-    const loc = state.locations.find(l => l.id === state.selectedLocationId);
-    if (loc) {
-        return {
-            text: `ARRIVED AT ${loc.name.toUpperCase()}`,
-            color: "bg-blue-600"
-        };
-    }
-
-    return null;
-}
-// VISIT LOGIC
-function startVisit() {
-    const locId = state.selectedLocationId;
-    if (!locId) return;
-
-    const loc = state.locations.find(l => l.id === locId);
-    if (!loc && locId !== 'travel') return;
-
-    const visitData = {
-        locationId: locId,
-        locationName: locId === 'travel' ? 'Travelling' : loc.name,
-        startTime: new Date().toISOString(),
-        travelTarget: (locId === 'travel') ? travelTargetName : null,
-        status: locId === 'travel' ? 'TRAVELLING' : 'ARRIVED'
-    };
-
-    state.activeVisit = visitData;
-    state.selectedLocationId = null;
-    saveState();
-    renderLocations();
-    updateArrivedButtonState();
-    
-    processUploadQueue(buildPayload({
-        "Alarm Status": visitData.status,
-        "Current Site": visitData.locationName,
-        "Notes": visitData.travelTarget ? `Heading to: ${visitData.travelTarget}` : "Started Visit"
-    }));
-
-    startCheckinTimer();
-    state.lowBatSent = false;
-    enterLockedScreen();
-
-    // Pulse Logic
-    if (locId === 'travel') {
-        startTravellingPulse();
-    }
-
-    showToast(`✅ ${visitData.status} logged`);
-}
-function preDepart() {
-    // Kill the auto-dim timer so the report form stays visible
-    if (autoDimTimer) clearTimeout(autoDimTimer);
-
-    isMidVisitUpdate = false; 
-    const l = state.locations.find(x => x.id === state.activeVisit.locationId); 
-    const sg = state.activeVisit.startGPS;
-
-    if (l.id === 'travel') {
-        if (l.noReport) { submitReport(); return; }
-        document.getElementById('btnDepart').innerText = "Syncing...";
-        
-        navigator.geolocation.getCurrentPosition(async(pos) => { 
-            const eg = `${pos.coords.latitude},${pos.coords.longitude}`; 
-            if (navigator.onLine) { 
-                calculatedDist = await getDistance(sg, eg); 
-            } else { 
-                const d = haversine(sg, eg); 
-                calculatedDist = {km: d.toFixed(2), type:'crow', offline: true}; 
-            } 
-            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
-            loadFormAndShow(l.templateName || "(Standard)"); 
-        }, (err) => { 
-            calculatedDist = null; 
-            document.getElementById('btnDepart').innerText = "HOLD TO END"; 
-            loadFormAndShow(l.templateName || "(Standard)"); 
-        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    } 
-    else if (l.noReport) { 
-        submitReport(); 
-    } 
-    else { 
-        calculatedDist = null;
-        loadFormAndShow(l.templateName || "(Standard)");
-    }
-}
-
-function warmUpGps() { if(gpsWarm) return; gpsWarm = true; navigator.geolocation.getCurrentPosition(()=>{}, (err)=>{ if(err.code === 1) showToast("📍 GPS Permission Required"); }, {enableHighAccuracy:true, timeout:10000, maximumAge:0}); setTimeout(()=> { gpsWarm = false; }, 30000); }
-function startGPSMonitoring() {
-    if (!('geolocation' in navigator)) return;
-    let lastUpdate = 0; setInterval(() => { if(Date.now() - lastUpdate > 30000) { updateGPSUI(-1); } }, 5000);
-    const updateGPSUI = (acc) => { lastUpdate = Date.now(); const bars = [document.getElementById('gps1'), document.getElementById('gps2'), document.getElementById('gps3')]; const err = document.getElementById('gpsError'); const barContainer = document.getElementById('gpsBars'); bars.forEach(b => b.className = 'gps-bar'); if (acc === -1) { barContainer.classList.add('hidden'); err.classList.remove('hidden'); } else { barContainer.classList.remove('hidden'); err.classList.add('hidden'); if(acc <= 15) { bars.forEach(b => b.classList.add('active-green')); } else if(acc <= 45) { bars[0].classList.add('active-amber'); bars[1].classList.add('active-amber'); } else { bars[0].classList.add('active-red'); } } };
-    gpsWatchId = navigator.geolocation.watchPosition((pos) => { updateGPSUI(pos.coords.accuracy); }, (err) => { updateGPSUI(-1); showToast("📍 GPS Signal Lost"); }, { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 });
-    if ('getBattery' in navigator) { navigator.getBattery().then(function(battery) { const updateBat = () => { currentBatteryLevel = Math.round(battery.level * 100) + "%"; if (battery.level <= 0.20 && document.getElementById('batterySaver').classList.contains('hidden')) { toggleBatterySaver(); showToast("🔋 Low Battery: Auto-Dim Active"); } }; updateBat(); battery.addEventListener('levelchange', updateBat); }); }
-}
-
-function enterLockedScreen(){
-    const l=state.locations.find(x=>x.id===state.activeVisit.locationId); document.getElementById('lockedLocationName').innerText=l.name; navigate('locked');
-    if(state.activeVisit&&state.activeVisit.isPanic){renderPanicState();}
-    else{ document.getElementById('btnDepart').classList.remove('hidden'); document.getElementById('btnSafe').classList.add('hidden'); document.getElementById('btnExtend').classList.remove('hidden'); document.getElementById('lockedPage').classList.remove('panic-mode'); }
-    timerInt=setInterval(tick,1000); setupLongPress(document.getElementById('btnDepart'),()=>preDepart()); setupLongPress(document.getElementById('btnExtend'),()=>showModal('extend')); 
-    if(state.activeVisit.highRisk) document.getElementById('highRiskBadge').classList.remove('hidden'); else document.getElementById('highRiskBadge').classList.add('hidden');
-}
-
-function tick(){
-    if(!state.activeVisit){clearInterval(timerInt);return;}
-    const now=new Date().getTime(); 
-    const dueTime=new Date(state.activeVisit.anticipatedDepartureTime).getTime(); 
-    const remaining=dueTime-now;
-    const isCriticalMode = state.activeVisit.highRisk; 
-    const escTime = isCriticalMode ? 0 : (CONFIG.escalationMinutes||15)*60000; 
-    const timeUntilEscalation = remaining + escTime;
-    
-    // 1. ALARM ACTIVATION CHECK
-    if(timeUntilEscalation <= 0) {
-        document.getElementById('overdueLabel').classList.remove('hidden'); 
-        document.getElementById('btnDepart').classList.add('hidden'); 
-        document.getElementById('btnExtend').classList.add('hidden'); 
-        document.getElementById('btnSafe').classList.remove('hidden'); 
-        setupLongPress(document.getElementById('btnSafe'), iamSafe);
-        document.getElementById('countdownTimer').innerText="ALARM SENT";
-        if(!state.activeVisit.criticalSent){
-            state.activeVisit.criticalSent=true; 
-            saveState(); 
-            triggerAutoAlert(isCriticalMode ? 'EMERGENCY - CRITICAL TIMING' : 'EMERGENCY - OVERDUE'); 
-        } 
-    } else {
-        // 2. VERBAL WARNINGS
-        if(timeUntilEscalation <= 300000 && !state.activeVisit.warn5minSent){ 
-            state.activeVisit.warn5minSent = true; saveState(); playSound('warning'); 
-        } 
-        if(timeUntilEscalation <= 120000 && !state.activeVisit.warn2minSent){ 
-            state.activeVisit.warn2minSent = true; saveState();
-            playSound('arrive'); 
-            setTimeout(() => speakWithAccent("Warning. Safety alarm will activate in two minutes."), 1000); 
-        } 
-        if(timeUntilEscalation <= 90000 && !state.activeVisit.warn90Sent){ 
-            state.activeVisit.warn90Sent = true; saveState();
-            playSound('arrive'); 
-            setTimeout(() => speakWithAccent("Critical Warning. Safety alarm will activate in 90 seconds."), 1000); 
-        }
-
-        // 3. TIMER DISPLAY
-        if (remaining <= 0) {
-            document.getElementById('overdueLabel').classList.remove('hidden'); 
-            document.getElementById('btnDepart').classList.remove('hidden'); 
-            document.getElementById('btnExtend').classList.remove('hidden'); 
-            document.getElementById('btnSafe').classList.add('hidden');
-            const absRem = Math.abs(remaining); 
-            const mTotal = Math.floor(absRem / 60000);
-            const s = Math.floor((absRem % 60000) / 1000);
-            document.getElementById('countdownTimer').innerHTML = mTotal >= 60 ? `-${Math.floor(mTotal/60)}h ${mTotal%60}m` : `-${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
-            document.getElementById('countdownTimer').classList.add('text-red-500','animate-pulse');
-        } else {
-            const mTotal = Math.floor(remaining / 60000);
-            const s = Math.floor((remaining % 60000) / 1000);
-            document.getElementById('countdownTimer').innerHTML = mTotal >= 60 ? `${Math.floor(mTotal/60)}h ${mTotal%60}m` : `${mTotal}:${s<10?'0':''}${s}<span class="text-3xl ml-2 font-black">min</span>`;
-            document.getElementById('countdownTimer').classList.remove('text-red-500','animate-pulse'); 
-            document.getElementById('overdueLabel').classList.add('hidden'); 
-        }
-    }
-
-    if(state.activeVisit.anticipatedDepartureTime) { 
-        document.getElementById('lockedAnticipatedTime').innerText=new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', hour12:true}); 
-    }
-}
-    
-function warmUpSpeech() { if('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } }
-function speakWithAccent(msg){ if(!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg); const v = window.speechSynthesis.getVoices(); u.voice = v.find(x => x.lang.includes(CONFIG.voiceLocale)) || v.find(x => x.lang.includes('en-NZ')); u.rate = 0.9; u.volume = 1.0; window.speechSynthesis.speak(u); }
-
-function preDepart(){
-    // Kill the timer so the screen stays bright for form filling
-    if (autoDimTimer) clearTimeout(autoDimTimer);
-    isMidVisitUpdate=false; const l=state.locations.find(x=>x.id===state.activeVisit.locationId); const sg=state.activeVisit.startGPS;
-    if(l.id === 'travel'){
-        if(l.noReport) { submitReport(); return; }
-        document.getElementById('btnDepart').innerText="Syncing...";
-        navigator.geolocation.getCurrentPosition(async(pos)=>{ const eg=`${pos.coords.latitude},${pos.coords.longitude}`; if(navigator.onLine) { calculatedDist=await getDistance(sg,eg); } else { const d = haversine(sg, eg); calculatedDist = {km: d.toFixed(2), type:'crow', offline: true}; } document.getElementById('btnDepart').innerText="HOLD TO END"; loadFormAndShow(l.templateName||"(Standard)"); }, (err) => { calculatedDist = null; document.getElementById('btnDepart').innerText="HOLD TO END"; loadFormAndShow(l.templateName||"(Standard)"); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    } else if(l.noReport) { submitReport(); return; } 
-    else { calculatedDist=null; loadFormAndShow(l.templateName||"(Standard)"); }
-}
-
-async function getDistance(p1, p2) {
-    if (!p1 || !p2) return { km: 0, type: 'none' };
-    try { 
-        const u = `${CONFIG.url}?action=getDistance&start=${p1}&end=${p2}&key=${CONFIG.key}`;
-        const r = await fetch(u); 
-        const j = await r.json(); 
-        if (j.status === "success" && j.km) return { km: j.km, type: 'road' };
-    } catch (e) { console.warn("Road distance failed, falling back to straight-line."); }
-    
-    const d = haversine(p1, p2);
-    return { km: d.toFixed(2), type: 'crow' };
-}
-function haversine(p1, p2) {
-    const [la1, lo1] = p1.split(',').map(Number);
-    const [la2, lo2] = p2.split(',').map(Number);
-    const R = 6371; // Earth radius in km
-    const dLa = (la2 - la1) * Math.PI / 180;
-    const dLo = (lo2 - lo1) * Math.PI / 180;
-    const a = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-function loadFormAndShow(t){
-    clearSig(); 
-    showModal('report'); 
-    const displayTitle = t === "(Standard)" ? "Status Update" : t;
-    document.getElementById('reportTitle').innerText = isMidVisitUpdate ? "Update: " + displayTitle : displayTitle;
-    currentActiveTemplate = t; 
-    buildReportForm(t, document.getElementById('reportFields'));
-    if(calculatedDist){ let di = document.querySelector('[data-key*="Distance"]') || document.querySelector('[data-key*="KM"]'); if(di){ di.value = calculatedDist.km; di.style.border = "2px solid #4ade80"; di.classList.add("bg-green-900/20"); } }
-    const b=document.getElementById('btnSubmitRep'); const nb=b.cloneNode(true); b.parentNode.replaceChild(nb,b);
-    if(!state.activeVisit){ nb.innerText="SUBMIT REPORT"; nb.classList.remove('long-press-btn'); nb.classList.add('bg-blue-600','hover:bg-blue-500'); nb.onclick=submitReport; } 
-    else if(isMidVisitUpdate){ nb.innerText="SEND UPDATE"; nb.classList.remove('long-press-btn'); nb.classList.add('bg-indigo-600','hover:bg-indigo-500'); nb.onclick=submitReport; } 
-    else { nb.innerText="HOLD TO SUBMIT & END"; nb.classList.add('long-press-btn'); setupLongPress(nb,submitReport); }
-}
-function submitReport(){
-    // Kill the auto-dim timer so the report form stays visible
-    if (autoDimTimer) clearTimeout(autoDimTimer);
-    const d=gatherFormData(); let photoCount = 0; const photoMap = {};
-    Object.keys(state.photoStore).forEach((key, index) => { photoCount++; const token = `{{PHOTO_${photoCount}}}`; photoMap[`Photo ${photoCount}`] = state.photoStore[key]; if(d.custom[key] !== undefined) { d.custom[key] = token; d.jsonPayload[key] = token; } });
-    const fd={...d.custom,"Visit Report Data":JSON.stringify(d.jsonPayload),"Template Name":currentActiveTemplate};
-    if(d.custom&&d.custom["Distance (km)"])fd["Distance"]=d.custom["Distance (km)"];
-    Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; }); if(d.sig)fd["Signature"]=d.sig;
-    
-    if(!state.activeVisit){
-        processUploadQueue(buildPayload({...fd,"Alarm Status":"DATA_ENTRY_ONLY","Notes":d.notes}));
-        showToast("Report Sent"); closeModal('report'); return;
-    }
-    
-    let s = isMidVisitUpdate ? (state.activeVisit.locationId==='travel'?"TRAVELLING":"ON SITE") : "DEPARTED";
-    processUploadQueue(buildPayload({...fd,"Alarm Status":s,"Notes":d.notes}));
-    
-    if(!isMidVisitUpdate){ 
-        state.activeVisit = null; 
-        state.photoStore = {}; 
-        state.visitDurationMinutes = 0; 
-        
-        // PATCH: Reset all selection states and refresh UI
-        state.selectedLocationId = null; 
-        travelTargetName = ""; 
-        renderLocations(); 
-        updateArrivedButtonState(); 
-        
-        navigate('main'); 
-        if(travellingInterval) clearInterval(travellingInterval); 
-    }
-    
-    saveState(); 
-    closeModal('report');
-}
-
-function gatherFormData(){const d={custom:{},notes:'',sig:null,jsonPayload:{}};const sn=document.getElementById('rep_notes');if(sn)d.notes=sn.value;document.querySelectorAll('[data-key]').forEach(el=>{const k=el.getAttribute('data-key');let v=el.value;if(el.type==='checkbox')v=el.checked?'Yes':'No';else if(el.type==='radio'){if(!el.checked)return;v=el.value;}d.custom[k]=v;d.jsonPayload[k]=v;});const c=document.querySelector('canvas[id^="sig-canvas-"]');if(c)d.sig=c.toDataURL('image/png');return d;}
-function handlePhoto(i,k){if(i.files[0]){const b=document.getElementById(`lbl_${i.id.split('_')[1]}`);if(b)b.innerText="Compressing...";compressImg(i.files[0]).then(b64=>{state.photoStore[k]=b64;if(b)b.innerText="✅ Saved";});}}
-function compressImg(f){
-    return new Promise(r=>{
-        const rd=new FileReader();
-        rd.onload=e=>{
-            const i=new Image();
-            i.onload=()=>{
-                const c=document.createElement('canvas');
-               // CELL LIMIT OPTIMIZATION: 600px ensures Base64 strings fit within Google Sheet cell limits
-                const s = Math.min(600/i.width, 600/i.height, 1);
-                c.width=i.width*s; c.height=i.height*s;
-                c.getContext('2d').drawImage(i,0,0,c.width,c.height);
-                r(c.toDataURL('image/jpeg', 0.4));
-            };
-            i.src=e.target.result;
-        };
-        rd.readAsDataURL(f);
-    });
-}
 function buildReportForm(n, c) {
     state.photoStore = {};
     const sn = n ? n.trim() : "(Standard)";
-    let t = state.globalForms?.find(f => f.name.trim() === sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
+    let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || state.cachedForms[sn] || state.cachedForms["(Standard)"];
     c.innerHTML = '';
     
-    if (!t) {
-        c.innerHTML = '<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
+    if (!questions) {
+        c.innerHTML = '<label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
         return;
     }
 
-    t.forEach((f, i) => {
-        let y = 'text'; let x = f.text || f; let dropOptions = [];
-        const upperX = x.toUpperCase();
-        const fieldId = `dyn_field_${i}`; // UNIQUE ID for association
+    questions.forEach((f, i) => {
+        let type = 'text'; 
+        let labelText = f.text || f; 
+        let dropOptions = [];
+        const upper = labelText.toUpperCase();
+        const fieldId = `dyn_field_${i}`;
 
-        // 1. Tag Detection
-        if (upperX.includes('[HEADING]') || x.trim().startsWith('#')) { y = 'header'; x = x.replace(/\[HEADING\]/gi, '').replace('#', '').trim(); }
-        else if (upperX.includes('[NOTE]')) { y = 'note'; x = x.replace(/\[NOTE\]/gi, '').trim(); }
-        else if (upperX.includes('[SIGN]')) { y = 'signature'; x = x.replace(/\[SIGN\]/gi, '').trim(); }
-        else if (upperX.includes('[PHOTO]')) { y = 'photo'; x = x.replace(/\[PHOTO\]/gi, '').trim(); }
-        else if (upperX.includes('[GPS]')) { y = 'gps'; x = x.replace(/\[GPS\]/gi, '').trim(); if (!x) x = "Location Status"; }
-        else if (upperX.includes('[YESNO]')) { y = 'yesno'; x = x.replace(/\[YESNO\]/gi, '').trim(); }
-        else if (upperX.includes('[$]')) { y = 'currency'; x = x.replace(/\[\$\]/gi, '').trim(); }
-        else if (upperX.includes('[1TEXT]')) { y = '1text'; x = x.replace(/\[1TEXT\]/gi, '').trim(); }
-        else if (upperX.startsWith('[DROP')) {
-            y = 'drop';
-            const dropMatch = x.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-            if (dropMatch) {
-                dropOptions = dropMatch[1].split(',').map(o => o.trim());
-                x = x.replace(dropMatch[0], '').trim();
+        // Tag Detection Logic
+        if (upper.includes('[HEADING]') || labelText.trim().startsWith('#')) { type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').replace('#','').trim(); }
+        else if (upper.includes('[SIGN]')) { type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); }
+        else if (upper.includes('[PHOTO]')) { type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); }
+        else if (upper.includes('[GPS]')) { type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); if (!labelText) labelText = "Location Status"; }
+        else if (upper.includes('[YESNO]')) { type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); }
+        else if (upper.includes('[$]')) { type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); }
+        else if (upper.startsWith('[DROP')) {
+            type = 'drop';
+            const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
+            if (match) {
+                dropOptions = match[1].split(',').map(o => o.trim());
+                labelText = labelText.replace(match[0], '').trim();
             }
         }
 
         const container = document.createElement('div');
         container.className = "mb-4";
 
-        if (y === 'header') {
-            container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${x}</h3></div>`;
-        } else if (y === 'note') {
-            container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${x}</div>`;
+        if (type === 'header') {
+            container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${labelText}</h3></div>`;
         } else {
-            // FIXED: Added 'for' attribute to match fieldId
-            container.innerHTML = `<label for="${fieldId}" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
+            // FIXED: accessibility label association
+            container.innerHTML = `<label for="${fieldId}" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${labelText}</label>`;
 
-            // 2. Element Generation with matching ID
-            if (y === 'photo') {
-                container.innerHTML += `<div class="flex items-center gap-3"><label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${x}')"></div>`;
-            } else if (y === 'signature') {
-                container.innerHTML += `<div class="bg-white rounded-xl p-1 mb-2"><canvas id="sig-canvas-${i}" class="w-full h-40 border border-gray-200"></canvas></div><button type="button" class="text-[10px] font-bold text-gray-500 uppercase sig-clear-btn" data-index="${i}">Clear Signature</button>`;
-            } else if (y === 'gps') {
-                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${x}"></div>`;
-            } else if (y === 'drop') {
-                const sel = document.createElement('select'); sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = x;
-                const def = document.createElement('option'); def.text = `Select ${x}...`; def.value = ""; sel.appendChild(def);
-                dropOptions.forEach(optText => { const opt = document.createElement('option'); opt.text = optText; opt.value = optText; sel.appendChild(opt); });
+            if (type === 'photo') {
+                container.innerHTML += `<div class="flex items-center gap-3"><label for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')"></div>`;
+            } else if (type === 'gps') {
+                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${labelText}"></div>`;
+            } else if (type === 'currency') {
+                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${labelText}"></div>`;
+            } else if (type === 'drop') {
+                const sel = document.createElement('select'); sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = labelText;
+                const def = document.createElement('option'); def.text = `Select ${labelText}...`; def.value = ""; sel.appendChild(def);
+                dropOptions.forEach(opt => { const o = document.createElement('option'); o.text = opt; o.value = opt; sel.appendChild(o); });
                 container.appendChild(sel);
-            } else if (y === 'currency') {
-                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${x}"></div>`;
-            } else if (y === 'yesno') {
-                container.innerHTML += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_y" value="Yes" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">YES</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_n" value="No" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">NO</span></label></div>`;
-            } else if (y === '1text') {
-                container.innerHTML += `<input type="text" id="${fieldId}" class="form-input font-bold" data-key="${x}">`;
+            } else if (type === 'yesno') {
+                container.innerHTML += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_y" value="Yes" class="w-5 h-5" data-key="${labelText}"> <span class="text-sm font-black text-white">YES</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" id="${fieldId}_n" value="No" class="w-5 h-5" data-key="${labelText}"> <span class="text-sm font-black text-white">NO</span></label></div>`;
             } else {
-                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${x}"></textarea>`;
+                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${labelText}"></textarea>`;
             }
         }
         c.appendChild(container);
@@ -1352,606 +640,88 @@ function buildReportForm(n, c) {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
     }, 600);
 }
-function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
-function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
-function checkIn() {
-    if (!state.activeVisit) return;
 
-    // 1. Calculate the new due time
-    const interval = CONFIG.checkinInterval || 60;
-    const now = new Date();
-    state.activeVisit.nextCheckinDue = new Date(now.getTime() + interval * 60000).toISOString();
-    
-    // 2. Clear and restart the background monitor
-    startCheckinTimer();
-    
-    // 3. Persist and notify the backend
-    saveState();
-    processUploadQueue(buildPayload({
-        "Alarm Status": "CHECK-IN",
-        "Notes": state.activeVisit.status === 'TRAVELLING' ? "Travel Check-in" : "Site Check-in"
-    }));
+// --- 5. IDENTITY & DIAGNOSTICS ---
 
-    showToast("✅ Check-in Successful");
-}
-    function triggerCheckin() {
-    if(!document.getElementById('checkinModal').classList.contains('hidden')) return;
-    showModal('checkin');
-    document.getElementById('batterySaver').classList.add('hidden');
-    let rem = 120;
-    const el = document.getElementById('checkinCountdown');
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
-    playSound('checkin');
-    
-    // Refresh button listeners
-    const btn = document.getElementById('btnCheckinConfirm');
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    setupLongPress(newBtn, confirmCheckin);
-    
-    checkinIntervalId = setInterval(() => {
-        rem--;
-        const m = Math.floor(rem/60);
-        const s = rem % 60;
-        el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-        if (rem <= 0) {
-            clearInterval(checkinIntervalId);
-            closeModal('checkin');
-            processUploadQueue(buildPayload({
-                "Alarm Status": 'MISSED_CHECKIN', 
-                "Notes": "Worker failed to respond to check-in"
-            }));
-            showToast('MISSED CHECK-IN ALERT SENT');
-        }
-    }, 1000);
-}
-function confirmCheckin(){clearInterval(checkinIntervalId);closeModal('checkin');state.activeVisit.nextCheckin=new Date(Date.now()+CONFIG.checkinInterval*60000);saveState();}
-function confirmExtension(m){const p=()=>{state.activeVisit.anticipatedDepartureTime=new Date(new Date(state.activeVisit.anticipatedDepartureTime).getTime()+m*60000);saveState();processUploadQueue(buildPayload({"Alarm Status":'EXTENDED',"Notes":"Extended "+m+"m"}));};const n=new Date(),d=new Date(state.activeVisit.anticipatedDepartureTime);closeModal('extend');if((d-n)<0||state.activeVisit.isPanic)withPinVerification(false,p);else p();}
-function triggerPanic(){ 
-    if (Date.now() - lastAlertTime < 60000) return; 
-    lastAlertTime = Date.now(); 
-    state.activeVisit = state.activeVisit || {}; 
-    state.activeVisit.isPanic = true; 
-    saveState(); 
-    renderPanicState(); 
-    // playSound('panic'); // REMOVED to ensure the alert is silent on the device
-    processUploadQueue(buildPayload({"Alarm Status":'EMERGENCY - PANIC BUTTON',"Notes":"Panic Pressed"})); 
-    showToast('🚨 SOS SENT 🚨'); 
-}
-function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
-function iamSafe() {
-    // 1. STOP THE GPS PULSE IMMEDIATELY
-    stopTravellingPulse(); 
-
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
-    state.activeVisit = null;
-    saveState();
-    
-    // ... leave the rest of your iamSafe logic exactly as it is ...
-    navigate('main');
-    showToast("Safety Monitoring Ended");
-}
-    function toggleBatterySaver() { 
-    const saver = document.getElementById('batterySaver'); 
-    const prog = document.getElementById('saverProgress');
-    const themeMeta = document.querySelector('meta[name="theme-color"]');
-    const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-    if (!saver) return; 
-
-    if (saver.classList.contains('hidden')) { 
-        saver.classList.remove('hidden'); 
-        saver.style.pointerEvents = 'auto'; 
-        
-        // DIM SYSTEM: Signal the OS to black out bars and use dark icons
-        document.documentElement.classList.add('system-dim');
-        document.body.classList.add('system-dim');
-        if(themeMeta) themeMeta.setAttribute('content', '#000000');
-        if(appleMeta) appleMeta.setAttribute('content', 'black');
-        
-        showToast("🌙 Battery Saver Active"); 
-        
-        // POCKET PROTECTION: Require a 1.5s hold to wake the screen
-        setupLongPress(saver, () => {
-        // User has manually woken the screen
-    if (autoDimTimer) clearTimeout(autoDimTimer); 
-    
-    toggleBatterySaver(); // This turns dark mode OFF
-});
-    } else { 
-        saver.classList.add('hidden'); 
-        saver.style.pointerEvents = 'none'; 
-        if(prog) prog.style.opacity = "0";
-        
-        // RESTORE SYSTEM
-        document.documentElement.classList.remove('system-dim');
-        document.body.classList.remove('system-dim');
-        if(themeMeta) themeMeta.setAttribute('content', '#111827');
-        if(appleMeta) appleMeta.setAttribute('content', 'black-translucent');
-    } 
-}
-// Add this CSS-like logic to your setupLongPress to handle the visual wake-up
-const originalSetup = setupLongPress;
-setupLongPress = function(btn, cb) {
-    originalSetup(btn, cb);
-    if(btn.id === 'batterySaver') {
-        const prog = document.getElementById('saverProgress');
-        const start = btn.ontouchstart;
-        const end = btn.ontouchend;
-        
-        btn.ontouchstart = (e) => { start(e); if(prog) prog.style.opacity = "1"; };
-        btn.ontouchend = (e) => { end(e); if(prog) prog.style.opacity = "0"; };
-        btn.onmousedown = (e) => { start(e); if(prog) prog.style.opacity = "1"; };
-        btn.onmouseup = (e) => { end(e); if(prog) prog.style.opacity = "0"; };
-    }
-};
-
-function buildPayload(d) {
-    let dt = ""; 
-    let ln = "Unknown Site"; 
-    let la = "No Address Provided";
-
-    // 1. Determine Location and Departure Time
-    // Priority 1: Current Active Visit data
-    if (state.activeVisit) {
-        if (state.activeVisit.anticipatedDepartureTime) {
-            dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
-        }
-        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-        if (l) { 
-            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
-            la = l.address; 
-        }
-    } 
-    // Priority 2: Selected location (if visit hasn't officially started)
-    else if (state.selectedLocationId) {
-        const l = state.locations.find(x => x.id === state.selectedLocationId);
-        if (l) { 
-            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name; 
-            la = l.address; 
-        }
-    }
-    
-    // 2. Determine GPS Coordinates
-    // Uses fresh coordinates from the argument 'd' or falls back to visit start coordinates
-    let gps = d['Last Known GPS'] || "";
-    if (!gps && state.activeVisit && state.activeVisit.startGPS) { 
-        gps = state.activeVisit.startGPS; 
-    }
-    
-    // 3. Assemble and Return the Final Payload
-    return {
-        'key': CONFIG.key,
-        'Worker Name': state.settings.workerName,
-        'Worker Phone Number': state.settings.workerPhone,
-        'Worker Email': state.settings.workerEmail,
-        
-        // Maps the Wizard IDs (emgName/escName) to the Sheet headers
-        'Emergency Contact Name': state.settings.emgName,
-        'Emergency Contact Number': state.settings.emgPhone,
-        'Emergency Contact Email': state.settings.emgEmail,
-        'Escalation Contact Name': state.settings.escName,
-        'Escalation Contact Number': state.settings.escPhone,
-        'Escalation Contact Email': state.settings.escEmail,
-        
-        'Battery Level': currentBatteryLevel,
-        'Location Name': ln,
-        'Location Address': la,
-        'Anticipated Departure Time': dt,
-        'Timestamp': new Date().toISOString(),
-        'deviceId': getDeviceID(),
-        'Last Known GPS': gps,
-        
-        // Merges specific alert data (e.g., "Alarm Status": "PANIC")
-        ...d
-    };
-}
-let isUploading = false;
-let uploadRetryDelay = 1000; 
-const MAX_QUEUE_SIZE = 50;
-
-async function processUploadQueue(payload = null) {
-    if (payload) {
-        uploadQueue.push(payload);
-        if (uploadQueue.length > MAX_QUEUE_SIZE) uploadQueue.shift();
-        saveState();
-    }
-
-    if (isUploading || uploadQueue.length === 0) return;
-    isUploading = true;
-
-    try {
-        const item = uploadQueue[0];
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-
-        await fetch(CONFIG.scriptUrl, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify(item),
-            signal: controller.signal
-        });
-
-        clearTimeout(timeout);
-        uploadQueue.shift();
-        saveState();
-        uploadRetryDelay = 1000; 
-        isUploading = false;
-        if (uploadQueue.length > 0) processUploadQueue();
-    } catch (err) {
-        isUploading = false;
-        // Exponentially increase wait time up to 5 minutes
-        uploadRetryDelay = Math.min(uploadRetryDelay * 2, 300000);
-        setTimeout(() => processUploadQueue(), uploadRetryDelay);
-    }
-}
-function setupLongPress(btn, cb) {
-    let t;
-    const prog = btn.id === 'batterySaver' ? document.getElementById('saverProgress') : null;
-
-    const start = (e) => {
-        if (e.type === 'touchstart') e.preventDefault();
-        btn.classList.add('pressing');
-        if (prog) prog.style.opacity = "1"; // Show visual wake feedback
-        
-        t = setTimeout(() => {
-            cb();
-            btn.classList.remove('pressing');
-            if (prog) prog.style.opacity = "0";
-        }, 1500);
-    };
-
-    const cancel = () => {
-        clearTimeout(t);
-        btn.classList.remove('pressing');
-        if (prog) prog.style.opacity = "0";
-    };
-
-    btn.onmousedown = btn.ontouchstart = start;
-    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
-}
-function withPinVerification(d,c){ showModal('pin'); const i=document.getElementById('pinInput'); i.value=''; i.focus(); const cf=()=>{ const v=i.value; closeModal('pin'); if(checkPin(v)){ c(); } else if(v===state.settings.duressPin){ processUploadQueue(buildPayload({"Alarm Status":"DURESS_CODE_ACTIVATED","Notes":"Silent Alarm Triggered"})); if(state.activeVisit) { state.activeVisit = null; saveState(); navigate('main'); } } document.getElementById('confirmPinBtn').removeEventListener('click',cf); }; document.getElementById('confirmPinBtn').addEventListener('click',cf); document.getElementById('cancelPinBtn').onclick=()=>closeModal('pin'); }
-function clearData(){
-    if(confirm('🚨 WARNING: This will permanently delete your identity, PINs, and safety site list. You will need to re-run the setup. Continue?')){
-        localStorage.clear();
-        location.reload();
-    }
-}
-function clearFormsCache() {
-    if (confirm('Clear all synced form templates? (Requires network to re-download)')) {
-        state.cachedForms = {};
-        state.globalForms = [];
-        saveState();
-        
-        // FEEDBACK: Immediate toast to confirm the cache is gone
-        showToast("✅ Cache Cleared. Downloading fresh templates...");
-        
-        // Restart sync with UI enabled
-        forceSync(true);
-    }
-}
-function syncForms(){if(!CONFIG.url)return;fetch(`${CONFIG.url}?action=getGlobalForms`).then(r=>r.json()).then(j=>{if(Array.isArray(j)){state.globalForms=j;saveState();}});}
-async function initAudio(){if(!synth){await Tone.start();synth=new Tone.Synth().toDestination();}}
-function playSound(t){initAudio().then(()=>{const n=Tone.now();if(t==='arrive')synth.triggerAttackRelease("C4","8n",n);if(t==='depart')synth.triggerAttackRelease("G4","8n",n);if(t==='warning')synth.triggerAttackRelease("E5","16n",n);if(t==='panic')synth.triggerAttackRelease("G5","16n",n);});}
-function captureGPS(btn){
-    btn.innerText="Locating...";
-    btn.disabled = true; // Prevent double-taps
-    
-    const options = { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 };
-    
-    const success = (p) => {
-        const coords = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
-        btn.innerText="✅ " + coords;
-        btn.disabled = false;
-        if(btn.nextElementSibling) btn.nextElementSibling.value = coords;
-    };
-    
-    const error = (err) => {
-        if (err.code === 3) {
-            // INDOOR FALLBACK: If high-accuracy times out, try standard signal
-            btn.innerText = "Retrying (Wide)...";
-            navigator.geolocation.getCurrentPosition(success, (err2) => {
-                btn.innerText = "❌ GPS Error";
-                btn.disabled = false;
-                showToast("📍 Could not lock GPS signal indoors.");
-            }, { enableHighAccuracy: false, timeout: 5000 });
-        } else {
-            btn.innerText = "❌ GPS Error";
-            btn.disabled = false;
-            showToast("📍 GPS: " + (err.code === 1 ? "Permission Denied" : "Signal Unavailable"));
-        }
-    };
-    
-    navigator.geolocation.getCurrentPosition(success, error, options);
-}
-function initSigPad(c) {
-    if (!c) return; 
-    const ctx = c.getContext('2d'); 
-    let lastX, lastY; 
-    
-    // PATCH: Simplified coordinate logic to prevent double-scaling
-    const getPos = (e) => { 
-        const rect = c.getBoundingClientRect(); 
-        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0); 
-        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0); 
-        return { 
-            x: clientX - rect.left, 
-            y: clientY - rect.top 
-        }; 
-    };
-
-    c.addEventListener('pointerdown', (e) => { 
-        isDrawing = true; 
-        const pos = getPos(e); 
-        lastX = pos.x; lastY = pos.y; 
-        
-        ctx.strokeStyle = "#000000"; 
-        ctx.lineWidth = 3; 
-        ctx.lineCap = "round";
-        
-        ctx.beginPath(); 
-        ctx.moveTo(lastX, lastY); 
-        e.preventDefault(); 
-    }, {passive: false});
-
-    c.addEventListener('pointermove', (e) => { 
-        if (!isDrawing) return; 
-        const pos = getPos(e); 
-        const midX = (lastX + pos.x) / 2; 
-        const midY = (lastY + pos.y) / 2; 
-        ctx.quadraticCurveTo(lastX, lastY, midX, midY); 
-        ctx.stroke(); 
-        lastX = pos.x; lastY = pos.y; 
-        e.preventDefault(); 
-    }, {passive: false});
-
-    window.addEventListener('pointerup', () => { isDrawing = false; });
-}
-async function hardRefreshUpdate() {
-    if(!confirm("Force reload and clear internal app memory?")) return;
-    showToast("🧹 Deep cleaning system cache...");
-
-    if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (let r of regs) { await r.unregister(); }
-    }
-
-    if ('caches' in window) {
-        const keys = await caches.keys();
-        for (let k of keys) { await caches.delete(k); }
-    }
-
-    state.backendVersion = null;
-    await saveState(); // Standardized call
-    location.reload(true); 
-}
-
-    function loadState() {
-    const saved = localStorage.getItem('otg_worker_state');
-    if (saved) {
-        try {
-            state = JSON.parse(saved);
-            
-            // Ensure sub-objects exist to prevent crashes
-            if (!state.settings) state.settings = {};
-            if (!state.locations) state.locations = [];
-            if (!state.meta) state.meta = {};
-
-            // Update UI from the loaded data
-            populateSettingsForm();
-            renderLocations();
-            
-            // Restart Advanced GPS if it was active
-            if (state.settings.isAdvanced) {
-                startGPSMonitoring();
-            }
-            
-            console.log("System State Restored");
-        } catch (e) {
-            console.error("Failed to parse saved state", e);
-        }
-    }
-}
-    function saveSettings() {
-    // 1. Collect values from the Settings UI IDs
-    const nameInput = document.getElementById('set_workerName');
-    const pinInput = document.getElementById('set_pinCode');
+function populateSettingsForm() {
     const urlInput = document.getElementById('set_url');
+    if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
 
-    // 2. Update the global state with trimmed values
-    if (nameInput) state.settings.workerName = nameInput.value.trim();
-    if (urlInput) state.settings.googleSheetUrl = urlInput.value.trim();
+    const nameInput = document.getElementById('set_workerName');
+    if (nameInput) nameInput.value = state.settings.workerName || "";
 
-    // 3. Obfuscate the PIN using Base64 before saving
-    if (pinInput && pinInput.value) {
-        state.settings.pinCode = btoa(pinInput.value.trim());
-    }
-
-    // 4. Persist the updated state to localStorage
-    saveState();
-
-    // 5. Visual feedback and Manual Sync
-    showToast("✅ Settings Saved Successfully");
+    const diagApp = document.getElementById('diagApp');
+    const diagCloud = document.getElementById('diagCloud');
     
-    // For manual saves, we pass 'true' so the worker sees the "Syncing" banner
-    forceSync(true); 
-}
+    if (diagApp) diagApp.innerText = APP_VERSION;
     
-function checkPin(input) {
-    if (!state.settings.pinCode) return false;
-    try {
-        // Decodes the stored string for comparison
-        return input === atob(state.settings.pinCode);
-    } catch (e) {
-        // Fallback for old plain-text pins during transition
-        return input === state.settings.pinCode;
-    }
-}    
-let panicHoldTimer;
-
-function initPanicButton() {
-    const sosBtn = document.getElementById('btnPanic');
-    if (!sosBtn) return;
-
-    const startHold = (e) => {
-        // Prevent context menus on mobile long-press
-        if (e.cancelable) e.preventDefault(); 
-        
-        sosBtn.classList.add('holding');
-
-        // Set timer for 3 seconds
-        panicHoldTimer = setTimeout(() => {
-            sosBtn.classList.remove('holding');
-            executePanicAction(); 
-        }, 3000);
-    };
-
-    const cancelHold = () => {
-        clearTimeout(panicHoldTimer);
-        sosBtn.classList.remove('holding');
-    };
-
-    // Standard Desktop & Mobile Listeners
-    sosBtn.addEventListener('mousedown', startHold);
-    sosBtn.addEventListener('touchstart', startHold);
-
-    sosBtn.addEventListener('mouseup', cancelHold);
-    sosBtn.addEventListener('mouseleave', cancelHold);
-    sosBtn.addEventListener('touchend', cancelHold);
-}
-
-/**
- * Replaces the old handlePanicTap()
- */
-function executePanicAction() {
-    // Kill the auto-dim timer immediately on emergency
-    if (autoDimTimer) clearTimeout(autoDimTimer); 
-
-    if (Date.now() - lastAlertTime < 60000) return; 
-    lastAlertTime = Date.now();
-
-    state.activeVisit = state.activeVisit || {};
-    state.activeVisit.isPanic = true;
-    saveState();
-
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 500]);
-    showToast("🚨 SOS ACTIVATED");
-
-    processUploadQueue(buildPayload({
-        "Alarm Status": "PANIC_BUTTON_HELD",
-        "Notes": "Emergency SOS triggered by 3-second hold."
-    }));
-}
-
-function startTravellingPulse() {
-    if (travellingInterval) clearInterval(travellingInterval);
-    const frequency = 300000; // 5 Minutes
-
-    travellingInterval = setInterval(() => {
-        if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
-            stopTravellingPulse();
-            return;
+    if (diagCloud) {
+        diagCloud.innerText = state.meta.backendVersion || "Not Synced";
+        if (state.meta.backendVersion) {
+            diagCloud.className = "text-green-400 font-bold text-xs";
         }
-
-        navigator.geolocation.getCurrentPosition(pos => {
-            processUploadQueue(buildPayload({
-                "Alarm Status": "TRAVELLING",
-                "Last Known GPS": `${pos.coords.latitude},${pos.coords.longitude}`,
-                "Notes": state.activeVisit.travelTarget ? `En route to: ${state.activeVisit.travelTarget}` : "Transit"
-            }));
-        }, null, { enableHighAccuracy: true });
-    }, frequency);
-}
-function updateTimerDisplay(now, due) {
-    const timerEl = document.getElementById('checkinTimerDisplay');
-    if (!timerEl) return;
-    
-    const diff = due - now;
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-function stopTravellingPulse() {
-    if (travellingInterval) {
-        clearInterval(travellingInterval);
-        travellingInterval = null;
-        console.log("🛑 Travel Tracking Stopped");
     }
 }
-function resizeCanvas(canvasEl) { 
-    // 1. Selector flexibility: Uses parameter or searches for a signature canvas
-    const c = canvasEl || document.getElementById('sigPad') || document.querySelector('canvas[id^="sig-canvas-"]'); 
-    if (!c) return; 
-    
-    const ctx = c.getContext('2d'); 
-    
-    // 2. Data Persistence: Capture existing drawing before the canvas clears
-    const tempImg = c.toDataURL();
-    
-    // 3. High-DPI Scaling: Calculate ratio for retina/high-resolution displays
-    const ratio = Math.max(window.devicePixelRatio || 1, 1); 
-    
-    // 4. RESET coordinates before applying new scale
-    ctx.setTransform(1, 0, 0, 1, 0, 0); 
-    
-    // 5. Apply new dimensions (Note: This action clears the canvas)
-    c.width = c.offsetWidth * ratio; 
-    c.height = c.offsetHeight * ratio; 
-    
-    // 6. Apply scale and restore pen styling (Resizing resets context state)
-    ctx.scale(ratio, ratio); 
-    ctx.strokeStyle = "#000000"; 
-    ctx.lineWidth = 3; 
-    ctx.lineCap = "round";
 
-    // 7. Restore the signature from the temporary image
-    const img = new Image();
-    img.onload = () => {
-        // Draw back at the original display size; the scale(ratio) handles the rest
-        ctx.drawImage(img, 0, 0, c.offsetWidth, c.offsetHeight);
-    };
-    img.src = tempImg;
-}
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; if(!localStorage.getItem('otg_install_dismissed')) document.getElementById('installBanner').classList.remove('hidden'); });
-function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
-function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
-function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
-// --- UNIFIED STARTUP SEQUENCE ---
-window.onload = async () => {
-    // 1. Standardized data restoration
-    loadState(); 
-
-    // 2. DOM Guard & "Travelling" Injection
+function initLocations() {
     if (!state.locations) state.locations = [];
     
-    // Ensure "Travelling" is the first tile on the dashboard
-    const hasTravel = state.locations.find(l => l.id === 'travel');
-    if (!hasTravel) {
-        state.locations.unshift({
-            id: 'travel',
-            name: 'Travelling',
-            noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
-        });
-    }
+    // Always force Travelling to index 0
+    state.locations = state.locations.filter(l => l.id !== 'travel');
+    state.locations.unshift({
+        id: 'travel',
+        name: 'Travelling',
+        noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
+    });
 
-    // 3. Initialize UI Components
-    initPanicButton();
     renderLocations();
-    checkVehicleStatus();
+    checkVehicleStatus(); 
+    populateSettingsForm(); 
+}
 
-    // 4. Robust Routing logic
+function showSiteInfo(id, e) {
+    if (e) e.stopPropagation(); 
+    const l = state.locations.find(x => x.id === id); 
+    if (!l) return;
+
+    document.getElementById('infoTitle').innerText = l.name; 
+    let h = "";
+    if (l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
+    
+    const nav = document.getElementById('btnSiteNav');
+    if (l.address && l.address.length > 3) { 
+        h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
+        // FIXED: navigation URL template literal
+        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
+        nav.classList.remove('hidden'); 
+    } else { 
+        nav.classList.add('hidden'); 
+    }
+    document.getElementById('siteInfoContent').innerHTML = h;
+    showModal('info');
+}
+
+// --- 6. STARTUP SEQUENCE ---
+
+
+
+window.onload = async () => {
+    // 1. Restore persistent data
+    loadState(); 
+
+    // 2. Initialize Logic
+    initLocations();
+    initPanicButton();
+
+    // 3. Routing Logic
     if (!state.settings || !state.settings.workerName) {
         navigate('setup'); 
-        const setupPage = document.getElementById('setupPage');
-        if (setupPage) setupPage.classList.remove('hidden');
+        document.getElementById('setupPage')?.classList.remove('hidden');
     } else if (state.activeVisit) {
         navigate('locked'); 
-        startCheckinTimer();
         if (state.activeVisit.status === 'TRAVELLING') startTravellingPulse();
-        forceSync(false);
     } else {
         navigate('main');
-        forceSync(false); 
     }
 
     console.log("🚀 System Initialised: Operational Mode");
@@ -1959,6 +729,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
