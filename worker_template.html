@@ -1414,9 +1414,19 @@ function triggerPanic(){
     showToast('🚨 SOS SENT 🚨'); 
 }
 function renderPanicState(){document.getElementById('lockedPage').classList.add('panic-mode');document.getElementById('btnDepart').classList.add('hidden');document.getElementById('btnExtend').classList.add('hidden');document.getElementById('btnSafe').classList.remove('hidden');setupLongPress(document.getElementById('btnSafe'),iamSafe);}
-function iamSafe(){withPinVerification(false,()=>{playSound('safe');processUploadQueue(buildPayload({"Alarm Status":'SAFE - MANUALLY CLEARED',"Notes":"Worker safe"}));state.activeVisit.isPanic=false;document.getElementById('lockedPage').classList.remove('panic-mode');document.getElementById('btnSafe').classList.add('hidden');document.getElementById('btnDepart').classList.remove('hidden');document.getElementById('btnExtend').classList.remove('hidden');preDepart();});}
-function startTravellingPulse(){ travellingInterval = setInterval(() => { navigator.geolocation.getCurrentPosition(p => { processUploadQueue(buildPayload({"Alarm Status": "TRAVELLING", "Last Known GPS": `${p.coords.latitude},${p.coords.longitude}`, "Notes": "Routine Travelling Update"})); }, err => {}, { enableHighAccuracy: true, timeout: 15000 }); }, 300000); }
-function toggleBatterySaver() { 
+function iamSafe() {
+    // 1. STOP THE GPS PULSE IMMEDIATELY
+    stopTravellingPulse(); 
+
+    if (checkinIntervalId) clearInterval(checkinIntervalId);
+    state.activeVisit = null;
+    saveState();
+    
+    // ... leave the rest of your iamSafe logic exactly as it is ...
+    navigate('main');
+    showToast("Safety Monitoring Ended");
+}
+    function toggleBatterySaver() { 
     const saver = document.getElementById('batterySaver'); 
     const prog = document.getElementById('saverProgress');
     const themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -1795,44 +1805,41 @@ function executePanicAction() {
         "Notes": "Emergency SOS triggered by 3-second hold."
     }));
 }
-let travellingInterval;
+let travellingInterval; // Global variable
 
 function startTravellingPulse() {
-    // 1. Clear any existing pulse to prevent multiple loops
+    // 1. Clear any existing pulse to prevent battery drain
     if (travellingInterval) clearInterval(travellingInterval);
 
-    console.log("🛣️ Travel Pulse Started");
+    console.log("🛣️ Travel Tracking Active");
 
-    // 2. Set the pulse interval (e.g., every 2 minutes)
-    // You can also use CONFIG.vehInterval if you have that defined
-    const pulseFrequency = 120000; 
-
+    // 2. Set the Pulse (Every 2 minutes)
     travellingInterval = setInterval(() => {
+        // Only pulse if we are still in "Travelling" status
         if (!state.activeVisit || state.activeVisit.status !== 'TRAVELLING') {
             stopTravellingPulse();
             return;
         }
 
-        navigator.geolocation.getCurrentPosition(position => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-
-            // 3. Send the "PULSE" to the Google Sheet
+        navigator.geolocation.getCurrentPosition(pos => {
+            const coords = `${pos.coords.latitude},${pos.coords.longitude}`;
+            
+            // Send GPS to Google Sheet
             processUploadQueue(buildPayload({
                 "Alarm Status": "TRAVELLING",
-                "Last Known GPS": `${lat},${lng}`,
+                "Last Known GPS": coords,
                 "Notes": state.activeVisit.travelTarget ? `En route to: ${state.activeVisit.travelTarget}` : "In Transit"
             }));
-        }, err => console.error("GPS Pulse Error:", err), { enableHighAccuracy: true });
+        }, err => console.warn("GPS Pulse Error"), { enableHighAccuracy: true });
 
-    }, pulseFrequency);
+    }, 120000); 
 }
 
 function stopTravellingPulse() {
     if (travellingInterval) {
         clearInterval(travellingInterval);
         travellingInterval = null;
-        console.log("🛑 Travel Pulse Stopped");
+        console.log("🛑 Travel Tracking Stopped");
     }
 }
 function resizeCanvas(canvasEl) { 
@@ -1931,5 +1938,6 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
