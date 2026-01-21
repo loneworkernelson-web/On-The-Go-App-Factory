@@ -576,21 +576,23 @@ function createTravelTile(loc) {
 }
 
 /**
- * Dynamically builds form fields based on template tags.
- * Resolves accessibility warnings and specialized rendering for GPS, Photos, and Signatures.
+ * Fully Patched Form Builder
+ * - Resolves Accessibility: All <label> elements associated with unique IDs.
+ * - Activates Interactive Tags: [PHOTO], [GPS], [SIGN], [DROP], [$].
+ * - Standardized Styling: Consistent with dashboard theme.
  */
 function buildReportForm(n, c) {
     state.photoStore = {};
     const sn = n ? n.trim() : "(Standard)";
     
-    // 1. Resolve Question Source
+    // 1. Source the questions from Global Forms or Cache
     let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || 
                     state.cachedForms[sn] || 
                     state.cachedForms["(Standard)"];
     
     c.innerHTML = '';
     
-    // Fallback if no template is found
+    // Fallback logic for empty templates
     if (!questions) {
         c.innerHTML = `
             <label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label>
@@ -604,9 +606,9 @@ function buildReportForm(n, c) {
         let labelText = f.text || f; 
         let dropOptions = [];
         const upper = labelText.toUpperCase();
-        const fieldId = `dyn_field_${i}`; // Unique ID for accessibility association
+        const fieldId = `dyn_field_${i}`; // Root ID for accessibility
 
-        // 2. Tag Detection Logic
+        // 2. Tag Detection logic
         if (upper.includes('[HEADING]') || labelText.trim().startsWith('#')) { 
             type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').replace('#','').trim(); 
         }
@@ -653,7 +655,7 @@ function buildReportForm(n, c) {
         const container = document.createElement('div');
         container.className = "mb-4";
 
-        // 3. Render Element Based on Type
+        // 3. Render Element Logic
         if (type === 'header') {
             container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${labelText}</h3></div>`;
         } 
@@ -661,7 +663,7 @@ function buildReportForm(n, c) {
             container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${labelText}</div>`;
         } 
         else {
-            // Standard Label (Fixes accessibility warning)
+            // Accessible Label Association
             const label = document.createElement('label');
             label.setAttribute('for', fieldId);
             label.className = "block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1";
@@ -672,7 +674,7 @@ function buildReportForm(n, c) {
                 const wrap = document.createElement('div');
                 wrap.className = "flex items-center gap-3";
                 wrap.innerHTML = `
-                    <label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer transition active:scale-95">📸 Tap to Take Photo</label>
+                    <label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer transition active:scale-95">📸 Take Photo</label>
                     <input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">
                 `;
                 container.appendChild(wrap);
@@ -717,16 +719,16 @@ function buildReportForm(n, c) {
                 container.appendChild(wrap);
             } 
             else if (type === 'yesno') {
-                // Radio buttons need unique IDs for each option to link labels
+                // Radio buttons using unique IDs to link correctly to nested labels
                 const wrap = document.createElement('div');
                 wrap.className = "flex gap-4 p-2 bg-gray-900 rounded-xl";
                 wrap.innerHTML = `
                     <label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 active:bg-blue-900 transition">
-                        <input type="radio" name="yn_${i}" id="${fieldId}_yes" value="Yes" class="w-5 h-5" data-key="${labelText}"> 
+                        <input type="radio" name="yn_${i}" id="${fieldId}_y" value="Yes" class="w-5 h-5" data-key="${labelText}"> 
                         <span class="text-sm font-black text-white">YES</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 active:bg-blue-900 transition">
-                        <input type="radio" name="yn_${i}" id="${fieldId}_no" value="No" class="w-5 h-5" data-key="${labelText}"> 
+                        <input type="radio" name="yn_${i}" id="${fieldId}_n" value="No" class="w-5 h-5" data-key="${labelText}"> 
                         <span class="text-sm font-black text-white">NO</span>
                     </label>
                 `;
@@ -756,6 +758,15 @@ function buildReportForm(n, c) {
         }
         c.appendChild(container);
     });
+
+    // 4. Initialize specialized hardware handlers
+    setTimeout(() => {
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
+            if (typeof resizeCanvas === 'function') resizeCanvas(canvas);
+            if (typeof initSigPad === 'function') initSigPad(canvas);
+        });
+    }, 600);
+}
 
     // 4. Initialize Signature Pads (Post-Render)
     setTimeout(() => {
@@ -853,6 +864,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
