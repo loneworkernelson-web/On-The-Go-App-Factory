@@ -1308,7 +1308,7 @@ function buildReportForm(n, c) {
     c.innerHTML = '';
     
     if (!t) {
-        c.innerHTML = '<label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
+        c.innerHTML = '<label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label><textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>';
         return;
     }
 
@@ -1317,19 +1317,16 @@ function buildReportForm(n, c) {
         const upperX = x.toUpperCase();
         const fieldId = `dyn_field_${i}`;
 
-        // 1. TAG DETECTION LOGIC
+        // TAG DETECTION
         if (upperX.includes('[HEADING]') || x.trim().startsWith('#')) { y = 'header'; x = x.replace(/\[HEADING\]/gi, '').replace('#', '').trim(); }
         else if (upperX.includes('[NOTE]')) { y = 'note'; x = x.replace(/\[NOTE\]/gi, '').trim(); }
         else if (upperX.includes('[SIGN]')) { y = 'signature'; x = x.replace(/\[SIGN\]/gi, '').trim(); }
         else if (upperX.includes('[PHOTO]')) { y = 'photo'; x = x.replace(/\[PHOTO\]/gi, '').trim(); }
         else if (upperX.includes('[GPS]')) { y = 'gps'; x = x.replace(/\[GPS\]/gi, '').trim(); if (!x) x = "Location Status"; }
         else if (upperX.includes('[YESNO]')) { y = 'yesno'; x = x.replace(/\[YESNO\]/gi, '').trim(); }
-        else if (upperX.includes('[CHECK]')) { y = 'checkbox'; x = x.replace(/\[CHECK\]/gi, '').trim(); }
-        else if (upperX.includes('[DATE]')) { y = 'date'; x = x.replace(/\[DATE\]/gi, '').trim(); }
-        else if (upperX.includes('[NUMBER]')) { y = 'number'; x = x.replace(/\[NUMBER\]/gi, '').trim(); }
-        else if (upperX.includes('[$]')) { y = 'currency'; x = x.replace(/\[\$\]/gi, '').trim(); } // Currency
+        else if (upperX.includes('[$]')) { y = 'currency'; x = x.replace(/\[\$\]/gi, '').trim(); }
         else if (upperX.includes('[1TEXT]')) { y = '1text'; x = x.replace(/\[1TEXT\]/gi, '').trim(); }
-        else if (upperX.startsWith('[DROP')) { // Dropdown
+        else if (upperX.startsWith('[DROP')) {
             y = 'drop';
             const dropMatch = x.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
             if (dropMatch) {
@@ -1348,37 +1345,34 @@ function buildReportForm(n, c) {
         } else {
             container.innerHTML = `<label for="${fieldId}" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">${x}</label>`;
 
-            // 2. ELEMENT GENERATION
+            // ELEMENT GENERATION
             if (y === 'photo') {
-                container.innerHTML += `<div class="flex items-center gap-3"><label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Tap to Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${x}')"></div>`;
+                container.innerHTML += `<div class="flex items-center gap-3"><label id="lbl_${i}" for="${fieldId}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl flex items-center justify-center text-gray-400 font-bold cursor-pointer">📸 Take Photo</label><input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${x}')"></div>`;
             } else if (y === 'signature') {
                 container.innerHTML += `<div class="bg-white rounded-xl p-1 mb-2"><canvas id="sig-canvas-${i}" class="w-full h-40 border border-gray-200"></canvas></div><button type="button" class="text-[10px] font-bold text-gray-500 uppercase sig-clear-btn" data-index="${i}">Clear Signature</button>`;
             } else if (y === 'gps') {
-                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">Capture GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${x}"></div>`;
+                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase">GPS</button><input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs text-gray-400" readonly data-key="${x}"></div>`;
             } else if (y === 'drop') {
                 const sel = document.createElement('select'); sel.id = fieldId; sel.className = "form-input font-bold"; sel.dataset.key = x;
                 const def = document.createElement('option'); def.text = `Select ${x}...`; def.value = ""; sel.appendChild(def);
                 dropOptions.forEach(optText => { const opt = document.createElement('option'); opt.text = optText; opt.value = optText; sel.appendChild(opt); });
                 container.appendChild(sel);
             } else if (y === 'currency') {
-                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" inputmode="decimal" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${x}"></div>`;
+                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span><input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${x}"></div>`;
             } else if (y === 'yesno') {
                 container.innerHTML += `<div class="flex gap-4 p-2 bg-gray-900 rounded-xl"><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" value="Yes" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">YES</span></label><label class="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-lg border border-gray-700"><input type="radio" name="yn_${i}" value="No" class="w-5 h-5" data-key="${x}"> <span class="text-sm font-black text-white">NO</span></label></div>`;
-            } else if (y === 'text') {
-                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${x}"></textarea>`;
+            } else if (y === '1text') {
+                container.innerHTML += `<input type="text" id="${fieldId}" class="form-input font-bold" data-key="${x}">`;
             } else {
-                container.innerHTML += `<input type="${y === 'date' ? 'date' : (y === 'number' ? 'number' : 'text')}" id="${fieldId}" class="form-input font-bold" data-key="${x}">`;
+                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24 font-medium" data-key="${x}"></textarea>`;
             }
         }
         c.appendChild(container);
     });
 
     setTimeout(() => {
-        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
-            resizeCanvas(canvas);
-            initSigPad(canvas);
-        });
-    }, 500);
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas));
+    }, 600);
 }
 function clearSig(id){ const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas'; const c = document.getElementById(canvasId); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height); }
 function triggerAutoAlert(s){const sel=state.locations.find(l=>l.id===state.activeVisit.locationId);const ln=sel?(sel.companyName?`${sel.companyName} - ${sel.name}`:sel.name):"Unknown";navigator.geolocation.getCurrentPosition(p=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert","Location Name":ln,"Last Known GPS":`${p.coords.latitude},${p.coords.longitude}`}));},()=>{processUploadQueue(buildPayload({"Alarm Status":s,"Notes":"Automated System Alert (GPS Fail)","Location Name":ln}));});}
@@ -1947,52 +1941,50 @@ function resizeCanvas(canvasEl) {
     };
     img.src = tempImg;
 }
-window.addEventListener('load', () => {
-    try { const saved = localStorage.getItem('loneWorkerState'); if(saved) { state = JSON.parse(saved); if(state.locations) renderLocations(); if(state.meta) checkVehicleStatus(); } } catch(e) {}
-    initLocations(); if(!state.settings || !state.settings.workerName) { startWizard(); } else { if(state.activeVisit) enterLockedScreen(); else navigate('main'); if(navigator.onLine) forceSync(false); }
-    startGPSMonitoring(); startReminderTimer(); checkIosInstall();
-    if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-    window.addEventListener('resize', () => { document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => resizeCanvas(canvas)); });
-});
-
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; if(!localStorage.getItem('otg_install_dismissed')) document.getElementById('installBanner').classList.remove('hidden'); });
 function triggerInstall() { if(deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(() => { deferredPrompt = null; }); document.getElementById('installBanner').classList.add('hidden'); } }
 function dismissInstall(type) { if(type==='android') document.getElementById('installBanner').classList.add('hidden'); if(type==='ios') document.getElementById('iosInstallModal').classList.add('hidden'); localStorage.setItem('otg_install_dismissed', 'true'); }
 function checkIosInstall() { const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); const isStandalone = window.navigator.standalone === true; if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) { document.getElementById('iosInstallModal').classList.remove('hidden'); } }
-window.onload = () => {
+// --- UNIFIED STARTUP SEQUENCE ---
+window.onload = async () => {
     // 1. Standardized data restoration
     try {
-        loadState(); 
+        loadState(); // Standardized to use 'otg_worker_state'
     } catch (e) {
         console.error("Critical: Initialization aborted - ", e);
     }
 
-    // 2. Initialize UI components
-    initPanicButton();
+    // 2. Ensure "Travelling" is always in the locations list
+    if (!state.locations) state.locations = [];
+    const hasTravel = state.locations.find(l => l.id === 'travel');
+    if (!hasTravel) {
+        state.locations.unshift({
+            id: 'travel',
+            name: 'Travelling',
+            noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
+        });
+    }
 
-    // 3. Robust Routing
+    // 3. Initialize UI
+    initPanicButton();
+    renderLocations();
+    checkVehicleStatus();
+
+    // 4. Routing logic
     if (!state.settings || !state.settings.workerName) {
-        // Force show setup if identity is missing
         navigate('setup'); 
-        const setupContainer = document.getElementById('setupPage'); 
-        if (setupContainer) setupContainer.classList.remove('hidden');
-    } 
-    else if (state.activeVisit) {
-        // Resume active session
-        const activePage = state.activeVisit.status === 'TRAVELLING' ? 'locked' : 'locked';
-        navigate(activePage); 
+        document.getElementById('setupPage')?.classList.remove('hidden');
+    } else if (state.activeVisit) {
+        navigate('locked'); 
         startCheckinTimer();
-        if (state.activeVisit.status === 'TRAVELLING') {
-            startTravellingPulse();
-        }
+        if (state.activeVisit.status === 'TRAVELLING') startTravellingPulse();
         forceSync(false);
-    } 
-    else {
+    } else {
         navigate('main');
         forceSync(false); 
     }
 
-    console.log("🚀 System Initialised: All libraries synced.");
+    console.log("🚀 System Initialised: All systems operational.");
 };
 </script>
  <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
@@ -2011,6 +2003,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
