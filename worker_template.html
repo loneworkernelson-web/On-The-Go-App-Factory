@@ -1010,33 +1010,34 @@ function startVisit() {
     updateArrivedButtonState();
     
     // 5. Trigger Network Sync
-    // We send a "Check-in" payload immediately so the backend knows the worker is active
     processUploadQueue(buildPayload({
         "Alarm Status": visitData.status,
         "Current Site": visitData.locationName,
-        "Notes": visitData.travelTarget ? `To: ${visitTargetName}` : "Started Visit"
+        "Notes": visitData.travelTarget ? `To: ${visitData.travelTarget}` : "Started Visit"
     }));
 
     // 6. Start the Safety Timers
     startCheckinTimer();
     
-    showToast(`✅ ${visitData.status} logged`);
-}
-    
+    // 7. Battery Saver & UI Lock Logic
     state.lowBatSent = false; 
     saveState(); 
     enterLockedScreen(); 
     
     // Auto-switch to Dark Mode after 10 seconds
-    if (autoDimTimer) clearTimeout(autoDimTimer);
-    autoDimTimer = setTimeout(() => {
-        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver').classList.contains('hidden')) {
+    if (window.autoDimTimer) clearTimeout(window.autoDimTimer);
+    window.autoDimTimer = setTimeout(() => {
+        if(state.activeVisit && !state.activeVisit.isPanic && document.getElementById('batterySaver')?.classList.contains('hidden')) {
             toggleBatterySaver();
         }
     }, 10000);
 
-    // IMPORTANT: Reintroduce the pulse for travel visits
-    if(s.id === 'travel') startTravellingPulse();
+    // 8. Start Background GPS Pulse if Travelling
+    if (locId === 'travel') {
+        startTravellingPulse();
+    }
+
+    showToast(`✅ ${visitData.status} logged`);
 }
 function preDepart() {
     // Kill the auto-dim timer so the report form stays visible
@@ -1979,6 +1980,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
