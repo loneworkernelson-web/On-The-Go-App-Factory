@@ -784,7 +784,34 @@ function renderIconGrid(forms, loc) {
     }
 }
 
-function initLocations(){if(!state.locations)state.locations=[];if(!state.cachedForms["Standard Visit Note"])state.cachedForms["Standard Visit Note"]=[{type:'note',text:'Standard Check-in'}];if(CONFIG.mileage&&!state.cachedForms['Travel Report'])state.cachedForms['Travel Report']=[{type:'number',text:'Distance (km)'},{type:'text',text:'Details'},{type:'photo',text:'Odometer'}];}
+function initLocations() {
+    if (!state.locations) state.locations = [];
+    
+    // 1. Ensure the 'travel' object exists in the array
+    const hasTravel = state.locations.find(l => l.id === 'travel');
+    if (!hasTravel) {
+        state.locations.push({
+            id: 'travel',
+            name: 'Travelling',
+            noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
+        });
+    }
+
+    if (!state.cachedForms["Standard Visit Note"]) {
+        state.cachedForms["Standard Visit Note"] = [{type:'note', text:'Standard Check-in'}];
+    }
+    
+    if (CONFIG.mileage && !state.cachedForms['Travel Report']) {
+        state.cachedForms['Travel Report'] = [
+            {type:'number', text:'Distance (km)'},
+            {type:'text', text:'Details'},
+            {type:'photo', text:'Odometer'}
+        ];
+    }
+    
+    // Refresh the UI to show the new card
+    renderLocations();
+}
 function createDestinationTile(loc) {
     const d = document.createElement('div');
     const isSel = state.selectedLocationId === loc.id;
@@ -822,11 +849,12 @@ function createDestinationTile(loc) {
 /**
  * Creates the specialized purple 'Travel' tile.
  */
+/**
+ * Builds the wide purple 'Travel' tile at the top of the dashboard.
+ */
 function createTravelTile(loc) {
     const d = document.createElement('div');
     const isSel = state.selectedLocationId === 'travel';
-    
-    // Safety check for user preferences (noReport)
     const isNoReport = loc.noReport || localStorage.getItem('otg_user_travel_pref') === 'true';
 
     d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-purple-500 bg-purple-900/40 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
@@ -844,11 +872,9 @@ function createTravelTile(loc) {
     `;
 
     d.onclick = (e) => {
-        // Prevent clicking the gear icon from selecting the tile
         if (e.target.tagName === 'BUTTON') return;
-        
         state.selectedLocationId = isSel ? null : 'travel';
-        travelTargetName = ""; // Reset target for general travel
+        travelTargetName = ""; 
         renderLocations();
         updateArrivedButtonState();
     };
@@ -928,12 +954,12 @@ function forceSync(showUi){
         state.locations = ms.concat(existingManual); 
         state.globalForms = data.forms || []; 
         state.cachedForms = data.cachedTemplates || {}; 
-        state.meta = data.meta || {};
-        
-        saveState(); 
-        renderLocations(); 
-        checkVehicleStatus(); 
-        document.getElementById('uploadBanner').classList.add('hidden'); 
+state.meta = data.meta || {};
+saveState(); 
+renderLocations(); 
+checkVehicleStatus(); 
+populateSettingsForm(); // ADD THIS LINE: Refreshes the versioning text
+document.getElementById('uploadBanner').classList.add('hidden');
         if(showUi) showToast("Sync Complete!");
     });
 }
@@ -1999,6 +2025,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
