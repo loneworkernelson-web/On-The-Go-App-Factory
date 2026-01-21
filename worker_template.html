@@ -658,18 +658,21 @@ function toggleAdvancedMode(el) {
  * Persists the current app state to local storage. 
  * Preserves Advanced Mode, branding, and Cloud Version data.
  */
-function saveState() {
+/**
+ * Persists the current app state using standardized navigator.storage.
+ */
+async function saveState() {
     try {
-        // 1. Convert the state object to a JSON string
+        // 1. Modern Standard: Request persistent storage if supported
+        if (navigator.storage && navigator.storage.persist) {
+            const isPersisted = await navigator.storage.persist();
+            console.log(`Standardized Storage Persisted: ${isPersisted}`);
+        }
+
+        // 2. Core Persistence
         const stateString = JSON.stringify(state);
-        
-        // 2. Save to the browser's persistent storage
         localStorage.setItem('otg_worker_state', stateString);
-        
-        // 3. Optional: Log to console for debugging in development
-        // console.log("State Saved Successfully");
     } catch (e) {
-        // 4. Error handling (e.g., if storage is full)
         console.error("Critical: Failed to save app state", e);
         showToast("⚠️ Storage Error: Progress may not be saved.");
     }
@@ -2012,6 +2015,7 @@ window.onload = () => {
 </div>   
 </body>
 </html>
+
 
 
 
