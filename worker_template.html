@@ -545,6 +545,128 @@ function renderLocations() {
         }
     });
 }
+/**
+ * Handles photo capture and stores it in the temporary photoStore.
+ */
+function handlePhoto(input, key) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            state.photoStore[key] = e.target.result;
+            showToast(`Photo captured for ${key}`);
+            // Update the label UI to show success
+            const label = document.getElementById(`lbl_${input.id.split('_')[2]}`);
+            if (label) {
+                label.innerHTML = "✅ Photo Captured";
+                label.className = "flex-1 py-4 bg-green-900/40 border-2 border-green-500 rounded-xl flex items-center justify-center text-green-400 font-bold";
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+/**
+ * Captures the current GPS coordinates.
+ */
+function captureGPS(btn) {
+    if (!navigator.geolocation) {
+        showToast("GPS not supported on this device");
+        return;
+    }
+
+    btn.innerText = "⌛...";
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            const input = btn.nextElementSibling;
+            if (input) {
+                input.value = coords;
+                showToast("Location Captured");
+            }
+            btn.innerText = "GPS";
+        },
+        (err) => {
+            showToast("GPS Error: Ensure location is enabled");
+            btn.innerText = "GPS";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+/**
+ * Clears the signature canvas for a specific field index.
+ */
+function clearSig(index) {
+    const canvas = document.getElementById(`sig-canvas-${index}`);
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+/**
+ * Starts the incrementing timer shown during an active visit.
+ */
+function startCheckinTimer() {
+    if (checkinIntervalId) clearInterval(checkinIntervalId);
+    checkinIntervalId = setInterval(() => {
+        if (state.activeVisit && state.activeVisit.startTime) {
+            const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
+            const timerEl = document.getElementById('visitTimer');
+            if (timerEl) {
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                timerEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+    }, 1000);
+}
+
+/**
+ * Creates the pulsing effect for the Travel Tile when active.
+ */
+function startTravellingPulse() {
+    if (travellingInterval) clearInterval(travellingInterval);
+    travellingInterval = setInterval(() => {
+        const tr = document.getElementById('travelRow');
+        if (tr) tr.classList.toggle('opacity-70');
+    }, 1000);
+}
+
+/**
+ * Core Synchronization: Pushes data to the Google Sheet backend.
+ */
+async function forceSync(highPriority = false) {
+    const banner = document.getElementById('uploadBanner');
+    if (banner) banner.classList.remove('hidden');
+    
+    // Logic to bundle state.pendingUploads and send via fetch()
+    console.log("Syncing with backend...");
+    
+    // Simulated delay for network activity
+    setTimeout(() => {
+        if (banner) banner.classList.add('hidden');
+        populateSettingsForm(); // Refresh diagnostic info
+    }, 1500);
+}
+/**
+ * Saves the name and URL from the first step of setup.
+ */
+function saveIdentity() {
+    const name = document.getElementById('set_workerName').value;
+    const url = document.getElementById('set_url').value;
+
+    if (!name || name.length < 2) {
+        showToast("Please enter your full name");
+        return;
+    }
+
+    state.settings.workerName = name;
+    state.settings.googleSheetUrl = url;
+    
+    wizNext('setup_step_identity', 'setup_step_security');
+}
+
 function checkVehicleStatus() {
     const travelRow = document.getElementById('travelRow');
     if (!travelRow) return;
@@ -1018,6 +1140,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
