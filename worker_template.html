@@ -806,7 +806,48 @@ function populateSettingsForm() {
         }
     }
 }
+/**
+ * Initialises the Panic/Emergency button listeners.
+ * Configured for a "Long Press" to prevent accidental triggers.
+ */
+function initPanicButton() {
+    const btn = document.getElementById('panicBtn');
+    if (!btn) return;
 
+    let panicTimer;
+    
+    // Long-press logic (requires 2 seconds of holding)
+    btn.addEventListener('mousedown', () => {
+        btn.classList.add('bg-red-500', 'scale-95');
+        panicTimer = setTimeout(handlePanic, 2000);
+    });
+
+    btn.addEventListener('mouseup', () => {
+        btn.classList.remove('bg-red-500', 'scale-95');
+        clearTimeout(panicTimer);
+    });
+
+    btn.addEventListener('touchstart', (e) => {
+        btn.classList.add('bg-red-500', 'scale-95');
+        panicTimer = setTimeout(handlePanic, 2000);
+    }, {passive: true});
+
+    btn.addEventListener('touchend', () => {
+        btn.classList.remove('bg-red-500', 'scale-95');
+        clearTimeout(panicTimer);
+    });
+}
+
+/**
+ * The action triggered by the panic button.
+ */
+function handlePanic() {
+    if (confirm("🚨 TRIGGER EMERGENCY ALERT?\n\nThis will notify the server and capture your current GPS location.")) {
+        showToast("Sending Emergency Signal...");
+        // This pushes a high-priority packet to your upload queue
+        forceSync(true); 
+    }
+}
 function initLocations() {
     if (!state.locations) state.locations = [];
     
@@ -873,14 +914,3 @@ window.onload = async () => {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
