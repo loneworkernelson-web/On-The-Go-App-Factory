@@ -335,12 +335,17 @@ let travelTargetName = ""; // Tracks driving destination
 
 async function saveState() {
     try {
-        // RESTORED: Standardized Storage Persistence
+        // MODERN STANDARD: Replaces deprecated StorageType.persistent
         if (navigator.storage && navigator.storage.persist) {
-            await navigator.storage.persist();
+            const isPersisted = await navigator.storage.persist();
+            if (isPersisted) {
+                console.log("💾 Persistent storage granted by browser.");
+            }
         }
         localStorage.setItem('otg_worker_state', JSON.stringify(state));
-    } catch (e) { console.error("Storage Error:", e); }
+    } catch (e) { 
+        console.error("Storage Error:", e); 
+    }
 }
 
 function loadState() {
@@ -824,22 +829,29 @@ function savePin() {
  * Finalizes the setup and moves the user to the dashboard.
  */
 async function finishSetup() {
-    // Capture restored identity fields
+    // 1. Capture Identity Fields
     state.settings.workerName = document.getElementById('set_workerName').value;
     state.settings.workerPhone = document.getElementById('set_workerPhone').value;
     state.settings.workerEmail = document.getElementById('set_workerEmail').value;
     
-    // Capture new emergency contact step
+    // 2. Capture Emergency Contacts
     state.settings.emergency = {
         primary: { 
             name: document.getElementById('set_emgName')?.value || "", 
             phone: document.getElementById('set_emgPhone')?.value || "" 
+        },
+        escalation: {
+            name: document.getElementById('set_escName')?.value || "",
+            phone: document.getElementById('set_escPhone')?.value || ""
         }
     };
 
     if (state.settings.workerName) {
         await saveState();
+        showToast("Setup Complete!");
         navigate('main');
+    } else {
+        showToast("Please enter your name to proceed.");
     }
 }
 // --- 5. IDENTITY & DIAGNOSTICS ---
@@ -917,28 +929,38 @@ function showToast(msg) {
 /**
  * RESTORED: Wizard Navigation with CSS 'active' class toggling
  */
+/**
+ * FIXED: Wizard Navigation (Uses 'active' class for CSS compatibility)
+ */
 function wizNext(currentId, nextId) {
     const curr = document.getElementById(currentId);
     const next = document.getElementById(nextId);
+    
     if (curr && next) {
+        // Toggle 'active' class to match CSS visibility rules
         curr.classList.remove('active');
         next.classList.add('active');
         
-        // Update Progress Dots
+        // Update Progress Dots based on the step
         const step = nextId.split('_').pop();
-        if (step === 'security') document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        if (step === 'emergency') document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        window.scrollTo(0,0);
+        if (step === 'security') {
+            document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
+        } else if (step === 'emergency' || step === 'review') {
+            document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
+        }
+        
+        window.scrollTo(0, 0);
     }
 }
 
 function wizBack(currentId, prevId) {
     const curr = document.getElementById(currentId);
     const prev = document.getElementById(prevId);
+    
     if (curr && prev) {
         curr.classList.remove('active');
         prev.classList.add('active');
-        window.scrollTo(0,0);
+        window.scrollTo(0, 0);
     }
 }
 /**
@@ -1057,7 +1079,11 @@ function resizeCanvas(canvas) {
 function initSigPad(canvas) {
     const ctx = canvas.getContext('2d');
     let drawing = false, lastPoint = null;
-    ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = '#000000';
+    
+    ctx.lineWidth = 2.5; 
+    ctx.lineJoin = 'round'; 
+    ctx.lineCap = 'round'; 
+    ctx.strokeStyle = '#000000';
 
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -1067,22 +1093,29 @@ function initSigPad(canvas) {
     };
 
     canvas.addEventListener('touchstart', (e) => {
-        drawing = true; lastPoint = getPos(e);
-        ctx.beginPath(); ctx.moveTo(lastPoint.x, lastPoint.y);
+        drawing = true; 
+        lastPoint = getPos(e);
+        ctx.beginPath(); 
+        ctx.moveTo(lastPoint.x, lastPoint.y);
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
         if (!drawing) return;
         e.preventDefault();
         const currentPoint = getPos(e);
+        
         // RESTORED: Quadratic Bezier Midpoint logic for smooth curves
-        const midPoint = { x: lastPoint.x + (currentPoint.x - lastPoint.x) / 2, y: lastPoint.y + (currentPoint.y - lastPoint.y) / 2 };
+        const midPoint = { 
+            x: lastPoint.x + (currentPoint.x - lastPoint.x) / 2, 
+            y: lastPoint.y + (currentPoint.y - lastPoint.y) / 2 
+        };
+        
         ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
         ctx.stroke();
         lastPoint = currentPoint;
     }, { passive: false });
 
-    window.addEventListener('touchend', () => { drawing = false; });
+    window.addEventListener('touchend', () => { drawing = false; lastPoint = null; });
 }
 // 3. PHOTO ENGINE (EXIF Stripping & 0.4 Quality Compression)
 function handlePhoto(input, key) {
@@ -1246,6 +1279,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
