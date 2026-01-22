@@ -784,7 +784,48 @@ function buildReportForm(n, c) {
             if (typeof initSigPad === 'function') initSigPad(canvas);
         });
     }, 600);
+/**
+ * Processes and saves the security PIN.
+ * Uses Base64 encoding as a basic masking layer before saving to state.
+ */
+function savePin() {
+    const pin1 = document.getElementById('setup_pin1').value;
+    const pin2 = document.getElementById('setup_pin2').value;
 
+    if (!pin1 || pin1.length < 4) {
+        showToast("PIN must be at least 4 digits");
+        return;
+    }
+
+    if (pin1 !== pin2) {
+        showToast("PINs do not match");
+        return;
+    }
+
+    // Save masked PIN to state
+    state.settings.pinCode = btoa(pin1); 
+    showToast("Security PIN Set");
+    
+    // Proceed to final review or finish
+    wizNext('setup_step_security', 'setup_step_review');
+}
+
+/**
+ * Finalizes the setup and moves the user to the dashboard.
+ */
+async function finishSetup() {
+    state.settings.workerName = document.getElementById('set_workerName').value;
+    state.settings.googleSheetUrl = document.getElementById('set_url').value;
+    
+    if (!state.settings.workerName) {
+        showToast("Please enter your name");
+        return;
+    }
+
+    await saveState();
+    showToast("Setup Complete!");
+    navigate('main');
+}
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
 function populateSettingsForm() {
@@ -966,4 +1007,5 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
