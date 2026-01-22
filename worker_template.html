@@ -205,6 +205,33 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 text-white font-bold rounded-xl text-center shadow-xl mb-4">🗺️ NAVIGATE</a>
         <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl">CLOSE</button>
     </div>
+<div id="modalBackdrop" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[150]">
+    <div id="infoModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
+        <h2 id="infoTitle" class="text-xl font-bold mb-4 text-white">Site Info</h2>
+        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
+        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 text-white font-bold rounded-xl text-center shadow-xl mb-4 uppercase">🗺️ Navigate</a>
+        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
+    </div>
+
+    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
+        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
+        <div class="space-y-4">
+            <input type="text" id="locName" class="form-input" placeholder="Site Name (Required)">
+            <input type="text" id="locBusiness" class="form-input" placeholder="Company Name (Optional)">
+            <input type="text" id="locAddr" class="form-input" placeholder="Physical Address">
+        </div>
+        <div class="mt-8 flex gap-3">
+            <button onclick="closeModal('location')" class="flex-1 bg-gray-700 py-3 rounded-xl text-white font-bold">Cancel</button>
+            <button onclick="saveLoc()" class="flex-[2] bg-blue-600 py-3 rounded-xl text-white font-bold shadow-lg">Save Site</button>
+        </div>
+    </div>
+
+    <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
+        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Forms Library</h2>
+        <div id="templateList" class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2"></div>
+        <button onclick="closeModal('template')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-white uppercase tracking-widest">Cancel</button>
+    </div>
+</div>
 </div>
 <script>
 // --- 1. GLOBAL CONSTANTS & CORE STATE ---
@@ -1100,6 +1127,48 @@ function showSiteInfo(id, e) {
     showModal('info');
 }
 
+    /**
+ * FIXED: Location Manager (Resolves ReferenceError)
+ */
+function openLocModal(id = null) {
+    const title = document.getElementById('locModalTitle');
+    const nameInp = document.getElementById('locName');
+    const busInp = document.getElementById('locBusiness');
+    const addrInp = document.getElementById('locAddr');
+
+    if (id) {
+        const loc = state.locations.find(l => l.id === id);
+        if (loc) {
+            title.innerText = "Edit Site";
+            nameInp.value = loc.name;
+            busInp.value = loc.companyName || "";
+            addrInp.value = loc.address || "";
+        }
+    } else {
+        title.innerText = "New Destination";
+        nameInp.value = ""; busInp.value = ""; addrInp.value = "";
+    }
+    showModal('location');
+}
+
+async function saveLoc() {
+    const name = document.getElementById('locName').value;
+    if (!name) return showToast("Site Name is required");
+
+    const newLoc = {
+        id: 'loc_' + Date.now(),
+        name: name,
+        companyName: document.getElementById('locBusiness').value,
+        address: document.getElementById('locAddr').value,
+        icon: '🏢'
+    };
+
+    state.locations.push(newLoc);
+    await saveState();
+    closeModal('location');
+    renderLocations();
+    showToast("Site added to database");
+}
 // --- 6. STARTUP SEQUENCE ---
 
 
@@ -1128,4 +1197,5 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
