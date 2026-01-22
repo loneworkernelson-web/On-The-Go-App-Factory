@@ -1014,13 +1014,31 @@ function compressImg(data, key, inputId) {
 }
 
 // 4. AUTOMATION & HARDWARE (GPS, Timers, Speech)
+/**
+ * RESTORED: High-Accuracy GPS Capture
+ */
 function captureGPS(btn) {
-    navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-        const input = btn.nextElementSibling;
-        if (input) input.value = coords;
-        showToast("GPS Captured");
-    }, (err) => showToast("GPS Error: Enable location"), { enableHighAccuracy: true });
+    if (!navigator.geolocation) {
+        showToast("GPS Not Supported");
+        return;
+    }
+    btn.innerText = "⌛...";
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            const input = btn.nextElementSibling;
+            if (input) {
+                input.value = coords;
+                showToast("Location Captured");
+            }
+            btn.innerText = "GPS";
+        },
+        (err) => {
+            showToast("GPS Error: Ensure Location is ON");
+            btn.innerText = "GPS";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
 }
 
 function startCheckinTimer() {
@@ -1048,6 +1066,33 @@ function speak(text) {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+/**
+ * RESTORED: Full Report Submission & Sync Queue
+ */
+async function submitReport() {
+    const fields = document.querySelectorAll('#reportFields input, #reportFields textarea, #reportFields select');
+    const data = {
+        timestamp: new Date().toISOString(),
+        location: state.activeVisit ? state.activeVisit.locationName : 'Unknown',
+        worker: state.settings.workerName,
+        responses: {},
+        photos: { ...state.photoStore } // Includes the EXIF-stripped images
+    };
+
+    fields.forEach(f => {
+        const key = f.dataset.key || f.id;
+        data.responses[key] = f.type === 'checkbox' ? f.checked : f.value;
+    });
+
+    state.pendingUploads.push(data);
+    await saveState();
+    
+    showToast("Report Saved to Sync Queue");
+    state.activeVisit = null;
+    state.photoStore = {}; // Clear for next visit
+    navigate('main');
+    forceSync();
 }
 function showSiteInfo(id, e) {
     if (e) e.stopPropagation(); 
@@ -1099,6 +1144,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
