@@ -478,18 +478,6 @@ function startTravellingPulse() {
  * RESTORED: Auto-Dim Inactivity Logic
  */
 let inactivityTimer;
-
-function resetAutoDim() {
-    clearTimeout(inactivityTimer);
-    // Only auto-dim if a visit is active and we aren't already dimmed
-    if (state.activeVisit && !document.getElementById('batterySaver').classList.contains('hidden')) {
-        // Do nothing, already dimmed
-    } else if (state.activeVisit) {
-        // Set for 5 minutes (300,000ms)
-        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000);
-    }
-}
-
 /**
  * GLUE: Attach inactivity listeners to the whole document
  */
@@ -501,7 +489,7 @@ function initAutoDimListeners() {
 }
 
 /**
- * UPDATE: Ensure toggleBatterySaver manages the timer
+ * RESTORED: Advanced Battery Saver with OS-level dimming glue
  */
 function toggleBatterySaver(force) {
     const saver = document.getElementById('batterySaver');
@@ -512,15 +500,26 @@ function toggleBatterySaver(force) {
     const targetState = (force !== undefined) ? force : !isCurrentlyDim;
 
     if (targetState) {
+        // TURN DIM ON
         saver.classList.remove('hidden');
         document.documentElement.classList.add('system-dim');
-        if (progress) progress.style.opacity = "0"; // Reset glow
-        initWakeListener(); 
-        clearTimeout(inactivityTimer); // Stop looking for inactivity while already dimmed
+        if (progress) progress.style.opacity = "0"; 
+        initWakeListener(); // Re-glues the hold-to-wake logic
+        clearTimeout(inactivityTimer);
     } else {
+        // TURN DIM OFF
         saver.classList.add('hidden');
         document.documentElement.classList.remove('system-dim');
-        resetAutoDim(); // Restart inactivity countdown
+        resetAutoDim(); 
+    }
+}
+
+// RESTORED: 5-Minute Inactivity Dimmer
+let inactivityTimer;
+function resetAutoDim() {
+    clearTimeout(inactivityTimer);
+    if (state.activeVisit && document.getElementById('batterySaver')?.classList.contains('hidden')) {
+        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000); // 5 mins
     }
 }
 /**
@@ -1279,6 +1278,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
