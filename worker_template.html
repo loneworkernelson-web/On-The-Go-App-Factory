@@ -779,16 +779,19 @@ function savePin() {
  */
 async function finishSetup() {
     state.settings.workerName = document.getElementById('set_workerName').value;
+    state.settings.workerPhone = document.getElementById('set_workerPhone').value;
+    state.settings.workerEmail = document.getElementById('set_workerEmail').value;
     state.settings.googleSheetUrl = document.getElementById('set_url').value;
     
-    if (!state.settings.workerName) {
-        showToast("Please enter your name");
-        return;
-    }
+    state.settings.emergency = {
+        primary: { name: document.getElementById('set_emgName').value, phone: document.getElementById('set_emgPhone').value },
+        escalation: { name: document.getElementById('set_escName').value, phone: document.getElementById('set_escPhone').value }
+    };
 
-    await saveState();
-    showToast("Setup Complete!");
-    navigate('main');
+    if (state.settings.workerName) {
+        await saveState();
+        navigate('main');
+    }
 }
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
@@ -1205,6 +1208,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
