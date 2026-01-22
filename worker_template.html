@@ -516,53 +516,79 @@ function initWakeListener() {
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }    
 /**
- * GOLDEN SYNC ENGINE: Sends validated data to Google Sheets
+ * GOLDEN SYNC ENGINE: Authenticated Connection to Backend
  */
 async function forceSync(highPriority = false) {
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    // 1. Prepare the Refined Payload
+    // 1. Prepare Payload: Name, ID, and Password required for match
     const payload = {
-        // Explicitly passed for Apps Script validation
-        workerName: state.settings.workerName || "Unknown",
-        deviceId: state.settings.deviceId || "Pending",
+        systemPassword: CONFIG.key, // Allows connection
+        workerName: state.settings.workerName || "Unknown", // Required for record check
+        deviceId: state.settings.deviceId || "Pending", // Required for handset match
         
-        // Full data sets
-        identity: state.settings,
+        // Data sets (Note: PIN is EXCLUDED to remain local-only)
         reports: state.pendingUploads,
-        
-        // Metadata
-        isEmergency: highPriority, 
         timestamp: new Date().toISOString(),
-        appVersion: APP_VERSION 
+        isEmergency: highPriority
     };
 
     try {
-        // 2. Execute the Network Request
-        const response = await fetch(CONFIG.url, {
+        // 2. Execute Network Handshake
+        await fetch(CONFIG.url, {
             method: 'POST',
-            mode: 'no-cors', // standard for GAS redirects
-            cache: 'no-cache',
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        // 3. Success Logic
-        showToast(highPriority ? "🚨 Emergency Signal Sent!" : "✅ Cloud Sync Complete");
-        
-        // Clear the queue ONLY after a successful fetch handoff
-        state.pendingUploads = []; 
-        await saveState(); 
+        state.pendingUploads = [];
+        state.meta.lastSync = new Date().toLocaleTimeString();
+        await saveState();
+        showToast(highPriority ? "🚨 EMERGENCY ALERT SENT" : "✅ SYNC SUCCESSFUL");
     } catch (e) {
-        console.error("Sync Failed:", e);
-        showToast("📡 Offline: Data saved to local queue");
+        showToast("📡 OFFLINE: Saved to queue");
     } finally {
         if (banner) banner.classList.add('hidden');
-        populateSettingsForm(); // Refresh diagnostic labels
+        populateSettingsForm(); 
     }
 }
 
+/**
+ * FIXED: finishSetup (Resolves syntax crash and generates ID)
+ */
+async function finishSetup() {
+    state.settings.workerName = document.getElementById('set_workerName').value;
+    state.settings.workerPhone = document.getElementById('set_workerPhone').value;
+    state.settings.workerEmail = document.getElementById('set_workerEmail').value;
+    
+    state.settings.emergency = {
+        primary: { 
+            name: document.getElementById('set_emgName')?.value || "", 
+            phone: document.getElementById('set_emgPhone')?.value || "",
+            email: document.getElementById('set_emgEmail')?.value || ""
+        },
+        escalation: {
+            name: document.getElementById('set_escName')?.value || "", 
+            phone: document.getElementById('set_escPhone')?.value || "",
+            email: document.getElementById('set_escEmail')?.value || ""
+        }
+    };
+
+    // Generate unique Device ID for backend matching
+    if (state.settings.workerName && !state.settings.deviceId) {
+        state.settings.deviceId = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+    }
+
+    if (state.settings.workerName) {
+        await saveState();
+        await forceSync(); // Trigger initial handshake
+        navigate('main');
+    } else {
+        showToast("Please enter your name");
+    }
+}
 /**
  * FIXED: buildReportForm (Restores Golden UI with [$], [TIME], and [GPS] tags)
  */
@@ -687,46 +713,7 @@ function savePin() {
     // REMOVED the extra wizNext from here
 }
 
-/**
- * FIXED: finishSetup (Resolves crash and triggers first cloud sync)
- */
-async function finishSetup() {
-    // 1. Capture Primary Identity
-    state.settings.workerName = document.getElementById('set_workerName').value;
-    state.settings.workerPhone = document.getElementById('set_workerPhone').value;
-    state.settings.workerEmail = document.getElementById('set_workerEmail').value;
-    
-    // 2. Capture Emergency Contacts (Restoring Email Fields)
-    state.settings.emergency = {
-        primary: { 
-            name: document.getElementById('set_emgName')?.value || "", 
-            phone: document.getElementById('set_emgPhone')?.value || "",
-            email: document.getElementById('set_emgEmail')?.value || "" 
-        },
-        escalation: {
-            name: document.getElementById('set_escName')?.value || "",
-            phone: document.getElementById('set_escPhone')?.value || "",
-            email: document.getElementById('set_escEmail')?.value || "" 
-        }
-    };
 
-    // 3. GOLDEN: Generate Device ID (Corrected placement outside object)
-    if (state.settings.workerName && !state.settings.deviceId) {
-        state.settings.deviceId = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-    }
-
-    if (state.settings.workerName) {
-        await saveState(); // Save to local storage
-        
-        // 4. TRIGGER FIRST SYNC: Registers Worker Name & Device ID to Sheet
-        showToast("Synchronising Identity...");
-        await forceSync(); 
-        
-        navigate('main');
-    } else {
-        showToast("Please enter your name");
-    }
-}
     
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
@@ -1302,6 +1289,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
