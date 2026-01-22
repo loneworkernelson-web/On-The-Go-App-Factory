@@ -334,12 +334,10 @@ let travelTargetName = ""; // Tracks driving destination
 
 async function saveState() {
     try {
-        // MODERN STANDARD: Replaces deprecated StorageType.persistent
+        // MODERN STANDARD: navigator.storage standard replaces deprecated StorageType
         if (navigator.storage && navigator.storage.persist) {
             const isPersisted = await navigator.storage.persist();
-            if (isPersisted) {
-                console.log("💾 Persistent storage granted by browser.");
-            }
+            if (isPersisted) console.log("💾 Persistent storage granted.");
         }
         localStorage.setItem('otg_worker_state', JSON.stringify(state));
     } catch (e) { 
@@ -816,6 +814,7 @@ function savePin() {
     } else {
         showToast("Standard PINs must be 4 digits and match.");
     }
+    wizNext('wizStep2', 'wizStep3');
 }
 
 /**
@@ -930,17 +929,14 @@ function wizNext(currentId, nextId) {
     const next = document.getElementById(nextId);
     
     if (curr && next) {
-        // Toggle 'active' class to match CSS visibility rules
+        // Toggle 'active' class to match your CSS visibility rules
         curr.classList.remove('active');
         next.classList.add('active');
         
-        // Update Progress Dots based on the step
-        const step = nextId.split('_').pop();
-        if (step === 'security') {
-            document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        } else if (step === 'emergency' || step === 'review') {
-            document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        }
+        // Update Progress Dots
+        const step = nextId.replace('wizStep', '');
+        if (step == '2') document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
+        if (step == '3') document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
         
         window.scrollTo(0, 0);
     }
@@ -949,13 +945,13 @@ function wizNext(currentId, nextId) {
 function wizBack(currentId, prevId) {
     const curr = document.getElementById(currentId);
     const prev = document.getElementById(prevId);
-    
     if (curr && prev) {
         curr.classList.remove('active');
         prev.classList.add('active');
         window.scrollTo(0, 0);
     }
 }
+
 /**
  * Initialises the Panic/Emergency button listeners.
  * Configured for a "Long Press" to prevent accidental triggers.
@@ -1272,6 +1268,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
