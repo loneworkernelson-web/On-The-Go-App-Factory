@@ -253,9 +253,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
-<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center select-none">
-    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em]">Battery Saver Active</div>
-    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 border border-gray-900 px-4 py-2 rounded-full">Hold screen to wake</div>
+<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center select-none">
+    <div id="saverProgress" class="absolute inset-0 bg-white/5 opacity-0 transition-opacity duration-[2000ms] pointer-events-none"></div>
+    
+    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em] z-10">Battery Saver Active</div>
+    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 z-10 border border-gray-900 px-4 py-2 rounded-full font-bold">Hold screen to wake</div>
 </div>
 
 <div id="lockedPage" class="page bg-black">
@@ -468,26 +470,52 @@ function startTravellingPulse() {
     }, 1000);
 }
 /**
- * RESTORED: Advanced Battery Saver with "Hold to Wake" logic
- * @param {boolean} force - Optional. If true, forces the dim mode on.
+ * RESTORED: Auto-Dim Inactivity Logic
+ */
+let inactivityTimer;
+
+function resetAutoDim() {
+    clearTimeout(inactivityTimer);
+    // Only auto-dim if a visit is active and we aren't already dimmed
+    if (state.activeVisit && !document.getElementById('batterySaver').classList.contains('hidden')) {
+        // Do nothing, already dimmed
+    } else if (state.activeVisit) {
+        // Set for 5 minutes (300,000ms)
+        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000);
+    }
+}
+
+/**
+ * GLUE: Attach inactivity listeners to the whole document
+ */
+function initAutoDimListeners() {
+    ['mousedown', 'mousemove', 'keypress', 'touchstart', 'scroll'].forEach(name => {
+        document.addEventListener(name, resetAutoDim, {passive: true});
+    });
+    resetAutoDim();
+}
+
+/**
+ * UPDATE: Ensure toggleBatterySaver manages the timer
  */
 function toggleBatterySaver(force) {
     const saver = document.getElementById('batterySaver');
+    const progress = document.getElementById('saverProgress');
     if (!saver) return;
 
     const isCurrentlyDim = !saver.classList.contains('hidden');
     const targetState = (force !== undefined) ? force : !isCurrentlyDim;
 
     if (targetState) {
-        // ENTRANCE: Turn dim mode ON
         saver.classList.remove('hidden');
         document.documentElement.classList.add('system-dim');
-        requestWakeLock();
-        initWakeListener(); // Set up the long-press to exit
+        if (progress) progress.style.opacity = "0"; // Reset glow
+        initWakeListener(); 
+        clearTimeout(inactivityTimer); // Stop looking for inactivity while already dimmed
     } else {
-        // EXIT: Turn dim mode OFF
         saver.classList.add('hidden');
         document.documentElement.classList.remove('system-dim');
+        resetAutoDim(); // Restart inactivity countdown
     }
 }
 /**
@@ -1218,6 +1246,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
