@@ -1,134 +1,240 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>%%APP_NAME%%</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        /* BASE STYLES & OS INTEGRATION */
-        body { 
-            font-family: 'Inter', sans-serif; 
-            -webkit-tap-highlight-color: transparent; 
-            user-select: none; 
-            background-color: #111827; 
-            color: white; 
-            height: 100%; 
-            width: 100%; 
-            overflow: hidden; 
-        }
-        canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-.pulse-border { animation: pulse 2s infinite; }
-@keyframes pulse { 0% { border-color: #3b82f6; } 50% { border-color: #ef4444; } 100% { border-color: #3b82f6; } }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>%%APP_NAME%%</title>
+<meta name="apple-mobile-web-app-title" content="%%APP_NAME%%">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="%%LOGO_DATA%%">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<style>
+/* 1. FORCE SYSTEM DIM: Required to dim the OS navigation bars */
+html.system-dim, body.system-dim { 
+    background-color: #000000 !important; 
+    color-scheme: dark !important; 
+}
 
-        /* PAGE ROUTING VISIBILITY */
-        .page { 
-            display: none; 
-            height: 100%; 
-            width: 100%; 
-            flex-direction: column; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-        }
-        .page.active { display: flex; z-index: 10; }
+/* 2. BASE STYLES */
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
 
-        /* UI COMPONENT STYLING */
-        .header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
-        .content-area { flex: 1; overflow-y: auto; padding: 1rem; position: relative; }
-        .footer-bar { padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; }
+.page { 
+    display: none; 
+    height: 100%; 
+    width: 100%; 
+    flex-direction: column; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    background-color: #111827; 
+}
 
-        /* INPUTS & CARDS */
-        .form-input { width: 100%; background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.75rem; padding: 0.75rem; color: white; outline: none; margin-bottom: 0.75rem; }
-        .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-        .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-        
-        /* HARDWARE INDICATORS */
-        .gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; }
-        .gps-active { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
-        .long-press-btn { transition: transform 0.1s; }
-        .long-press-btn:active { transform: scale(0.96); }
+.page.active { display: flex; z-index: 10; }
 
-        /* SLIDER STYLING */
-        .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: #3b82f6; border-radius: 50%; border: 2px solid white; }
-    </style>
+.header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
+.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
+
+/* 3. UPDATED FOOTER: Adds safety padding for the navigation bar */
+.footer-bar { 
+    padding: 1rem; 
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom)); 
+    background-color: #111827; 
+    border-top: 1px solid #374151; 
+    flex-shrink: 0; 
+    z-index: 20; 
+}
+
+/* Optimized Long-Press SOS Styling with Visual Progress */
+.long-press-btn {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.long-press-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(255, 255, 255, 0.3);
+    transition: width 0.2s ease-out; 
+    z-index: 1;
+}
+
+/* When the button is held, the width expands over exactly 3 seconds */
+.long-press-btn.holding::after {
+    width: 100%;
+    transition: width 3s linear;
+}
+
+.long-press-btn:active { transform: scale(0.96); }
+
+/* UI ANIMATIONS */
+.pulse-border { 
+    animation: pulseGlow 2s infinite; 
+    border-width: 2px;
+}
+
+@keyframes pulseGlow {
+    0% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    50% { border-color: #a855f7; box-shadow: 0 0 15px 2px rgba(168, 85, 247, 0.4); }
+    100% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+}
+
+.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
+.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+
+.gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
+.gps-active { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
+
+.wizard-step { display: none; height: 100%; flex-direction: column; }
+.wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+</style>
 </head>
 <body class="bg-gray-900 text-white">
 
-<div id="toast" class="hidden fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-2xl z-[100] flex items-center gap-3">
-    <div class="text-xl">ℹ️</div>
-    <p id="toastText" class="font-bold text-sm"></p>
+<div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 z-[1000] translate-y-[-150%] transition-transform duration-300">
+    <div class="text-xl">✅</div>
+    <p class="font-bold text-sm" id="toastText">Operation Successful</p>
 </div>
 
+<div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-4 z-[100] shadow-xl flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-2xl">📲</span>
+        <div><p class="font-bold text-sm">Install Safety App</p><p class="text-xs opacity-90">Add to home screen for safety monitoring.</p></div>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="dismissInstall()" class="px-3 py-1 text-xs font-bold bg-blue-700 rounded">Later</button>
+        <button onclick="triggerInstall()" class="px-4 py-1 text-xs font-black bg-white text-blue-600 rounded">Install</button>
+    </div>
+</div>
+
+<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
+
 <div id="setupPage" class="page active bg-gray-900 z-[60]">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center">
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900">
         <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
+        <div class="flex gap-1">
+            <div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div>
+            <div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div>
+            <div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div>
+        </div>
     </div>
 
-    <div id="setup_step_identity" class="content-area">
-        <h2 class="text-3xl font-bold mb-2">Who are you?</h2>
+    <div id="setup_step_identity" class="wizard-step active p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
         <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
-        <label for="set_workerName" class="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Full Name</label>
-        <input type="text" id="set_workerName" class="form-input" placeholder="e.g. John Doe">
-        <label for="set_url" class="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Google Sheet URL</label>
-        <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
-        <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg mt-8">Next: Security →</button>
+        <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
+        <input type="text" id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
+        <label for="set_url" class="setting-label lbl-blue">Google Sheet URL</label>
+        <input type="text" id="set_url" class="form-input mb-8" value="%%GOOGLE_SHEET_URL%%">
+        <div class="mt-auto">
+            <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
+        </div>
     </div>
 
-    <div id="setup_step_security" class="content-area hidden">
-        <h2 class="text-3xl font-bold mb-2">Security PIN</h2>
-        <p class="text-gray-400 mb-8 text-sm">Create a 4-digit code to unlock the app and declare safety.</p>
-        <label for="setup_pin1" class="block text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Create PIN</label>
-        <input type="password" id="setup_pin1" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest">
-        <label for="setup_pin2" class="block text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Confirm PIN</label>
-        <input type="password" id="setup_pin2" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest">
-        <div class="flex gap-3 mt-8">
+    <div id="setup_step_security" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
+        <p class="text-gray-400 mb-6 text-sm">Create a 4-digit code to declare safety.</p>
+        <label for="setup_pin1" class="setting-label lbl-green">Create PIN</label>
+        <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
+        <label for="setup_pin2" class="setting-label lbl-green mt-4">Confirm PIN</label>
+        <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
+        <div class="flex gap-3 mt-auto">
             <button onclick="wizBack('setup_step_security', 'setup_step_identity')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
             <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl">Next: Review →</button>
         </div>
     </div>
 
-    <div id="setup_step_review" class="content-area hidden">
-        <h2 class="text-3xl font-bold mb-2">Ready?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Pressing finish will launch your dashboard.</p>
-        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase">✅ Launch App</button>
+    <div id="setup_step_review" class="wizard-step p-6 overflow-y-auto">
+        <h2 class="text-3xl font-bold text-white mb-2">Ready?</h2>
+        <p class="text-gray-400 mb-8 text-sm">Review your details before launching.</p>
+        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase">✅ Save & Launch App</button>
+    </div>
+</div>
+
+<div id="settingsPage" class="page bg-gray-800">
+    <div class="header-bar">
+        <h1 class="text-2xl font-bold text-white">Settings</h1>
+        <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
+    </div>
+    <div class="content-area">
+        <div class="setting-card">
+            <label class="setting-label lbl-blue">Your Identity</label>
+            <input id="set_workerName_diag" class="form-input-card text-sm font-bold" readonly placeholder="Worker Name">
+        </div>
+        <div class="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center px-2">
+            <div class="flex flex-col">
+                <span class="text-[10px] text-gray-500 font-black">APP VERSION</span>
+                <span id="diagApp" class="text-xs text-gray-400 font-bold">---</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] text-gray-500 font-black">CLOUD VERSION</span>
+                <span id="diagCloud" class="text-xs text-gray-400 font-bold">---</span>
+            </div>
+        </div>
     </div>
 </div>
 
 <div id="mainPage" class="page">
     <div class="header-bar">
-        <div class="flex items-center gap-2">
-            <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
-        </div>
+        <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
         <div class="flex items-center gap-3">
             <div class="flex gap-0.5" id="gpsBars">
-                <div class="gps-bar gps-active"></div><div class="gps-bar gps-active"></div><div class="gps-bar"></div>
+                <div id="gps1" class="gps-bar"></div>
+                <div id="gps2" class="gps-bar"></div>
+                <div id="gps3" class="gps-bar"></div>
             </div>
-            <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700">⚙️</button>
+            <button onclick="navigate('settings')" class="p-2 text-gray-400">⚙️</button>
         </div>
     </div>
-    
     <div class="content-area">
-        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold uppercase tracking-widest animate-pulse">Syncing...</div>
+        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold uppercase animate-pulse">Syncing...</div>
         <div id="travelRow" class="mb-4"></div>
         <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Destinations</div>
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
-
     <div class="footer-bar">
         <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2"><span class="text-gray-400 text-[10px] font-black uppercase">Visit Time</span><span id="durationDisplay" class="text-xs text-blue-400 font-bold">0 mins</span></div>
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+            <div class="flex justify-between mb-2">
+                <span class="text-gray-400 text-[10px] font-black uppercase">Visit Time</span>
+                <span id="durationDisplay" class="text-xs text-blue-400 font-bold">0 mins</span>
+            </div>
+            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb">
         </div>
         <button id="panicBtn" class="long-press-btn w-full py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest">Hold for SOS</button>
     </div>
 </div>
 
+<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center">
+    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em]">Battery Saver Active</div>
+    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 border border-gray-900 px-4 py-2 rounded-full">Hold screen to wake</div>
+</div>
+
 <div id="lockedPage" class="page bg-black">
     <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
         <div id="visitTimer" class="text-8xl font-mono font-bold text-white tracking-tighter">00:00</div>
-        <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2">---</h2>
+        <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2 tracking-tight">---</h2>
         
         <div class="mt-12 w-full max-w-xs space-y-4">
             <input type="password" id="lock_pin_input" maxlength="4" inputmode="numeric" placeholder="Enter PIN" class="form-input text-center text-3xl tracking-[0.5em]">
@@ -138,24 +244,25 @@
     </div>
 </div>
 
-<div id="reportPage" class="page bg-gray-900 z-50">
-    <div class="header-bar">
-        <h2 id="reportTitle" class="text-lg font-bold">Visit Report</h2>
-    </div>
-    <div class="content-area" id="reportFields">
+<div id="modalBackdrop" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[150]">
+    <div id="infoModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
+        <h2 id="infoTitle" class="text-xl font-bold mb-4">Site Info</h2>
+        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
+        <div class="flex gap-3 mb-4">
+            <a id="btnSiteCall" href="#" class="hidden flex-1 bg-green-600 text-white py-4 rounded-xl text-center font-black">📞 CALL</a>
+            <a id="btnSiteEmail" href="#" class="hidden flex-1 bg-blue-600 text-white py-4 rounded-xl text-center font-black">✉️ EMAIL</a>
         </div>
-    <div class="footer-bar flex gap-3">
-        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-700 font-bold rounded-xl">Cancel</button>
-        <button id="btnSubmitRep" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl">Submit Report</button>
+        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 text-white font-bold rounded-xl text-center shadow-xl mb-4">🗺️ NAVIGATE</a>
+        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl">CLOSE</button>
     </div>
 </div>
 
-<div id="infoModal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
-        <h2 id="infoTitle" class="text-xl font-bold mb-4">Site Info</h2>
-        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-blue-600 text-white font-bold rounded-xl text-center mb-3">Navigate to Site</a>
-        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl">Close</button>
+<div id="reportPage" class="page bg-gray-900">
+    <div class="header-bar"><h2 id="reportTitle" class="text-lg font-bold text-white">Report</h2></div>
+    <div class="content-area" id="reportFields"></div>
+    <div class="footer-bar flex gap-3">
+        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-700 font-bold rounded-xl">CANCEL</button>
+        <button id="btnSubmitRep" class="flex-[2] py-4 bg-green-600 font-black rounded-xl uppercase">Submit & End</button>
     </div>
 </div>
 <script>
@@ -992,6 +1099,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
