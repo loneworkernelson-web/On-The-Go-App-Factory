@@ -1,442 +1,160 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>%%APP_NAME%%</title>
-<meta name="apple-mobile-web-app-title" content="%%APP_NAME%%">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#111827">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="%%LOGO_DATA%%">
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-<style>
-/* 1. FORCE SYSTEM DIM: Toggling color-scheme is required to dim the OS navigation bar */
-html.system-dim, body.system-dim { 
-    background-color: #000000 !important; 
-    color-scheme: dark !important; 
-}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>%%APP_NAME%%</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* BASE STYLES & OS INTEGRATION */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none; 
+            background-color: #111827; 
+            color: white; 
+            height: 100%; 
+            width: 100%; 
+            overflow: hidden; 
+        }
 
-/* 2. BASE STYLES */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
+        /* PAGE ROUTING VISIBILITY */
+        .page { 
+            display: none; 
+            height: 100%; 
+            width: 100%; 
+            flex-direction: column; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+        }
+        .page.active { display: flex; z-index: 10; }
 
-/* FIX: This base .page class was missing, causing all pages to show at once */
-.page { 
-    display: none; 
-    height: 100%; 
-    width: 100%; 
-    flex-direction: column; 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    background-color: #111827; 
-}
+        /* UI COMPONENT STYLING */
+        .header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
+        .content-area { flex: 1; overflow-y: auto; padding: 1rem; position: relative; }
+        .footer-bar { padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; }
 
-.page.active { display: flex; z-index: 10; }
+        /* INPUTS & CARDS */
+        .form-input { width: 100%; background-color: #1f2937; border: 1px solid #4b5563; border-radius: 0.75rem; padding: 0.75rem; color: white; outline: none; margin-bottom: 0.75rem; }
+        .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+        .setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
+        
+        /* HARDWARE INDICATORS */
+        .gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; }
+        .gps-active { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
+        .long-press-btn { transition: transform 0.1s; }
+        .long-press-btn:active { transform: scale(0.96); }
 
-.header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
-.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
-
-/* 3. UPDATED FOOTER: Adds safety padding for the navigation bar */
-.footer-bar { 
-    padding: 1rem; 
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom)); 
-    background-color: #111827; 
-    border-top: 1px solid #374151; 
-    flex-shrink: 0; 
-    z-index: 20; 
-}
-/* Optimized Long-Press SOS Styling */
-.long-press-btn {
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.1s;
-    user-select: none; /* Prevents text selection during the hold */
-    -webkit-user-select: none;
-}
-
-.long-press-btn::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 0;
-    background: rgba(255, 255, 255, 0.3);
-    /* Transition for the reset (shrinks back quickly when released) */
-    transition: width 0.2s ease-out; 
-    z-index: 1;
-}
-
-/* When the button is held, the width expands over exactly 3 seconds */
-.long-press-btn.holding::after {
-    width: 100%;
-    transition: width 3s linear;
-}
-
-/* Visual feedback for the initial press */
-.long-press-btn:active {
-    transform: scale(0.96);
-}
-.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
-.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
-.form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-.form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
-.chip-btn { background-color: #374151; color: #e5e7eb; font-weight: 600; font-size: 0.75rem; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #4b5563; flex: 1; transition: all 0.1s; }
-.chip-btn:active { background-color: #2563eb; border-color: #3b82f6; transform: scale(0.95); }
-.chip-btn.selected { background-color: #2563eb; border-color: #3b82f6; color: white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
-.panic-mode { background-color: #7f1d1d !important; }
-.gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
-.gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
-.gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
-.gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
-.menu-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; background: #374151; border-radius: 0.75rem; border: 1px solid #4b5563; text-align: center; padding: 0.5rem; transition: all 0.2s; }
-.menu-icon-btn:active { background: #2563eb; transform: scale(0.95); }
-.wizard-step { display: none; height: 100%; flex-direction: column; }
-.wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
-@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-#toastMsg { z-index: 1000; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateY(-150%); }
-#toastMsg.show { transform: translateY(0); }
-#installBanner { animation: slideDown 0.5s ease-out; }
-@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
-.ios-arrow { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 10px solid #1f2937; }
-
-</style>
+        /* SLIDER STYLING */
+        .slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: #3b82f6; border-radius: 50%; border: 2px solid white; }
+    </style>
 </head>
 <body class="bg-gray-900 text-white">
 
-<div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-green-500 text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3">
-    <div class="text-xl">✅</div>
-    <div><p class="font-bold text-sm" id="toastText">Operation Successful</p></div>
+<div id="toast" class="hidden fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-2xl z-[100] flex items-center gap-3">
+    <div class="text-xl">ℹ️</div>
+    <p id="toastText" class="font-bold text-sm"></p>
 </div>
 
-<div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-4 z-[100] shadow-xl flex items-center justify-between">
-    <div class="flex items-center gap-3">
-        <span class="text-2xl">📲</span>
-        <div><p class="font-bold text-sm">Install Safety App</p><p class="text-xs opacity-90">Add to home screen for safety monitoring.</p></div>
-    </div>
-    <div class="flex gap-2"><button onclick="dismissInstall('android')" class="px-3 py-1 text-xs font-bold bg-blue-700 rounded">Later</button><button onclick="triggerInstall()" class="px-4 py-1 text-xs font-black bg-white text-blue-600 rounded">Install</button></div>
-</div>
-
-<div id="app-container" class="relative h-full w-full">
-<div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
-<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
-
-<div id="setupPage" class="page fixed inset-0 bg-gray-900 z-[60] flex flex-col overflow-hidden">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
+<div id="setupPage" class="page active bg-gray-900 z-[60]">
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center">
         <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
-        <div class="flex gap-1"><div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div><div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div><div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div></div>
     </div>
-<div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
-    <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
-    <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
-    
-    <label for="wiz_name" class="setting-label lbl-blue">Full Name</label>
-    <input type="text" id="wiz_name" class="form-input mb-4" placeholder="e.g. John Doe">
-    
-    <label for="wiz_phone" class="setting-label lbl-blue">Mobile Number</label>
-    <input type="tel" id="wiz_phone" class="form-input mb-4" placeholder="021...">
-    
-    <label for="wiz_email" class="setting-label lbl-blue">Work Email</label>
-    <input type="email" id="wiz_email" class="form-input mb-8" placeholder="name@org.co.nz">
-    
-    <div class="mt-auto">
-        <button onclick="wizNext(1)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
+
+    <div id="setup_step_identity" class="content-area">
+        <h2 class="text-3xl font-bold mb-2">Who are you?</h2>
+        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
+        <label for="set_workerName" class="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Full Name</label>
+        <input type="text" id="set_workerName" class="form-input" placeholder="e.g. John Doe">
+        <label for="set_url" class="block text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Google Sheet URL</label>
+        <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
+        <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg mt-8">Next: Security →</button>
+    </div>
+
+    <div id="setup_step_security" class="content-area hidden">
+        <h2 class="text-3xl font-bold mb-2">Security PIN</h2>
+        <p class="text-gray-400 mb-8 text-sm">Create a 4-digit code to unlock the app and declare safety.</p>
+        <label for="setup_pin1" class="block text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Create PIN</label>
+        <input type="password" id="setup_pin1" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest">
+        <label for="setup_pin2" class="block text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Confirm PIN</label>
+        <input type="password" id="setup_pin2" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest">
+        <div class="flex gap-3 mt-8">
+            <button onclick="wizBack('setup_step_security', 'setup_step_identity')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
+            <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl">Next: Review →</button>
+        </div>
+    </div>
+
+    <div id="setup_step_review" class="content-area hidden">
+        <h2 class="text-3xl font-bold mb-2">Ready?</h2>
+        <p class="text-gray-400 mb-8 text-sm">Pressing finish will launch your dashboard.</p>
+        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase">✅ Launch App</button>
     </div>
 </div>
-<div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
-    <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
-    <p class="text-gray-400 mb-6 text-sm">These 4-digit codes are stored privately on this phone.</p>
-    
-    <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
-        <label for="wiz_pin" class="block text-green-400 font-bold mb-1">1. Standard PIN</label>
-        <p class="text-xs text-gray-300 mb-3">Used to declare "I AM SAFE".</p>
-        <input id="wiz_pin" type="tel" maxlength="4" class="w-full bg-gray-900 border border-green-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-green-500" placeholder="0000">
-    </div>
 
-    <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
-        <label for="wiz_duress" class="block text-purple-400 font-bold mb-1">2. Duress PIN (Silent)</label>
-        <p class="text-xs text-gray-300 mb-3">Secretly sends a high-priority "DURESS" alert.</p>
-        <input id="wiz_duress" type="tel" maxlength="4" class="w-full bg-gray-900 border border-purple-500/50 rounded p-3 text-center text-xl tracking-widest text-white outline-none focus:border-purple-500" placeholder="9999">
-    </div>
-
-    <div class="mt-auto">
-        <button onclick="wizNext(2)" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-lg shadow-lg">Next: Contacts →</button>
-        <button onclick="wizBack(2)" class="w-full py-3 text-gray-400 font-bold mt-2">Back</button>
-    </div>
-</div>
-    <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
-    <h2 class="text-3xl font-bold text-white mb-2">Emergency Contacts</h2>
-    <p class="text-gray-400 mb-6 text-sm">These people will receive SMS/Email alerts.</p>
-    
-    <label for="wiz_emg_name" class="setting-label lbl-red">Primary Emergency Contact Name</label>
-    <input id="wiz_emg_name" class="form-input-card" placeholder="Name">
-    
-    <label for="wiz_emg_phone" class="setting-label text-xs text-gray-500 mt-2">Primary Mobile Number</label>
-    <input id="wiz_emg_phone" type="tel" class="form-input-card" placeholder="Mobile Number">
-    
-    <label for="wiz_emg_email" class="setting-label text-xs text-gray-500 mt-2">Primary Email Address</label>
-    <input id="wiz_emg_email" type="email" class="form-input mb-6" placeholder="Email Address">
-
-    <label for="wiz_esc_name" class="setting-label lbl-gray">Escalation Contact Name (Optional)</label>
-    <input id="wiz_esc_name" class="form-input-card" placeholder="Name">
-    
-    <label for="wiz_esc_phone" class="setting-label text-xs text-gray-500 mt-2">Escalation Mobile Number</label>
-    <input id="wiz_esc_phone" type="tel" class="form-input-card" placeholder="Mobile Number">
-    
-    <label for="wiz_esc_email" class="setting-label text-xs text-gray-500 mt-2">Escalation Email Address</label>
-    <input id="wiz_esc_email" type="email" class="form-input mb-8" placeholder="Email Address">
-
-    <div class="mt-auto">
-        <button onclick="wizSave()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl text-lg shadow-lg">
-            ✅ Save & Launch App
-        </button>
-        <button onclick="wizBack(3)" class="w-full py-3 text-gray-400 font-bold mt-2">Back</button>
-    </div>
-</div>
-</div>
-
-<div id="settingsPage" class="page bg-gray-800">
+<div id="mainPage" class="page">
     <div class="header-bar">
-        <h1 class="text-2xl font-bold text-white">Settings</h1>
-        <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
-    </div>
-    
-    <div class="content-area pb-24"> 
-        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
-            <p class="text-xs text-blue-200 font-bold">Restart the onboarding process?</p>
-            <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Setup Wizard</button>
+        <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1>
         </div>
-
-        <div class="setting-card border-gray-600">
-            <div class="setting-label lbl-blue">Your Identity</div>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Full Name</label>
-                    <input id="set_workerName" class="form-input-card text-sm font-bold" readonly placeholder="Not Set">
-                </div>
-                <div>
-                    <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Mobile Number</label>
-                    <input id="set_workerPhone" class="form-input-card text-sm font-bold" readonly placeholder="Not Set">
-                </div>
-                <div>
-                    <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Work Email</label>
-                    <input id="set_workerEmail" class="form-input-card text-sm font-bold" readonly placeholder="Not Set">
-                </div>
-            </div>
-        </div>
-
-        <div class="setting-card border-gray-600">
-            <div class="setting-label lbl-gray">Cloud & Storage</div>
-            <input id="set_url" disabled class="form-input-card text-[10px] font-mono text-gray-500 mb-2" value="%%GOOGLE_SHEET_URL%%">
-            <div class="flex gap-2">
-                <button onclick="forceSync(true)" class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded text-[10px] font-black text-white uppercase shadow-lg">Force Sync</button>
-                <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-[10px] font-black text-white uppercase">Clear Cache</button>
-                <button onclick="clearData()" class="flex-1 bg-red-900/50 text-red-400 hover:bg-red-900/70 py-2 rounded text-[10px] font-black uppercase">Reset App</button>
-            </div>
-        </div>
-
-        <div class="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center px-2">
-            <div class="flex flex-col">
-                <span class="text-[10px] text-gray-500 uppercase font-black tracking-widest">App Version</span>
-                <span id="diagApp" class="text-xs text-gray-400 font-bold">---</span>
-            </div>
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500 uppercase font-black tracking-widest">Cloud Version</span>
-                <span id="diagCloud" class="text-xs text-gray-400 font-bold">---</span>
-            </div>
-        </div>
-    </div> 
-</div>
-<div id="mainPage" class="page active">
-    <div class="header-bar">
-        <div class="flex items-center gap-2"><img src="%%LOGO_DATA%%" class="w-8 h-8 rounded bg-white object-contain" onerror="this.style.display='none'"> <h1 class="text-lg font-bold text-blue-400">%%ORG_NAME%%</h1></div>
         <div class="flex items-center gap-3">
-            <div class="flex flex-col items-end gap-0.5" id="gpsContainer"><span class="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">GPS</span><div class="flex gap-0.5" id="gpsBars"><div id="gps1" class="gps-bar"></div><div id="gps2" class="gps-bar"></div><div id="gps3" class="gps-bar"></div></div><div id="gpsError" class="hidden text-red-500 font-bold text-xs animate-pulse">❌ NO SIG</div></div>
-            <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700 text-gray-400">⚙️</button>
+            <div class="flex gap-0.5" id="gpsBars">
+                <div class="gps-bar gps-active"></div><div class="gps-bar gps-active"></div><div class="gps-bar"></div>
+            </div>
+            <button onclick="navigate('settings')" class="p-2 rounded-full hover:bg-gray-700">⚙️</button>
         </div>
     </div>
+    
     <div class="content-area">
-        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 font-bold uppercase tracking-widest"><div class="spinner"></div><span>Syncing...</span></div>
-        <div class="flex gap-2 mb-4"><button onclick="forceSync(true)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">↻</button><button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">+</button><div id="travelRow" class="flex-1"></div></div>
-        <div class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 ml-1">Safety Destinations</div>
+        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold uppercase tracking-widest animate-pulse">Syncing...</div>
+        <div id="travelRow" class="mb-4"></div>
+        <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Destinations</div>
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
-<div class="footer-bar">
-    <div class="flex justify-end items-center gap-2 mb-2">
-        <span class="text-[10px] font-bold text-gray-500 tracking-widest" id="lblHighRisk">Critical timing mode</span>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
-          <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
-        </label>
-    </div>
-    <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-        <div class="flex justify-between mb-2 font-black tracking-tighter"><span class="text-gray-400 text-[10px]">Estimated visit time</span><span id="durationDisplay" class="text-xs text-blue-400">0 mins</span></div>
-        <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
-    </div>
-    <div class="flex gap-4">
-        <button id="btnQuick" onclick="openQuickMenu()" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl border border-violet-700/50 shadow-lg active:scale-95 transition text-xs tracking-widest">Forms</button>
-        <button type="button" id="btnStart" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
-    </div>
-</div>
-</div>
 
-<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center pointer-events-none select-none">
-    <div class="absolute inset-0 bg-white/5 opacity-0 transition-opacity duration-[1500ms]" id="saverProgress"></div>
-    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em] z-10">Battery Saver Active</div>
-    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 z-10 border border-gray-900 px-4 py-2 rounded-full">Hold screen to wake</div>
-</div>
-
-<div id="lockedPage" class="page">
-    <div class="flex-1 flex flex-col justify-between p-6">
-        <div class="flex justify-between items-start">
-            <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700 shadow-xl" aria-label="Toggle Dark Mode">🌙</button>
-            <button id="btnPanic" class="long-press-btn w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl flex items-center justify-center select-none tracking-widest">
-                SOS
-            </button>
+    <div class="footer-bar">
+        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between mb-2"><span class="text-gray-400 text-[10px] font-black uppercase">Visit Time</span><span id="durationDisplay" class="text-xs text-blue-400 font-bold">0 mins</span></div>
+            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
         </div>
+        <button id="panicBtn" class="long-press-btn w-full py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest">Hold for SOS</button>
+    </div>
+</div>
 
-        <div class="text-center">
-            <div class="setting-label lbl-blue">Active Visit</div>
-            
-            <p class="text-gray-500 text-xs uppercase font-black tracking-[0.3em] mt-2">Currently Active At</p>
-            <div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()">
-                <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px] tracking-tight"></h2>
-                <span class="text-blue-400 text-xl">ℹ️</span>
-            </div>
-            
-            <div id="highRiskBadge" class="hidden text-red-500 font-black text-xs uppercase tracking-widest border border-red-500 inline-block px-3 py-1 rounded-lg mb-2">⚡ CRITICAL TIMING MODE</div>
-            <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse my-2 tracking-[0.2em] border-2 border-red-500 inline-block px-6 py-2 rounded-xl uppercase">OVERDUE</div>
-            
-            <div id="countdownTimer" class="text-8xl font-bold font-mono text-white tracking-tighter">00:00</div>
-            
-            <div class="setting-label lbl-red mt-4">Manual SOS</div>
-            
-            <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span></p>
-        </div>
-
-        <div class="space-y-3 w-full">
-            <div class="flex gap-3">
-                <button id="btnExtend" class="long-press-btn flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest" onclick="showModal('extend')">Extend</button>
-                <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">Notes</button>
-            </div>
-            <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">Hold to END</button>
-            <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">I AM SAFE</button>
+<div id="lockedPage" class="page bg-black">
+    <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div id="visitTimer" class="text-8xl font-mono font-bold text-white tracking-tighter">00:00</div>
+        <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2">---</h2>
+        
+        <div class="mt-12 w-full max-w-xs space-y-4">
+            <input type="password" id="lock_pin_input" maxlength="4" inputmode="numeric" placeholder="Enter PIN" class="form-input text-center text-3xl tracking-[0.5em]">
+            <button onclick="checkPin()" class="w-full py-4 bg-blue-600 font-bold rounded-2xl text-lg">Unlock Options</button>
+            <button onclick="endVisit()" class="w-full py-4 bg-red-600 font-bold rounded-2xl text-lg">End Visit</button>
         </div>
     </div>
 </div>
 
-<div id="modalBackdrop" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
-    <div id="infoModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto border border-gray-700">
-        <h2 id="infoTitle" class="text-2xl font-black text-white mb-4 tracking-tight border-b border-gray-700 pb-2">Site Info</h2>
-        <div id="siteInfoContent" class="text-gray-300 text-sm space-y-3 mb-6 font-medium"></div>
-        <div class="flex gap-3 mb-4">
-            <a id="btnSiteCall" href="#" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest hidden shadow-lg">📞 Call</a>
-            <a id="btnSiteEmail" href="#" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest hidden shadow-lg">✉️ Email</a>
+<div id="reportPage" class="page bg-gray-900 z-50">
+    <div class="header-bar">
+        <h2 id="reportTitle" class="text-lg font-bold">Visit Report</h2>
+    </div>
+    <div class="content-area" id="reportFields">
         </div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl text-center mb-4 hidden shadow-xl uppercase tracking-widest">🗺️ Navigate to Site</a>
-        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-xl uppercase tracking-widest border border-gray-600">Close</button>
-    </div>
-
-    <div id="extendModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center border border-gray-700">
-        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Extend Visit</h2>
-        <div class="grid grid-cols-3 gap-3 mb-8">
-            <button onclick="confirmExtension(10)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+10</button>
-            <button onclick="confirmExtension(15)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+15</button>
-            <button onclick="confirmExtension(30)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+30</button>
-        </div>
-        <button onclick="closeModal('extend')" class="w-full py-4 bg-gray-700 hover:bg-gray-600 rounded-xl font-black text-gray-400 uppercase tracking-widest border border-gray-600">Cancel</button>
-    </div>
-
-    <div id="pinModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-xs p-6 text-center border border-gray-700">
-        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Security PIN</h2>
-        <input type="password" id="pinInput" maxlength="4" class="text-center text-4xl tracking-[0.5em] w-full bg-gray-900 border-2 border-gray-700 rounded-xl py-4 text-white focus:outline-none focus:border-blue-500 font-mono shadow-inner mb-6" inputmode="numeric">
-        <div class="grid grid-cols-2 gap-3">
-            <button id="cancelPinBtn" onclick="closeModal('pin')" class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-black py-3 rounded-xl uppercase text-xs tracking-widest border border-gray-600">Cancel</button>
-            <button id="confirmPinBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl shadow-lg uppercase text-xs tracking-widest">Confirm</button>
-        </div>
-    </div>
-
-    <div id="templateModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center border border-gray-700">
-        <h2 id="modalMenuTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Select Form</h2>
-        <div id="templateList" class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2"></div>
-        <button onclick="closeModal('template')" class="mt-6 w-full py-4 bg-gray-700 hover:bg-gray-600 rounded-xl font-black text-white uppercase tracking-widest border border-gray-600">Cancel</button>
-    </div>
-
-<div id="reportModal" class="hidden bg-gray-800 w-full max-w-lg rounded-xl p-6 max-h-[90vh] flex flex-col border border-gray-700 shadow-2xl">
-    <h2 class="text-2xl font-bold text-white mb-6 flex-shrink-0" id="reportTitle">Report</h2>
-    
-    <div id="reportFields" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div>
-    
-    <div class="flex gap-3 flex-shrink-0 border-t border-gray-700 pt-4">
-        <button onclick="closeModal('report')" class="flex-1 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold">Cancel</button>
-        <button id="btnSubmitRep" class="long-press-btn flex-1 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold shadow-lg">Submit & END</button>
+    <div class="footer-bar flex gap-3">
+        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-700 font-bold rounded-xl">Cancel</button>
+        <button id="btnSubmitRep" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl">Submit Report</button>
     </div>
 </div>
 
-    <div id="checkinModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-yellow-500">
-        <h2 class="text-3xl font-black text-yellow-400 mb-2 uppercase tracking-tighter">Are you OK?</h2>
-        <p class="text-lg text-gray-300 mb-6 font-bold leading-tight">Scheduled Safety Check-in Required.</p>
-        <div id="checkinCountdown" class="text-7xl font-black text-yellow-400 mb-8 font-mono tracking-tighter">2:00</div>
-        <button id="btnCheckinConfirm" class="long-press-btn w-full bg-green-600 hover:bg-green-500 text-white font-black py-5 px-4 rounded-2xl text-2xl shadow-2xl uppercase tracking-widest">Hold to Confirm</button>
+<div id="infoModal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
+        <h2 id="infoTitle" class="text-xl font-bold mb-4">Site Info</h2>
+        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
+        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-blue-600 text-white font-bold rounded-xl text-center mb-3">Navigate to Site</a>
+        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl">Close</button>
     </div>
-
-    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 relative z-50 border border-gray-700">
-        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
-        <input type="hidden" id="locId">
-        <div class="space-y-4">
-            <div><label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Business Name</label><input type="text" id="locBusiness" class="form-input" placeholder="Optional"></div>
-            <div><label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label><input type="text" id="locName" class="form-input" placeholder="Required"></div>
-            <div><label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label><div class="flex gap-2"><input type="text" id="locAddr" class="form-input mb-0 flex-1 font-medium"><button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl font-black text-xs shrink-0 shadow-lg uppercase">📍 GPS</button></div></div>
-            <div id="advLocOptions" class="pt-4 border-t border-gray-700">
-                <div class="mb-4 bg-gray-900 p-3 rounded-xl shadow-inner">
-                    <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest block mb-3">Report Required on Departure?</label>
-                    <div class="flex gap-8">
-                        <label class="flex items-center gap-3 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-6 h-6 text-blue-600"> <span class="text-sm text-white font-black uppercase">Yes</span></label>
-                        <label class="flex items-center gap-3 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-6 h-6 text-red-500"> <span class="text-sm text-gray-400 font-black uppercase">No</span></label>
-                    </div>
-                </div>
-                <div><label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Specific Form Template</label><input type="text" id="locTemplate" class="form-input text-sm font-bold" placeholder="(Standard Visit)"></div>
-            </div>
-        </div>
-        <div class="mt-8 flex justify-between gap-3">
-            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl hidden uppercase text-xs tracking-widest border border-red-800/30">Delete</button>
-            <div class="flex-1"></div>
-            <button onclick="closeModal('location')" class="bg-gray-700 hover:bg-gray-600 text-white font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest">Cancel</button>
-            <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs tracking-widest">Save</button>
-        </div>
-    </div>
-
-    <div id="wofBlockModal" class="hidden bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-10 text-center border-4 border-red-600 animate-pulse">
-        <div class="text-7xl mb-6">⛔</div>
-        <h2 class="text-3xl font-black text-red-500 mb-4 uppercase tracking-tighter">STOP</h2>
-        <p class="text-lg text-white font-bold mb-6">This vehicle has an EXPIRED WOF or Registration. It is prohibited for work use.</p>
-        <button onclick="closeWofBlocker()" class="w-full py-5 bg-red-600 text-white font-black rounded-2xl text-xl shadow-2xl">I Understand</button>
-    </div>
-
-    <div id="wofWarnModal" class="hidden bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-orange-500">
-        <div class="text-6xl mb-4">⚠️</div>
-        <h2 class="text-2xl font-black text-orange-500 mb-2 uppercase tracking-tight">VEHICLE COMPLIANCE</h2>
-        <p class="text-white font-bold mb-6">Vehicle WOF or Rego is expiring soon:<br><span id="wofWarnText" class="text-2xl text-orange-400 font-black"></span></p>
-        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 text-left mb-6">
-            <label class="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" id="chkWofAck" class="mt-1 w-6 h-6 rounded text-blue-600" onchange="toggleWofContinue()">
-                <span class="text-sm text-gray-300 font-bold">I acknowledge the vehicle is legal and safe to operate.</span>
-            </label>
-        </div>
-        <button id="btnWofContinue" disabled onclick="closeWofWarn()" class="w-full py-4 bg-gray-700 text-gray-500 font-black rounded-2xl text-lg transition-all">Continue</button>
-    </div>
- </div> 
+</div>
 <script>
 // --- 1. GLOBAL CONSTANTS & CORE STATE ---
 const APP_VERSION = "v79.35";
@@ -635,6 +353,49 @@ function speak(text) {
     msg.rate = 0.9;
     msg.pitch = 1;
     window.speechSynthesis.speak(msg);
+}
+/**
+ * MISSING: Generates the standard gray location tiles.
+ */
+function createLocationTile(loc) {
+    const d = document.createElement('div');
+    const isSel = state.selectedLocationId === loc.id;
+    d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-gray-800'}`;
+    d.innerHTML = `
+        <div class="text-3xl">${loc.icon || '🏢'}</div>
+        <div class="flex-1">
+            <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1">${loc.companyName || 'Site'}</div>
+            <div class="text-lg font-black text-white leading-tight">${loc.name}</div>
+        </div>
+    `;
+    d.onclick = () => { state.selectedLocationId = isSel ? null : loc.id; renderLocations(); };
+    return d;
+}
+
+/**
+ * MISSING: Required for the signature [SIGN] tag to work.
+ */
+function resizeCanvas(canvas) {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    canvas.width = canvas.offsetWidth * ratio;
+    canvas.height = canvas.offsetHeight * ratio;
+    canvas.getContext("2d").scale(ratio, ratio);
+}
+
+function initSigPad(canvas) {
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+    canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener('mousemove', (e) => { if (!drawing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+    window.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('touchstart', (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); }, {passive: false});
+    canvas.addEventListener('touchmove', (e) => { if (!drawing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, {passive: false});
 }
 
 /**
@@ -1260,6 +1021,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
