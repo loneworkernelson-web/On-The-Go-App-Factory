@@ -518,23 +518,22 @@ function createTravelTile(loc) {
     return d;
 }
 
-/*Fully Patched Form Builder*/
-/* - Resolves Accessibility: All <label> elements associated with unique IDs.*/
-/* - Activates Interactive Tags: [PHOTO], [GPS], [SIGN], [DROP], [$].*/
-/* - Standardized Styling: Consistent with dashboard theme.*/
 /**
- * FIXED: buildReportForm (Resolves SyntaxError and Tag Logic)
+ * FIXED: buildReportForm (Restores Golden UI with [$], [TIME], and [GPS] tags)
  */
 function buildReportForm(n, c) {
     state.photoStore = {};
     const sn = n ? n.trim() : "(Standard)";
+    
+    // 1. Template Resolution
     let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || 
                     state.cachedForms[sn] || 
                     state.cachedForms["(Standard)"];
+    
     c.innerHTML = '';
     
     if (!questions) {
-        c.innerHTML = '<label class="setting-label">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+        c.innerHTML = '<label class="setting-label">Visit Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
         return;
     }
 
@@ -543,46 +542,86 @@ function buildReportForm(n, c) {
         const upper = labelText.toUpperCase();
         const fieldId = `dyn_field_${i}`;
 
-        if (upper.includes('[HEADING]')) { type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').trim(); }
-        else if (upper.includes('[SIGN]')) { type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); }
-        else if (upper.includes('[PHOTO]')) { type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); }
-        else if (upper.startsWith('[DROP')) {
+        // 2. Advanced Tag Detection
+        if (upper.includes('[HEADING]')) { 
+            type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').trim(); 
+        } else if (upper.includes('[SIGN]')) { 
+            type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); 
+        } else if (upper.includes('[PHOTO]')) { 
+            type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); 
+        } else if (upper.includes('[GPS]')) { 
+            type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); 
+        } else if (upper.includes('[YESNO]')) { 
+            type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); 
+        } else if (upper.includes('[CHECK]')) { 
+            type = 'checkbox'; labelText = labelText.replace(/\[CHECK\]/gi, '').trim(); 
+        } else if (upper.includes('[DATE]')) { 
+            type = 'date'; labelText = labelText.replace(/\[DATE\]/gi, '').trim(); 
+        } else if (upper.includes('[TIME]')) { 
+            // RESTORED: [TIME] tag support
+            type = 'time'; labelText = labelText.replace(/\[TIME\]/gi, '').trim(); 
+        } else if (upper.includes('[NUMBER]')) { 
+            type = 'number'; labelText = labelText.replace(/\[NUMBER\]/gi, '').trim(); 
+        } else if (upper.includes('[$]')) { 
+            // RESTORED: [$] Currency tag support
+            type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); 
+        } else if (upper.includes('[1TEXT]')) { 
+            type = '1text'; labelText = labelText.replace(/\[1TEXT\]/gi, '').trim(); 
+        } else if (upper.startsWith('[DROP')) {
             type = 'drop';
             const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-            if (match) { dropOptions = match[1].split(',').map(o => o.trim()); labelText = labelText.replace(match[0], '').trim(); }
+            if (match) { 
+                dropOptions = match[1].split(',').map(o => o.trim()); 
+                labelText = labelText.replace(match[0], '').trim(); 
+            }
         }
 
         const container = document.createElement('div');
         container.className = "mb-4";
 
+        // 3. Render Element Logic
         if (type === 'header') {
             container.innerHTML = `<h3 class="text-blue-400 font-bold uppercase text-xs border-b border-gray-700 pb-1 mb-2">${labelText}</h3>`;
         } else {
             container.innerHTML = `<label for="${fieldId}" class="setting-label lbl-gray">${labelText}</label>`;
+
             if (type === 'photo') {
-                container.innerHTML += `<button type="button" onclick="document.getElementById('${fieldId}').click()" class="form-input text-center">📸 Take Photo</button>
+                container.innerHTML += `<button type="button" onclick="document.getElementById('${fieldId}').click()" id="lbl_${i}" class="form-input text-center">📸 Take Photo</button>
                                         <input type="file" id="${fieldId}" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">`;
             } else if (type === 'signature') {
                 container.innerHTML += `<div class="bg-white rounded-lg p-1"><canvas id="sig-canvas-${i}" class="w-full h-40"></canvas></div>
                                         <button type="button" class="text-[10px] font-bold text-gray-500 uppercase mt-1" onclick="clearSig(${i})">Clear Signature</button>`;
+            } else if (type === 'gps') {
+                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-lg text-xs font-bold uppercase">GPS</button>
+                                        <input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs" readonly data-key="${labelText}" placeholder="Capture GPS"></div>`;
+            } else if (type === 'currency') {
+                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                                        <input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${labelText}"></div>`;
+            } else if (type === 'time' || type === 'date' || type === 'number' || type === '1text') {
+                const inputType = (type === '1text') ? 'text' : type;
+                container.innerHTML += `<input type="${inputType}" id="${fieldId}" class="form-input font-bold" data-key="${labelText}">`;
+            } else if (type === 'checkbox') {
+                container.innerHTML = `<label class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 active:bg-gray-700 cursor-pointer">
+                                        <input id="${fieldId}" type="checkbox" class="w-7 h-7 text-blue-600 rounded" data-key="${labelText}">
+                                        <span class="text-sm font-bold text-gray-200 select-none">${labelText}</span></label>`;
             } else if (type === 'drop') {
                 let opts = dropOptions.map(o => `<option value="${o}">${o}</option>`).join('');
                 container.innerHTML += `<select id="${fieldId}" class="form-input font-bold" data-key="${labelText}"><option value="">Select...</option>${opts}</select>`;
             } else {
-                container.innerHTML += `<textarea id="${fieldId}" class="form-input" data-key="${labelText}"></textarea>`;
+                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24" data-key="${labelText}"></textarea>`;
             }
         }
         c.appendChild(container);
     });
 
+    // 4. Hardware Re-Initialization
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
-            resizeCanvas(canvas);
-            initSigPad(canvas);
+            if (typeof resizeCanvas === 'function') resizeCanvas(canvas);
+            if (typeof initSigPad === 'function') initSigPad(canvas);
         });
     }, 600);
 }
-
 /**
  * Processes and saves the security PIN.
  * Uses Base64 encoding as a basic masking layer before saving to state.
@@ -604,45 +643,49 @@ function savePin() {
 }
 
 /**
- * Finalizes the setup and moves the user to the dashboard.
+ * FIXED: finishSetup (Captures contact emails and diagnostic IDs)
  */
 async function finishSetup() {
-    // 1. Capture Identity
     state.settings.workerName = document.getElementById('set_workerName').value;
     state.settings.workerPhone = document.getElementById('set_workerPhone').value;
     state.settings.workerEmail = document.getElementById('set_workerEmail').value;
     
-    // 2. Capture Emergency Contacts
     state.settings.emergency = {
         primary: { 
             name: document.getElementById('set_emgName')?.value || "", 
-            phone: document.getElementById('set_emgPhone')?.value || "" 
+            phone: document.getElementById('set_emgPhone')?.value || "",
+            email: document.getElementById('set_emgEmail')?.value || "" // RESTORED
         },
         escalation: {
             name: document.getElementById('set_escName')?.value || "",
-            phone: document.getElementById('set_escPhone')?.value || ""
+            phone: document.getElementById('set_escPhone')?.value || "",
+            email: document.getElementById('set_escEmail')?.value || "" // RESTORED
         }
     };
 
     if (state.settings.workerName) {
-        await saveState(); // Standard navigator.storage API runs here
-        showToast("Setup Complete!");
-        navigate('main'); // Now correctly triggers the 'active' class
+        await saveState();
+        showToast("App Synchronised");
+        navigate('main');
     } else {
         showToast("Please enter your name");
     }
 }
+    
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
 function populateSettingsForm() {
-    // System URL remains visible in settings but hidden from wizard
     const urlInput = document.getElementById('set_url');
     if (urlInput) urlInput.value = state.settings.googleSheetUrl || "%%GOOGLE_SHEET_URL%%";
 
-    // Diagnostic labels
-    document.getElementById('diagApp').innerText = APP_VERSION;
-    document.getElementById('diagCloud').innerText = state.meta.backendVersion || "Not Synced";
+    // Update Diagnostics Card
+    const diagId = document.getElementById('set_workerName_diag');
+    if (diagId) diagId.innerText = state.settings.workerName || "Not Setup";
+    
+    const diagApp = document.getElementById('diagApp');
+    if (diagApp) diagApp.innerText = "Version: " + APP_VERSION;
 }
+    
 /**
  * Core Routing: Switches between different app screens.
  * @param {string} pageId - The ID of the div to show (e.g., 'setup', 'main', 'locked').
@@ -813,12 +856,13 @@ function initLocations() {
  * RESTORED: Advanced Smoothing, Compression, and Hardware Integration
  */
 
+/**
+ * FIXED: renderLocations (Glues tiles to the footer button)
+ */
 function renderLocations() {
     const list = document.getElementById('locationList');
     const travel = document.getElementById('travelRow');
-    const footerBtn = document.getElementById('panicBtn'); // This is your big footer button
-    
-    if (!list || !travel || !footerBtn) return;
+    if (!list || !travel) return;
     
     list.innerHTML = ''; travel.innerHTML = '';
 
@@ -828,15 +872,32 @@ function renderLocations() {
         (loc.id === 'travel') ? travel.appendChild(tile) : list.appendChild(tile);
     });
 
-    // GOLDEN LOGIC: Contextual Footer Button
-    if (state.selectedLocationId) {
-        const selectedLoc = state.locations.find(l => l.id === state.selectedLocationId);
-        footerBtn.innerText = `Hold to Start: ${selectedLoc.name}`;
-        footerBtn.className = "long-press-btn w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase tracking-widest shadow-xl pulse-border";
-        footerBtn.onclick = () => startVisit(state.selectedLocationId); 
+    updateArrivedButtonState(); // Ensure footer button reflects selection
+}
+
+/**
+ * FIXED: updateArrivedButtonState (Preserves "Hold to Start" vs "Hold for SOS")
+ */
+function updateArrivedButtonState() {
+    const footerBtn = document.getElementById('panicBtn');
+    const val = parseInt(document.getElementById('durationSlider').value);
+    const display = document.getElementById('durationDisplay');
+    
+    // Calculate minutes
+    const mins = val <= 10 ? val * 5 : (val - 10) * 15 + 50;
+    state.visitDurationMinutes = mins;
+    if (display) display.innerText = mins + " mins";
+
+    if (state.selectedLocationId && mins > 0) {
+        const loc = state.locations.find(l => l.id === state.selectedLocationId);
+        footerBtn.innerText = `Hold to Start: ${loc.name}`;
+        // GOLDEN START: Blue appearance with pulse
+        footerBtn.className = "long-press-btn flex-1 py-4 bg-blue-600 text-white font-black rounded-xl uppercase tracking-widest shadow-xl pulse-border";
+        footerBtn.onclick = () => startVisit(state.selectedLocationId);
     } else {
         footerBtn.innerText = "Hold for SOS";
-        footerBtn.className = "long-press-btn w-full py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest";
+        // GOLDEN SOS: Red appearance
+        footerBtn.className = "long-press-btn flex-1 py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest";
         footerBtn.onclick = () => handlePanic();
     }
 }
@@ -1067,3 +1128,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
