@@ -150,18 +150,18 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
     <div class="footer-bar">
-        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2 font-black tracking-tighter">
-                <span class="text-gray-400 text-[10px] uppercase">Estimated visit time</span>
-                <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
-            </div>
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+    <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+        <div class="flex justify-between mb-2 font-black tracking-tighter">
+            <span class="text-gray-400 text-[10px] uppercase">Estimated visit time</span>
+            <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
         </div>
-        <div class="flex gap-4">
-            <button id="btnQuick" onclick="showModal('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
-            <button type="button" id="panicBtn" class="long-press-btn flex-1 py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest">Hold for SOS</button>
-        </div>
+        <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
     </div>
+    <div class="flex gap-4">
+        <button id="btnQuick" onclick="showModal('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
+        <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
+    </div>
+</div>
 </div>
 
 <div id="batterySaver" class="hidden fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center select-none">
@@ -171,13 +171,20 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <div id="lockedPage" class="page bg-black">
-    <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <div id="visitTimer" class="text-8xl font-mono font-bold text-white tracking-tighter">00:00</div>
-        <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2 tracking-tight">---</h2>
-        <div class="mt-12 w-full max-w-xs space-y-4">
-            <input type="password" id="lock_pin_input" maxlength="4" inputmode="numeric" placeholder="Enter PIN" class="form-input text-center text-3xl tracking-[0.5em]">
-            <button onclick="checkPin()" class="w-full py-4 bg-blue-600 font-bold rounded-2xl text-lg">Unlock Options</button>
-            <button onclick="endVisit()" class="w-full py-4 bg-red-600 font-bold rounded-2xl text-lg">End Visit</button>
+    <div class="flex-1 flex flex-col p-6">
+        <div class="flex justify-end mb-8">
+            <button onclick="handlePanic()" class="w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none tracking-widest">SOS</button>
+        </div>
+        
+        <div class="text-center flex-1">
+            <div id="visitTimer" class="text-8xl font-mono font-bold text-white tracking-tighter">00:00</div>
+            <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2 tracking-tight">---</h2>
+            
+            <div class="mt-12 w-full max-w-xs mx-auto space-y-4">
+                <input type="password" id="lock_pin_input" maxlength="4" inputmode="numeric" placeholder="Enter PIN" class="form-input text-center text-3xl tracking-[0.5em]">
+                <button onclick="checkPin()" class="w-full py-4 bg-blue-600 font-bold rounded-2xl text-lg">Unlock Options</button>
+                <button onclick="endVisit()" class="w-full py-4 bg-red-600 font-bold rounded-2xl text-lg">End Visit</button>
+            </div>
         </div>
     </div>
 </div>
@@ -213,18 +220,50 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
     </div>
 
-    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
-        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
-        <div class="space-y-4">
-            <input type="text" id="locName" class="form-input" placeholder="Site Name (Required)">
-            <input type="text" id="locBusiness" class="form-input" placeholder="Company Name (Optional)">
-            <input type="text" id="locAddr" class="form-input" placeholder="Physical Address">
+<div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
+    <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
+    
+    <input type="hidden" id="locId">
+    
+    <div class="space-y-4">
+        <div>
+            <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label>
+            <input type="text" id="locName" class="form-input" placeholder="Required">
         </div>
-        <div class="mt-8 flex gap-3">
-            <button onclick="closeModal('location')" class="flex-1 bg-gray-700 py-3 rounded-xl text-white font-bold">Cancel</button>
-            <button onclick="saveLoc()" class="flex-[2] bg-blue-600 py-3 rounded-xl text-white font-bold shadow-lg">Save Site</button>
+        <div>
+            <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Business Name</label>
+            <input type="text" id="locBusiness" class="form-input" placeholder="Optional">
+        </div>
+        <div>
+            <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
+            <div class="flex gap-2">
+                <input type="text" id="locAddr" class="form-input mb-0 flex-1 font-medium">
+                <button onclick="getGpsAddress()" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl font-black text-xs shrink-0 shadow-lg">📍 GPS</button>
+            </div>
+        </div>
+        
+        <div id="advLocOptions" class="pt-4 border-t border-gray-700">
+            <div class="mb-4 bg-gray-900 p-3 rounded-xl shadow-inner">
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest block mb-3">Report Required on Departure?</label>
+                <div class="flex gap-8">
+                    <label class="flex items-center gap-3 cursor-pointer"><input type="radio" name="reportReq" id="radRepYes" class="w-6 h-6 text-blue-600"> <span class="text-sm text-white font-black uppercase">Yes</span></label>
+                    <label class="flex items-center gap-3 cursor-pointer"><input type="radio" name="reportReq" id="radRepNo" class="w-6 h-6 text-red-500"> <span class="text-sm text-gray-400 font-black uppercase">No</span></label>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Specific Form Template</label>
+                <input type="text" id="locTemplate" class="form-input text-sm font-bold" placeholder="(Standard Visit)">
+            </div>
         </div>
     </div>
+    
+    <div class="mt-8 flex justify-between gap-3">
+        <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl hidden uppercase text-xs tracking-widest border border-red-800/30">Delete</button>
+        <div class="flex-1"></div>
+        <button onclick="closeModal('location')" class="bg-gray-700 hover:bg-gray-600 text-white font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest">Cancel</button>
+        <button onclick="saveLoc()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs tracking-widest">Save</button>
+    </div>
+</div>
 
     <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
         <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Forms Library</h2>
@@ -903,29 +942,41 @@ function renderLocations() {
 }
 
 /**
- * FIXED: updateArrivedButtonState (Preserves "Hold to Start" vs "Hold for SOS")
+ * FIXED: Contextual Footer Logic (Travel vs Start)
  */
 function updateArrivedButtonState() {
-    const footerBtn = document.getElementById('panicBtn');
+    const btn = document.getElementById('btnMainAction');
     const val = parseInt(document.getElementById('durationSlider').value);
     const display = document.getElementById('durationDisplay');
     
-    // Calculate minutes
+    // Calculate minutes based on slider
     const mins = val <= 10 ? val * 5 : (val - 10) * 15 + 50;
     state.visitDurationMinutes = mins;
     if (display) display.innerText = mins + " mins";
 
+    // Identification of selections
+    const isTravelSelected = (state.selectedLocationId === 'travel');
+    const hasSiteSelected = state.locations.some(l => l.id === state.selectedLocationId && l.id !== 'travel');
+
     if (state.selectedLocationId && mins > 0) {
         const loc = state.locations.find(l => l.id === state.selectedLocationId);
-        footerBtn.innerText = `Hold to Start: ${loc.name}`;
-        // GOLDEN START: Blue appearance with pulse
-        footerBtn.className = "long-press-btn flex-1 py-4 bg-blue-600 text-white font-black rounded-xl uppercase tracking-widest shadow-xl pulse-border";
-        footerBtn.onclick = () => startVisit(state.selectedLocationId);
+        btn.disabled = false;
+        btn.classList.replace('bg-gray-700', 'bg-blue-600');
+        btn.classList.replace('text-gray-500', 'text-white');
+
+        // GOLDEN LOGIC: Contextual Text
+        if (isTravelSelected) {
+            btn.innerText = "Travel to Destination";
+        } else {
+            btn.innerText = `Hold to Start: ${loc.name}`;
+        }
+        btn.onclick = () => startVisit(state.selectedLocationId);
     } else {
-        footerBtn.innerText = "Hold for SOS";
-        // GOLDEN SOS: Red appearance
-        footerBtn.className = "long-press-btn flex-1 py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest";
-        footerBtn.onclick = () => handlePanic();
+        // Disabled state
+        btn.disabled = true;
+        btn.innerText = "Start";
+        btn.classList.replace('bg-blue-600', 'bg-gray-700');
+        btn.classList.replace('text-white', 'text-gray-500');
     }
 }
 
@@ -1127,25 +1178,30 @@ function showSiteInfo(id, e) {
     showModal('info');
 }
 
-    /**
- * FIXED: Location Manager (Resolves ReferenceError)
+/**
+ * FIXED: Location Manager (Handles both New and Edit modes)
  */
 function openLocModal(id = null) {
     const title = document.getElementById('locModalTitle');
     const nameInp = document.getElementById('locName');
     const busInp = document.getElementById('locBusiness');
     const addrInp = document.getElementById('locAddr');
+    const idInp = document.getElementById('locId'); // Ensure this hidden input exists in HTML
 
     if (id) {
+        // EDIT MODE: Populate fields from existing data
         const loc = state.locations.find(l => l.id === id);
         if (loc) {
             title.innerText = "Edit Site";
-            nameInp.value = loc.name;
+            if (idInp) idInp.value = id;
+            nameInp.value = loc.name || "";
             busInp.value = loc.companyName || "";
             addrInp.value = loc.address || "";
         }
     } else {
+        // NEW MODE: Clear all fields
         title.innerText = "New Destination";
+        if (idInp) idInp.value = "";
         nameInp.value = ""; busInp.value = ""; addrInp.value = "";
     }
     showModal('location');
@@ -1153,21 +1209,37 @@ function openLocModal(id = null) {
 
 async function saveLoc() {
     const name = document.getElementById('locName').value;
+    const id = document.getElementById('locId')?.value; // Check if we are editing
+    
     if (!name) return showToast("Site Name is required");
 
-    const newLoc = {
-        id: 'loc_' + Date.now(),
+    const locData = {
         name: name,
         companyName: document.getElementById('locBusiness').value,
         address: document.getElementById('locAddr').value,
         icon: '🏢'
     };
 
-    state.locations.push(newLoc);
-    await saveState();
+    if (id) {
+        // GOLDEN FIX: Update existing site instead of duplicating
+        const index = state.locations.findIndex(l => l.id === id);
+        if (index !== -1) {
+            state.locations[index] = { ...state.locations[index], ...locData };
+            showToast("Site details updated");
+        }
+    } else {
+        // ADD MODE: Create new unique ID
+        const newLoc = {
+            id: 'loc_' + Date.now(),
+            ...locData
+        };
+        state.locations.push(newLoc);
+        showToast("Site added to database");
+    }
+
+    await saveState(); // Standardized navigator.storage call
     closeModal('location');
     renderLocations();
-    showToast("Site added to database");
 }
 // --- 6. STARTUP SEQUENCE ---
 
@@ -1197,5 +1269,6 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
