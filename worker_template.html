@@ -94,12 +94,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
         <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
         <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
-            <h3 class="text-green-400 font-bold mb-1">1. Standard PIN</h3>
+            <h3 class="text-green-400 font-bold mb-1">1. Standard PIN (Local Only)</h3>
             <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
             <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest mt-2" placeholder="Confirm">
         </div>
         <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
-            <h3 class="text-purple-400 font-bold mb-1">2. Duress PIN (Silent)</h3>
+            <h3 class="text-purple-400 font-bold mb-1">2. Duress PIN (Local Only)</h3>
             <input id="set_duressPin" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest border-purple-500/50" placeholder="9999">
         </div>
         <div class="flex gap-3 mt-auto">
@@ -134,34 +134,32 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <span class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">Safety Dashboard</span>
         </div>
         <div class="flex items-center gap-2">
-            <button onclick="forceSync()" class="p-2 bg-gray-800 rounded-lg text-blue-400">🔄</button>
-            <button onclick="showModal('template')" class="p-2 bg-gray-800 rounded-lg text-purple-400">📝</button>
             <button onclick="navigate('settings')" class="p-2 text-gray-400">⚙️</button>
         </div>
     </div>
     <div class="content-area">
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold animate-pulse">Syncing...</div>
         <div class="flex gap-2 mb-4">
-            <button onclick="forceSync(true)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition">↻</button>
-            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition">+</button>
+            <button onclick="forceSync(true)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg transition">↻</button>
+            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg transition">+</button>
             <div id="travelRow" class="flex-1"></div>
         </div>
         <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Safety Destinations</div>
         <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
     </div>
     <div class="footer-bar">
-    <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-        <div class="flex justify-between mb-2 font-black tracking-tighter">
-            <span class="text-gray-400 text-[10px] uppercase">Estimated visit time</span>
-            <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
+        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between mb-2 font-black tracking-tighter">
+                <span class="text-gray-400 text-[10px] uppercase">Estimated visit time</span>
+                <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
+            </div>
+            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
-        <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+        <div class="flex gap-4">
+            <button id="btnQuick" onclick="showModal('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
+            <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
+        </div>
     </div>
-    <div class="flex gap-4">
-        <button id="btnQuick" onclick="showModal('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
-        <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
-    </div>
-</div>
 </div>
 
 <div id="batterySaver" class="hidden fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center select-none">
@@ -198,13 +196,20 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div class="setting-card">
             <label for="set_url" class="setting-label lbl-blue">System URL</label>
             <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
+            <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear System Cache & Reset</button>
         </div>
-        <div class="setting-card">
-            <label for="set_workerName_diag" class="setting-label lbl-blue">Worker Identity</label>
-            <div id="set_workerName_diag" class="text-sm font-bold text-white">---</div>
-            <div id="diagApp" class="text-[10px] text-gray-500 mt-2 uppercase">---</div>
+
+        <div class="setting-card border-blue-500/20 bg-blue-900/10">
+            <label class="setting-label lbl-blue">Handset Diagnostics</label>
+            <div class="space-y-2">
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
+            </div>
         </div>
-        <button onclick="localStorage.clear(); location.reload();" class="w-full py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-xs uppercase">Reset App</button>
+        
+        <button onclick="localStorage.clear(); location.reload();" class="w-full py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-xs uppercase">Factory Reset App</button>
     </div>
 </div>
 
@@ -215,7 +220,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="content-area" id="reportFields">
         </div>
     <div class="footer-bar flex gap-3">
-        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400 uppercase">Cancel</button>
+        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Cancel</button>
         <button id="btnSubmitRep" onclick="submitReport()" class="flex-[2] py-4 bg-green-600 font-black rounded-xl uppercase shadow-lg">Submit & End</button>
     </div>
 </div>
@@ -234,11 +239,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <input type="hidden" id="locId">
         <div class="space-y-4">
             <div>
-                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label>
+                <label for="locName" class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label>
                 <input type="text" id="locName" class="form-input" placeholder="Required">
             </div>
             <div>
-                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
+                <label for="locAddr" class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
                 <div class="flex gap-2">
                     <input type="text" id="locAddr" class="form-input mb-0 flex-1 font-medium">
                     <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shrink-0 shadow-lg">📍 GPS</button>
@@ -259,6 +264,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="closeModal('template')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-white uppercase tracking-widest">Close</button>
     </div>
 </div>
+
 <script>
 // --- 1. GLOBAL CONSTANTS & CORE STATE ---
 const APP_VERSION = "v79.35";
@@ -1289,6 +1295,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
