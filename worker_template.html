@@ -467,12 +467,52 @@ function startTravellingPulse() {
         if (tr) tr.classList.toggle('opacity-70');
     }, 1000);
 }
-function toggleBatterySaver() {
+/**
+ * RESTORED: Advanced Battery Saver with "Hold to Wake" logic
+ * @param {boolean} force - Optional. If true, forces the dim mode on.
+ */
+function toggleBatterySaver(force) {
     const saver = document.getElementById('batterySaver');
-    const isNowVisible = saver.classList.toggle('hidden');
-    // RESTORED: Toggle OS-level dimming class
-    document.documentElement.classList.toggle('system-dim', !isNowVisible);
+    if (!saver) return;
+
+    const isCurrentlyDim = !saver.classList.contains('hidden');
+    const targetState = (force !== undefined) ? force : !isCurrentlyDim;
+
+    if (targetState) {
+        // ENTRANCE: Turn dim mode ON
+        saver.classList.remove('hidden');
+        document.documentElement.classList.add('system-dim');
+        requestWakeLock();
+        initWakeListener(); // Set up the long-press to exit
+    } else {
+        // EXIT: Turn dim mode OFF
+        saver.classList.add('hidden');
+        document.documentElement.classList.remove('system-dim');
+    }
 }
+/**
+ * GLUE: Attaches the hold-to-wake duration to the black overlay
+ */
+function initWakeListener() {
+    const saver = document.getElementById('batterySaver');
+    let wakeTimer;
+    
+    const startWake = () => {
+        document.getElementById('saverProgress').style.opacity = "1";
+        wakeTimer = setTimeout(() => {
+            toggleBatterySaver(false);
+            showToast("Screen Active");
+        }, 2000); // Must hold for 2 seconds to "wake"
+    };
+
+    const stopWake = () => {
+        document.getElementById('saverProgress').style.opacity = "0";
+        clearTimeout(wakeTimer);
+    };
+
+    saver.onmousedown = startWake; saver.onmouseup = stopWake;
+    saver.ontouchstart = startWake; saver.ontouchend = stopWake;
+}    
 /**
  * Core Synchronization: Pushes data to the Google Sheet backend.
  */
@@ -1178,6 +1218,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
