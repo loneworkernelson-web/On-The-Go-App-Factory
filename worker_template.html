@@ -205,8 +205,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
     <div class="content-area">
-        <div class="setting-card">
-            <label class="setting-label lbl-blue">Your Identity</label>
+         <div class="setting-card">
+            <label for="set_workerName_diag" class="setting-label lbl-blue">Your Identity</label>
             <input id="set_workerName_diag" class="form-input-card text-sm font-bold" readonly placeholder="Worker Name">
         </div>
         <div class="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center px-2">
@@ -332,16 +332,24 @@ let travelTargetName = ""; // Tracks driving destination
 /* Modern Standard: Uses the navigator.storage API to request persistence.*/
 /* This replaces the deprecated webkitPersistentStorage and StorageType calls.*/
 
+/**
+ * FIXED: Standardized Storage Persistence
+ * Uses the modern navigator.storage API to replace deprecated StorageType logic.
+ */
 async function saveState() {
     try {
-        // MODERN STANDARD: navigator.storage standard replaces deprecated StorageType
+        // MODERN STANDARD: Requests persistence from the OS
         if (navigator.storage && navigator.storage.persist) {
             const isPersisted = await navigator.storage.persist();
-            if (isPersisted) console.log("💾 Persistent storage granted.");
+            if (isPersisted) {
+                console.log("💾 Data persistence confirmed by browser.");
+            }
         }
-        localStorage.setItem('otg_worker_state', JSON.stringify(state));
-    } catch (e) { 
-        console.error("Storage Error:", e); 
+        
+        const stateString = JSON.stringify(state);
+        localStorage.setItem('otg_worker_state', stateString);
+    } catch (e) {
+        console.error("Critical: Storage Failure", e);
     }
 }
 
@@ -1191,6 +1199,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
