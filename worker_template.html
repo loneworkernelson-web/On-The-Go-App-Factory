@@ -807,6 +807,58 @@ function populateSettingsForm() {
     }
 }
 /**
+ * Core Routing: Switches between different app screens.
+ * @param {string} pageId - The ID of the div to show (e.g., 'setup', 'main', 'locked').
+ */
+function navigate(pageId) {
+    // 1. Define all possible page IDs in your HTML
+    const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'infoPage'];
+    
+    // 2. Hide everything
+    pages.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+
+    // 3. Show the target page
+    const target = document.getElementById(pageId + 'Page');
+    if (target) {
+        target.classList.remove('hidden');
+        window.scrollTo(0, 0); // Reset scroll position for the new screen
+    } else {
+        console.error(`Navigation Error: Page ID "${pageId}Page" not found in HTML.`);
+    }
+
+    // 4. Update the UI state
+    if (pageId === 'main') {
+        renderLocations(); // Ensure tiles are fresh when returning to dashboard
+    }
+}
+/**
+ * Generic Modal Controls
+ */
+function showModal(id) {
+    const m = document.getElementById(id + 'Modal');
+    if (m) m.classList.remove('hidden');
+}
+
+function closeModal(id) {
+    const m = document.getElementById(id + 'Modal');
+    if (m) m.classList.add('hidden');
+}
+
+/**
+ * Toast Notifications: Provides non-blocking feedback to the user.
+ */
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.innerText = msg;
+    t.classList.remove('hidden');
+    // Auto-hide after 3 seconds
+    setTimeout(() => { t.classList.add('hidden'); }, 3000);
+}
+/**
  * Initialises the Panic/Emergency button listeners.
  * Configured for a "Long Press" to prevent accidental triggers.
  */
@@ -914,3 +966,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
