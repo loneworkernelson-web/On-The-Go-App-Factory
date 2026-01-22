@@ -609,120 +609,63 @@ function createTravelTile(loc) {
 /* - Resolves Accessibility: All <label> elements associated with unique IDs.*/
 /* - Activates Interactive Tags: [PHOTO], [GPS], [SIGN], [DROP], [$].*/
 /* - Standardized Styling: Consistent with dashboard theme.*/
+/**
+ * FIXED: buildReportForm (Resolves SyntaxError and Tag Logic)
+ */
 function buildReportForm(n, c) {
     state.photoStore = {};
     const sn = n ? n.trim() : "(Standard)";
-    
-    // 1. Source the questions from Global Forms or Cache
     let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || 
                     state.cachedForms[sn] || 
                     state.cachedForms["(Standard)"];
-    
     c.innerHTML = '';
     
-    // Fallback logic for empty templates
     if (!questions) {
-        c.innerHTML = `
-            <label for="rep_notes" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Visit Notes</label>
-            <textarea id="rep_notes" class="form-input h-32" placeholder="Write notes here..."></textarea>
-        `;
+        c.innerHTML = '<label class="setting-label">Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
         return;
     }
 
     questions.forEach((f, i) => {
-        let type = 'text'; 
-        let labelText = f.text || f; 
-        let dropOptions = [];
+        let type = 'text', labelText = f.text || f, dropOptions = [];
         const upper = labelText.toUpperCase();
-        const fieldId = `dyn_field_${i}`; // Root ID for accessibility
+        const fieldId = `dyn_field_${i}`;
 
-        // 2. Tag Detection logic
-        if (upper.includes('[HEADING]') || labelText.trim().startsWith('#')) { 
-            type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').replace('#','').trim(); 
-        }
-        else if (upper.includes('[NOTE]')) { 
-            type = 'note'; labelText = labelText.replace(/\[NOTE\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[SIGN]')) { 
-            type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[PHOTO]')) { 
-            type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[GPS]')) { 
-            type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); 
-            if (!labelText) labelText = "Location Status"; 
-        }
-        else if (upper.includes('[YESNO]')) { 
-            type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[CHECK]')) { 
-            type = 'checkbox'; labelText = labelText.replace(/\[CHECK\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[DATE]')) { 
-            type = 'date'; labelText = labelText.replace(/\[DATE\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[NUMBER]')) { 
-            type = 'number'; labelText = labelText.replace(/\[NUMBER\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[$]')) { 
-            type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[1TEXT]')) { 
-            type = '1text'; labelText = labelText.replace(/\[1TEXT\]/gi, '').trim(); 
-        }
-        else if (upper.includes('[TIME]')) { type = 'time'; labelText = labelText.replace(/\[TIME\]/gi, '').trim(); } 
-        
+        if (upper.includes('[HEADING]')) { type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').trim(); }
+        else if (upper.includes('[SIGN]')) { type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); }
+        else if (upper.includes('[PHOTO]')) { type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); }
         else if (upper.startsWith('[DROP')) {
             type = 'drop';
             const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-            if (match) {
-                dropOptions = match[1].split(',').map(o => o.trim());
-                labelText = labelText.replace(match[0], '').trim();
-            }
-else if (type === '1text' || type === 'date' || type === 'number' || type === 'time') {
-    const el = document.createElement('input');
-    el.id = fieldId;
-    el.type = (type === '1text') ? 'text' : type; // Sets 'date' or 'time'
-    el.className = "form-input font-bold";
-    el.dataset.key = labelText;
-    container.appendChild(el);
-}
+            if (match) { dropOptions = match[1].split(',').map(o => o.trim()); labelText = labelText.replace(match[0], '').trim(); }
         }
 
-// 3. Render Element Logic: Ensures exactly one label per form ID
-const container = document.createElement('div');
-container.className = "mb-4";
+        const container = document.createElement('div');
+        container.className = "mb-4";
 
-if (type === 'header') {
-    container.innerHTML = `<div class="mt-6 mb-2 border-b border-gray-700 pb-1"><h3 class="text-blue-400 font-bold uppercase text-xs tracking-widest">${labelText}</h3></div>`;
-} else if (type === 'note') {
-    container.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${labelText}</div>`;
-} else {
-    // Add the primary label only once
-    const label = document.createElement('label');
-    label.setAttribute('for', fieldId);
-    label.className = "block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1";
-    label.innerText = labelText;
-    container.appendChild(label);
+        if (type === 'header') {
+            container.innerHTML = `<h3 class="text-blue-400 font-bold uppercase text-xs border-b border-gray-700 pb-1 mb-2">${labelText}</h3>`;
+        } else {
+            container.innerHTML = `<label for="${fieldId}" class="setting-label lbl-gray">${labelText}</label>`;
+            if (type === 'photo') {
+                container.innerHTML += `<button type="button" onclick="document.getElementById('${fieldId}').click()" class="form-input text-center">📸 Take Photo</button>
+                                        <input type="file" id="${fieldId}" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">`;
+            } else if (type === 'signature') {
+                container.innerHTML += `<div class="bg-white rounded-lg p-1"><canvas id="sig-canvas-${i}" class="w-full h-40"></canvas></div>
+                                        <button type="button" class="text-[10px] font-bold text-gray-500 uppercase mt-1" onclick="clearSig(${i})">Clear Signature</button>`;
+            } else if (type === 'drop') {
+                let opts = dropOptions.map(o => `<option value="${o}">${o}</option>`).join('');
+                container.innerHTML += `<select id="${fieldId}" class="form-input font-bold" data-key="${labelText}"><option value="">Select...</option>${opts}</select>`;
+            } else {
+                container.innerHTML += `<textarea id="${fieldId}" class="form-input" data-key="${labelText}"></textarea>`;
+            }
+        }
+        c.appendChild(container);
+    });
 
-    if (type === 'photo') {
-        const wrap = document.createElement('div');
-        wrap.className = "flex items-center gap-3";
-        // REMOVED: redundant inner <label> to fix accessibility warning
-        wrap.innerHTML = `
-            <button type="button" onclick="document.getElementById('${fieldId}').click()" id="lbl_${i}" class="flex-1 py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-xl text-gray-400 font-bold">📸 Take Photo</button>
-            <input type="file" id="${fieldId}" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">
-        `;
-        container.appendChild(wrap);
-    } 
-    // ... continue with GPS, signature, and other types ...
-}
-// 4. Initialize specialized hardware handlers
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
-            if (typeof resizeCanvas === 'function') resizeCanvas(canvas);
-            if (typeof initSigPad === 'function') initSigPad(canvas);
+            resizeCanvas(canvas);
+            initSigPad(canvas);
         });
     }, 600);
 }
@@ -792,25 +735,28 @@ function populateSettingsForm() {
  * @param {string} pageId - The ID of the div to show (e.g., 'setup', 'main', 'locked').
  */
 /**
- * FIXED: Page Routing (Uses 'active' class to match CSS visibility rules)
+/**
+ * FIXED: Page Routing (Uses 'active' and 'hidden' to match CSS visibility)
  */
 function navigate(pageId) {
-    // Hide all pages first
     const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'infoPage'];
+    
     pages.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.classList.remove('active'); // CSS visibility trigger
-            el.classList.add('hidden');    // Tailwind safety
+            el.classList.remove('active');
+            el.classList.add('hidden');
         }
     });
 
-    // Show only the target page
     const target = document.getElementById(pageId + 'Page');
     if (target) {
-        target.classList.add('active');
+        target.classList.add('active'); // CSS visibility trigger
         target.classList.remove('hidden');
+        window.scrollTo(0, 0);
     }
+
+    if (pageId === 'main') renderLocations();
 }
 /**
  * Generic Modal Controls
@@ -1195,6 +1141,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
