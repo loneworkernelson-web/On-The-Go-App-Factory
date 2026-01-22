@@ -18,6 +18,9 @@
             width: 100%; 
             overflow: hidden; 
         }
+        canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
+.pulse-border { animation: pulse 2s infinite; }
+@keyframes pulse { 0% { border-color: #3b82f6; } 50% { border-color: #ef4444; } 100% { border-color: #3b82f6; } }
 
         /* PAGE ROUTING VISIBILITY */
         .page { 
@@ -647,14 +650,7 @@ function buildReportForm(n, c) {
             type = '1text'; labelText = labelText.replace(/\[1TEXT\]/gi, '').trim(); 
         }
         else if (upper.includes('[TIME]')) { type = 'time'; labelText = labelText.replace(/\[TIME\]/gi, '').trim(); } 
-        else if (type === '1text' || type === 'date' || type === 'number' || type === 'time') {
-    const el = document.createElement('input');
-    el.id = fieldId;
-    el.type = (type === '1text') ? 'text' : type; // Sets 'date' or 'time'
-    el.className = "form-input font-bold";
-    el.dataset.key = labelText;
-    container.appendChild(el);
-}
+        
         else if (upper.startsWith('[DROP')) {
             type = 'drop';
             const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
@@ -662,6 +658,14 @@ function buildReportForm(n, c) {
                 dropOptions = match[1].split(',').map(o => o.trim());
                 labelText = labelText.replace(match[0], '').trim();
             }
+else if (type === '1text' || type === 'date' || type === 'number' || type === 'time') {
+    const el = document.createElement('input');
+    el.id = fieldId;
+    el.type = (type === '1text') ? 'text' : type; // Sets 'date' or 'time'
+    el.className = "form-input font-bold";
+    el.dataset.key = labelText;
+    container.appendChild(el);
+}
         }
 
         const container = document.createElement('div');
@@ -1021,6 +1025,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
