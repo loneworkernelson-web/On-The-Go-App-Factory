@@ -143,33 +143,72 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
     <div id="setup_step_identity" class="wizard-step active p-6 overflow-y-auto">
         <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
+        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring and identification.</p>
+        
         <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
         <input type="text" id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
-        <label for="set_url" class="setting-label lbl-blue">Google Sheet URL</label>
+        
+        <label for="set_workerPhone" class="setting-label lbl-blue">Mobile Number</label>
+        <input type="tel" id="set_workerPhone" class="form-input mb-4" placeholder="021...">
+        
+        <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
+        <input type="email" id="set_workerEmail" class="form-input mb-4" placeholder="name@org.co.nz">
+        
+        <label for="set_url" class="setting-label lbl-blue">System URL</label>
         <input type="text" id="set_url" class="form-input mb-8" value="%%GOOGLE_SHEET_URL%%">
+        
         <div class="mt-auto">
             <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
         </div>
     </div>
 
-    <div id="setup_step_security" class="wizard-step p-6 overflow-y-auto">
+    <div id="setup_step_security" class="wizard-step p-6 overflow-y-auto hidden">
         <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
-        <p class="text-gray-400 mb-6 text-sm">Create a 4-digit code to declare safety.</p>
-        <label for="setup_pin1" class="setting-label lbl-green">Create PIN</label>
-        <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
-        <label for="setup_pin2" class="setting-label lbl-green mt-4">Confirm PIN</label>
-        <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
+        <p class="text-gray-400 mb-6 text-sm">Create your personal safety pins.</p>
+        
+        <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
+            <label for="setup_pin1" class="block text-green-400 font-bold mb-1 uppercase text-xs tracking-widest">1. Standard PIN</label>
+            <p class="text-[10px] text-gray-400 mb-3 uppercase">Used to declare "I AM SAFE"</p>
+            <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
+            
+            <label for="setup_pin2" class="block text-green-400 font-bold mt-4 mb-1 uppercase text-xs tracking-widest">Confirm Standard PIN</label>
+            <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
+            <label for="set_duressPin" class="block text-purple-400 font-bold mb-1 uppercase text-xs tracking-widest">2. Duress PIN (Silent)</label>
+            <p class="text-[10px] text-gray-400 mb-3 uppercase">Secretly sends a high-priority "DURESS" alert</p>
+            <input id="set_duressPin" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest border-purple-500/50" placeholder="9999">
+        </div>
+
         <div class="flex gap-3 mt-auto">
             <button onclick="wizBack('setup_step_security', 'setup_step_identity')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
-            <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl">Next: Review →</button>
+            <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl shadow-lg">Next: Contacts →</button>
         </div>
     </div>
 
-    <div id="setup_step_review" class="wizard-step p-6 overflow-y-auto">
+    <div id="setup_step_emergency" class="wizard-step p-6 overflow-y-auto hidden">
+        <h2 class="text-3xl font-bold text-white mb-2">Contacts</h2>
+        <p class="text-gray-400 mb-6 text-sm">Who should be notified in an emergency?</p>
+        
+        <label for="set_emgName" class="setting-label lbl-red">Primary Emergency Contact</label>
+        <input id="set_emgName" class="form-input mb-4" placeholder="Name">
+        <input id="set_emgPhone" type="tel" class="form-input mb-6" placeholder="Mobile Number">
+
+        <label for="set_escName" class="setting-label lbl-gray">Escalation Contact (Optional)</label>
+        <input id="set_escName" class="form-input mb-4" placeholder="Manager/Supervisor Name">
+        <input id="set_escPhone" type="tel" class="form-input mb-8" placeholder="Mobile Number">
+
+        <div class="flex gap-3 mt-auto">
+            <button onclick="wizBack('setup_step_emergency', 'setup_step_security')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
+            <button onclick="wizNext('setup_step_emergency', 'setup_step_review')" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl shadow-lg">Next: Review →</button>
+        </div>
+    </div>
+
+    <div id="setup_step_review" class="wizard-step p-6 overflow-y-auto hidden">
         <h2 class="text-3xl font-bold text-white mb-2">Ready?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Review your details before launching.</p>
-        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase">✅ Save & Launch App</button>
+        <p class="text-gray-400 mb-8 text-sm">Review your details before launching the dashboard.</p>
+        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase animate-pulse">✅ Save & Launch App</button>
     </div>
 </div>
 
@@ -1166,6 +1205,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
