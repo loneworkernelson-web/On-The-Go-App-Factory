@@ -476,10 +476,19 @@ function startTravellingPulse() {
 /**
  * RESTORED: Auto-Dim Inactivity Logic
  */
-let inactivityTimer;
 /**
- * GLUE: Attach inactivity listeners to the whole document
+ * RESTORED: Unified Battery Saver & Inactivity Logic
  */
+let inactivityTimer; // Single declaration to prevent SyntaxError
+
+function resetAutoDim() {
+    clearTimeout(inactivityTimer);
+    if (state.activeVisit && document.getElementById('batterySaver')?.classList.contains('hidden')) {
+        // Auto-dim after 5 minutes of inactivity during a visit
+        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000);
+    }
+}
+
 function initAutoDimListeners() {
     ['mousedown', 'mousemove', 'keypress', 'touchstart', 'scroll'].forEach(name => {
         document.addEventListener(name, resetAutoDim, {passive: true});
@@ -487,9 +496,6 @@ function initAutoDimListeners() {
     resetAutoDim();
 }
 
-/**
- * RESTORED: Advanced Battery Saver with OS-level dimming glue
- */
 function toggleBatterySaver(force) {
     const saver = document.getElementById('batterySaver');
     const progress = document.getElementById('saverProgress');
@@ -499,26 +505,15 @@ function toggleBatterySaver(force) {
     const targetState = (force !== undefined) ? force : !isCurrentlyDim;
 
     if (targetState) {
-        // TURN DIM ON
         saver.classList.remove('hidden');
-        document.documentElement.classList.add('system-dim');
+        document.documentElement.classList.add('system-dim'); // Triggers OS-level dimming
         if (progress) progress.style.opacity = "0"; 
-        initWakeListener(); // Re-glues the hold-to-wake logic
+        initWakeListener(); 
         clearTimeout(inactivityTimer);
     } else {
-        // TURN DIM OFF
         saver.classList.add('hidden');
         document.documentElement.classList.remove('system-dim');
         resetAutoDim(); 
-    }
-}
-
-// RESTORED: 5-Minute Inactivity Dimmer
-let inactivityTimer;
-function resetAutoDim() {
-    clearTimeout(inactivityTimer);
-    if (state.activeVisit && document.getElementById('batterySaver')?.classList.contains('hidden')) {
-        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000); // 5 mins
     }
 }
 /**
@@ -1277,6 +1272,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
