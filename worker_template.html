@@ -180,46 +180,64 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
 
-    <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-2">Emergency Contacts</h2>
-        <label for="set_emgName" class="setting-label lbl-red">Primary Contact Name</label>
-        <input id="set_emgName" class="form-input mb-4" placeholder="Name">
-        <label for="set_emgPhone" class="setting-label text-xs text-gray-500">Primary Mobile</label>
-        <input id="set_emgPhone" type="tel" class="form-input mb-6" placeholder="Mobile Number">
+<div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
+    <h2 class="text-3xl font-bold text-white mb-2">Emergency</h2>
+    <p class="text-gray-400 mb-6 text-sm">Who should we notify if you miss a check-in?</p>
 
-        <label for="set_escName" class="setting-label lbl-gray">Escalation Name (Optional)</label>
-        <input id="set_escName" class="form-input mb-4" placeholder="Name">
-        <label for="set_escPhone" class="setting-label text-xs text-gray-500">Escalation Mobile</label>
-        <input id="set_escPhone" type="tel" class="form-input mb-8" placeholder="Mobile Number">
+    <label for="set_emgName" class="setting-label lbl-red">Primary Contact</label>
+    <input id="set_emgName" class="form-input mb-2" placeholder="Full Name">
+    <input id="set_emgPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
+    <input id="set_emgEmail" type="email" class="form-input mb-6" placeholder="Email Address">
 
-        <div class="flex gap-3 mt-auto">
-            <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
-            <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase tracking-widest">✅ Launch App</button>
-        </div>
+    <label for="set_escName" class="setting-label lbl-gray">Escalation Manager</label>
+    <input id="set_escName" class="form-input mb-2" placeholder="Manager Name">
+    <input id="set_escPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
+    <input id="set_escEmail" type="email" class="form-input mb-8" placeholder="Work Email">
+
+    <div class="flex gap-3 mt-auto">
+        <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
+        <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase">✅ Launch App</button>
     </div>
+</div>
 </div>
 
 <div id="settingsPage" class="page bg-gray-800">
-    <div class="header-bar">
-        <h1 class="text-2xl font-bold text-white">Settings</h1>
-        <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
+<div class="header-bar">
+    <div class="flex flex-col">
+        <h1 class="text-lg font-black text-blue-400 leading-none">%%ORG_NAME%%</h1>
+        <span class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">Safety Dashboard</span>
     </div>
+    <div class="flex items-center gap-2">
+        <button onclick="forceSync()" class="p-2 bg-gray-800 rounded-lg text-blue-400 active:scale-95 transition-all">🔄</button>
+        <button onclick="showModal('template')" class="p-2 bg-gray-800 rounded-lg text-purple-400 active:scale-95 transition-all">📝</button>
+        <button onclick="navigate('settings')" class="p-2 text-gray-400">⚙️</button>
+    </div>
+</div>
     <div class="content-area">
-         <div class="setting-card">
-            <label for="set_workerName_diag" class="setting-label lbl-blue">Your Identity</label>
-            <input id="set_workerName_diag" class="form-input-card text-sm font-bold" readonly placeholder="Worker Name">
+    <div class="setting-card">
+        <label for="set_url" class="setting-label lbl-blue">System URL</label>
+        <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
+        <p class="text-[10px] text-gray-500 italic mt-1 uppercase font-bold">Points to the Master Safety Sheet</p>
+    </div>
+    
+    <div class="setting-card">
+        <label class="setting-label lbl-green">Diagnostics</label>
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-xs text-gray-400">Worker ID:</span>
+            <span id="set_workerName_diag" class="text-xs font-bold text-white">---</span>
         </div>
-        <div class="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center px-2">
-            <div class="flex flex-col">
-                <span class="text-[10px] text-gray-500 font-black">APP VERSION</span>
-                <span id="diagApp" class="text-xs text-gray-400 font-bold">---</span>
-            </div>
-            <div class="flex flex-col items-end">
-                <span class="text-[10px] text-gray-500 font-black">CLOUD VERSION</span>
-                <span id="diagCloud" class="text-xs text-gray-400 font-bold">---</span>
-            </div>
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-xs text-gray-400">App Version:</span>
+            <span id="diagApp" class="text-xs font-bold text-white">---</span>
+        </div>
+        <div class="flex justify-between items-center">
+            <span class="text-xs text-gray-400">Cloud Sync:</span>
+            <span id="diagCloud" class="text-xs font-bold text-white">---</span>
         </div>
     </div>
+    
+    <button onclick="hardRefreshUpdate()" class="w-full py-4 bg-red-900/20 border border-red-900 text-red-500 font-bold rounded-xl text-xs uppercase">Force Hard Refresh</button>
+</div>
 </div>
 
 <div id="mainPage" class="page">
@@ -900,11 +918,12 @@ function initLocations() {
  * RESTORED: Advanced Smoothing, Compression, and Hardware Integration
  */
 
-// 1. DASHBOARD ENGINE (Dynamic Site List)
 function renderLocations() {
     const list = document.getElementById('locationList');
     const travel = document.getElementById('travelRow');
-    if (!list || !travel) return;
+    const footerBtn = document.getElementById('panicBtn'); // This is your big footer button
+    
+    if (!list || !travel || !footerBtn) return;
     
     list.innerHTML = ''; travel.innerHTML = '';
 
@@ -913,6 +932,18 @@ function renderLocations() {
         const tile = (loc.id === 'travel') ? createTravelTile(loc) : createLocationTile(loc);
         (loc.id === 'travel') ? travel.appendChild(tile) : list.appendChild(tile);
     });
+
+    // GOLDEN LOGIC: Contextual Footer Button
+    if (state.selectedLocationId) {
+        const selectedLoc = state.locations.find(l => l.id === state.selectedLocationId);
+        footerBtn.innerText = `Hold to Start: ${selectedLoc.name}`;
+        footerBtn.className = "long-press-btn w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase tracking-widest shadow-xl pulse-border";
+        footerBtn.onclick = () => startVisit(state.selectedLocationId); 
+    } else {
+        footerBtn.innerText = "Hold for SOS";
+        footerBtn.className = "long-press-btn w-full py-4 bg-red-900/40 border-2 border-red-600 text-red-500 font-black rounded-xl uppercase tracking-widest";
+        footerBtn.onclick = () => handlePanic();
+    }
 }
 
 function createLocationTile(loc) {
@@ -1141,6 +1172,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
