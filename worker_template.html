@@ -131,8 +131,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="offlineBanner" class="hidden absolute top-0 left-0 w-full bg-red-600 text-white text-center text-xs font-bold py-1 z-50">📡 OFFLINE MODE - Data queued for upload</div>
 <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer z-40 border-b border-orange-400" onclick="startVehicleCheck()">⚠️ Vehicle Check Overdue - Tap to Complete</div>
 
-<div id="setupPage" class="page active bg-gray-900 z-[60]">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900">
+<div id="setupPage" class="page active bg-gray-900 z-[60] flex flex-col overflow-hidden">
+    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
         <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
         <div class="flex gap-1">
             <div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -141,9 +141,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
 
-    <div id="setup_step_identity" class="wizard-step active p-6 overflow-y-auto">
+    <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
         <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring and identification.</p>
+        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
         
         <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
         <input type="text" id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
@@ -152,63 +152,51 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <input type="tel" id="set_workerPhone" class="form-input mb-4" placeholder="021...">
         
         <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
-        <input type="email" id="set_workerEmail" class="form-input mb-4" placeholder="name@org.co.nz">
-        
-        <label for="set_url" class="setting-label lbl-blue">System URL</label>
-        <input type="text" id="set_url" class="form-input mb-8" value="%%GOOGLE_SHEET_URL%%">
+        <input type="email" id="set_workerEmail" class="form-input mb-8" placeholder="name@org.co.nz">
         
         <div class="mt-auto">
-            <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
+            <button onclick="wizNext('wizStep1', 'wizStep2')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
         </div>
     </div>
 
-    <div id="setup_step_security" class="wizard-step p-6 overflow-y-auto hidden">
+    <div id="wizStep2" class="wizard-step p-6 overflow-y-auto hidden">
         <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
-        <p class="text-gray-400 mb-6 text-sm">Create your personal safety pins.</p>
+        <p class="text-gray-400 mb-6 text-sm">Used for safety check-ins and duress alerts.</p>
         
         <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
-            <label for="setup_pin1" class="block text-green-400 font-bold mb-1 uppercase text-xs tracking-widest">1. Standard PIN</label>
-            <p class="text-[10px] text-gray-400 mb-3 uppercase">Used to declare "I AM SAFE"</p>
+            <label for="setup_pin1" class="block text-green-400 font-bold mb-1 uppercase text-xs">Standard PIN</label>
             <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
-            
-            <label for="setup_pin2" class="block text-green-400 font-bold mt-4 mb-1 uppercase text-xs tracking-widest">Confirm Standard PIN</label>
+            <label for="setup_pin2" class="block text-green-400 font-bold mt-4 mb-1 uppercase text-xs">Confirm PIN</label>
             <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
         </div>
 
         <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
-            <label for="set_duressPin" class="block text-purple-400 font-bold mb-1 uppercase text-xs tracking-widest">2. Duress PIN (Silent)</label>
-            <p class="text-[10px] text-gray-400 mb-3 uppercase">Secretly sends a high-priority "DURESS" alert</p>
+            <label for="set_duressPin" class="block text-purple-400 font-bold mb-1 uppercase text-xs">Duress PIN (Silent)</label>
             <input id="set_duressPin" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest border-purple-500/50" placeholder="9999">
         </div>
 
         <div class="flex gap-3 mt-auto">
-            <button onclick="wizBack('setup_step_security', 'setup_step_identity')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
+            <button onclick="wizBack('wizStep2', 'wizStep1')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
             <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl shadow-lg">Next: Contacts →</button>
         </div>
     </div>
 
-    <div id="setup_step_emergency" class="wizard-step p-6 overflow-y-auto hidden">
-        <h2 class="text-3xl font-bold text-white mb-2">Contacts</h2>
-        <p class="text-gray-400 mb-6 text-sm">Who should be notified in an emergency?</p>
-        
-        <label for="set_emgName" class="setting-label lbl-red">Primary Emergency Contact</label>
+    <div id="wizStep3" class="wizard-step p-6 overflow-y-auto hidden">
+        <h2 class="text-3xl font-bold text-white mb-2">Emergency Contacts</h2>
+        <label for="set_emgName" class="setting-label lbl-red">Primary Contact Name</label>
         <input id="set_emgName" class="form-input mb-4" placeholder="Name">
+        <label for="set_emgPhone" class="setting-label text-xs text-gray-500">Primary Mobile</label>
         <input id="set_emgPhone" type="tel" class="form-input mb-6" placeholder="Mobile Number">
 
-        <label for="set_escName" class="setting-label lbl-gray">Escalation Contact (Optional)</label>
-        <input id="set_escName" class="form-input mb-4" placeholder="Manager/Supervisor Name">
+        <label for="set_escName" class="setting-label lbl-gray">Escalation Name (Optional)</label>
+        <input id="set_escName" class="form-input mb-4" placeholder="Name">
+        <label for="set_escPhone" class="setting-label text-xs text-gray-500">Escalation Mobile</label>
         <input id="set_escPhone" type="tel" class="form-input mb-8" placeholder="Mobile Number">
 
         <div class="flex gap-3 mt-auto">
-            <button onclick="wizBack('setup_step_emergency', 'setup_step_security')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
-            <button onclick="wizNext('setup_step_emergency', 'setup_step_review')" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl shadow-lg">Next: Review →</button>
+            <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Back</button>
+            <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase tracking-widest">✅ Launch App</button>
         </div>
-    </div>
-
-    <div id="setup_step_review" class="wizard-step p-6 overflow-y-auto hidden">
-        <h2 class="text-3xl font-bold text-white mb-2">Ready?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Review your details before launching the dashboard.</p>
-        <button onclick="finishSetup()" class="w-full py-5 bg-green-600 font-black rounded-xl text-xl shadow-xl uppercase animate-pulse">✅ Save & Launch App</button>
     </div>
 </div>
 
@@ -345,16 +333,15 @@ let travelTargetName = ""; // Tracks driving destination
 
 async function saveState() {
     try {
-        // Standardized persistence request
+        // RESTORED: Standardized Storage Persistence
         if (navigator.storage && navigator.storage.persist) {
             const isPersisted = await navigator.storage.persist();
-            if (isPersisted) console.log("💾 Storage persistence granted.");
+            if (isPersisted) console.log("💾 Persistence granted by OS.");
         }
         
-        const stateString = JSON.stringify(state);
-        localStorage.setItem('otg_worker_state', stateString);
+        localStorage.setItem('otg_worker_state', JSON.stringify(state));
     } catch (e) {
-        console.error("Critical: Storage Failure", e);
+        console.error("Storage Error:", e);
     }
 }
 
@@ -753,66 +740,56 @@ else if (type === '1text' || type === 'date' || type === 'number' || type === 't
  * Uses Base64 encoding as a basic masking layer before saving to state.
  */
 function savePin() {
-    const pin1 = document.getElementById('setup_pin1').value;
-    const pin2 = document.getElementById('setup_pin2').value;
+    const p1 = document.getElementById('setup_pin1').value;
+    const p2 = document.getElementById('setup_pin2').value;
+    const duress = document.getElementById('set_duressPin').value;
 
-    if (!pin1 || pin1.length < 4) {
-        showToast("PIN must be at least 4 digits");
-        return;
+    if (p1.length === 4 && p1 === p2) {
+        state.settings.pinCode = btoa(p1);
+        state.settings.duressPin = btoa(duress);
+        wizNext('wizStep2', 'wizStep3');
+    } else {
+        showToast("Standard PINs must be 4 digits and match.");
     }
-
-    if (pin1 !== pin2) {
-        showToast("PINs do not match");
-        return;
-    }
-
-    // Save masked PIN to state
-    state.settings.pinCode = btoa(pin1); 
-    showToast("Security PIN Set");
-    
-    // Proceed to final review or finish
-    wizNext('setup_step_security', 'setup_step_review');
 }
 
 /**
  * Finalizes the setup and moves the user to the dashboard.
  */
 async function finishSetup() {
+    // Data Capture from Revised Wizard
     state.settings.workerName = document.getElementById('set_workerName').value;
     state.settings.workerPhone = document.getElementById('set_workerPhone').value;
     state.settings.workerEmail = document.getElementById('set_workerEmail').value;
-    state.settings.googleSheetUrl = document.getElementById('set_url').value;
     
+    // Emergency Contact Capture
     state.settings.emergency = {
-        primary: { name: document.getElementById('set_emgName').value, phone: document.getElementById('set_emgPhone').value },
-        escalation: { name: document.getElementById('set_escName').value, phone: document.getElementById('set_escPhone').value }
+        primary: { 
+            name: document.getElementById('set_emgName').value, 
+            phone: document.getElementById('set_emgPhone').value 
+        },
+        escalation: { 
+            name: document.getElementById('set_escName').value, 
+            phone: document.getElementById('set_escPhone').value 
+        }
     };
 
     if (state.settings.workerName) {
         await saveState();
+        showToast("Setup Complete!");
         navigate('main');
     }
 }
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
 function populateSettingsForm() {
+    // System URL remains visible in settings but hidden from wizard
     const urlInput = document.getElementById('set_url');
-    if (urlInput) urlInput.value = state.settings.googleSheetUrl || CONFIG.url;
+    if (urlInput) urlInput.value = state.settings.googleSheetUrl || "%%GOOGLE_SHEET_URL%%";
 
-    const nameInput = document.getElementById('set_workerName');
-    if (nameInput) nameInput.value = state.settings.workerName || "";
-
-    const diagApp = document.getElementById('diagApp');
-    const diagCloud = document.getElementById('diagCloud');
-    
-    if (diagApp) diagApp.innerText = APP_VERSION;
-    
-    if (diagCloud) {
-        diagCloud.innerText = state.meta.backendVersion || "Not Synced";
-        if (state.meta.backendVersion) {
-            diagCloud.className = "text-green-400 font-bold text-xs";
-        }
-    }
+    // Diagnostic labels
+    document.getElementById('diagApp').innerText = APP_VERSION;
+    document.getElementById('diagCloud').innerText = state.meta.backendVersion || "Not Synced";
 }
 /**
  * Core Routing: Switches between different app screens.
@@ -876,15 +853,15 @@ function showToast(msg) {
     setTimeout(() => { t.classList.add('hidden'); }, 3000);
 }
 function wizNext(current, next) {
-    const currEl = document.getElementById(current);
-    const nextEl = document.getElementById(next);
-    if (currEl && nextEl) {
-        currEl.classList.add('hidden');
-        nextEl.classList.remove('hidden');
-        window.scrollTo(0,0);
-    }
+    document.getElementById(current).classList.add('hidden');
+    document.getElementById(next).classList.remove('hidden');
+    
+    // Update Progress Dots
+    const step = next.replace('wizStep', '');
+    if (step == 2) document.getElementById('dot2').classList.replace('bg-gray-700', 'bg-blue-500');
+    if (step == 3) document.getElementById('dot3').classList.replace('bg-gray-700', 'bg-blue-500');
+    window.scrollTo(0, 0);
 }
-
 function wizBack(current, prev) {
     const currEl = document.getElementById(current);
     const prevEl = document.getElementById(prev);
@@ -1208,6 +1185,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
