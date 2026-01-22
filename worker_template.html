@@ -141,22 +141,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
 
-    <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
-        <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
-        
-        <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
-        <input type="text" id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
-        
-        <label for="set_workerPhone" class="setting-label lbl-blue">Mobile Number</label>
-        <input type="tel" id="set_workerPhone" class="form-input mb-4" placeholder="021...">
-        
-        <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
-        <input type="email" id="set_workerEmail" class="form-input mb-8" placeholder="name@org.co.nz">
-        
-        <div class="mt-auto">
-            <button onclick="wizNext('wizStep1', 'wizStep2')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
-        </div>
+    <div id="setup_step_identity" class="wizard-step active p-6 overflow-y-auto">
+    <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
+    <p class="text-gray-400 mb-8 text-sm">Required for safety monitoring match.</p>
+    
+    <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
+    <input type="text" id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
+    
+    <label for="set_workerPhone" class="setting-label lbl-blue">Mobile Number</label>
+    <input type="tel" id="set_workerPhone" class="form-input mb-4" placeholder="021...">
+    
+    <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
+    <input type="email" id="set_workerEmail" class="form-input mb-8" placeholder="name@org.co.nz">
+    
+    <div class="mt-auto">
+        <button onclick="wizNext('setup_step_identity', 'setup_step_security')" class="w-full py-4 bg-blue-600 font-bold rounded-xl text-lg shadow-lg">Next: Security →</button>
+    </div>
     </div>
 
     <div id="wizStep2" class="wizard-step p-6 overflow-y-auto hidden">
@@ -757,26 +757,28 @@ function savePin() {
  * Finalizes the setup and moves the user to the dashboard.
  */
 async function finishSetup() {
-    // Data Capture from Revised Wizard
     state.settings.workerName = document.getElementById('set_workerName').value;
     state.settings.workerPhone = document.getElementById('set_workerPhone').value;
     state.settings.workerEmail = document.getElementById('set_workerEmail').value;
     
-    // Emergency Contact Capture
+    // URL is now managed via Settings or defaults to the placeholder
+    if (!state.settings.googleSheetUrl) {
+        state.settings.googleSheetUrl = "%%GOOGLE_SHEET_URL%%";
+    }
+
     state.settings.emergency = {
         primary: { 
-            name: document.getElementById('set_emgName').value, 
-            phone: document.getElementById('set_emgPhone').value 
+            name: document.getElementById('set_emgName')?.value || "", 
+            phone: document.getElementById('set_emgPhone')?.value || "" 
         },
         escalation: { 
-            name: document.getElementById('set_escName').value, 
-            phone: document.getElementById('set_escPhone').value 
+            name: document.getElementById('set_escName')?.value || "", 
+            phone: document.getElementById('set_escPhone')?.value || "" 
         }
     };
 
     if (state.settings.workerName) {
         await saveState();
-        showToast("Setup Complete!");
         navigate('main');
     }
 }
@@ -852,22 +854,34 @@ function showToast(msg) {
     // Auto-hide after 3 seconds
     setTimeout(() => { t.classList.add('hidden'); }, 3000);
 }
-function wizNext(current, next) {
-    document.getElementById(current).classList.add('hidden');
-    document.getElementById(next).classList.remove('hidden');
+/**
+ * RESTORED: Wizard Navigation with CSS 'active' class toggling
+ */
+function wizNext(currentId, nextId) {
+    const current = document.getElementById(currentId);
+    const next = document.getElementById(nextId);
     
-    // Update Progress Dots
-    const step = next.replace('wizStep', '');
-    if (step == 2) document.getElementById('dot2').classList.replace('bg-gray-700', 'bg-blue-500');
-    if (step == 3) document.getElementById('dot3').classList.replace('bg-gray-700', 'bg-blue-500');
-    window.scrollTo(0, 0);
+    if (current && next) {
+        current.classList.remove('active');
+        next.classList.add('active');
+        
+        // Update Progress Dots based on the last part of the ID
+        const step = nextId.split('_').pop();
+        if (step === 'security') document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
+        if (step === 'emergency') document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
+        
+        window.scrollTo(0, 0);
+    }
 }
-function wizBack(current, prev) {
-    const currEl = document.getElementById(current);
-    const prevEl = document.getElementById(prev);
-    if (currEl && prevEl) {
-        currEl.classList.add('hidden');
-        prevEl.classList.remove('hidden');
+
+function wizBack(currentId, prevId) {
+    const current = document.getElementById(currentId);
+    const prev = document.getElementById(prevId);
+    
+    if (current && prev) {
+        current.classList.remove('active');
+        prev.classList.add('active');
+        window.scrollTo(0, 0);
     }
 }
 /**
@@ -1185,6 +1199,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
