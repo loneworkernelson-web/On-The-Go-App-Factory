@@ -102,7 +102,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .form-input-card { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.5rem; display: block; }
 .lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
 
-.gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
+.-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
 .gps-active { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
 
 .wizard-step { display: none; height: 100%; flex-direction: column; }
@@ -804,13 +804,22 @@ function navigate(pageId) {
  * Generic Modal Controls
  */
 function showModal(id) {
-    const m = document.getElementById(id + 'Modal');
-    if (m) m.classList.remove('hidden');
+    const backdrop = document.getElementById('modalBackdrop');
+    const modal = document.getElementById(id + 'Modal');
+    if (backdrop && modal) {
+        backdrop.classList.remove('hidden');
+        backdrop.classList.add('flex');
+        modal.classList.remove('hidden');
+    }
 }
-
 function closeModal(id) {
-    const m = document.getElementById(id + 'Modal');
-    if (m) m.classList.add('hidden');
+    const backdrop = document.getElementById('modalBackdrop');
+    const modal = document.getElementById(id + 'Modal');
+    if (backdrop && modal) {
+        backdrop.classList.add('hidden');
+        backdrop.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
 }
 
 /**
@@ -872,6 +881,19 @@ function initPanicButton() {
         btn.classList.remove('bg-red-500', 'scale-95');
         clearTimeout(panicTimer);
     });
+    /**
+ * GLUE: Global Long-Press CSS Trigger
+ * Links the visual progress bar (::after) to the JavaScript timer.
+ */
+document.querySelectorAll('.long-press-btn').forEach(btn => {
+    const startHolding = () => btn.classList.add('holding');
+    const stopHolding = () => btn.classList.remove('holding');
+    
+    btn.addEventListener('mousedown', startHolding);
+    btn.addEventListener('mouseup', stopHolding);
+    btn.addEventListener('touchstart', startHolding, {passive: true});
+    btn.addEventListener('touchend', stopHolding);
+});
 }
 
 /**
@@ -1144,6 +1166,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
