@@ -88,8 +88,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <input id="set_workerPhone" type="tel" class="form-input mb-4" placeholder="021...">
         <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
         <input id="set_workerEmail" type="email" class="form-input mb-8" placeholder="name@org.co.nz">
-        <div class="mt-auto"><button onclick="wizNext('wizStep1', 'wizStep2')" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg">Next: Security →</button></div>
-    </div>
+<div class="mt-auto"><button onclick="saveIdentity()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg">Next: Security →</button></div>    </div>
 
     <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
         <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
@@ -109,22 +108,22 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-2">Contacts</h2>
-        <label for="set_emgName" class="setting-label lbl-red">Primary Contact</label>
-        <input id="set_emgName" class="form-input mb-2" placeholder="Full Name">
-        <input id="set_emgPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
-        <input id="set_emgEmail" type="email" class="form-input mb-6" placeholder="Email Address">
+    <h2 class="text-3xl font-bold text-white mb-2">Contacts</h2>
+    <label for="set_emgName" class="setting-label lbl-red">Primary Contact</label>
+    <input id="set_emgName" class="form-input mb-2" placeholder="Full Name">
+    <input id="set_emgPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
+    <input id="set_emgEmail" type="email" class="form-input mb-6" placeholder="Email Address">
 
-        <label for="set_escName" class="setting-label lbl-gray">Escalation Manager</label>
-        <input id="set_escName" class="form-input mb-2" placeholder="Manager Name">
-        <input id="set_escPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
-        <input id="set_escEmail" type="email" class="form-input mb-8" placeholder="Work Email">
-        
-        <div class="flex gap-3 mt-auto">
-            <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl">Back</button>
-            <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase">✅ Launch App</button>
-        </div>
+    <label for="set_escName" class="setting-label lbl-gray">Escalation Manager</label>
+    <input id="set_escName" class="form-input mb-2" placeholder="Manager Name">
+    <input id="set_escPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
+    <input id="set_escEmail" type="email" class="form-input mb-8" placeholder="Work Email">
+    
+    <div class="flex gap-3 mt-auto">
+        <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl">Back</button>
+        <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase">✅ Launch App</button>
     </div>
+</div>
 </div>
 
 <div id="mainPage" class="page">
@@ -246,7 +245,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <label for="locAddr" class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
                 <div class="flex gap-2">
                     <input type="text" id="locAddr" class="form-input mb-0 flex-1 font-medium">
-                    <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shrink-0 shadow-lg">📍 GPS</button>
+                    <button onclick="captureGPS(this)" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl font-black text-xs shrink-0 shadow-lg">📍 GPS</button>
                 </div>
             </div>
         </div>
@@ -710,13 +709,22 @@ function savePin() {
     
 // --- 5. IDENTITY & DIAGNOSTICS ---
 
+/**
+ * FIXED: populateSettingsForm (Now updates all Diagnostic fields)
+ */
 function populateSettingsForm() {
     const urlInput = document.getElementById('set_url');
     if (urlInput) urlInput.value = state.settings.googleSheetUrl || "%%GOOGLE_SHEET_URL%%";
 
-    // Update Diagnostics Card
+    // Diagnostic Card Labels
     const diagId = document.getElementById('set_workerName_diag');
     if (diagId) diagId.innerText = state.settings.workerName || "Not Setup";
+    
+    const diagDev = document.getElementById('set_deviceId_diag');
+    if (diagDev) diagDev.innerText = state.settings.deviceId || "Pending";
+
+    const diagCloud = document.getElementById('diagCloud');
+    if (diagCloud) diagCloud.innerText = state.meta.lastSync ? `Synced: ${state.meta.lastSync}` : "Ready";
     
     const diagApp = document.getElementById('diagApp');
     if (diagApp) diagApp.innerText = "Version: " + APP_VERSION;
@@ -957,7 +965,7 @@ function updateArrivedButtonState() {
 function createTravelTile(loc) {
     const d = document.createElement('div');
     const isSel = state.selectedLocationId === 'travel';
-    const isNoReport = loc.noReport || localStorage.getItem('otg_user_travel_pref') === 'true';
+    const isNoReport = localStorage.getItem('otg_user_travel_pref') === 'true';
 
     d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-purple-500 bg-purple-900/40 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
     
@@ -1218,6 +1226,19 @@ function openLocModal(id = null) {
     showModal('location');
 }
 
+    /**
+ * FIXED: editTravelSettings (Resolves ReferenceError)
+ */
+function editTravelSettings(e) {
+    if (e) e.stopPropagation();
+    const pref = localStorage.getItem('otg_user_travel_pref') === 'true';
+    if (confirm(`Current Setting: ${pref ? "FAST-SYNC (No Report)" : "DETAILED REPORT"}\n\nSwitch to ${pref ? "Detailed Mode" : "Fast-Sync Mode"}?`)) {
+        localStorage.setItem('otg_user_travel_pref', !pref);
+        initLocations();
+        showToast("Travel Preference Updated");
+    }
+}
+    
 async function saveLoc() {
     const name = document.getElementById('locName').value;
     const id = document.getElementById('locId')?.value; // Check if we are editing
@@ -1280,15 +1301,3 @@ window.onload = async () => {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
