@@ -1273,6 +1273,27 @@ async function saveLoc() {
     closeModal('location');
     renderLocations();
 }
+
+/**
+ * GOLDEN GATEKEEPER: Validates identity before allowing navigation
+ */
+function saveIdentity() {
+    const name = document.getElementById('set_workerName').value;
+    const url = document.getElementById('set_url').value;
+
+    // 1. Requirement Check
+    if (!name || name.length < 2) {
+        showToast("Please enter your full name");
+        return; // Stops navigation if name is missing
+    }
+
+    // 2. Commit to State
+    state.settings.workerName = name;
+    state.settings.googleSheetUrl = url;
+    
+    // 3. Trigger Navigation
+    wizNext('wizStep1', 'wizStep2');
+}
 // --- 6. STARTUP SEQUENCE ---
 
 
@@ -1301,3 +1322,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
