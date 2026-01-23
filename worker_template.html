@@ -196,27 +196,37 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="settingsPage" class="page bg-gray-800">
     <div class="header-bar">
-        <h1 class="text-2xl font-bold text-white uppercase tracking-tighter">Settings</h1>
+        <h1 class="text-2xl font-bold text-white uppercase tracking-tighter">Edit Settings</h1>
         <button onclick="navigate('main')" class="text-3xl text-gray-400">×</button>
     </div>
     <div class="content-area">
         <div class="setting-card">
             <label for="set_url" class="setting-label lbl-blue">System URL</label>
             <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
-            <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear System Cache & Reset</button>
+            <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear Cache & Reload</button>
         </div>
 
         <div class="setting-card border-blue-500/20 bg-blue-900/10">
-            <div class="setting-label lbl-blue mb-3">Handset Diagnostics</div>
+            <div class="setting-label lbl-blue mb-3">Handset Identity</div>
+            <input id="edit_workerName" class="form-input mb-2" placeholder="Your Name">
+            <input id="edit_workerPhone" type="tel" class="form-input mb-2" placeholder="Your Mobile">
+            <input id="edit_workerEmail" type="email" class="form-input" placeholder="Your Email">
+        </div>
+
+        <div class="setting-card border-purple-500/20 bg-purple-900/10">
+            <div class="setting-label lbl-purple mb-3">Diagnostic Status</div>
             <div class="space-y-2">
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
                 <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App:</span><span id="diagApp" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">v79.35</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Last Sync:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
             </div>
         </div>
-        <button onclick="localStorage.clear(); location.reload();" class="w-full py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-xs uppercase">Factory Reset App</button>
+        
+        <div class="flex gap-3">
+            <button onclick="localStorage.clear(); location.reload();" class="flex-1 py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-[10px] uppercase">Reset App</button>
+            <button onclick="updateSettings()" class="flex-[2] py-4 bg-blue-600 text-white font-black rounded-xl text-xs uppercase shadow-xl">Save & Sync</button>
+        </div>
     </div>
 </div>
 
@@ -233,14 +243,21 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <div id="modalBackdrop" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[150]">
-    
-    <div id="infoModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
-        <h2 id="infoTitle" class="text-xl font-bold mb-4 text-white">Site Info</h2>
-        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 text-white font-bold rounded-xl text-center shadow-xl mb-4 uppercase">🗺️ Navigate</a>
-        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
+    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
+        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
+        <input type="hidden" id="locId">
+        <div class="space-y-4">
+            <input type="text" id="locName" class="form-input" placeholder="Site Name (Required)">
+            <input type="text" id="locBusiness" class="form-input" placeholder="Business Name">
+            <input type="text" id="locAddr" class="form-input" placeholder="Address">
+        </div>
+        <div class="mt-8 flex justify-between gap-3">
+            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs">Save</button>
+        </div>
     </div>
-
+</div>
+    
 <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
     <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
     <input type="hidden" id="locId">
@@ -534,21 +551,20 @@ function initWakeListener() {
 }   
     
 /**
- * FIXED: forceSync (Defensive mapping to prevent 'primary' undefined error)
+ * FIXED: forceSync (Matches backend headers and handles Opaque responses)
  */
 async function forceSync(highPriority = false) {
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    // Defensive check: If emergency object is missing, use empty defaults
     const emg = state.settings.emergency || { primary: {}, escalation: {} };
-
+    
     const payload = {
         key: CONFIG.key,
         deviceId: state.settings.deviceId || "Pending",
-        "Worker Name": state.settings.workerName || "Unknown",
-        "Worker Phone Number": state.settings.workerPhone || "",
-        "Worker Email": state.settings.workerEmail || "",
+        "Worker Name": state.settings.workerName,
+        "Worker Phone Number": state.settings.workerPhone,
+        "Worker Email": state.settings.workerEmail,
         "Emergency Contact Name": emg.primary?.name || "",
         "Emergency Contact Number": emg.primary?.phone || "",
         "Emergency Contact Email": emg.primary?.email || "",
@@ -563,9 +579,9 @@ async function forceSync(highPriority = false) {
 
     try {
         const queryString = new URLSearchParams(payload).toString();
+        // Fire-and-forget: CORS is blocked, but data reaches GAS
         await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
-
-        state.pendingUploads = [];
+        
         state.meta.lastSync = new Date().toLocaleTimeString();
         await saveState();
         showToast(highPriority ? "🚨 EMERGENCY ALERT SENT" : "✅ SYNC SUCCESSFUL");
@@ -752,33 +768,20 @@ function populateSettingsForm() {
 }
     
 /**
- * Core Routing: Switches between different app screens.
- * @param {string} pageId - The ID of the div to show (e.g., 'setup', 'main', 'locked').
- */
-/**
-/**
- * FIXED: Page Routing (Uses 'active' and 'hidden' to match CSS visibility)
+ * FIXED: Page Routing (Now includes settingsPage)
  */
 function navigate(pageId) {
-    const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'infoPage'];
-    
+    const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'settingsPage'];
     pages.forEach(id => {
         const el = document.getElementById(id);
-        if (el) {
-            el.classList.remove('active');
-            el.classList.add('hidden');
-        }
+        if (el) { el.classList.remove('active'); el.classList.add('hidden'); }
     });
 
-    const target = document.getElementById(pageId + 'Page');
-    if (target) {
-        target.classList.add('active'); // CSS visibility trigger
-        target.classList.remove('hidden');
-        window.scrollTo(0, 0);
-    }
-
+    const target = document.getElementById(pageId + (pageId === 'settings' ? '' : 'Page'));
+    if (target) { target.classList.add('active'); target.classList.remove('hidden'); }
     if (pageId === 'main') renderLocations();
 }
+    
 /**
  * Generic Modal Controls
  */
@@ -1339,6 +1342,21 @@ async function pullLatestData() {
         }
     } catch (e) { console.error("Sync Error:", e); }
 }
+
+/**
+ * NEW: updateSettings (Saves changes from Settings editor)
+ */
+async function updateSettings() {
+    state.settings.workerName = document.getElementById('edit_workerName').value;
+    state.settings.workerPhone = document.getElementById('edit_workerPhone').value;
+    state.settings.workerEmail = document.getElementById('edit_workerEmail').value;
+    state.settings.googleSheetUrl = document.getElementById('set_url').value;
+    
+    await saveState();
+    showToast("Settings Updated");
+    await forceSync(); // Push updates to sheet immediately
+    navigate('main');
+}
     
 // --- 6. STARTUP SEQUENCE ---
 
@@ -1368,6 +1386,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
