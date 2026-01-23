@@ -206,17 +206,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear System Cache & Reset</button>
         </div>
 
-<div class="setting-card border-blue-500/20 bg-blue-900/10" id="handsetDiagContainer">
-    <label for="handsetDiagContainer" class="setting-label lbl-blue">Handset Diagnostics</label>
-    <div class="space-y-2">
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">---</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
-    </div>
-</div>
-        
+        <div class="setting-card border-blue-500/20 bg-blue-900/10">
+            <div class="setting-label lbl-blue mb-3">Handset Diagnostics</div>
+            <div class="space-y-2">
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">---</span></div>
+                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
+            </div>
+        </div>
         <button onclick="localStorage.clear(); location.reload();" class="w-full py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-xs uppercase">Factory Reset App</button>
     </div>
 </div>
@@ -251,7 +250,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input type="text" id="locName" class="form-input" placeholder="Required">
         </div>
         <div>
-            <label for="locBusiness" class="setting-label text-gray-500">Business/Company</label>
+            <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
             <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
         </div>
         <div>
@@ -260,17 +259,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <input type="text" id="locAddr" class="form-input mb-0 flex-1">
                 <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
             </div>
-            </div>
-        </div>
-        <div class="mt-8 flex justify-between gap-3">
-            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl hidden uppercase text-xs">Delete</button>
-            <div class="flex-1"></div>
-            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs">Cancel</button>
-            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs">Save</button>
         </div>
     </div>
-
-    <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
+    <div class="mt-8 flex justify-between gap-3">
+        <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl hidden uppercase text-xs">Delete</button>
+        <div class="flex-1"></div>
+        <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs">Cancel</button>
+        <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs">Save</button>
+    </div>
+</div>
+    
+<div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
         <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Forms Library</h2>
         <div id="templateList" class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2"></div>
         <button onclick="closeModal('template')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-white uppercase tracking-widest">Close</button>
@@ -532,27 +531,30 @@ function initWakeListener() {
 
     saver.onmousedown = startWake; saver.onmouseup = stopWake;
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
-}    
+}   
+    
 /**
- * FIXED: forceSync (Matches Backend Sheet Headers)
+ * FIXED: forceSync (Defensive mapping to prevent 'primary' undefined error)
  */
 async function forceSync(highPriority = false) {
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    // MAPPING: Worker App keys -> Backend 'Visits' Column Headers
+    // Defensive check: If emergency object is missing, use empty defaults
+    const emg = state.settings.emergency || { primary: {}, escalation: {} };
+
     const payload = {
         key: CONFIG.key,
         deviceId: state.settings.deviceId || "Pending",
-        "Worker Name": state.settings.workerName,
-        "Worker Phone Number": state.settings.workerPhone,
-        "Worker Email": state.settings.workerEmail,
-        "Emergency Contact Name": state.settings.emergency.primary.name,
-        "Emergency Contact Number": state.settings.emergency.primary.phone,
-        "Emergency Contact Email": state.settings.emergency.primary.email,
-        "Escalation Contact Name": state.settings.emergency.escalation.name,
-        "Escalation Contact Number": state.settings.emergency.escalation.phone,
-        "Escalation Contact Email": state.settings.emergency.escalation.email,
+        "Worker Name": state.settings.workerName || "Unknown",
+        "Worker Phone Number": state.settings.workerPhone || "",
+        "Worker Email": state.settings.workerEmail || "",
+        "Emergency Contact Name": emg.primary?.name || "",
+        "Emergency Contact Number": emg.primary?.phone || "",
+        "Emergency Contact Email": emg.primary?.email || "",
+        "Escalation Contact Name": emg.escalation?.name || "",
+        "Escalation Contact Number": emg.escalation?.phone || "",
+        "Escalation Contact Email": emg.escalation?.email || "",
         "Alarm Status": highPriority ? "EMERGENCY - PANIC" : (state.activeVisit ? state.activeVisit.status : "SYNC"),
         "Last Known GPS": state.meta.lastGPS || "",
         "Battery Level": currentBatteryLevel || "100%",
@@ -560,12 +562,8 @@ async function forceSync(highPriority = false) {
     };
 
     try {
-        // Build the URL with parameters for the GET/POST handler
         const queryString = new URLSearchParams(payload).toString();
-        await fetch(`${CONFIG.url}?${queryString}`, {
-            method: 'POST',
-            mode: 'no-cors' 
-        });
+        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
 
         state.pendingUploads = [];
         state.meta.lastSync = new Date().toLocaleTimeString();
@@ -733,22 +731,24 @@ function savePin() {
 /**
  * FIXED: populateSettingsForm (Now updates all Diagnostic fields)
  */
+/**
+ * FIXED: Diagnostic Form updates Backend version
+ */
 function populateSettingsForm() {
     const urlInput = document.getElementById('set_url');
     if (urlInput) urlInput.value = state.settings.googleSheetUrl || "%%GOOGLE_SHEET_URL%%";
 
-    // Diagnostic Card Labels
     const diagId = document.getElementById('set_workerName_diag');
     if (diagId) diagId.innerText = state.settings.workerName || "Not Setup";
     
     const diagDev = document.getElementById('set_deviceId_diag');
     if (diagDev) diagDev.innerText = state.settings.deviceId || "Pending";
 
-    const diagCloud = document.getElementById('diagCloud');
-    if (diagCloud) diagCloud.innerText = state.meta.lastSync ? `Synced: ${state.meta.lastSync}` : "Ready";
-    
+    const diagBack = document.getElementById('diagBackend');
+    if (diagBack) diagBack.innerText = state.meta.backendVersion || "v79.35"; // Identifies version
+
     const diagApp = document.getElementById('diagApp');
-    if (diagApp) diagApp.innerText = "Version: " + APP_VERSION;
+    if (diagApp) diagApp.innerText = APP_VERSION;
 }
     
 /**
@@ -944,7 +944,7 @@ function renderLocations() {
 }
 
 /**
- * RESTORED: Dashboard Action Button (Color Inheritance & Context)
+ * FIXED: Unified Travel Logic (Simply "Travel", No Pulse)
  */
 function updateArrivedButtonState() {
     const btn = document.getElementById('btnMainAction');
@@ -955,18 +955,13 @@ function updateArrivedButtonState() {
     state.visitDurationMinutes = mins;
     if (display) display.innerText = mins + " mins";
 
-    // Dynamic Color from Factory Settings
-    const factoryColor = state.settings.themeColor || "#3b82f6"; 
-
     if (state.selectedLocationId && mins > 0) {
         btn.disabled = false;
-        btn.style.backgroundColor = factoryColor;
-        btn.classList.add('text-white');
-        btn.classList.remove('bg-gray-700', 'text-gray-500');
-
+        btn.style.backgroundColor = state.settings.themeColor || "#3b82f6";
+        
         if (state.selectedLocationId === 'travel') {
-            btn.innerText = "Travel to Destination";
-            btn.style.filter = "hue-rotate(45deg)"; // Contextual shift
+            btn.innerText = "Travel"; // Renamed from "Travel Safety Check"
+            btn.style.filter = "none"; // Removed hue-rotate
         } else {
             const loc = state.locations.find(l => l.id === state.selectedLocationId);
             btn.innerText = `Hold to Start: ${loc.name}`;
@@ -977,7 +972,6 @@ function updateArrivedButtonState() {
         btn.disabled = true;
         btn.innerText = "Start";
         btn.style.backgroundColor = ""; 
-        btn.style.filter = "none";
         btn.classList.add('bg-gray-700', 'text-gray-500');
     }
 }
@@ -1162,10 +1156,13 @@ function startCheckinTimer() {
     }, 1000);
 }
 
+/**
+ * FIXED: Dashboard Pulse Removal
+ */
 function checkVehicleStatus() {
-    const isTransit = state.activeVisit && state.activeVisit.status === 'TRAVELLING';
+    // PULSE REMOVED: Travel tile now looks standard but active
     const tr = document.getElementById('travelRow');
-    if (tr) isTransit ? tr.classList.add('border-purple-500', 'pulse-border') : tr.classList.remove('border-purple-500', 'pulse-border');
+    if (tr) tr.classList.remove('pulse-border'); 
 }
 
 function speak(text) {
@@ -1321,31 +1318,26 @@ function saveIdentity() {
 }
 
 /**
- * GOLDEN HANDSHAKE: Pulls Sites and Forms from the Backend
+ * GOLDEN HANDSHAKE: Pulls Sites and Version from Spreadsheet
  */
 async function pullLatestData() {
     const url = `${CONFIG.url}?action=sync&key=${CONFIG.key}&worker=${encodeURIComponent(state.settings.workerName)}&deviceId=${state.settings.deviceId}`;
-    
     try {
         const response = await fetch(url);
-        const data = await response.json(); // Requires standard CORS on backend
-        
+        const data = await response.json(); 
         if (data.sites) {
-            // Map backend sites to local location format
             state.locations = data.sites.map(s => ({
                 id: 'loc_' + Math.random().toString(36).substr(2, 5),
                 name: s.siteName,
                 companyName: s.company,
                 address: s.address
             }));
-            state.meta.backendVersion = data.version;
+            state.meta.backendVersion = data.version; // IDENTIFIES BACKEND VERSION
             await saveState();
             renderLocations();
             showToast("Cloud Data Loaded");
         }
-    } catch (e) {
-        console.error("Sync Data Error:", e);
-    }
+    } catch (e) { console.error("Sync Error:", e); }
 }
     
 // --- 6. STARTUP SEQUENCE ---
@@ -1376,6 +1368,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
