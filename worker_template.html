@@ -530,29 +530,37 @@ function initWakeListener() {
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }    
 /**
- * RESTORED: Golden Sync Engine (Authenticated Fetch)
+ * FIXED: forceSync (Matches Backend Sheet Headers)
  */
 async function forceSync(highPriority = false) {
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    // PAYLOAD: Prioritises validation data for Apps Script
+    // MAPPING: Worker App keys -> Backend 'Visits' Column Headers
     const payload = {
-        systemPassword: CONFIG.key, 
-        workerName: state.settings.workerName || "Unknown",
+        key: CONFIG.key,
         deviceId: state.settings.deviceId || "Pending",
-        identity: state.settings, // Includes contacts & masked PINs
-        reports: state.pendingUploads,
-        timestamp: new Date().toISOString(),
-        isEmergency: highPriority
+        "Worker Name": state.settings.workerName,
+        "Worker Phone Number": state.settings.workerPhone,
+        "Worker Email": state.settings.workerEmail,
+        "Emergency Contact Name": state.settings.emergency.primary.name,
+        "Emergency Contact Number": state.settings.emergency.primary.phone,
+        "Emergency Contact Email": state.settings.emergency.primary.email,
+        "Escalation Contact Name": state.settings.emergency.escalation.name,
+        "Escalation Contact Number": state.settings.emergency.escalation.phone,
+        "Escalation Contact Email": state.settings.emergency.escalation.email,
+        "Alarm Status": highPriority ? "EMERGENCY - PANIC" : (state.activeVisit ? state.activeVisit.status : "SYNC"),
+        "Last Known GPS": state.meta.lastGPS || "",
+        "Battery Level": currentBatteryLevel || "100%",
+        "Timestamp": new Date().toISOString()
     };
 
     try {
-        await fetch(CONFIG.url, {
+        // Build the URL with parameters for the GET/POST handler
+        const queryString = new URLSearchParams(payload).toString();
+        await fetch(`${CONFIG.url}?${queryString}`, {
             method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            mode: 'no-cors' 
         });
 
         state.pendingUploads = [];
@@ -1334,5 +1342,6 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
