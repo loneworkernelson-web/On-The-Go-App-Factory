@@ -148,8 +148,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div class="content-area">
         <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold animate-pulse">Syncing...</div>
         <div class="flex gap-2 mb-4">
-            <button onclick="forceSync(true)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg transition">↻</button>
-            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg transition">+</button>
+<button onclick="forceSync(false)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg transition">↻</button>            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg transition">+</button>
             <div id="travelRow" class="flex-1"></div>
         </div>
         <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Safety Destinations</div>
@@ -207,15 +206,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear System Cache & Reset</button>
         </div>
 
-        <div class="setting-card border-blue-500/20 bg-blue-900/10">
-            <label class="setting-label lbl-blue">Handset Diagnostics</label>
-            <div class="space-y-2">
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
-            </div>
-        </div>
+<div class="setting-card border-blue-500/20 bg-blue-900/10" id="handsetDiagContainer">
+    <label for="handsetDiagContainer" class="setting-label lbl-blue">Handset Diagnostics</label>
+    <div class="space-y-2">
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Identity:</span><span id="set_workerName_diag" class="text-white">---</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App Version:</span><span id="diagApp" class="text-white">---</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">---</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Sync Status:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
+    </div>
+</div>
         
         <button onclick="localStorage.clear(); location.reload();" class="w-full py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-xs uppercase">Factory Reset App</button>
     </div>
@@ -242,20 +242,24 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
     </div>
 
-    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
-        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
-        <input type="hidden" id="locId">
-        <div class="space-y-4">
-            <div>
-                <label for="locName" class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label>
-                <input type="text" id="locName" class="form-input" placeholder="Required">
+<div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
+    <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
+    <input type="hidden" id="locId">
+    <div class="space-y-4">
+        <div>
+            <label for="locName" class="setting-label text-gray-500">Site Name</label>
+            <input type="text" id="locName" class="form-input" placeholder="Required">
+        </div>
+        <div>
+            <label for="locBusiness" class="setting-label text-gray-500">Business/Company</label>
+            <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
+        </div>
+        <div>
+            <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
+            <div class="flex gap-2">
+                <input type="text" id="locAddr" class="form-input mb-0 flex-1">
+                <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
             </div>
-            <div>
-                <label for="locAddr" class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
-                <div class="flex gap-2">
-                    <input type="text" id="locAddr" class="form-input mb-0 flex-1 font-medium">
-                    <button onclick="captureGPS(this)" id="btnGpsAddr" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-xl font-black text-xs shrink-0 shadow-lg">📍 GPS</button>
-                </div>
             </div>
         </div>
         <div class="mt-8 flex justify-between gap-3">
@@ -996,7 +1000,8 @@ function createTravelTile(loc) {
                 <span class="text-[10px] font-black text-purple-400 uppercase tracking-widest">In-Transit Mode</span>
                 <button class="text-gray-500 hover:text-white" onclick="event.stopPropagation(); showToast('Travel settings updated');">⚙️</button>
             </div>
-            <div class="text-lg font-black text-white leading-tight">Travel Safety Check</div>
+            // Change this line:
+                <div class="text-lg font-black text-white leading-tight">Travel</div>
             ${isNoReport ? '<span class="text-[9px] text-gray-500 uppercase font-bold">Fast-Sync (No Report)</span>' : ''}
         </div>
     `;
@@ -1314,6 +1319,35 @@ function saveIdentity() {
     // 3. Trigger Navigation
     wizNext('wizStep1', 'wizStep2');
 }
+
+/**
+ * GOLDEN HANDSHAKE: Pulls Sites and Forms from the Backend
+ */
+async function pullLatestData() {
+    const url = `${CONFIG.url}?action=sync&key=${CONFIG.key}&worker=${encodeURIComponent(state.settings.workerName)}&deviceId=${state.settings.deviceId}`;
+    
+    try {
+        const response = await fetch(url);
+        const data = await response.json(); // Requires standard CORS on backend
+        
+        if (data.sites) {
+            // Map backend sites to local location format
+            state.locations = data.sites.map(s => ({
+                id: 'loc_' + Math.random().toString(36).substr(2, 5),
+                name: s.siteName,
+                companyName: s.company,
+                address: s.address
+            }));
+            state.meta.backendVersion = data.version;
+            await saveState();
+            renderLocations();
+            showToast("Cloud Data Loaded");
+        }
+    } catch (e) {
+        console.error("Sync Data Error:", e);
+    }
+}
+    
 // --- 6. STARTUP SEQUENCE ---
 
 
@@ -1342,6 +1376,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
