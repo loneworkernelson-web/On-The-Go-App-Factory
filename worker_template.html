@@ -764,23 +764,29 @@ function populateSettingsForm() {
 }
     
 /**
- * FIXED: Page Routing (Now includes settingsPage)
+ * FIXED: Page Routing (Corrected Page IDs & Diagnostic Refresh)
  */
 function navigate(pageId) {
     const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'settingsPage'];
+    
     pages.forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.classList.remove('active'); el.classList.add('hidden'); }
     });
 
-    const target = document.getElementById(pageId + (pageId === 'settings' ? '' : 'Page'));
-    if (target) { target.classList.add('active'); target.classList.remove('hidden'); }
+    // FIXED: Corrected ternary to match 'settingsPage' ID
+    const target = document.getElementById(pageId + 'Page');
+    if (target) {
+        target.classList.add('active');
+        target.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+
     if (pageId === 'main') renderLocations();
+    if (pageId === 'settings') populateSettingsForm(); // Ensures diagnostics are fresh
 }
     
-/**
- * Generic Modal Controls
- */
+// UPDATE: showModal to trigger renderForms
 function showModal(id) {
     const backdrop = document.getElementById('modalBackdrop');
     const modal = document.getElementById(id + 'Modal');
@@ -788,8 +794,10 @@ function showModal(id) {
         backdrop.classList.remove('hidden');
         backdrop.classList.add('flex');
         modal.classList.remove('hidden');
+        if (id === 'template') renderForms(); // FIXED: Triggers rendering
     }
 }
+
 function closeModal(id) {
     const backdrop = document.getElementById('modalBackdrop');
     const modal = document.getElementById(id + 'Modal');
@@ -977,7 +985,7 @@ function updateArrivedButtonState() {
 
     
 /**
- * FIXED: createTravelTile (Resolves ReferenceError)
+ * FIXED: createTravelTile (Now calls functional toggle)
  */
 function createTravelTile(loc) {
     const d = document.createElement('div');
@@ -985,19 +993,20 @@ function createTravelTile(loc) {
     const isNoReport = localStorage.getItem('otg_user_travel_pref') === 'true';
 
     d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-purple-500 bg-purple-900/40 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
-    
     d.innerHTML = `
         <div class="text-3xl">🛣️</div>
         <div class="flex-1">
             <div class="flex justify-between items-center">
-                <span class="text-[10px] font-black text-purple-400 uppercase tracking-widest">Monitored Travel Mode</span>
-                <button class="text-gray-500 hover:text-white" onclick="event.stopPropagation(); showToast('Travel settings updated');">⚙️</button>
+                <span class="text-[10px] font-black text-purple-400 uppercase tracking-widest">In-Transit Mode</span>
+                <button class="text-gray-500 hover:text-white" onclick="editTravelSettings(event)">⚙️</button>
             </div>
-                <div class="text-lg font-black text-white leading-tight">Travel</div>
-            ${isNoReport ? '<span class="text-[9px] text-gray-500 uppercase font-bold">Fast-Sync (No Report)</span>' : ''}
+            <div class="text-lg font-black text-white leading-tight">Travel</div>
+            ${isNoReport ? '<span class="text-[9px] text-gray-400 uppercase font-bold">Fast-Sync (No Report)</span>' : ''}
         </div>
     `;
-
+    d.onclick = () => { state.selectedLocationId = isSel ? null : 'travel'; renderLocations(); };
+    return d;
+}
     d.onclick = () => {
         state.selectedLocationId = isSel ? null : 'travel';
         renderLocations();
@@ -1246,13 +1255,13 @@ function openLocModal(id = null) {
     showModal('location');
 }
 
-    /**
- * FIXED: editTravelSettings (Resolves ReferenceError)
+/**
+ * NEW: editTravelSettings (Functional Toggle for Travel Reports)
  */
 function editTravelSettings(e) {
     if (e) e.stopPropagation();
     const pref = localStorage.getItem('otg_user_travel_pref') === 'true';
-    if (confirm(`Current Setting: ${pref ? "FAST-SYNC (No Report)" : "DETAILED REPORT"}\n\nSwitch to ${pref ? "Detailed Mode" : "Fast-Sync Mode"}?`)) {
+    if (confirm(`Switch to ${pref ? "Detailed Mode (Full Report)" : "Fast-Sync Mode (No Report)"}?`)) {
         localStorage.setItem('otg_user_travel_pref', !pref);
         initLocations();
         showToast("Travel Preference Updated");
@@ -1316,28 +1325,53 @@ function saveIdentity() {
 }
 
 /**
- * GOLDEN HANDSHAKE: Pulls Sites and Version from Spreadsheet
+ * FIXED: pullLatestData (Handshake to fetch Forms and Sites)
  */
 async function pullLatestData() {
     const url = `${CONFIG.url}?action=sync&key=${CONFIG.key}&worker=${encodeURIComponent(state.settings.workerName)}&deviceId=${state.settings.deviceId}`;
     try {
         const response = await fetch(url);
         const data = await response.json(); 
-        if (data.sites) {
+        if (data.forms) {
+            state.globalForms = data.forms; // Populates Forms Library
             state.locations = data.sites.map(s => ({
                 id: 'loc_' + Math.random().toString(36).substr(2, 5),
                 name: s.siteName,
                 companyName: s.company,
                 address: s.address
             }));
-            state.meta.backendVersion = data.version; // IDENTIFIES BACKEND VERSION
+            state.meta.backendVersion = data.version;
             await saveState();
             renderLocations();
-            showToast("Cloud Data Loaded");
+            showToast("Cloud Data Synchronised");
         }
     } catch (e) { console.error("Sync Error:", e); }
 }
 
+    /**
+ * NEW: renderForms (Populates the Forms Library Modal)
+ */
+function renderForms() {
+    const list = document.getElementById('templateList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // Standard Forms
+    const forms = state.globalForms || [];
+    forms.forEach(f => {
+        const btn = document.createElement('button');
+        btn.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl text-xs font-bold uppercase text-white transition-colors";
+        btn.innerText = f.name;
+        btn.onclick = () => {
+            const fieldArea = document.getElementById('reportFields');
+            buildReportForm(f.name, fieldArea);
+            navigate('report');
+            closeModal('template');
+        };
+        list.appendChild(btn);
+    });
+}
+    
 /**
  * NEW: updateSettings (Saves changes from Settings editor)
  */
@@ -1381,6 +1415,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
