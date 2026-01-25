@@ -1414,7 +1414,62 @@ function openQuickMenu() {
 }
 // --- 6. STARTUP SEQUENCE ---
 
+/**
+ * FIXED: preDepart (Conditional PIN Logic)
+ * Only requests PIN if an alarm is active.
+ */
+function preDepart() {
+    if (!state.activeVisit) return;
 
+    // Check if an alarm state is active
+    const alarmActive = state.activeVisit.isPanic || state.activeVisit.criticalSent;
+
+    const proceedToReport = () => {
+        isMidVisitUpdate = false; 
+        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
+        
+        if (l && l.noReport) {
+            submitReport(); 
+        } else {
+            loadFormAndShow(l ? (l.templateName || "(Standard)") : "(Standard)");
+        }
+    };
+
+    if (alarmActive) {
+        // Alarm is active: Require PIN to verify safety
+        withPinVerification(false, proceedToReport);
+    } else {
+        // Normal departure: Proceed directly to report
+        proceedToReport();
+    }
+}
+
+/**
+ * RESTORED: enterLockedScreen
+ * Consolidates all logic for the active/locked visit state.
+ */
+function enterLockedScreen() {
+    const l = state.locations.find(x => x.id === state.activeVisit.locationId);
+    if (!l) return;
+
+    // 1. UI Setup
+    document.getElementById('lockedLocationName').innerText = l.name;
+    navigate('locked');
+
+    // 2. High-Risk Visibility
+    const riskBadge = document.getElementById('highRiskBadge');
+    if (riskBadge) {
+        state.activeVisit.highRisk ? riskBadge.classList.remove('hidden') : riskBadge.classList.add('hidden');
+    }
+
+    // 3. Timer Initialization
+    if (timerInt) clearInterval(timerInt);
+    timerInt = setInterval(tick, 1000);
+
+    // 4. Long-Press Button Glue
+    setupLongPress(document.getElementById('btnDepart'), preDepart); 
+    setupLongPress(document.getElementById('btnExtend'), () => showModal('extend'));
+}
 
 window.onload = async () => {
     // 1. Restore persistent data
@@ -1440,8 +1495,3 @@ window.onload = async () => {
 </script>
 </body>
 </html>
-
-
-
-
-
