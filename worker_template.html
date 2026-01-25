@@ -186,9 +186,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2 tracking-tight">---</h2>
             
             <div class="mt-12 w-full max-w-xs mx-auto space-y-4">
-                <input type="password" id="lock_pin_input" maxlength="4" inputmode="numeric" placeholder="Enter PIN" class="form-input text-center text-3xl tracking-[0.5em]">
-                <button onclick="checkPin()" class="w-full py-4 bg-blue-600 font-bold rounded-2xl text-lg">Unlock Options</button>
-                <button onclick="endVisit()" class="w-full py-4 bg-red-600 font-bold rounded-2xl text-lg">End Visit</button>
+                <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 font-bold rounded-2xl text-lg uppercase tracking-widest">Add Notes / Forms</button>
+                <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 font-bold rounded-2xl text-lg uppercase tracking-widest">End Visit</button>
             </div>
         </div>
     </div>
@@ -379,6 +378,10 @@ async function hardRefreshUpdate() {
 /**
  * Starts a visit or travel session.
  */
+/**
+ * FIXED: startVisit (Consolidated Master Control)
+ * Hands off UI and Timer management to enterLockedScreen.
+ */
 function startVisit(id) {
     const loc = state.locations.find(l => l.id === id);
     if (!loc) return;
@@ -387,17 +390,20 @@ function startVisit(id) {
         id, 
         locationName: loc.name, 
         startTime: Date.now(), 
-        status: (id === 'travel' ? 'TRAVELLING' : 'ON_SITE') 
+        status: (id === 'travel' ? 'TRAVELLING' : 'ON_SITE'),
+        isPanic: false,
+        criticalSent: false
     };
 
     saveState();
-    navigate('locked');
-    startCheckinTimer();
+    
+    // MASTER HANDOFF: enterLockedScreen manages navigate('locked') and tick()
+    enterLockedScreen(); 
+    
     speak(`Visit started at ${loc.name}`);
 
-    // GLUE: Automatically dim the screen if driving to save battery
     if (id === 'travel') {
-        setTimeout(() => toggleBatterySaver(true), 2000); 
+        setTimeout(() => toggleBatterySaver(true), 10000); 
     }
 }
 /**
@@ -1188,6 +1194,10 @@ async function submitReport() {
     navigate('main');
     forceSync();
 }
+/**
+ * FIXED: showSiteInfo (Standardised External Mapping)
+ * Resolves confusion between app navigate() and external GPS navigation.
+ */
 function showSiteInfo(id, e) {
     if (e) e.stopPropagation(); 
     const l = state.locations.find(x => x.id === id); 
@@ -1197,14 +1207,14 @@ function showSiteInfo(id, e) {
     let h = "";
     if (l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
     
-    const nav = document.getElementById('btnSiteNav');
+    const navBtn = document.getElementById('btnSiteNav');
     if (l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // FIXED: navigation URL template literal
-        nav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
-        nav.classList.remove('hidden'); 
+        // FIXED: Uses standard Google Maps Search API to ensure reliability
+        navBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
+        navBtn.classList.remove('hidden'); 
     } else { 
-        nav.classList.add('hidden'); 
+        navBtn.classList.add('hidden'); 
     }
     document.getElementById('siteInfoContent').innerHTML = h;
     showModal('info');
@@ -1495,3 +1505,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
