@@ -163,7 +163,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
         <div class="flex gap-4">
-            <button id="btnQuick" onclick="showModal('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
+            <button id="btnQuick" onclick="openQuickMenu()('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
             <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
         </div>
     </div>
@@ -1418,10 +1418,38 @@ function renderIconGrid(forms) {
 }
 
 // UPDATE: Modify your existing showModal('template') to trigger this:
+/**
+ * FIXED: Icons Dashboard (Consolidated from renderForms)
+ */
 function openQuickMenu() {
     showModal('template');
-    renderIconGrid(state.globalForms); //
+    const list = document.getElementById('templateList');
+    list.innerHTML = ''; // Clear old buttons
+
+    const addBtn = (name, icon) => { 
+        const b = document.createElement('button'); 
+        b.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"; 
+        b.innerHTML = `<div class="text-3xl">${icon}</div><div class="text-[10px] font-bold uppercase text-white">${name}</div>`; 
+        b.onclick = () => {
+            closeModal('template');
+            const fieldArea = document.getElementById('reportFields');
+            buildReportForm(name, fieldArea);
+            navigate('report');
+        }; 
+        list.appendChild(b); 
+    };
+
+    // Populate from spreadsheet forms
+    state.globalForms.forEach(f => {
+        let icon = "📋";
+        if (f.name.toLowerCase().includes('vehicle')) icon = "🚗";
+        addBtn(f.name, icon);
+    });
 }
+
+// Update the Dashboard "Forms" button in HTML (Line 152):
+// Change: onclick="showModal('template')" 
+// To: onclick="openQuickMenu()"
 // --- 6. STARTUP SEQUENCE ---
 
 /**
@@ -1480,7 +1508,58 @@ function enterLockedScreen() {
     setupLongPress(document.getElementById('btnDepart'), preDepart); 
     setupLongPress(document.getElementById('btnExtend'), () => showModal('extend'));
 }
+/**
+ * RESTORED: Master Timer (Engine for the Locked Screen)
+ */
+function tick() {
+    if (!state.activeVisit) { clearInterval(timerInt); return; }
+    const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
+    const timerEl = document.getElementById('visitTimer');
+    if (timerEl) {
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        timerEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+}
 
+/**
+ * RESTORED: Long-Press Controller
+ * Essential for Start/End Visit buttons to function.
+ */
+function setupLongPress(btn, cb) {
+    let t;
+    const start = (e) => {
+        if (e.type === 'touchstart') e.preventDefault();
+        btn.classList.add('pressing');
+        t = setTimeout(() => {
+            cb();
+            btn.classList.remove('pressing');
+        }, 1500); // 1.5 second hold requirement
+    };
+    const cancel = () => { clearTimeout(t); btn.classList.remove('pressing'); };
+    btn.onmousedown = btn.ontouchstart = start;
+    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
+}
+
+/**
+ * RESTORED: PIN Verification Engine
+ */
+function withPinVerification(d, callback) {
+    // Note: In worker_template, this logic uses the lock_pin_input
+    const input = document.getElementById('lock_pin_input');
+    if (!input) return;
+    
+    const check = () => {
+        if (btoa(input.value) === state.settings.pinCode) {
+            input.value = "";
+            callback();
+        } else {
+            showToast("Incorrect PIN");
+        }
+    };
+    // Triggered by the checkPin() call in your HTML
+    check();
+}
 window.onload = async () => {
     // 1. Restore persistent data
     loadState(); 
@@ -1505,4 +1584,5 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
