@@ -256,24 +256,24 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
     <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
     <input type="hidden" id="locId">
-    <div class="space-y-4">
-        <div>
-            <label for="locName" class="setting-label text-gray-500">Site Name</label>
-            <input type="text" id="locName" class="form-input" placeholder="Required">
-        </div>
-        <div>
-            <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
-            <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
-        </div>
-        <div>
-            <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
-            <div class="flex gap-2">
-                <input type="text" id="locAddr" class="form-input mb-0 flex-1">
-                <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
-            </div>
+<div class="space-y-4">
+    <div>
+        <label for="locName" class="setting-label text-gray-500">Site Name</label>
+        <input type="text" id="locName" class="form-input" placeholder="Required">
+    </div>
+    <div>
+        <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
+        <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
+    </div>
+    <div>
+        <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
+        <div class="flex gap-2">
+            <input type="text" id="locAddr" class="form-input mb-0 flex-1">
+            <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
         </div>
     </div>
-    </div>
+</div>
+</div>
 
     <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
         <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Forms Library</h2>
@@ -539,51 +539,42 @@ function initWakeListener() {
     saver.onmousedown = startWake; saver.onmouseup = stopWake;
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }   
-    
 /**
- * RESTORED: Working Sync Engine
- * Uses GET for data retrieval to bypass CORB and populate libraries.
+ * FIXED: forceSync (Added 'async' to resolve SyntaxError)
  */
-function forceSync(showUi) {
+async function forceSync(highPriority = false) {
     if (!state.settings.workerName) return;
-    if (showUi) document.getElementById('uploadBanner').classList.remove('hidden');
+    const banner = document.getElementById('uploadBanner');
+    if (banner) banner.classList.remove('hidden');
 
-    const dId = state.settings.deviceId || getDeviceID();
-    
-    // AUTHENTICATED HANDSHAKE: Pulls Sites and Forms
-    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
-    .then(r => r.json())
-    .then(data => {
-        if (data.status === "error") {
-            if (showUi) alert("❌ Sync Error: " + data.message);
-            return;
-        }
+    // DEFENSIVE: Prevents 'undefined primary' error
+    const emg = state.settings.emergency || { primary: {}, escalation: {} };
+    const dId = state.settings.deviceId || "Pending";
 
-        // POPULATE LOCAL STATE
-        state.globalForms = data.forms || [];
-        state.cachedForms = data.cachedTemplates || {};
+    const payload = {
+        key: CONFIG.key,
+        deviceId: dId,
+        "Worker Name": state.settings.workerName,
+        "Alarm Status": highPriority ? "EMERGENCY - PANIC" : (state.activeVisit ? state.activeVisit.status : "SYNC"),
+        "Timestamp": new Date().toISOString()
+    };
+
+    try {
+        const queryString = new URLSearchParams(payload).toString();
+        // POST for high-security fire-and-forget
+        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
         
-        // Map backend sites to local location format
-        const ms = (data.sites || []).map(s => ({
-            id: 'site_' + s.siteName.replace(/\s/g, ''),
-            name: s.siteName,
-            address: s.address,
-            companyName: s.company,
-            templateName: s.template
-        }));
+        state.meta.lastSync = new Date().toLocaleTimeString();
+        await saveState();
+        showToast(highPriority ? "🚨 EMERGENCY ALERT SENT" : "✅ SYNC SUCCESSFUL");
         
-        state.locations = ms.concat(state.locations.filter(x => x.id.startsWith('loc_')));
-        state.meta = data.meta || {};
-        
-        saveState();
-        renderLocations();
-        document.getElementById('uploadBanner').classList.add('hidden');
-        if (showUi) showToast("Cloud Data Synchronised");
-    })
-    .catch(e => {
-        document.getElementById('uploadBanner').classList.add('hidden');
-        console.warn("Sync Failed: " + e.message);
-    });
+        // HANDSHAKE: Call GET to bypass CORB and load Sites/Forms
+        if (!highPriority) pullLatestData(); 
+    } catch (e) {
+        showToast("📡 OFFLINE: Data Queued");
+    } finally {
+        if (banner) banner.classList.add('hidden');
+    }
 }
 
     try {
@@ -1330,25 +1321,28 @@ function saveIdentity() {
 }
 
 /**
- * FIXED: pullLatestData (Handshake to fetch Forms and Sites)
+ * RESTORED: pullLatestData (Handshake via GET)
  */
 async function pullLatestData() {
     const url = `${CONFIG.url}?action=sync&key=${CONFIG.key}&worker=${encodeURIComponent(state.settings.workerName)}&deviceId=${state.settings.deviceId}`;
+    
     try {
         const response = await fetch(url);
         const data = await response.json(); 
+        
         if (data.forms) {
             state.globalForms = data.forms; // Populates Forms Library
-            state.locations = data.sites.map(s => ({
-                id: 'loc_' + Math.random().toString(36).substr(2, 5),
+            state.locations = (data.sites || []).map(s => ({
+                id: 'site_' + s.siteName.replace(/\s/g, ''),
                 name: s.siteName,
                 companyName: s.company,
-                address: s.address
-            }));
-            state.meta.backendVersion = data.version;
+                address: s.address,
+                templateName: s.template
+            })).concat(state.locations.filter(x => x.id.startsWith('loc_')));
+            
+            state.meta.backendVersion = data.version; 
             await saveState();
             renderLocations();
-            showToast("Cloud Data Synchronised");
         }
     } catch (e) { console.error("Sync Error:", e); }
 }
@@ -1458,4 +1452,5 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
