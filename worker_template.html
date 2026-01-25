@@ -540,17 +540,17 @@ function initWakeListener() {
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }   
 /**
- * FIXED: forceSync (Added 'async' to resolve SyntaxError)
+ * FIXED: Added 'async' to resolve SyntaxError
+ * Logic restored to match 'Last Good-Almost.html' performance
  */
 async function forceSync(highPriority = false) {
     if (!state.settings.workerName) return;
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    // DEFENSIVE: Prevents 'undefined primary' error
-    const emg = state.settings.emergency || { primary: {}, escalation: {} };
     const dId = state.settings.deviceId || "Pending";
 
+    // Standard Payload for the backend
     const payload = {
         key: CONFIG.key,
         deviceId: dId,
@@ -561,14 +561,14 @@ async function forceSync(highPriority = false) {
 
     try {
         const queryString = new URLSearchParams(payload).toString();
-        // POST for high-security fire-and-forget
+        // Uses POST for data submission (Fire-and-forget)
         await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
         
         state.meta.lastSync = new Date().toLocaleTimeString();
-        await saveState();
-        showToast(highPriority ? "🚨 EMERGENCY ALERT SENT" : "✅ SYNC SUCCESSFUL");
+        await saveState(); // This line was causing your SyntaxError
+        showToast(highPriority ? "🚨 EMERGENCY SENT" : "✅ SYNC SUCCESSFUL");
         
-        // HANDSHAKE: Call GET to bypass CORB and load Sites/Forms
+        // HANDSHAKE: Call GET to pull Sites/Forms
         if (!highPriority) pullLatestData(); 
     } catch (e) {
         showToast("📡 OFFLINE: Data Queued");
@@ -1452,5 +1452,6 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
