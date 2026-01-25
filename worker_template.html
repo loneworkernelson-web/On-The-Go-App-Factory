@@ -624,43 +624,50 @@ async function logSafety(status, notes = "") {
     if (state.syncing || !state.worker) return;
     state.syncing = true;
     
-    // Exact mapping from WSindex.html sent to Factory URL
+    // Exact mapping from WSindex.html logic
     const payload = {
+        'action': 'logVisit',
         'key': CONFIG.key,
         'Worker Name': state.worker.name,
         'Worker Phone': state.worker.phone,
-        'Emergency Contact': state.worker.emgName || "Not Set",
-        'Emergency Phone': state.worker.emgPhone || "Not Set",
-        'Escalation Contact': state.worker.escName || "Not Set",
-        'Escalation Phone': state.worker.escPhone || "Not Set",
+        'Emergency Contact Name': state.worker.emgName || "Not Set",
+        'Emergency Contact Number': state.worker.emgPhone || "Not Set",
+        'Escalation Contact Name': state.worker.escName || "Not Set",
+        'Escalation Contact Number': state.worker.escPhone || "Not Set",
         'Alarm Status': status,
         'Notes': notes,
-        'Last Known GPS': `${state.gps.lat},${state.gps.lng}`,
-        'Battery': state.battery || "Unknown",
-        'Timestamp': new Date().toISOString()
+        'Last Known GPS': state.gps.lat + "," + state.gps.lng,
+        'GPS Timestamp': new Date(state.gps.last).toLocaleString(),
+        'Battery Level': state.battery + "%",
+        'App Version': 'v81.36'
     };
 
     try {
-        await fetch(CONFIG.url, {
+        const response = await fetch(CONFIG.url, {
             method: 'POST',
             mode: 'no-cors',
+            cache: 'no-cache',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        document.getElementById('lastSyncTime').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        state.lastSync = Date.now();
+        const timeEl = document.getElementById('lastSyncTime');
+        if (timeEl) {
+            timeEl.innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
     } catch (e) {
-        console.warn("Sync Queued (Offline)");
+        console.warn("Sync failed - record stored in local cache.", e);
     } finally {
         state.syncing = false;
     }
 }
     
-/**
- * 9. DYNAMIC FORM ENGINE
- * Parses template tags from the database to build interactive reports.
- */
 function buildReportForm(formName, questions) {
     const container = document.getElementById('formContainer');
     if (!container) return;
+    
+    // Header for the specific form
     container.innerHTML = `<h3 class="text-xl font-black mb-6 uppercase tracking-widest text-blue-400">${formName}</h3>`;
     
     questions.forEach((q, index) => {
@@ -671,29 +678,35 @@ function buildReportForm(formName, questions) {
         
         const upperQ = q.toUpperCase();
 
+        // 1. Section Headings
         if (upperQ.includes('[HEADING]')) {
             qDiv.innerHTML = `<p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Section</p>
                               <p class="text-sm font-black text-white uppercase">${q.replace(/\[HEADING\]/gi, '').trim()}</p>`;
             qDiv.classList.replace('bg-white/5', 'bg-transparent');
             qDiv.classList.remove('border');
         } 
+        // 2. Multi-line Text Areas
         else if (upperQ.includes('[TEXT]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[TEXT\]/gi, '').trim()}</label>
-                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter notes..."></textarea>`;
+                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter detailed notes..."></textarea>`;
         }
+        // 3. Single-line Text Inputs
         else if (upperQ.includes('[1TEXT]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[1TEXT\]/gi, '').trim()}</label>
                               <input type="text" id="${qId}" class="form-input" placeholder="Response...">`;
         }
-        else if (upperQ.includes('[NUMBER]') || q.startsWith('$')) {
+        // 4. Numeric Inputs (Supports [NUMBER] tag or $ shortcut)
+        else if (upperQ.includes('[NUMBER]') || q.trim().startsWith('$')) {
             const label = q.replace(/\[NUMBER\]/gi, '').replace('$', '').trim();
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
-                              <input type="number" id="${qId}" class="form-input" placeholder="0.00">`;
+                              <input type="number" id="${qId}" class="form-input" placeholder="0.00" step="any">`;
         }
+        // 5. Date Selectors
         else if (upperQ.includes('[DATE]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[DATE\]/gi, '').trim()}</label>
                               <input type="date" id="${qId}" class="form-input">`;
         }
+        // 6. Dropdown Menus
         else if (upperQ.includes('[DROP]')) {
             const parts = q.replace(/\[DROP\]/gi, '').split(',');
             const label = parts[0].trim();
@@ -701,47 +714,73 @@ function buildReportForm(formName, questions) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
                               <select id="${qId}" class="form-input">${optionsHtml}</select>`;
         }
+        // 7. Binary Yes/No Toggles
         else if (upperQ.includes('[YESNO]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace(/\[YESNO\]/gi, '').trim()}</label>
                               <div class="flex gap-4">
-                                <button onclick="setYesNo('${qId}', true, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">Yes</button>
-                                <button onclick="setYesNo('${qId}', false, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">No</button>
+                                <button type="button" onclick="setYesNo('${qId}', true, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs transition-colors">Yes</button>
+                                <button type="button" onclick="setYesNo('${qId}', false, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs transition-colors">No</button>
                                 <input type="hidden" id="${qId}" value="">
                               </div>`;
         }
+        // 8. Checkboxes
         else if (upperQ.includes('[CHECK]')) {
             const label = q.replace(/\[CHECK\]/gi, '').trim();
-            qDiv.innerHTML = `<label class="flex items-center gap-4 cursor-pointer">
-                                <input type="checkbox" id="${qId}" class="w-6 h-6 rounded bg-gray-800 border-white/20">
-                                <span class="text-sm font-bold text-gray-200 uppercase">${label}</span>
+            qDiv.innerHTML = `<label class="flex items-center gap-4 cursor-pointer p-2 active:bg-white/5 rounded-lg transition-colors">
+                                <input type="checkbox" id="${qId}" class="w-6 h-6 rounded bg-gray-800 border-white/20 text-blue-600 focus:ring-blue-500">
+                                <span class="text-sm font-bold text-gray-200 uppercase tracking-tight">${label}</span>
                               </label>`;
         }
+        // 9. GPS Coordinate Capture
         else if (upperQ.includes('[GPS]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[GPS\]/gi, '').trim()}</label>
-                              <button onclick="captureFieldGPS('${qId}', this)" class="w-full py-4 bg-gray-800 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                                <span id="${qId}_icon">📍</span> <span id="${qId}_label">Capture Location</span>
+                              <button type="button" onclick="captureFormGPS(this)" class="w-full py-4 bg-gray-800 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-white/5 active:bg-gray-700">
+                                <span class="gps-icon">📍</span> <span class="gps-label">Capture Location</span>
                               </button>
                               <input type="hidden" id="${qId}" value="">`;
         }
+        // 10. Camera/Photo Upload
         else if (upperQ.includes('[PHOTO]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[PHOTO\]/gi, '').trim()}</label>
                               <input type="file" accept="image/*" capture="environment" id="${qId}" onchange="handleFormPhoto(this, '${qId}_preview')" class="hidden">
-                              <div onclick="document.getElementById('${qId}').click()" class="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
+                              <div onclick="document.getElementById('${qId}').click()" class="w-full h-40 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center overflow-hidden bg-white/5 active:border-blue-500 transition-colors">
                                 <img id="${qId}_preview" class="hidden h-full w-full object-cover">
-                                <span id="${qId}_prompt" class="text-[10px] font-black uppercase tracking-widest opacity-40">Tap to Take Photo</span>
+                                <div id="${qId}_placeholder" class="flex flex-col items-center">
+                                    <span class="text-2xl mb-2">📸</span>
+                                    <span class="text-[10px] font-black uppercase tracking-widest opacity-40">Tap to Take Photo</span>
+                                </div>
                               </div>`;
         }
+        // 11. Digital Signature Pad
         else if (upperQ.includes('[SIGN]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[SIGN\]/gi, '').trim()}</label>
-                              <canvas id="${qId}_canvas" class="w-full h-32 bg-white rounded-lg"></canvas>
-                              <button onclick="clearCanvas('${qId}_canvas')" class="text-[9px] font-black uppercase text-red-400 mt-2 tracking-widest">Clear Signature</button>`;
-            setTimeout(() => initSignaturePad(`${qId}_canvas`), 100);
+                              <div class="bg-white rounded-lg overflow-hidden">
+                                <canvas id="${qId}_canvas" class="w-full h-32 touch-none"></canvas>
+                              </div>
+                              <div class="flex justify-between items-center mt-2">
+                                <button type="button" onclick="clearCanvas('${qId}_canvas')" class="text-[9px] font-black uppercase text-red-400 tracking-widest">Clear Signature</button>
+                                <span class="text-[8px] text-gray-500 font-bold uppercase">Sign Above</span>
+                              </div>`;
+            // Brief timeout to ensure DOM is rendered before initializing canvas logic
+            setTimeout(() => initSignaturePad(`${qId}_canvas`), 150);
+        }
+        // 12. Default: Textarea for unknown tags
+        else {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q}</label>
+                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter response..."></textarea>`;
         }
         
         container.appendChild(qDiv);
     });
-    container.innerHTML += `<button onclick="submitReport('${formName}')" class="w-full py-6 mt-8 bg-blue-600 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl">Submit Report</button>`;
+
+    // Add Final Submission Button
+    const submitBtn = document.createElement('button');
+    submitBtn.className = "w-full py-6 mt-8 bg-blue-600 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all mb-12";
+    submitBtn.innerText = "Submit Report";
+    submitBtn.onclick = () => submitReport(formName);
+    container.appendChild(submitBtn);
 }
+    
 /**
  * 10. VEHICLE COMPLIANCE & FLEET LOGIC
  * High-resolution monitoring of vehicle safety status.
@@ -1206,3 +1245,4 @@ function closePinModal() {
 
 </body>
 </html>
+
