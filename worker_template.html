@@ -456,6 +456,23 @@ function updateUIForActiveActivity() {
     }
 }
 
+    async function endTravel() {
+    const endPoint = { lat: state.gps.lat, lng: state.gps.lng };
+    const distResult = await getDistance(state.travelStart, endPoint);
+    
+    // Store the distance for automatic form injection
+    state.lastTravelKm = distResult.km;
+    
+    // Find any open form fields for distance
+    const distFields = document.querySelectorAll('input[data-key*="Distance"], input[data-key*="KM"]');
+    distFields.forEach(f => f.value = distResult.km);
+
+    state.isTravel = false;
+    logSafety("Travel End", `Dist: ${distResult.km}km (${distResult.type})`);
+    alert(`Journey Finished: ${distResult.km}km`);
+    showPage('pageVisit');
+}
+    
 /**
  * 6. INTELLIGENT TRAVEL & MILEAGE ENGINE
  */
@@ -546,28 +563,35 @@ async function logSafety(status, notes = "") {
     if (state.syncing) return;
     state.syncing = true;
     
+    // Gather all local worker data to send with EVERY heartbeat
     const payload = {
         action: "logVisit",
+        key: CONFIG.key,
         worker: state.worker.name,
         phone: state.worker.phone,
+        emgName: state.worker.emgName || "Not Set",
+        emgPhone: state.worker.emgPhone || "Not Set",
+        escName: state.worker.escName || "Not Set",
+        escPhone: state.worker.escPhone || "Not Set",
         status: status,
         notes: notes,
         lat: state.gps.lat,
         lng: state.gps.lng,
         acc: state.gps.acc,
-        key: CONFIG.key
+        battery: state.battery || "Unknown",
+        timestamp: new Date().toISOString()
     };
 
     try {
-        const response = await fetch(CONFIG.url, {
+        await fetch(CONFIG.url, {
             method: 'POST',
-            mode: 'no-cors', // Standard for cross-origin Apps Script posts
+            mode: 'no-cors',
             body: JSON.stringify(payload)
         });
         state.lastSync = Date.now();
         document.getElementById('lastSyncTime').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     } catch (e) {
-        console.error("Sync failed, cached for later.");
+        console.warn("Sync failed - cached.");
     } finally {
         state.syncing = false;
     }
@@ -578,6 +602,7 @@ async function logSafety(status, notes = "") {
  */
 function buildReportForm(formName, questions) {
     const container = document.getElementById('formContainer');
+    if (!container) return;
     container.innerHTML = `<h3 class="text-xl font-black mb-6 uppercase tracking-widest text-blue-400">${formName}</h3>`;
     
     questions.forEach((q, index) => {
@@ -586,53 +611,70 @@ function buildReportForm(formName, questions) {
         const qDiv = document.createElement('div');
         qDiv.className = "mb-6 p-4 bg-white/5 rounded-xl border border-white/10";
         
-        // Parsing logic for specific OTG tags
-        if (q.includes('[HEADING]')) {
+        const upperQ = q.toUpperCase();
+
+        if (upperQ.includes('[HEADING]')) {
             qDiv.innerHTML = `<p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Section</p>
-                              <p class="text-sm font-black text-white uppercase">${q.replace('[HEADING]', '').trim()}</p>`;
+                              <p class="text-sm font-black text-white uppercase">${q.replace(/\[HEADING\]/gi, '').trim()}</p>`;
             qDiv.classList.replace('bg-white/5', 'bg-transparent');
             qDiv.classList.remove('border');
         } 
-        else if (q.includes('[TEXT]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[TEXT]', '').trim()}</label>
+        else if (upperQ.includes('[TEXT]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[TEXT\]/gi, '').trim()}</label>
                               <textarea id="${qId}" class="form-input h-24" placeholder="Enter notes..."></textarea>`;
         }
-        else if (q.includes('[1TEXT]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[1TEXT]', '').trim()}</label>
+        else if (upperQ.includes('[1TEXT]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[1TEXT\]/gi, '').trim()}</label>
                               <input type="text" id="${qId}" class="form-input" placeholder="Response...">`;
         }
-        else if (q.includes('[DROP]')) {
-            const parts = q.replace('[DROP]', '').split(',');
+        else if (upperQ.includes('[NUMBER]') || q.startsWith('$')) {
+            const label = q.replace(/\[NUMBER\]/gi, '').replace('$', '').trim();
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
+                              <input type="number" id="${qId}" class="form-input" placeholder="0.00">`;
+        }
+        else if (upperQ.includes('[DATE]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[DATE\]/gi, '').trim()}</label>
+                              <input type="date" id="${qId}" class="form-input">`;
+        }
+        else if (upperQ.includes('[DROP]')) {
+            const parts = q.replace(/\[DROP\]/gi, '').split(',');
             const label = parts[0].trim();
             let optionsHtml = parts.slice(1).map(o => `<option value="${o.trim()}">${o.trim()}</option>`).join('');
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
                               <select id="${qId}" class="form-input">${optionsHtml}</select>`;
         }
-        else if (q.includes('[YESNO]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace('[YESNO]', '').trim()}</label>
+        else if (upperQ.includes('[YESNO]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace(/\[YESNO\]/gi, '').trim()}</label>
                               <div class="flex gap-4">
                                 <button onclick="setYesNo('${qId}', true, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">Yes</button>
                                 <button onclick="setYesNo('${qId}', false, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">No</button>
                                 <input type="hidden" id="${qId}" value="">
                               </div>`;
         }
-        else if (q.includes('[GPS]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[GPS]', '').trim()}</label>
+        else if (upperQ.includes('[CHECK]')) {
+            const label = q.replace(/\[CHECK\]/gi, '').trim();
+            qDiv.innerHTML = `<label class="flex items-center gap-4 cursor-pointer">
+                                <input type="checkbox" id="${qId}" class="w-6 h-6 rounded bg-gray-800 border-white/20">
+                                <span class="text-sm font-bold text-gray-200 uppercase">${label}</span>
+                              </label>`;
+        }
+        else if (upperQ.includes('[GPS]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[GPS\]/gi, '').trim()}</label>
                               <button onclick="captureFieldGPS('${qId}', this)" class="w-full py-4 bg-gray-800 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
                                 <span id="${qId}_icon">📍</span> <span id="${qId}_label">Capture Location</span>
                               </button>
                               <input type="hidden" id="${qId}" value="">`;
         }
-        else if (q.includes('[PHOTO]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[PHOTO]', '').trim()}</label>
+        else if (upperQ.includes('[PHOTO]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[PHOTO\]/gi, '').trim()}</label>
                               <input type="file" accept="image/*" capture="environment" id="${qId}" onchange="handleFormPhoto(this, '${qId}_preview')" class="hidden">
                               <div onclick="document.getElementById('${qId}').click()" class="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
                                 <img id="${qId}_preview" class="hidden h-full w-full object-cover">
                                 <span id="${qId}_prompt" class="text-[10px] font-black uppercase tracking-widest opacity-40">Tap to Take Photo</span>
                               </div>`;
         }
-        else if (q.includes('[SIGN]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[SIGN]', '').trim()}</label>
+        else if (upperQ.includes('[SIGN]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[SIGN\]/gi, '').trim()}</label>
                               <canvas id="${qId}_canvas" class="w-full h-32 bg-white rounded-lg"></canvas>
                               <button onclick="clearCanvas('${qId}_canvas')" class="text-[9px] font-black uppercase text-red-400 mt-2 tracking-widest">Clear Signature</button>`;
             setTimeout(() => initSignaturePad(`${qId}_canvas`), 100);
@@ -640,8 +682,8 @@ function buildReportForm(formName, questions) {
         
         container.appendChild(qDiv);
     });
+    container.innerHTML += `<button onclick="submitReport('${formName}')" class="w-full py-6 mt-8 bg-blue-600 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl">Submit Report</button>`;
 }
-
 /**
  * 10. VEHICLE COMPLIANCE & FLEET LOGIC
  * High-resolution monitoring of vehicle safety status.
@@ -733,11 +775,39 @@ let pinBuffer = "";
 
 function openPinModal(onSuccess) {
     pinBuffer = "";
-    document.getElementById('pinModal').classList.remove('hidden');
+    const modal = document.getElementById('pinModal');
+    modal.classList.remove('hidden');
     state.pinCallback = onSuccess;
+    
+    // Build Digital Keypad
+    const keypadContainer = modal.querySelector('.grid');
+    if (keypadContainer) {
+        keypadContainer.innerHTML = "";
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].forEach(key => {
+            const btn = document.createElement('button');
+            btn.className = "h-16 rounded-xl bg-white/10 border border-white/10 text-xl font-black active:bg-blue-600 transition-colors";
+            btn.innerText = key;
+            btn.onclick = () => {
+                if (key === 'C') {
+                    pinBuffer = "";
+                } else if (key === 'OK') {
+                    verifyPin();
+                } else {
+                    if (pinBuffer.length < 4) pinBuffer += key;
+                    if (pinBuffer.length === 4) setTimeout(verifyPin, 200);
+                }
+                updatePinDisplay();
+            };
+            keypadContainer.appendChild(btn);
+        });
+    }
     updatePinDisplay();
 }
 
+function updatePinDisplay() {
+    const dots = document.getElementById('pinDots');
+    if (dots) dots.innerText = "●".repeat(pinBuffer.length) + "○".repeat(4 - pinBuffer.length);
+}
 function updatePinDisplay() {
     // Visual feedback for PIN entry
     const dots = "●".repeat(pinBuffer.length) + "○".repeat(4 - pinBuffer.length);
@@ -856,9 +926,17 @@ function startVisitCountdown() {
 
         const remaining = state.activeVisit.dueOut - Date.now();
         
-        // Critical verbal warnings
-        if (remaining <= 120000 && remaining > 115000) announce("Two minutes remaining.");
-        if (remaining <= 60000 && remaining > 55000) announce("One minute until safety alarm.");
+        // Verbal Warnings
+        if (remaining <= 300000 && !state.activeVisit.warn5Sent) { // 5 Mins
+            state.activeVisit.warn5Sent = true;
+            announce("Five minutes until safety check-in.");
+        }
+        if (remaining <= 90000 && !state.activeVisit.warn90Sent) { // 90 Seconds
+            state.activeVisit.warn90Sent = true;
+            announce("Critical Warning. Safety alarm will activate in 90 seconds. Please mark yourself safe.");
+            // Trigger visual alert
+            document.body.classList.add('bg-orange-950');
+        }
         
         if (remaining <= 0) {
             clearInterval(timer);
@@ -866,7 +944,6 @@ function startVisitCountdown() {
         }
     }, 5000);
 }
-
 async function triggerSafetyAlarm() {
     document.body.classList.add('bg-red-900');
     announce("Safety alarm activated. Contacting emergency services.");
@@ -1017,3 +1094,4 @@ function closePinModal() {
 
 </body>
 </html>
+
