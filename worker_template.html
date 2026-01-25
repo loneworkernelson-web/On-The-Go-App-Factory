@@ -540,17 +540,18 @@ function initWakeListener() {
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }   
 /**
- * FIXED: Added 'async' to resolve SyntaxError
- * Logic restored to match 'Last Good-Almost.html' performance
+ * FIXED: forceSync (Surgical Async Correction)
+ * Logic aligned with 'Last Good-Almost.html'
  */
 async function forceSync(highPriority = false) {
     if (!state.settings.workerName) return;
+    
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
     const dId = state.settings.deviceId || "Pending";
 
-    // Standard Payload for the backend
+    // PAYLOAD: Matches backend_template.js expectations
     const payload = {
         key: CONFIG.key,
         deviceId: dId,
@@ -561,35 +562,26 @@ async function forceSync(highPriority = false) {
 
     try {
         const queryString = new URLSearchParams(payload).toString();
-        // Uses POST for data submission (Fire-and-forget)
-        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
+        
+        // This is the line the browser is flagging
+        // If the SyntaxError persists, check the line immediately ABOVE this function for a missing '}'
+        await fetch(`${CONFIG.url}?${queryString}`, { 
+            method: 'POST', 
+            mode: 'no-cors' 
+        });
         
         state.meta.lastSync = new Date().toLocaleTimeString();
-        await saveState(); // This line was causing your SyntaxError
+        await saveState(); 
         showToast(highPriority ? "🚨 EMERGENCY SENT" : "✅ SYNC SUCCESSFUL");
         
-        // HANDSHAKE: Call GET to pull Sites/Forms
+        // HANDSHAKE: Pull updated Sites/Forms from Spreadsheet
         if (!highPriority) pullLatestData(); 
-    } catch (e) {
-        showToast("📡 OFFLINE: Data Queued");
-    } finally {
-        if (banner) banner.classList.add('hidden');
-    }
-}
-
-    try {
-        const queryString = new URLSearchParams(payload).toString();
-        // Fire-and-forget: CORS is blocked, but data reaches GAS
-        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
         
-        state.meta.lastSync = new Date().toLocaleTimeString();
-        await saveState();
-        showToast(highPriority ? "🚨 EMERGENCY ALERT SENT" : "✅ SYNC SUCCESSFUL");
     } catch (e) {
+        console.error("Sync Error:", e);
         showToast("📡 OFFLINE: Data Queued");
     } finally {
         if (banner) banner.classList.add('hidden');
-        populateSettingsForm(); 
     }
 }
 
@@ -1452,6 +1444,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
