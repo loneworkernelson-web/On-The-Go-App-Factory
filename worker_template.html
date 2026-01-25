@@ -206,12 +206,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear Cache & Reload</button>
         </div>
 
-        <div class="setting-card border-blue-500/20 bg-blue-900/10">
-            <div class="setting-label lbl-blue mb-3">Handset Identity</div>
-            <input id="edit_workerName" class="form-input mb-2" placeholder="Your Name">
-            <input id="edit_workerPhone" type="tel" class="form-input mb-2" placeholder="Your Mobile">
-            <input id="edit_workerEmail" type="email" class="form-input" placeholder="Your Email">
-        </div>
+<div class="setting-card border-blue-500/20 bg-blue-900/10">
+    <div class="setting-label lbl-blue mb-3">Handset Diagnostics</div>
+    <div class="space-y-2">
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">v79.35</span></div>
+        <div class="flex justify-between text-[10px] uppercase font-black"><span id="diagCloud" class="text-green-400">Ready</span></div>
+    </div>
+</div>
 
         <div class="setting-card border-purple-500/20 bg-purple-900/10">
             <div class="setting-label lbl-purple mb-3">Diagnostic Status</div>
@@ -251,34 +253,26 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
     </div>
 
-    <div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
-        <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
-        <input type="hidden" id="locId">
-        
-        <div class="space-y-4">
-            <div>
-                <label for="locName" class="setting-label text-gray-500">Site Name</label>
-                <input type="text" id="locName" class="form-input" placeholder="Required">
-            </div>
-            <div>
-                <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
-                <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
-            </div>
-            <div>
-                <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
-                <div class="flex gap-2">
-                    <input type="text" id="locAddr" class="form-input mb-0 flex-1">
-                    <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
-                </div>
+<div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
+    <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
+    <input type="hidden" id="locId">
+    <div class="space-y-4">
+        <div>
+            <label for="locName" class="setting-label text-gray-500">Site Name</label>
+            <input type="text" id="locName" class="form-input" placeholder="Required">
+        </div>
+        <div>
+            <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
+            <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
+        </div>
+        <div>
+            <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
+            <div class="flex gap-2">
+                <input type="text" id="locAddr" class="form-input mb-0 flex-1">
+                <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
             </div>
         </div>
-
-        <div class="mt-8 flex justify-between gap-3">
-            <button onclick="deleteLoc()" id="btnDelLoc" class="bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl hidden uppercase text-xs">Delete</button>
-            <div class="flex-1"></div>
-            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs">Cancel</button>
-            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs">Save</button>
-        </div>
+    </div>
     </div>
 
     <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
@@ -547,31 +541,50 @@ function initWakeListener() {
 }   
     
 /**
- * FIXED: forceSync (Matches backend headers and handles Opaque responses)
+ * RESTORED: Working Sync Engine
+ * Uses GET for data retrieval to bypass CORB and populate libraries.
  */
-async function forceSync(highPriority = false) {
-    const banner = document.getElementById('uploadBanner');
-    if (banner) banner.classList.remove('hidden');
+function forceSync(showUi) {
+    if (!state.settings.workerName) return;
+    if (showUi) document.getElementById('uploadBanner').classList.remove('hidden');
 
-    const emg = state.settings.emergency || { primary: {}, escalation: {} };
+    const dId = state.settings.deviceId || getDeviceID();
     
-    const payload = {
-        key: CONFIG.key,
-        deviceId: state.settings.deviceId || "Pending",
-        "Worker Name": state.settings.workerName,
-        "Worker Phone Number": state.settings.workerPhone,
-        "Worker Email": state.settings.workerEmail,
-        "Emergency Contact Name": emg.primary?.name || "",
-        "Emergency Contact Number": emg.primary?.phone || "",
-        "Emergency Contact Email": emg.primary?.email || "",
-        "Escalation Contact Name": emg.escalation?.name || "",
-        "Escalation Contact Number": emg.escalation?.phone || "",
-        "Escalation Contact Email": emg.escalation?.email || "",
-        "Alarm Status": highPriority ? "EMERGENCY - PANIC" : (state.activeVisit ? state.activeVisit.status : "SYNC"),
-        "Last Known GPS": state.meta.lastGPS || "",
-        "Battery Level": currentBatteryLevel || "100%",
-        "Timestamp": new Date().toISOString()
-    };
+    // AUTHENTICATED HANDSHAKE: Pulls Sites and Forms
+    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(state.settings.workerName)}&key=${CONFIG.key}&deviceId=${dId}`)
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "error") {
+            if (showUi) alert("❌ Sync Error: " + data.message);
+            return;
+        }
+
+        // POPULATE LOCAL STATE
+        state.globalForms = data.forms || [];
+        state.cachedForms = data.cachedTemplates || {};
+        
+        // Map backend sites to local location format
+        const ms = (data.sites || []).map(s => ({
+            id: 'site_' + s.siteName.replace(/\s/g, ''),
+            name: s.siteName,
+            address: s.address,
+            companyName: s.company,
+            templateName: s.template
+        }));
+        
+        state.locations = ms.concat(state.locations.filter(x => x.id.startsWith('loc_')));
+        state.meta = data.meta || {};
+        
+        saveState();
+        renderLocations();
+        document.getElementById('uploadBanner').classList.add('hidden');
+        if (showUi) showToast("Cloud Data Synchronised");
+    })
+    .catch(e => {
+        document.getElementById('uploadBanner').classList.add('hidden');
+        console.warn("Sync Failed: " + e.message);
+    });
+}
 
     try {
         const queryString = new URLSearchParams(payload).toString();
@@ -764,26 +777,24 @@ function populateSettingsForm() {
 }
     
 /**
- * FIXED: Page Routing (Corrected Page IDs & Diagnostic Refresh)
+ * RESTORED: Working Page Router
  */
-function navigate(pageId) {
-    const pages = ['setupPage', 'mainPage', 'lockedPage', 'reportPage', 'settingsPage'];
-    
-    pages.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) { el.classList.remove('active'); el.classList.add('hidden'); }
+function navigate(p) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(e => {
+        e.classList.remove('active');
+        e.classList.add('hidden');
     });
 
-    // FIXED: Corrected ternary to match 'settingsPage' ID
-    const target = document.getElementById(pageId + 'Page');
+    // Show target page
+    const target = document.getElementById(p + 'Page');
     if (target) {
         target.classList.add('active');
         target.classList.remove('hidden');
-        window.scrollTo(0, 0);
     }
 
-    if (pageId === 'main') renderLocations();
-    if (pageId === 'settings') populateSettingsForm(); // Ensures diagnostics are fresh
+    if (p === 'main') renderLocations();
+    if (p === 'settings') populateSettingsForm();
 }
     
 // UPDATE: showModal to trigger renderForms
@@ -1380,7 +1391,45 @@ async function updateSettings() {
     await forceSync(); // Push updates to sheet immediately
     navigate('main');
 }
-    
+
+    /**
+ * RESTORED: Icon Grid Renderer
+ * Populates the 'templateList' div with buttons for each form.
+ */
+function renderIconGrid(forms) {
+    const list = document.getElementById('templateList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const addBtn = (name, icon, label) => { 
+        const b = document.createElement('button'); 
+        b.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95"; 
+        b.innerHTML = `<div class="text-3xl">${icon}</div><div class="text-[10px] font-bold uppercase text-white">${label}</div>`; 
+        b.onclick = () => {
+            closeModal('template');
+            const fieldArea = document.getElementById('reportFields');
+            buildReportForm(name, fieldArea);
+            navigate('report');
+        }; 
+        list.appendChild(b); 
+    };
+
+    if (forms) { 
+        forms.forEach(f => { 
+            let icon = "📋"; 
+            const n = f.name.toLowerCase();
+            if (n.includes('vehicle')) icon = "🚗"; 
+            else if (n.includes('incident')) icon = "⚠️"; 
+            addBtn(f.name, icon, f.name); 
+        }); 
+    }
+}
+
+// UPDATE: Modify your existing showModal('template') to trigger this:
+function openQuickMenu() {
+    showModal('template');
+    renderIconGrid(state.globalForms); //
+}
 // --- 6. STARTUP SEQUENCE ---
 
 
@@ -1409,3 +1458,4 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
