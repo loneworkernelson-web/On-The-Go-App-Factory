@@ -339,6 +339,19 @@ window.onload = async () => {
             .then(reg => console.log('Safety Watchdog Active:', reg.scope))
             .catch(err => console.warn('Offline Mode Disabled:', err));
     }
+    if ('getBattery' in navigator) {
+    navigator.getBattery().then(function(battery) {
+        const updateBat = () => {
+            state.battery = Math.round(battery.level * 100);
+            if (battery.level <= 0.20 && !state.isDimmed) {
+                toggleBatterySaver();
+                announce("Low Battery. Auto-dimming for safety.");
+            }
+        };
+        updateBat();
+        battery.addEventListener('levelchange', updateBat);
+    });
+}
 };
 
 function loadSettings() {
@@ -1222,12 +1235,41 @@ function prevWiz() {
     }
 }
 
-// Final utility for standard modal closing
+/**
+ * Final Utility Functions
+ * These handle the closing of modals and the dismissal of installation prompts.
+ */
 function closePinModal() {
-    document.getElementById('pinModal').classList.add('hidden');
+    const modal = document.getElementById('pinModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }
 
+function dismissInstall(type) {
+    if (type === 'ios') {
+        const iosModal = document.getElementById('iosInstallModal');
+        if (iosModal) iosModal.classList.add('hidden');
+    }
+    // Ensures the user isn't nagged again after dismissing
+    localStorage.setItem('otg_install_dismissed', 'true');
+}
+
+/**
+ * iOS Installation Watchdog
+ * Checks if the app is run as a PWA and shows the 'Add to Home Screen' prompt if needed.
+ */
+function checkIosInstall() {
+    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const isStandalone = window.navigator.standalone === true;
+    
+    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
+        const modal = document.getElementById('iosInstallModal');
+        if (modal) modal.classList.remove('hidden');
+    }
+}
 </script>
+
 
 <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
     <div class="flex items-start gap-4">
@@ -1239,10 +1281,9 @@ function closePinModal() {
                 <span>1. Tap Share</span><span class="text-xl">⎋</span><span>2. 'Add to Home Screen'</span><span class="text-xl">⊕</span>
             </div>
         </div>
-        <button onclick="dismissInstall('ios')" class="text-gray-500 font-black">✕</button>
+        <button onclick="dismissInstall('ios')" class="text-gray-500 font-black p-2">✕</button>
     </div>
 </div>
 
 </body>
 </html>
-
