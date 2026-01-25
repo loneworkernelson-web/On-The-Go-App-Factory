@@ -720,13 +720,17 @@ function buildReportForm(formName, questions) {
                               <input type="date" id="${qId}" class="form-input">`;
         }
         // 6. Dropdown Menus
-        else if (upperQ.includes('[DROP]')) {
-            const parts = q.replace(/\[DROP\]/gi, '').split(',');
-            const label = parts[0].trim();
-            let optionsHtml = parts.slice(1).map(o => `<option value="${o.trim()}">${o.trim()}</option>`).join('');
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
-                              <select id="${qId}" class="form-input">${optionsHtml}</select>`;
-        }
+        // Replace the [DROP] block with this:
+    else if (upperQ.startsWith('[DROP')) {
+    const dropMatch = q.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
+    if (dropMatch) {
+        const options = dropMatch[1].split(',').map(o => o.trim());
+        const label = q.replace(dropMatch[0], '').trim();
+        let optionsHtml = options.map(o => `<option value="${o}">${o}</option>`).join('');
+        qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
+                          <select id="${qId}" class="form-input">${optionsHtml}</select>`;
+    }
+}
         // 7. Binary Yes/No Toggles
         else if (upperQ.includes('[YESNO]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace(/\[YESNO\]/gi, '').trim()}</label>
@@ -1054,6 +1058,12 @@ function startVisitCountdown() {
             triggerSafetyAlarm();
         }
     }, 5000);
+    // Auto-dim screen after 10 seconds of inactivity
+setTimeout(() => {
+    if (state.activeVisit && !state.isDimmed) {
+        toggleBatterySaver();
+    }
+}, 10000);
 }
 async function triggerSafetyAlarm() {
     document.body.classList.add('bg-red-900');
@@ -1287,3 +1297,4 @@ function checkIosInstall() {
 
 </body>
 </html>
+
