@@ -3,64 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>%%APP_NAME%%</title>
+<title>%%ORG_NAME%% Safety</title>
 <meta name="apple-mobile-web-app-title" content="%%APP_NAME%%">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#111827">
-<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="%%PRIMARY_COLOR%%">
 <link rel="icon" href="%%LOGO_DATA%%">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
 <style>
-/* 1. FORCE SYSTEM DIM: Required for OS-level dimming */
-html.system-dim, body.system-dim { background-color: #000000 !important; color-scheme: dark !important; }
-
-/* 2. BASE STYLES */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: #111827; color: white; height: 100%; width: 100%; overflow: hidden; }
-
-.page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: #111827; }
-.page.active { display: flex; z-index: 10; }
-
-.header-bar { padding: 0.75rem 1rem; background-color: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
-.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
-
-.footer-bar { padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); background-color: #111827; border-top: 1px solid #374151; flex-shrink: 0; z-index: 20; }
-
-/* 3. LONG-PRESS SOS & START LOGIC */
-.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; -webkit-user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; z-index: 1; }
-.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
-.long-press-btn.holding::after { width: 100%; transition: width 3s linear; }
-.long-press-btn:active { transform: scale(0.96); }
-
-/* 4. UI ANIMATIONS & PULSE */
-.pulse-border { animation: pulseGlow 2s infinite; border-width: 2px; }
-@keyframes pulseGlow {
-    0% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-    50% { border-color: #a855f7; box-shadow: 0 0 15px 2px rgba(168, 85, 247, 0.4); }
-    100% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+/* 1. FACTORY DYNAMIC THEME */
+:root {
+    --primary: %%PRIMARY_COLOR%%;
+    --accent: %%ACCENT_COLOR%%;
 }
 
-.slider-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #3b82f6; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
-.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* 2. FORCE SYSTEM DIM: Required to dim the OS navigation bar for Battery Saver */
+html.system-dim, body.system-dim { 
+    background-color: #000000 !important; 
+    color-scheme: dark !important; 
+}
 
-/* 5. FORM & INPUT COMPONENTS */
-canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-.setting-card { background-color: #1f2937; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
-.setting-label { display: block; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.form-input { width: 100%; background-color: #111827; border: 1px solid #4b5563; border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
-.lbl-blue { color: #60a5fa; } .lbl-green { color: #4ade80; } .lbl-purple { color: #c084fc; } .lbl-red { color: #f87171; } .lbl-gray { color: #9ca3af; }
+/* 3. SOPHISTICATED UI BASE */
+body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: var(--primary); color: white; height: 100%; width: 100%; overflow: hidden; }
 
+.page { display: none; height: 100%; width: 100%; flex-direction: column; position: absolute; top: 0; left: 0; background-color: var(--primary); }
+.page.active { display: flex; z-index: 10; }
+
+.header-bar { padding: 0.75rem 1rem; background-color: var(--primary); border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; }
+.content-area { flex: 1; overflow-y: auto; padding: 1rem; z-index: 10; position: relative; }
+.footer-bar { padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); background-color: var(--primary); border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; z-index: 20; }
+
+/* 4. LONG-PRESS INTERACTION STYLES */
+.long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
+.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
+.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+
+/* 5. GPS SIGNAL BARS */
 .gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
+.gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
+.gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
 .gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
 
+/* 6. UTILITY CLASSES */
+.form-input { width: 100%; background-color: var(--primary); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+.spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
 .wizard-step { display: none; height: 100%; flex-direction: column; }
 .wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* 7. POCKET PROTECTION/BATTERY SAVER VISUALS */
+#batterySaver { background-color: #000; }
+#saverProgress { background: rgba(255, 255, 255, 0.2); transition: opacity 1.5s linear; }
+
+/* 8. INSTALL OVERLAYS */
+#toastMsg { z-index: 1000; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateY(-150%); }
+#toastMsg.show { transform: translateY(0); }
 </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -1576,6 +1581,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
