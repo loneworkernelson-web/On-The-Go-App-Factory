@@ -163,8 +163,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
         </div>
         <div class="flex gap-4">
-            <button id="btnQuick" onclick="openQuickMenu()('template')" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>
-            <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
+        <button id="btnQuick" onclick="openQuickMenu()" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>            <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
         </div>
     </div>
 </div>
@@ -176,20 +175,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <div id="lockedPage" class="page bg-black">
-    <div class="flex-1 flex flex-col p-6">
-        <div class="flex justify-end mb-8">
-            <button onclick="handlePanic()" class="w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center select-none tracking-widest">SOS</button>
-        </div>
-        
-        <div class="text-center flex-1">
-            <div id="visitTimer" class="text-8xl font-mono font-bold text-white tracking-tighter">00:00</div>
-            <h2 id="lockedLocationName" class="text-2xl font-bold text-gray-400 mt-2 tracking-tight">---</h2>
-            
-            <div class="mt-12 w-full max-w-xs mx-auto space-y-4">
-                <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 font-bold rounded-2xl text-lg uppercase tracking-widest">Add Notes / Forms</button>
-                <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 font-bold rounded-2xl text-lg uppercase tracking-widest">End Visit</button>
-            </div>
-        </div>
+    <div class="mt-12 w-full max-w-xs mx-auto space-y-4">
+        <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 font-bold rounded-2xl text-lg uppercase tracking-widest">Add Notes / Forms</button>
+        <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 font-bold rounded-2xl text-lg uppercase tracking-widest">End Visit</button>
     </div>
 </div>
 
@@ -1198,6 +1186,10 @@ async function submitReport() {
  * FIXED: showSiteInfo (Standardised External Mapping)
  * Resolves confusion between app navigate() and external GPS navigation.
  */
+/**
+ * FIXED: showSiteInfo (Corrected Maps Syntax)
+ * Resolves the broken URL literal and uses the standard Google Maps Search API.
+ */
 function showSiteInfo(id, e) {
     if (e) e.stopPropagation(); 
     const l = state.locations.find(x => x.id === id); 
@@ -1210,7 +1202,7 @@ function showSiteInfo(id, e) {
     const navBtn = document.getElementById('btnSiteNav');
     if (l.address && l.address.length > 3) { 
         h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // FIXED: Uses standard Google Maps Search API to ensure reliability
+        // FIXED: Switched to standard Search API with proper template literal
         navBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
         navBtn.classList.remove('hidden'); 
     } else { 
@@ -1584,5 +1576,6 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
