@@ -540,51 +540,47 @@ function initWakeListener() {
     saver.ontouchstart = startWake; saver.ontouchend = stopWake;
 }   
 /**
- * FIXED: forceSync (Surgical Async Correction)
- * Logic aligned with 'Last Good-Almost.html'
+ * FIXED: forceSync Payload
+ * Removes forced "EMERGENCY" status unless explicitly triggered by SOS.
  */
 async function forceSync(highPriority = false) {
     if (!state.settings.workerName) return;
-    
     const banner = document.getElementById('uploadBanner');
     if (banner) banner.classList.remove('hidden');
 
-    const dId = state.settings.deviceId || "Pending";
+    const dId = state.settings.deviceId || getDeviceID();
+    
+    // Determine the true status
+    let currentStatus = "SYNC";
+    if (highPriority) {
+        currentStatus = "EMERGENCY - PANIC";
+    } else if (state.activeVisit) {
+        currentStatus = state.activeVisit.status || "ON_SITE";
+    }
 
-    // PAYLOAD: Matches backend_template.js expectations
     const payload = {
         key: CONFIG.key,
         deviceId: dId,
         "Worker Name": state.settings.workerName,
-        "Alarm Status": highPriority ? "EMERGENCY - PANIC" : (state.activeVisit ? state.activeVisit.status : "SYNC"),
+        "Alarm Status": currentStatus, // Corrected logic
         "Timestamp": new Date().toISOString()
     };
 
     try {
         const queryString = new URLSearchParams(payload).toString();
-        
-        // This is the line the browser is flagging
-        // If the SyntaxError persists, check the line immediately ABOVE this function for a missing '}'
-        await fetch(`${CONFIG.url}?${queryString}`, { 
-            method: 'POST', 
-            mode: 'no-cors' 
-        });
+        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
         
         state.meta.lastSync = new Date().toLocaleTimeString();
         await saveState(); 
-        showToast(highPriority ? "🚨 EMERGENCY SENT" : "✅ SYNC SUCCESSFUL");
+        showToast(highPriority ? "🚨 SOS ALERT SENT" : "✅ SYNC SUCCESSFUL");
         
-        // HANDSHAKE: Pull updated Sites/Forms from Spreadsheet
         if (!highPriority) pullLatestData(); 
-        
     } catch (e) {
-        console.error("Sync Error:", e);
         showToast("📡 OFFLINE: Data Queued");
     } finally {
         if (banner) banner.classList.add('hidden');
     }
 }
-
 /**
  * RESTORED: finishSetup (Generates ID & Triggers Handshake)
  */
@@ -1444,6 +1440,7 @@ window.onload = async () => {
 </script>
 </body>
 </html>
+
 
 
 
