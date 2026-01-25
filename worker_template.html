@@ -68,1520 +68,952 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 #toastMsg.show { transform: translateY(0); }
 </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="h-full overflow-hidden select-none">
 
-<div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-2xl flex items-center gap-3 z-[1000] translate-y-[-150%] transition-transform duration-300">
-    <div class="text-xl">✅</div>
-    <p class="font-bold text-sm" id="toastText">Ready</p>
-</div>
-
-<div id="setupPage" class="page active bg-gray-900 z-[60]">
-    <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900">
-        <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
-        <div class="flex gap-1">
-            <div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div>
-            <div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div>
-            <div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div>
+<div id="batterySaver" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none transition-opacity duration-500">
+    <div class="absolute top-0 left-0 h-1 bg-blue-500 opacity-50" id="saverProgress" style="width: 0%"></div>
+    <div class="flex flex-col items-center gap-6">
+        <div class="w-24 h-24 rounded-full border-2 border-white/10 flex items-center justify-center">
+            <div class="w-16 h-16 rounded-full bg-white/5 animate-pulse"></div>
+        </div>
+        <div class="text-center">
+            <p class="text-white/40 text-xs font-black uppercase tracking-[0.3em]">Pocket Protection Active</p>
+            <p class="text-white/20 text-[10px] mt-2 font-bold uppercase">Hold Screen to Wake</p>
         </div>
     </div>
-
-    <div id="wizStep1" class="wizard-step active p-6 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-2">Who are you?</h2>
-        <label for="set_workerName" class="setting-label lbl-blue">Full Name</label>
-        <input id="set_workerName" class="form-input mb-4" placeholder="e.g. John Doe">
-        <label for="set_workerPhone" class="setting-label lbl-blue">Mobile Number</label>
-        <input id="set_workerPhone" type="tel" class="form-input mb-4" placeholder="021...">
-        <label for="set_workerEmail" class="setting-label lbl-blue">Work Email</label>
-        <input id="set_workerEmail" type="email" class="form-input mb-8" placeholder="name@org.co.nz">
-<div class="mt-auto"><button onclick="saveIdentity()" class="w-full py-4 bg-blue-600 text-white font-bold rounded-xl text-lg shadow-lg">Next: Security →</button></div>    </div>
-
-    <div id="wizStep2" class="wizard-step p-6 overflow-y-auto">
-        <h2 class="text-3xl font-bold text-white mb-2">Security Codes</h2>
-        <div class="bg-gray-800 p-4 rounded-xl border border-green-500/30 mb-6">
-            <h3 class="text-green-400 font-bold mb-1">1. Standard PIN (Local Only)</h3>
-            <input id="setup_pin1" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest" placeholder="0000">
-            <input id="setup_pin2" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest mt-2" placeholder="Confirm">
-        </div>
-        <div class="bg-gray-800 p-4 rounded-xl border border-purple-500/30 mb-8">
-            <h3 class="text-purple-400 font-bold mb-1">2. Duress PIN (Local Only)</h3>
-            <input id="set_duressPin" type="password" maxlength="4" inputmode="numeric" class="form-input text-center text-4xl tracking-widest border-purple-500/50" placeholder="9999">
-        </div>
-        <div class="flex gap-3 mt-auto">
-            <button onclick="wizBack('wizStep2', 'wizStep1')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl">Back</button>
-            <button onclick="savePin()" class="flex-[2] py-4 bg-blue-600 font-bold rounded-xl shadow-lg">Next: Contacts →</button>
-        </div>
-    </div>
-
-<div id="wizStep3" class="wizard-step p-6 overflow-y-auto">
-    <h2 class="text-3xl font-bold text-white mb-2">Contacts</h2>
-    
-    <label for="set_emgName" class="setting-label lbl-red">Primary Contact Name</label>
-    <input id="set_emgName" class="form-input mb-2" placeholder="Full Name">
-    
-    <label for="set_emgPhone" class="setting-label text-[10px] text-gray-500 -mt-1 ml-1">Primary Phone</label>
-    <input id="set_emgPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
-    
-    <label for="set_emgEmail" class="setting-label text-[10px] text-gray-500 -mt-1 ml-1">Primary Email</label>
-    <input id="set_emgEmail" type="email" class="form-input mb-6" placeholder="Email Address">
-
-    <label for="set_escName" class="setting-label lbl-gray">Escalation Manager Name</label>
-    <input id="set_escName" class="form-input mb-2" placeholder="Manager Name">
-    
-    <label for="set_escPhone" class="setting-label text-[10px] text-gray-500 -mt-1 ml-1">Manager Phone</label>
-    <input id="set_escPhone" type="tel" class="form-input mb-2" placeholder="Mobile Number">
-    
-    <label for="set_escEmail" class="setting-label text-[10px] text-gray-500 -mt-1 ml-1">Manager Email</label>
-    <input id="set_escEmail" type="email" class="form-input mb-8" placeholder="Work Email">
-    
-    <div class="flex gap-3 mt-auto">
-        <button onclick="wizBack('wizStep3', 'wizStep2')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl">Back</button>
-        <button onclick="finishSetup()" class="flex-[2] py-4 bg-green-600 font-bold rounded-xl shadow-lg uppercase">✅ Launch App</button>
-    </div>
-</div>
 </div>
 
-<div id="mainPage" class="page">
-    <div class="header-bar">
-        <div class="flex flex-col">
-            <h1 class="text-lg font-black text-blue-400 leading-none">%%ORG_NAME%%</h1>
-            <span class="text-[9px] text-gray-500 font-bold tracking-widest uppercase">Safety Dashboard</span>
+<div id="setupWizard" class="hidden fixed inset-0 bg-gray-900 z-[90] flex flex-col p-8 pb-12">
+    <div class="flex-1 overflow-y-auto">
+        <div id="wizStep1" class="wizard-step active">
+            <h2 class="text-3xl font-black mb-2">Welcome.</h2>
+            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Setup your Safety Profile</p>
+            
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Full Name</label>
+            <input type="text" id="wizName" class="form-input mb-6" placeholder="As per Staff Records">
+            
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Mobile Number</label>
+            <input type="tel" id="wizPhone" class="form-input mb-6" placeholder="021 000 0000">
+
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Email Address</label>
+            <input type="email" id="wizEmail" class="form-input" placeholder="name@%%ORG_NAME%%.org">
+        </div>
+
+        <div id="wizStep2" class="wizard-step">
+            <h2 class="text-3xl font-black mb-2">Security.</h2>
+            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Standard & Duress PINs</p>
+            
+            <div class="bg-gray-800/50 p-4 rounded-xl border border-white/10 mb-6">
+                <label class="block text-[10px] font-black text-green-400 uppercase tracking-widest mb-2">Standard PIN</label>
+                <input type="password" id="wizPin" maxlength="4" pattern="\d*" inputmode="numeric" class="form-input text-2xl tracking-[1em] text-center" placeholder="****">
+                <p class="text-[10px] text-gray-400 font-bold mt-2">Used to confirm you are safe.</p>
+            </div>
+
+            <div class="bg-red-900/20 p-4 rounded-xl border border-red-500/30">
+                <label class="block text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">Duress PIN (Silent Alarm)</label>
+                <input type="password" id="wizDuress" maxlength="4" pattern="\d*" inputmode="numeric" class="form-input text-2xl tracking-[1em] text-center border-red-500/30" placeholder="****">
+                <p class="text-[10px] text-red-400/60 font-bold mt-2 italic">Triggers emergency alerts silently.</p>
+            </div>
+        </div>
+
+        <div id="wizStep3" class="wizard-step">
+            <h2 class="text-3xl font-black mb-2">Contacts.</h2>
+            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Emergency Escalation</p>
+            
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Primary Contact Name</label>
+            <input type="text" id="wizContactName" class="form-input mb-4" placeholder="Manager or Spouse">
+            
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Primary Contact Mobile</label>
+            <input type="tel" id="wizContactPhone" class="form-input" placeholder="021 000 0000">
+        </div>
+    </div>
+    
+    <div class="flex gap-4 pt-6">
+        <button id="btnWizPrev" onclick="prevWiz()" class="hidden flex-1 py-4 font-black uppercase tracking-widest text-xs border border-white/20 rounded-xl">Back</button>
+        <button id="btnWizNext" onclick="nextWiz()" class="flex-1 py-4 bg-blue-600 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg">Next Step</button>
+    </div>
+</div>
+
+<div id="mainApp" class="h-full flex flex-col">
+    
+    <header class="header-bar">
+        <div class="flex items-center gap-3">
+            <img src="%%LOGO_DATA%%" class="w-8 h-8 object-contain rounded-sm">
+            <div class="flex flex-col">
+                <span class="text-[10px] font-black uppercase tracking-widest opacity-60">%%ORG_NAME%%</span>
+                <span class="text-xs font-black uppercase tracking-tighter" id="headerWorkerName">Safety On-The-Go</span>
+            </div>
         </div>
         <div class="flex items-center gap-2">
-            <button onclick="navigate('settings')" class="p-2 text-gray-400">⚙️</button>
-        </div>
-    </div>
-    <div class="content-area">
-        <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded text-center font-bold animate-pulse">Syncing...</div>
-        <div class="flex gap-2 mb-4">
-<button onclick="forceSync(false)" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg transition">↻</button>            <button onclick="openLocModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg transition">+</button>
-            <div id="travelRow" class="flex-1"></div>
-        </div>
-        <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Safety Destinations</div>
-        <div id="locationList" class="grid grid-cols-2 gap-3 pb-4"></div>
-    </div>
-    <div class="footer-bar">
-        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2 font-black tracking-tighter">
-                <span class="text-gray-400 text-[10px] uppercase">Estimated visit time</span>
-                <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
+            <div class="flex items-end gap-[2px] h-3 mr-2" id="gpsIndicator">
+                <div class="gps-bar"></div>
+                <div class="gps-bar"></div>
+                <div class="gps-bar"></div>
+                <div class="gps-bar"></div>
             </div>
-            <input id="durationSlider" type="range" min="0" max="23" value="0" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" oninput="updateArrivedButtonState()">
+            <button onclick="toggleBatterySaver()" class="p-2 opacity-40 active:opacity-100">🌙</button>
         </div>
-        <div class="flex gap-4">
-        <button id="btnQuick" onclick="openQuickMenu()" class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl text-xs tracking-widest uppercase">Forms</button>            <button type="button" id="btnMainAction" class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" disabled>Start</button>
-        </div>
+    </header>
+
+    <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-[10px] font-black py-2 uppercase tracking-widest cursor-pointer shadow-lg z-50" onclick="showPage('pageVehicle')">
+        ⚠️ %%VEHICLE_TERM%% Check Overdue
     </div>
-</div>
 
-<div id="batterySaver" class="hidden fixed inset-0 bg-black z-[200] flex flex-col items-center justify-center select-none">
-    <div id="saverProgress" class="absolute inset-0 bg-white/5 opacity-0 transition-opacity duration-[2000ms] pointer-events-none"></div>
-    <div class="text-gray-800 text-sm font-bold animate-pulse uppercase tracking-[0.3em] z-10">Battery Saver Active</div>
-    <div class="text-gray-900 text-[10px] uppercase font-black tracking-widest mt-4 z-10 border border-gray-900 px-4 py-2 rounded-full font-bold">Hold screen to wake</div>
-</div>
-
-<div id="lockedPage" class="page bg-black">
-    <div class="mt-12 w-full max-w-xs mx-auto space-y-4">
-        <button onclick="openMidVisitMenu()" class="w-full py-4 bg-indigo-600 font-bold rounded-2xl text-lg uppercase tracking-widest">Add Notes / Forms</button>
-        <button id="btnDepart" class="long-press-btn w-full py-4 bg-red-600 font-bold rounded-2xl text-lg uppercase tracking-widest">End Visit</button>
-    </div>
-</div>
-
-<div id="settingsPage" class="page bg-gray-800">
-    <div class="header-bar">
-        <h1 class="text-2xl font-bold text-white uppercase tracking-tighter">Edit Settings</h1>
-        <button onclick="navigate('main')" class="text-3xl text-gray-400">×</button>
-    </div>
-    <div class="content-area">
-        <div class="setting-card">
-            <label for="set_url" class="setting-label lbl-blue">System URL</label>
-            <input type="text" id="set_url" class="form-input" value="%%GOOGLE_SHEET_URL%%">
-            <button onclick="hardRefreshUpdate()" class="w-full mt-2 py-2 bg-gray-700 hover:bg-gray-600 rounded text-[10px] font-black uppercase text-gray-300">Clear Cache & Reload</button>
-        </div>
-
-<div class="setting-card border-blue-500/20 bg-blue-900/10">
-    <div class="setting-label lbl-blue mb-3">Handset Diagnostics</div>
-    <div class="space-y-2">
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">v79.35</span></div>
-        <div class="flex justify-between text-[10px] uppercase font-black"><span id="diagCloud" class="text-green-400">Ready</span></div>
-    </div>
-</div>
-
-        <div class="setting-card border-purple-500/20 bg-purple-900/10">
-            <div class="setting-label lbl-purple mb-3">Diagnostic Status</div>
-            <div class="space-y-2">
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Device ID:</span><span id="set_deviceId_diag" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">App:</span><span id="diagApp" class="text-white">---</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Backend:</span><span id="diagBackend" class="text-purple-400">v79.35</span></div>
-                <div class="flex justify-between text-[10px] uppercase font-black"><span class="text-gray-500">Last Sync:</span><span id="diagCloud" class="text-green-400">Ready</span></div>
-            </div>
-        </div>
+    <main class="content-area">
         
-        <div class="flex gap-3">
-            <button onclick="localStorage.clear(); location.reload();" class="flex-1 py-4 bg-red-900/20 text-red-500 font-bold rounded-xl text-[10px] uppercase">Reset App</button>
-            <button onclick="updateSettings()" class="flex-[2] py-4 bg-blue-600 text-white font-black rounded-xl text-xs uppercase shadow-xl">Save & Sync</button>
+        <div id="pageVisit" class="page active">
+            <div class="space-y-6">
+                <div class="p-6 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+                    <p class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Safety Status</p>
+                    <div class="flex justify-between items-end">
+                        <h2 class="text-4xl font-black tracking-tighter" id="visitStatus">Ready</h2>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[10px] font-bold opacity-40 uppercase">Last Sync</span>
+                            <span class="text-xs font-black" id="lastSyncTime">--:--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="showPage('pageTravel')" class="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+                        <span class="text-2xl">🚗</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Travel</span>
+                    </button>
+                    <button onclick="showPage('pageForms')" class="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
+                        <span class="text-2xl">📋</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Forms</span>
+                    </button>
+                </div>
+
+                <div id="currentActivity" class="hidden p-6 rounded-2xl bg-blue-600/20 border-2 border-blue-500 shadow-lg">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-blue-400" id="activityType">Visit Active</p>
+                            <h3 class="text-xl font-black" id="activityName">Location Name</h3>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-red-400">Due Out</p>
+                            <p class="text-xl font-black" id="dueOutTime">--:--</p>
+                        </div>
+                    </div>
+                    <button id="btnSafe" class="long-press-btn w-full py-5 bg-green-600 rounded-xl font-black uppercase tracking-[0.2em] shadow-lg">Hold to Mark Safe</button>
+                </div>
+
+                <button id="btnStartVisit" onclick="startVisit()" class="w-full py-8 bg-blue-600 rounded-2xl font-black text-xl uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all">Start Visit</button>
+            </div>
         </div>
-    </div>
-</div>
 
-<div id="reportPage" class="page bg-gray-900">
-    <div class="header-bar">
-        <h2 id="reportTitle" class="text-lg font-black text-blue-400 uppercase tracking-widest">Visit Report</h2>
-    </div>
-    <div class="content-area" id="reportFields">
+        <div id="pageTravel" class="page">
+            <h2 class="text-3xl font-black mb-2">Travel.</h2>
+            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Mileage & Safety</p>
+            
+            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Destination / Purpose</label>
+            <input type="text" id="travelDest" class="form-input mb-8" placeholder="e.g. Nelson Office to Home">
+
+            <button id="btnStartTravel" onclick="toggleTravel()" class="w-full py-8 bg-white/5 border-2 border-white/20 rounded-2xl font-black text-xl uppercase tracking-[0.2em] transition-all">Start Journey</button>
+            
+            <div id="travelStats" class="hidden mt-8 grid grid-cols-2 gap-4">
+                <div class="p-4 bg-white/5 rounded-xl border border-white/10">
+                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Distance</p>
+                    <p class="text-2xl font-black"><span id="liveKm">0.0</span> <span class="text-xs">km</span></p>
+                </div>
+                <div class="p-4 bg-white/5 rounded-xl border border-white/10">
+                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Method</p>
+                    <p class="text-sm font-black uppercase" id="distMethod">GPS</p>
+                </div>
+            </div>
         </div>
-    <div class="footer-bar flex gap-3">
-        <button onclick="navigate('main')" class="flex-1 py-4 bg-gray-800 font-bold rounded-xl text-gray-400">Cancel</button>
-        <button id="btnSubmitRep" onclick="submitReport()" class="flex-[2] py-4 bg-green-600 font-black rounded-xl uppercase shadow-lg">Submit & End</button>
-    </div>
-</div>
 
-<div id="modalBackdrop" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[150]">
-    
-    <div id="infoModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700">
-        <h2 id="infoTitle" class="text-xl font-bold mb-4 text-white">Site Info</h2>
-        <div id="siteInfoContent" class="text-gray-300 text-sm mb-6"></div>
-        <a id="btnSiteNav" href="#" target="_blank" class="block w-full py-4 bg-purple-600 text-white font-bold rounded-xl text-center shadow-xl mb-4 uppercase">🗺️ Navigate</a>
-        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 font-bold rounded-xl text-white">CLOSE</button>
-    </div>
+        <div id="pageVehicle" class="page">
+            <h2 class="text-3xl font-black mb-2">Fleet.</h2>
+            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">%%VEHICLE_TERM%% & Maintenance</p>
+            
+            <div class="bg-white/5 p-6 rounded-2xl border border-white/10 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[10px] font-black uppercase tracking-widest opacity-60">Status</span>
+                    <span id="vehStatusBadge" class="px-2 py-1 bg-green-600 rounded text-[9px] font-black uppercase tracking-widest">Compliant</span>
+                </div>
+                <div class="flex justify-between items-end">
+                    <div>
+                        <p class="text-xs font-bold opacity-40 uppercase">%%VEHICLE_TERM%% Expiry</p>
+                        <p class="text-2xl font-black" id="vehExpiryDisp">--/--/--</p>
+                    </div>
+                    <button onclick="updateWof()" class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Update</button>
+                </div>
+            </div>
 
-<div id="locationModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm relative z-50 border border-gray-700 shadow-2xl">
-    <h2 id="locModalTitle" class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Destination</h2>
-    <input type="hidden" id="locId">
-<div class="space-y-4">
-    <div>
-        <label for="locName" class="setting-label text-gray-500">Site Name</label>
-        <input type="text" id="locName" class="form-input" placeholder="Required">
-    </div>
-    <div>
-        <label for="locBusiness" class="setting-label text-gray-500">Business / Company</label>
-        <input type="text" id="locBusiness" class="form-input" placeholder="e.g. ABC Ltd">
-    </div>
-    <div>
-        <label for="locAddr" class="setting-label text-gray-500">Physical Address</label>
-        <div class="flex gap-2">
-            <input type="text" id="locAddr" class="form-input mb-0 flex-1">
-            <button onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-xl font-black text-xs shadow-lg">📍 GPS</button>
+            <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Safety Checklist</p>
+            <div id="vehChecklist" class="space-y-3">
+                </div>
         </div>
-    </div>
-</div>
+
+    </main>
+
+    <footer class="footer-bar flex justify-around items-center">
+        <button onclick="showPage('pageVisit')" class="p-4 opacity-40 active:opacity-100"><span class="text-2xl">🏠</span></button>
+        <button id="btnPanic" class="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform -mt-10 border-4 border-var(--primary)">
+            <span class="text-white font-black text-xs uppercase tracking-widest">SOS</span>
+        </button>
+        <button onclick="showPage('pageVehicle')" class="p-4 opacity-40 active:opacity-100"><span class="text-2xl">⚙️</span></button>
+    </footer>
+
 </div>
 
-    <div id="templateModal" class="hidden bg-gray-800 rounded-2xl p-6 w-full max-w-sm border border-gray-700 text-center">
-        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Forms Library</h2>
-        <div id="templateList" class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2"></div>
-        <button onclick="closeModal('template')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-white uppercase tracking-widest">Close</button>
-    </div>
+<div id="pinModal" class="hidden fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-8">
+    <h3 class="text-2xl font-black mb-8 uppercase tracking-widest">Enter Safety PIN</h3>
+    <div class="grid grid-cols-3 gap-4 w-full max-w-xs">
+        </div>
 </div>
+
+<div id="wofBlockModal" class="hidden fixed inset-0 bg-red-950 z-[110] flex flex-col items-center justify-center p-8 text-center">
+    <div class="text-6xl mb-6">🚫</div>
+    <h2 class="text-3xl font-black mb-4 uppercase">VEHICLE GROUNDED</h2>
+    <p class="text-red-200 font-bold mb-8">The %%VEHICLE_TERM%% for your assigned vehicle has expired. For your safety, you cannot proceed with work-related travel until this is updated.</p>
+    <button onclick="startVehicleCheck()" class="w-full py-5 bg-white text-red-950 font-black rounded-xl uppercase tracking-widest">Update %%VEHICLE_TERM%%</button>
+</div>
+
+</body>
 
 <script>
-    
-// --- 1. GLOBAL CONSTANTS & CORE STATE ---
-const APP_VERSION = "v79.35";
+/**
+ * 1. FACTORY INJECTION CONFIGURATION
+ * These %%PLACEHOLDERS%% are replaced by the Factory during the build process.
+ */
 const CONFIG = {
     url: "%%GOOGLE_SHEET_URL%%",
     key: "%%SECRET_KEY%%",
-    mileage: true
+    org: "%%ORG_NAME%%",
+    app: "%%APP_NAME%%",
+    isAdv: %%IS_ADVANCED%%,
+    mileage: %%ENABLE_MILEAGE%%,
+    checkin: %%CHECKIN_ENABLED%%,
+    checkinMins: %%CHECKIN_INTERVAL%%,
+    escalation: %%ESCALATION_MINUTES%%,
+    vehEnabled: %%VEHICLE_ENABLED%%,
+    vehInterval: %%VEHICLE_INTERVAL%%,
+    vehTerm: "%%VEHICLE_TERM%%",
+    locale: "%%VOICE_LOCALE%%",
+    prefix: "%%COUNTRY_PREFIX%%",
+    reqTravel: %%REQ_TRAVEL_REPORT%%,
+    logo: "%%LOGO_DATA%%"
 };
-
-// Centralized state object
-let state = { 
-    settings: {}, 
-    locations: [], 
-    selectedLocationId: null, 
-    visitDurationMinutes: 0,
-    activeVisit: null, 
-    cachedForms: {}, 
-    pendingUploads: [],
-    globalForms: [],
-    photoStore: {},
-    lowBatSent: false,
-    meta: {} 
-};
-
-// Variables for hardware and timers
-let synth, checkinIntervalId, mainScreenReminderTimer, wakeLock, timerInt, travellingInterval;
-let autoDimTimer = null;
-let tempPhoto = null, sigPad = null;
-let deferredPrompt, isMidVisitUpdate = false, currentActiveTemplate = "", isDrawing = false;
-let calculatedDist = null, gpsWarm = false, gpsWatchId = null, lastAlertTime = 0;
-let currentBatteryLevel = "100%";
-let uploadQueue = []; 
-let travelTargetName = ""; // Tracks driving destination
-
-// --- 2. STORAGE & SYNCHRONIZATION ---
-
-/* Modern Standard: Uses the navigator.storage API to request persistence.*/
-/* This replaces the deprecated webkitPersistentStorage and StorageType calls.*/
 
 /**
- * FIXED: Standardized Storage Persistence
- * Uses the modern navigator.storage API to replace deprecated StorageType logic.
+ * 2. GLOBAL STATE ENGINE
  */
-async function saveState() {
-    try {
-        // MODERN STANDARD: Requests persistence from the OS
-        if (navigator.storage && navigator.storage.persist) {
-            const isPersisted = await navigator.storage.persist();
-            if (isPersisted) {
-                console.log("💾 Data persistence confirmed by browser.");
-            }
-        }
-        
-        const stateString = JSON.stringify(state);
-        localStorage.setItem('otg_worker_state', stateString);
-    } catch (e) {
-        console.error("Critical: Storage Failure", e);
+let state = {
+    worker: null,
+    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
+    activeVisit: null,
+    isTravel: false,
+    travelStart: null,
+    pins: { std: '', duress: '' },
+    currentWizStep: 1,
+    voice: null,
+    isDimmed: false,
+    syncing: false,
+    installPrompt: null
+};
+
+/**
+ * 3. INITIALIZATION & PWA LIFESTYLE
+ */
+window.onload = async () => {
+    console.log("OTG Safety Engine v81.36 Initializing...");
+    loadSettings();
+    initVoice();
+    checkIosInstall();
+    startGPS();
+    
+    if (!state.worker) {
+        document.getElementById('setupWizard').classList.remove('hidden');
+    } else {
+        document.getElementById('headerWorkerName').innerText = state.worker.name;
+        checkVehicleStatus();
+        syncData(); // Initial heartbeat
     }
-}
-
-function loadState() {
-    const saved = localStorage.getItem('otg_worker_state');
-    if (saved) {
-        try {
-            state = JSON.parse(saved);
-        } catch (e) {
-            console.error("Critical: State Corrupted", e);
-        }
-    }
-}
-
-/*Robust Refresh: Uses async to prevent library crashes.*/
-async function hardRefreshUpdate() {
-    if(!confirm("Force reload and clear internal app memory?")) return;
-    showToast("🧹 Deep cleaning system cache...");
-
+    
+    // Register Service Worker for Offline Safety
     if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (let r of regs) { await r.unregister(); }
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Safety Watchdog Active:', reg.scope))
+            .catch(err => console.warn('Offline Mode Disabled:', err));
     }
+};
 
-    if ('caches' in window) {
-        const keys = await caches.keys();
-        for (let k of keys) { await caches.delete(k); }
-    }
-
-    state.meta.backendVersion = null;
-    await saveState(); 
-    location.reload(true); 
-}
-
-// --- 3. DASHBOARD & UI RENDERING ---
-
-/**
- * Starts a visit or travel session.
- */
-/**
- * FIXED: startVisit (Consolidated Master Control)
- * Hands off UI and Timer management to enterLockedScreen.
- */
-function startVisit(id) {
-    const loc = state.locations.find(l => l.id === id);
-    if (!loc) return;
-    
-    state.activeVisit = { 
-        id, 
-        locationName: loc.name, 
-        startTime: Date.now(), 
-        status: (id === 'travel' ? 'TRAVELLING' : 'ON_SITE'),
-        isPanic: false,
-        criticalSent: false
-    };
-
-    saveState();
-    
-    // MASTER HANDOFF: enterLockedScreen manages navigate('locked') and tick()
-    enterLockedScreen(); 
-    
-    speak(`Visit started at ${loc.name}`);
-
-    if (id === 'travel') {
-        setTimeout(() => toggleBatterySaver(true), 10000); 
-    }
-}
-/**
- * FIXED: endVisit (No PIN required, triggers Report Screen)
- */
-function endVisit() {
-    if (!state.activeVisit) return;
-    
-    // 1. Clear active timers
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
-    
-    const locName = state.activeVisit.locationName;
-    const template = (state.activeVisit.id === 'travel') ? 'Travel Report' : 'Standard Visit Note';
-    
-    // 2. Populate Report Page (Fixes innerText error)
-    const titleEl = document.getElementById('reportTitle');
-    const fieldArea = document.getElementById('reportFields');
-    
-    if (titleEl) titleEl.innerText = `Report: ${locName}`;
-    
-    // 3. Navigate to Reporting context
-    buildReportForm(template, fieldArea);
-    navigate('report');
-}
-/**
- * Validates the entered PIN against the masked version in settings.
- */
-function checkPin() {
-    const input = document.getElementById('lock_pin_input').value;
-    const maskedInput = btoa(input); // Matches the masking used in savePin
-
-    if (maskedInput === state.settings.pinCode) {
-        document.getElementById('lock_pin_input').value = ""; // Clear for safety
-        showModal('template'); // Opens the form selection menu
-    } else {
-        showToast("Incorrect PIN");
-        // Haptic feedback if supported
-        if (navigator.vibrate) navigator.vibrate(200);
+function loadSettings() {
+    const saved = localStorage.getItem('otg_user_data');
+    if (saved) {
+        state.worker = JSON.parse(saved);
+        state.pins.std = state.worker.pin || '';
+        state.pins.duress = state.worker.duress || '';
     }
 }
 
 /**
- * Screen WakeLock: Prevents the phone from sleeping during active sessions.
+ * 4. SOPHISTICATED GPS ENGINE (High-Accuracy & Signal Strength)
  */
-async function requestWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-            console.log("🔒 WakeLock Active");
-        }
-    } catch (err) {
-        console.warn("WakeLock failed:", err.message);
-    }
-}
-/**
- * Clears the signature canvas for a specific field index.
- */
-function clearSig(index) {
-    const canvas = document.getElementById(`sig-canvas-${index}`);
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-}
-
-/**
- * Creates the pulsing effect for the Travel Tile when active.
- */
-function startTravellingPulse() {
-    if (travellingInterval) clearInterval(travellingInterval);
-    travellingInterval = setInterval(() => {
-        const tr = document.getElementById('travelRow');
-        if (tr) tr.classList.toggle('opacity-70');
-    }, 1000);
-}
-/**
- * RESTORED: Auto-Dim Inactivity Logic
- */
-/**
- * RESTORED: Unified Battery Saver & Inactivity Logic
- */
-let inactivityTimer; // Single declaration to prevent SyntaxError
-
-function resetAutoDim() {
-    clearTimeout(inactivityTimer);
-    if (state.activeVisit && document.getElementById('batterySaver')?.classList.contains('hidden')) {
-        // Auto-dim after 5 minutes of inactivity during a visit
-        inactivityTimer = setTimeout(() => toggleBatterySaver(true), 300000);
-    }
-}
-
-function initAutoDimListeners() {
-    ['mousedown', 'mousemove', 'keypress', 'touchstart', 'scroll'].forEach(name => {
-        document.addEventListener(name, resetAutoDim, {passive: true});
-    });
-    resetAutoDim();
-}
-
-function toggleBatterySaver(force) {
-    const saver = document.getElementById('batterySaver');
-    const progress = document.getElementById('saverProgress');
-    if (!saver) return;
-
-    const isCurrentlyDim = !saver.classList.contains('hidden');
-    const targetState = (force !== undefined) ? force : !isCurrentlyDim;
-
-    if (targetState) {
-        saver.classList.remove('hidden');
-        document.documentElement.classList.add('system-dim'); // Triggers OS-level dimming
-        if (progress) progress.style.opacity = "0"; 
-        initWakeListener(); 
-        clearTimeout(inactivityTimer);
-    } else {
-        saver.classList.add('hidden');
-        document.documentElement.classList.remove('system-dim');
-        resetAutoDim(); 
-    }
-}
-/**
- * GLUE: Attaches the hold-to-wake duration to the black overlay
- */
-function initWakeListener() {
-    const saver = document.getElementById('batterySaver');
-    let wakeTimer;
-    
-    const startWake = () => {
-        document.getElementById('saverProgress').style.opacity = "1";
-        wakeTimer = setTimeout(() => {
-            toggleBatterySaver(false);
-            showToast("Screen Active");
-        }, 2000); // Must hold for 2 seconds to "wake"
-    };
-
-    const stopWake = () => {
-        document.getElementById('saverProgress').style.opacity = "0";
-        clearTimeout(wakeTimer);
-    };
-
-    saver.onmousedown = startWake; saver.onmouseup = stopWake;
-    saver.ontouchstart = startWake; saver.ontouchend = stopWake;
-}   
-/**
- * FIXED: forceSync Payload
- * Removes forced "EMERGENCY" status unless explicitly triggered by SOS.
- */
-async function forceSync(highPriority = false) {
-    if (!state.settings.workerName) return;
-    const banner = document.getElementById('uploadBanner');
-    if (banner) banner.classList.remove('hidden');
-
-    const dId = state.settings.deviceId || getDeviceID();
-    
-    // Determine the true status
-    let currentStatus = "SYNC";
-    if (highPriority) {
-        currentStatus = "EMERGENCY - PANIC";
-    } else if (state.activeVisit) {
-        currentStatus = state.activeVisit.status || "ON_SITE";
-    }
-
-    const payload = {
-        key: CONFIG.key,
-        deviceId: dId,
-        "Worker Name": state.settings.workerName,
-        "Alarm Status": currentStatus, // Corrected logic
-        "Timestamp": new Date().toISOString()
-    };
-
-    try {
-        const queryString = new URLSearchParams(payload).toString();
-        await fetch(`${CONFIG.url}?${queryString}`, { method: 'POST', mode: 'no-cors' });
-        
-        state.meta.lastSync = new Date().toLocaleTimeString();
-        await saveState(); 
-        showToast(highPriority ? "🚨 SOS ALERT SENT" : "✅ SYNC SUCCESSFUL");
-        
-        if (!highPriority) pullLatestData(); 
-    } catch (e) {
-        showToast("📡 OFFLINE: Data Queued");
-    } finally {
-        if (banner) banner.classList.add('hidden');
-    }
-}
-/**
- * RESTORED: finishSetup (Generates ID & Triggers Handshake)
- */
-async function finishSetup() {
-    state.settings.workerName = document.getElementById('set_workerName').value;
-    state.settings.workerPhone = document.getElementById('set_workerPhone').value;
-    state.settings.workerEmail = document.getElementById('set_workerEmail').value;
-    
-    // GENERATE ID: Mandatory for backend matching
-    if (state.settings.workerName && !state.settings.deviceId) {
-        state.settings.deviceId = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-    }
-
-    if (state.settings.workerName) {
-        await saveState();
-        showToast("Synchronising Identity...");
-        await forceSync(); // Registers name & device ID immediately
-        navigate('main');
-    } else {
-        showToast("Please enter your name");
-    }
-}
-    
-/**
- * FIXED: buildReportForm (Restores Golden UI with [$], [TIME], and [GPS] tags)
- */
-function buildReportForm(n, c) {
-    state.photoStore = {};
-    const sn = n ? n.trim() : "(Standard)";
-    
-    // 1. Template Resolution
-    let questions = state.globalForms?.find(f => f.name.trim() === sn)?.questions || 
-                    state.cachedForms[sn] || 
-                    state.cachedForms["(Standard)"];
-    
-    c.innerHTML = '';
-    
-    if (!questions) {
-        c.innerHTML = '<label class="setting-label">Visit Notes</label><textarea id="rep_notes" class="form-input h-32"></textarea>';
+function startGPS() {
+    if (!("geolocation" in navigator)) {
+        alert("CRITICAL: GPS is not supported on this device. Safety features will be disabled.");
         return;
     }
 
-    questions.forEach((f, i) => {
-        let type = 'text', labelText = f.text || f, dropOptions = [];
-        const upper = labelText.toUpperCase();
-        const fieldId = `dyn_field_${i}`;
-
-        // 2. Advanced Tag Detection
-        if (upper.includes('[HEADING]')) { 
-            type = 'header'; labelText = labelText.replace(/\[HEADING\]/gi, '').trim(); 
-        } else if (upper.includes('[SIGN]')) { 
-            type = 'signature'; labelText = labelText.replace(/\[SIGN\]/gi, '').trim(); 
-        } else if (upper.includes('[PHOTO]')) { 
-            type = 'photo'; labelText = labelText.replace(/\[PHOTO\]/gi, '').trim(); 
-        } else if (upper.includes('[GPS]')) { 
-            type = 'gps'; labelText = labelText.replace(/\[GPS\]/gi, '').trim(); 
-        } else if (upper.includes('[YESNO]')) { 
-            type = 'yesno'; labelText = labelText.replace(/\[YESNO\]/gi, '').trim(); 
-        } else if (upper.includes('[CHECK]')) { 
-            type = 'checkbox'; labelText = labelText.replace(/\[CHECK\]/gi, '').trim(); 
-        } else if (upper.includes('[DATE]')) { 
-            type = 'date'; labelText = labelText.replace(/\[DATE\]/gi, '').trim(); 
-        } else if (upper.includes('[TIME]')) { 
-            // RESTORED: [TIME] tag support
-            type = 'time'; labelText = labelText.replace(/\[TIME\]/gi, '').trim(); 
-        } else if (upper.includes('[NUMBER]')) { 
-            type = 'number'; labelText = labelText.replace(/\[NUMBER\]/gi, '').trim(); 
-        } else if (upper.includes('[$]')) { 
-            // RESTORED: [$] Currency tag support
-            type = 'currency'; labelText = labelText.replace(/\[\$\]/gi, '').trim(); 
-        } else if (upper.includes('[1TEXT]')) { 
-            type = '1text'; labelText = labelText.replace(/\[1TEXT\]/gi, '').trim(); 
-        } else if (upper.startsWith('[DROP')) {
-            type = 'drop';
-            const match = labelText.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-            if (match) { 
-                dropOptions = match[1].split(',').map(o => o.trim()); 
-                labelText = labelText.replace(match[0], '').trim(); 
-            }
-        }
-
-        const container = document.createElement('div');
-        container.className = "mb-4";
-
-        // 3. Render Element Logic
-        if (type === 'header') {
-            container.innerHTML = `<h3 class="text-blue-400 font-bold uppercase text-xs border-b border-gray-700 pb-1 mb-2">${labelText}</h3>`;
-        } else {
-            container.innerHTML = `<label for="${fieldId}" class="setting-label lbl-gray">${labelText}</label>`;
-
-            if (type === 'photo') {
-                container.innerHTML += `<button type="button" onclick="document.getElementById('${fieldId}').click()" id="lbl_${i}" class="form-input text-center">📸 Take Photo</button>
-                                        <input type="file" id="${fieldId}" capture="environment" class="hidden" onchange="handlePhoto(this, '${labelText}')">`;
-            } else if (type === 'signature') {
-                container.innerHTML += `<div class="bg-white rounded-lg p-1"><canvas id="sig-canvas-${i}" class="w-full h-40"></canvas></div>
-                                        <button type="button" class="text-[10px] font-bold text-gray-500 uppercase mt-1" onclick="clearSig(${i})">Clear Signature</button>`;
-            } else if (type === 'gps') {
-                container.innerHTML += `<div class="flex gap-2"><button type="button" onclick="captureGPS(this)" class="bg-blue-600 p-3 rounded-lg text-xs font-bold uppercase">GPS</button>
-                                        <input type="text" id="${fieldId}" class="form-input flex-1 font-mono text-xs" readonly data-key="${labelText}" placeholder="Capture GPS"></div>`;
-            } else if (type === 'currency') {
-                container.innerHTML += `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                                        <input type="number" step="0.01" id="${fieldId}" class="form-input pl-8 font-bold" data-key="${labelText}"></div>`;
-            } else if (type === 'time' || type === 'date' || type === 'number' || type === '1text') {
-                const inputType = (type === '1text') ? 'text' : type;
-                container.innerHTML += `<input type="${inputType}" id="${fieldId}" class="form-input font-bold" data-key="${labelText}">`;
-            } else if (type === 'checkbox') {
-                container.innerHTML = `<label class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl border border-gray-600 active:bg-gray-700 cursor-pointer">
-                                        <input id="${fieldId}" type="checkbox" class="w-7 h-7 text-blue-600 rounded" data-key="${labelText}">
-                                        <span class="text-sm font-bold text-gray-200 select-none">${labelText}</span></label>`;
-            } else if (type === 'drop') {
-                let opts = dropOptions.map(o => `<option value="${o}">${o}</option>`).join('');
-                container.innerHTML += `<select id="${fieldId}" class="form-input font-bold" data-key="${labelText}"><option value="">Select...</option>${opts}</select>`;
-            } else {
-                container.innerHTML += `<textarea id="${fieldId}" class="form-input h-24" data-key="${labelText}"></textarea>`;
-            }
-        }
-        c.appendChild(container);
-    });
-
-    // 4. Hardware Re-Initialization
-    setTimeout(() => {
-        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
-            if (typeof resizeCanvas === 'function') resizeCanvas(canvas);
-            if (typeof initSigPad === 'function') initSigPad(canvas);
-        });
-    }, 600);
-}
-/**
- * Processes and saves the security PIN.
- * Uses Base64 encoding as a basic masking layer before saving to state.
- */
-function savePin() {
-    const p1 = document.getElementById('setup_pin1').value;
-    const p2 = document.getElementById('setup_pin2').value;
-    const duress = document.getElementById('set_duressPin').value;
-
-    if (p1.length === 4 && p1 === p2) {
-        state.settings.pinCode = btoa(p1);
-        state.settings.duressPin = btoa(duress);
-        // Only advance if validation passes
-        wizNext('wizStep2', 'wizStep3'); 
-    } else {
-        showToast("Standard PINs must be 4 digits and match.");
-    }
-    // REMOVED the extra wizNext from here
-}
-
-
-    
-// --- 5. IDENTITY & DIAGNOSTICS ---
-
-/**
- * FIXED: populateSettingsForm (Now updates all Diagnostic fields)
- */
-/**
- * FIXED: Diagnostic Form updates Backend version
- */
-function populateSettingsForm() {
-    const urlInput = document.getElementById('set_url');
-    if (urlInput) urlInput.value = state.settings.googleSheetUrl || "%%GOOGLE_SHEET_URL%%";
-
-    const diagId = document.getElementById('set_workerName_diag');
-    if (diagId) diagId.innerText = state.settings.workerName || "Not Setup";
-    
-    const diagDev = document.getElementById('set_deviceId_diag');
-    if (diagDev) diagDev.innerText = state.settings.deviceId || "Pending";
-
-    const diagBack = document.getElementById('diagBackend');
-    if (diagBack) diagBack.innerText = state.meta.backendVersion || "v79.35"; // Identifies version
-
-    const diagApp = document.getElementById('diagApp');
-    if (diagApp) diagApp.innerText = APP_VERSION;
-}
-    
-/**
- * RESTORED: Working Page Router
- */
-function navigate(p) {
-    // Hide all pages
-    document.querySelectorAll('.page').forEach(e => {
-        e.classList.remove('active');
-        e.classList.add('hidden');
-    });
-
-    // Show target page
-    const target = document.getElementById(p + 'Page');
-    if (target) {
-        target.classList.add('active');
-        target.classList.remove('hidden');
-    }
-
-    if (p === 'main') renderLocations();
-    if (p === 'settings') populateSettingsForm();
-}
-    
-// UPDATE: showModal to trigger renderForms
-function showModal(id) {
-    const backdrop = document.getElementById('modalBackdrop');
-    const modal = document.getElementById(id + 'Modal');
-    if (backdrop && modal) {
-        backdrop.classList.remove('hidden');
-        backdrop.classList.add('flex');
-        modal.classList.remove('hidden');
-        if (id === 'template') renderForms(); // FIXED: Triggers rendering
-    }
-}
-
-function closeModal(id) {
-    const backdrop = document.getElementById('modalBackdrop');
-    const modal = document.getElementById(id + 'Modal');
-    if (backdrop && modal) {
-        backdrop.classList.add('hidden');
-        backdrop.classList.remove('flex');
-        modal.classList.add('hidden');
-    }
-}
-
-/**
- * FIXED: Toast Notifications (Matches HTML IDs)
- */
-function showToast(msg) {
-    const banner = document.getElementById('toastMsg');
-    const text = document.getElementById('toastText');
-    if (!banner || !text) return;
-
-    text.innerText = msg;
-    banner.classList.remove('translate-y-[-150%]'); // Slides into view
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => { 
-        banner.classList.add('translate-y-[-150%]'); 
-    }, 3000);
-}
-    
-/**
- * FIXED: Wizard Navigation (Uses 'active' class for CSS compatibility)
- */
-function wizNext(currentId, nextId) {
-    const curr = document.getElementById(currentId);
-    const next = document.getElementById(nextId);
-    
-    if (curr && next) {
-        // Toggle 'active' class to match your CSS visibility rules
-        curr.classList.remove('active');
-        next.classList.add('active');
-        
-        // Update Progress Dots
-        const step = nextId.replace('wizStep', '');
-        if (step == '2') document.getElementById('dot2')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        if (step == '3') document.getElementById('dot3')?.classList.replace('bg-gray-700', 'bg-blue-500');
-        
-        window.scrollTo(0, 0);
-    }
-}
-
-function wizBack(currentId, prevId) {
-    const curr = document.getElementById(currentId);
-    const prev = document.getElementById(prevId);
-    if (curr && prev) {
-        curr.classList.remove('active');
-        prev.classList.add('active');
-        window.scrollTo(0, 0);
-    }
-}
-
-/**
- * Initialises the Panic/Emergency button listeners.
- * Configured for a "Long Press" to prevent accidental triggers.
- */
-function initPanicButton() {
-    const btn = document.getElementById('panicBtn');
-    if (!btn) return;
-
-    let panicTimer;
-    
-    // Long-press logic (requires 2 seconds of holding)
-    btn.addEventListener('mousedown', () => {
-        btn.classList.add('bg-red-500', 'scale-95');
-        panicTimer = setTimeout(handlePanic, 2000);
-    });
-
-    btn.addEventListener('mouseup', () => {
-        btn.classList.remove('bg-red-500', 'scale-95');
-        clearTimeout(panicTimer);
-    });
-
-    btn.addEventListener('touchstart', (e) => {
-        btn.classList.add('bg-red-500', 'scale-95');
-        panicTimer = setTimeout(handlePanic, 2000);
-    }, {passive: true});
-
-    btn.addEventListener('touchend', () => {
-        btn.classList.remove('bg-red-500', 'scale-95');
-        clearTimeout(panicTimer);
-    });
-    /**
- * GLUE: Global Long-Press CSS Trigger
- * Links the visual progress bar (::after) to the JavaScript timer.
- */
-document.querySelectorAll('.long-press-btn').forEach(btn => {
-    const startHolding = () => btn.classList.add('holding');
-    const stopHolding = () => btn.classList.remove('holding');
-    
-    btn.addEventListener('mousedown', startHolding);
-    btn.addEventListener('mouseup', stopHolding);
-    btn.addEventListener('touchstart', startHolding, {passive: true});
-    btn.addEventListener('touchend', stopHolding);
-});
-}
-
-/**
- * The action triggered by the panic button.
- */
-function handlePanic() {
-    if (confirm("🚨 TRIGGER EMERGENCY ALERT?\n\nThis will notify the server and capture your current GPS location.")) {
-        showToast("Sending Emergency Signal...");
-        // This pushes a high-priority packet to your upload queue
-        forceSync(true); 
-    }
-}
-function initLocations() {
-    if (!state.locations) state.locations = [];
-    
-    // Always force Travelling to index 0
-    state.locations = state.locations.filter(l => l.id !== 'travel');
-    state.locations.unshift({
-        id: 'travel',
-        name: 'Travelling',
-        noReport: localStorage.getItem('otg_user_travel_pref') === 'true'
-    });
-
-    renderLocations();
-    checkVehicleStatus(); 
-    populateSettingsForm(); 
-}
-/**
- * --- MASTER OPERATIONAL LOGIC ---
- * RESTORED: Advanced Smoothing, Compression, and Hardware Integration
- */
-
-/**
- * FIXED: renderLocations (Glues tiles to the footer button)
- */
-function renderLocations() {
-    const list = document.getElementById('locationList');
-    const travel = document.getElementById('travelRow');
-    if (!list || !travel) return;
-    
-    list.innerHTML = ''; travel.innerHTML = '';
-
-    state.locations.forEach(loc => {
-        if (!loc || !loc.id) return;
-        const tile = (loc.id === 'travel') ? createTravelTile(loc) : createLocationTile(loc);
-        (loc.id === 'travel') ? travel.appendChild(tile) : list.appendChild(tile);
-    });
-
-    updateArrivedButtonState(); // Ensure footer button reflects selection
-}
-
-/**
- * FIXED: Unified Travel Logic (Simply "Travel", No Pulse)
- */
-function updateArrivedButtonState() {
-    const btn = document.getElementById('btnMainAction');
-    const val = parseInt(document.getElementById('durationSlider').value);
-    const display = document.getElementById('durationDisplay');
-    
-    const mins = val <= 10 ? val * 5 : (val - 10) * 15 + 50;
-    state.visitDurationMinutes = mins;
-    if (display) display.innerText = mins + " mins";
-
-    if (state.selectedLocationId && mins > 0) {
-        btn.disabled = false;
-        btn.style.backgroundColor = state.settings.themeColor || "#3b82f6";
-        
-        if (state.selectedLocationId === 'travel') {
-            btn.innerText = "Travel"; // Renamed from "Travel Safety Check"
-            btn.style.filter = "none"; // Removed hue-rotate
-        } else {
-            const loc = state.locations.find(l => l.id === state.selectedLocationId);
-            btn.innerText = `Hold to Start: ${loc.name}`;
-            btn.style.filter = "none";
-        }
-        btn.onclick = () => startVisit(state.selectedLocationId);
-    } else {
-        btn.disabled = true;
-        btn.innerText = "Start";
-        btn.style.backgroundColor = ""; 
-        btn.classList.add('bg-gray-700', 'text-gray-500');
-    }
-}
-
-    
-/**
- * FIXED: createTravelTile (Now calls functional toggle)
- */
-function createTravelTile(loc) {
-    const d = document.createElement('div');
-    const isSel = state.selectedLocationId === 'travel';
-    const isNoReport = localStorage.getItem('otg_user_travel_pref') === 'true';
-
-    d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-purple-500 bg-purple-900/40 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
-    d.innerHTML = `
-        <div class="text-3xl">🛣️</div>
-        <div class="flex-1">
-            <div class="flex justify-between items-center">
-                <span class="text-[10px] font-black text-purple-400 uppercase tracking-widest">In-Transit Mode</span>
-                <button class="text-gray-500 hover:text-white" onclick="editTravelSettings(event)">⚙️</button>
-            </div>
-            <div class="text-lg font-black text-white leading-tight">Travel</div>
-            ${isNoReport ? '<span class="text-[9px] text-gray-400 uppercase font-bold">Fast-Sync (No Report)</span>' : ''}
-        </div>
-    `;
-    d.onclick = () => { state.selectedLocationId = isSel ? null : 'travel'; renderLocations(); };
-    return d;
-}
-
-/**
- * FIXED: createLocationTile (Restores Golden Info Button)
- */
-function createLocationTile(loc) {
-    const d = document.createElement('div');
-    const isSel = state.selectedLocationId === loc.id;
-    d.className = `p-3 rounded-lg border-2 cursor-pointer flex items-center gap-4 transition-all ${isSel ? 'border-blue-500 bg-blue-900/20 shadow-lg' : 'border-gray-700 bg-gray-800'}`;
-    
-    d.innerHTML = `
-        <div class="text-3xl">${loc.icon || '🏢'}</div>
-        <div class="flex-1">
-            <div class="flex justify-between items-start">
-                <div class="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1">${loc.companyName || 'Site'}</div>
-                <button class="text-blue-400 text-sm" onclick="showSiteInfo('${loc.id}', event)">ℹ️</button>
-            </div>
-            <div class="text-lg font-black text-white leading-tight">${loc.name}</div>
-        </div>
-    `;
-    
-    d.onclick = () => { 
-        state.selectedLocationId = isSel ? null : loc.id; 
-        renderLocations(); 
-    };
-    return d;
-}
-
-// 2. SIGNATURE PAD (Gaussian Smoothing & High-DPI Scaling)
-function resizeCanvas(canvas) {
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    canvas.width = canvas.offsetWidth * ratio;
-    canvas.height = canvas.offsetHeight * ratio;
-    canvas.getContext("2d").scale(ratio, ratio);
-}
-
-function initSigPad(canvas) {
-    const ctx = canvas.getContext('2d');
-    let drawing = false, lastPoint = null;
-    
-    ctx.lineWidth = 2.5; 
-    ctx.lineJoin = 'round'; 
-    ctx.lineCap = 'round'; 
-    ctx.strokeStyle = '#000000';
-
-    const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
+    const options = {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
     };
 
-    canvas.addEventListener('touchstart', (e) => {
-        drawing = true; 
-        lastPoint = getPos(e);
-        ctx.beginPath(); 
-        ctx.moveTo(lastPoint.x, lastPoint.y);
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-        if (!drawing) return;
-        e.preventDefault();
-        const currentPoint = getPos(e);
-        
-        // RESTORED: Quadratic Bezier Midpoint logic for smooth curves
-        const midPoint = { 
-            x: lastPoint.x + (currentPoint.x - lastPoint.x) / 2, 
-            y: lastPoint.y + (currentPoint.y - lastPoint.y) / 2 
-        };
-        
-        ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, midPoint.x, midPoint.y);
-        ctx.stroke();
-        lastPoint = currentPoint;
-    }, { passive: false });
-
-    window.addEventListener('touchend', () => { drawing = false; lastPoint = null; });
-}
-// 3. PHOTO ENGINE (EXIF Stripping & 0.4 Quality Compression)
-function handlePhoto(input, key) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => compressImg(e.target.result, key, input.id);
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
-function compressImg(data, key, inputId) {
-    const img = new Image();
-    img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        let scale = Math.min(600 / img.width, 600 / img.height, 1);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        state.photoStore[key] = canvas.toDataURL('image/jpeg', 0.4);
-        
-        const labelIndex = inputId.split('_')[2];
-        const label = document.getElementById(`lbl_${labelIndex}`);
-        if (label) {
-            label.innerHTML = "✅ Optimized";
-            label.className = "flex-1 py-4 bg-green-900/40 border-2 border-green-500 rounded-xl text-green-400 font-bold text-center";
-        }
-        showToast(`Processed optimized photo for ${key}`);
-    };
-    img.src = data;
-}
-
-// 4. AUTOMATION & HARDWARE (GPS, Timers, Speech)
-/**
- * RESTORED: High-Accuracy GPS Capture
- */
-function captureGPS(btn) {
-    if (!navigator.geolocation) {
-        showToast("GPS Not Supported");
-        return;
-    }
-    btn.innerText = "⌛...";
-    navigator.geolocation.getCurrentPosition(
+    navigator.geolocation.watchPosition(
         (pos) => {
-            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-            const input = btn.nextElementSibling;
-            if (input) {
-                input.value = coords;
-                showToast("Location Captured");
+            state.gps = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                acc: pos.coords.accuracy,
+                last: Date.now()
+            };
+            
+            // Log history for "As-the-crow-flies" fallback calculations
+            state.gps.history.push({ ...state.gps });
+            if (state.gps.history.length > 10) state.gps.history.shift();
+            
+            updateGPSIndicator(pos.coords.accuracy);
+            
+            // If in an active visit/travel, update the remote server
+            if (state.activeVisit || state.isTravel) {
+                throttledSync();
             }
-            btn.innerText = "GPS";
         },
         (err) => {
-            showToast("GPS Error: Ensure Location is ON");
-            btn.innerText = "GPS";
+            console.warn("GPS Signal Lost:", err.message);
+            updateGPSIndicator(999); // Force Red Indicator
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        options
     );
 }
 
-function startCheckinTimer() {
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
-    checkinIntervalId = setInterval(() => {
-        if (state.activeVisit) {
-            const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
-            const timerEl = document.getElementById('visitTimer');
-            if (timerEl) {
-                const mins = Math.floor(elapsed / 60);
-                const secs = elapsed % 60;
-                timerEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
-            }
-        }
-    }, 1000);
+function updateGPSIndicator(acc) {
+    const bars = document.getElementById('gpsIndicator').children;
+    for (let b of bars) b.className = 'gps-bar'; // Reset
+    
+    if (acc <= 15) {
+        // High Accuracy (Green)
+        for (let i=0; i<4; i++) bars[i].classList.add('active-green');
+    } else if (acc <= 45) {
+        // Moderate Accuracy (Amber)
+        for (let i=0; i<2; i++) bars[i].classList.add('active-amber');
+    } else {
+        // Poor/No Signal (Red)
+        bars[0].classList.add('active-red');
+    }
+}
+/**
+ * 5. VISIT MANAGEMENT (Safety Timing)
+ */
+async function startVisit() {
+    const loc = prompt("Enter Location Name / Site ID:");
+    if (!loc) return;
+
+    // Standard 60-minute visit, but you can add a prompt for duration
+    const durationMins = 60; 
+    const now = Date.now();
+    
+    state.activeVisit = {
+        name: loc,
+        startTime: now,
+        dueOut: now + (durationMins * 60 * 1000),
+        type: 'visit'
+    };
+
+    updateUIForActiveActivity();
+    
+    // Immediate sync to server to start the "Watchdog" timer
+    await logSafety("Visit Start", `Location: ${loc} | Duration: ${durationMins}m`);
+    
+    // Start the local visual countdown
+    startVisitCountdown();
+    
+    // Voice Confirmation
+    announce(`Visit started at ${loc}. You are due out in one hour.`);
+}
+
+function updateUIForActiveActivity() {
+    if (state.activeVisit) {
+        document.getElementById('currentActivity').classList.remove('hidden');
+        document.getElementById('btnStartVisit').classList.add('hidden');
+        document.getElementById('activityName').innerText = state.activeVisit.name;
+        document.getElementById('activityType').innerText = 
+            state.activeVisit.type === 'visit' ? 'Visit Active' : 'Travel Active';
+        
+        const due = new Date(state.activeVisit.dueOut);
+        document.getElementById('dueOutTime').innerText = 
+            due.getHours().toString().padStart(2, '0') + ":" + 
+            due.getMinutes().toString().padStart(2, '0');
+    } else {
+        document.getElementById('currentActivity').classList.add('hidden');
+        document.getElementById('btnStartVisit').classList.remove('hidden');
+    }
 }
 
 /**
- * FIXED: Dashboard Pulse Removal
+ * 6. INTELLIGENT TRAVEL & MILEAGE ENGINE
+ */
+async function toggleTravel() {
+    const btn = document.getElementById('btnStartTravel');
+    const dest = document.getElementById('travelDest').value;
+    
+    if (!state.isTravel) {
+        // START JOURNEY
+        if (!dest) { alert("Please enter a destination purpose."); return; }
+        
+        state.isTravel = true;
+        state.travelStart = { 
+            lat: state.gps.lat, 
+            lng: state.gps.lng, 
+            time: Date.now(),
+            dest: dest 
+        };
+
+        // UI Updates
+        btn.innerText = "End Journey";
+        btn.classList.replace('bg-white/5', 'bg-orange-600');
+        document.getElementById('travelStats').classList.remove('hidden');
+        
+        // Safety Sync
+        logSafety("Travel Start", `Destination: ${dest}`);
+        announce(`Journey to ${dest} started.`);
+    } else {
+        // END JOURNEY
+        const endPoint = { lat: state.gps.lat, lng: state.gps.lng };
+        
+        // Sophisticated distance calculation
+        const distResult = await getDistance(state.travelStart, endPoint);
+        
+        state.isTravel = false;
+        btn.innerText = "Start Journey";
+        btn.classList.replace('bg-orange-600', 'bg-white/5');
+        document.getElementById('travelStats').classList.add('hidden');
+        
+        // Final Log with Mileage
+        logSafety("Travel End", `Dest: ${state.travelStart.dest} | Dist: ${distResult.km}km (${distResult.type})`);
+        
+        alert(`Journey Logged: ${distResult.km}km (${distResult.type} distance)`);
+        document.getElementById('travelDest').value = '';
+    }
+}
+
+/**
+ * 7. DISTANCE CALCULATION (Road API vs Crow-Flies Fallback)
+ * This logic ensures data integrity even in low-signal areas.
+ */
+async function getDistance(p1, p2) {
+    // 1. Try Google Apps Script Road Distance (ORS/Google Maps)
+    if (navigator.onLine) {
+        try {
+            const u = `${CONFIG.url}?action=getDistance&start=${p1.lat},${p1.lng}&end=${p2.lat},${p2.lng}&key=${CONFIG.key}`;
+            const response = await fetch(u);
+            const data = await response.json();
+            if (data.status === "success" && data.km > 0) {
+                return { km: data.km.toFixed(2), type: 'Road' };
+            }
+        } catch (e) {
+            console.warn("Road API failed, falling back to Haversine.");
+        }
+    }
+
+    // 2. Fallback: Haversine "As the crow flies"
+    const km = calculateHaversine(p1.lat, p1.lng, p2.lat, p2.lng);
+    return { km: km.toFixed(2), type: 'Direct (Offline)' };
+}
+
+function calculateHaversine(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+/**
+ * 8. HEARTBEAT & SYNC ENGINE
+ * Sends background updates to ensure the cloud system knows the worker is safe.
+ */
+async function logSafety(status, notes = "") {
+    if (state.syncing) return;
+    state.syncing = true;
+    
+    const payload = {
+        action: "logVisit",
+        worker: state.worker.name,
+        phone: state.worker.phone,
+        status: status,
+        notes: notes,
+        lat: state.gps.lat,
+        lng: state.gps.lng,
+        acc: state.gps.acc,
+        key: CONFIG.key
+    };
+
+    try {
+        const response = await fetch(CONFIG.url, {
+            method: 'POST',
+            mode: 'no-cors', // Standard for cross-origin Apps Script posts
+            body: JSON.stringify(payload)
+        });
+        state.lastSync = Date.now();
+        document.getElementById('lastSyncTime').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    } catch (e) {
+        console.error("Sync failed, cached for later.");
+    } finally {
+        state.syncing = false;
+    }
+}
+/**
+ * 9. DYNAMIC FORM ENGINE
+ * Parses template tags from the database to build interactive reports.
+ */
+function buildReportForm(formName, questions) {
+    const container = document.getElementById('formContainer');
+    container.innerHTML = `<h3 class="text-xl font-black mb-6 uppercase tracking-widest text-blue-400">${formName}</h3>`;
+    
+    questions.forEach((q, index) => {
+        if (!q) return;
+        const qId = `q_${index}`;
+        const qDiv = document.createElement('div');
+        qDiv.className = "mb-6 p-4 bg-white/5 rounded-xl border border-white/10";
+        
+        // Parsing logic for specific OTG tags
+        if (q.includes('[HEADING]')) {
+            qDiv.innerHTML = `<p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Section</p>
+                              <p class="text-sm font-black text-white uppercase">${q.replace('[HEADING]', '').trim()}</p>`;
+            qDiv.classList.replace('bg-white/5', 'bg-transparent');
+            qDiv.classList.remove('border');
+        } 
+        else if (q.includes('[TEXT]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[TEXT]', '').trim()}</label>
+                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter notes..."></textarea>`;
+        }
+        else if (q.includes('[1TEXT]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[1TEXT]', '').trim()}</label>
+                              <input type="text" id="${qId}" class="form-input" placeholder="Response...">`;
+        }
+        else if (q.includes('[DROP]')) {
+            const parts = q.replace('[DROP]', '').split(',');
+            const label = parts[0].trim();
+            let optionsHtml = parts.slice(1).map(o => `<option value="${o.trim()}">${o.trim()}</option>`).join('');
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
+                              <select id="${qId}" class="form-input">${optionsHtml}</select>`;
+        }
+        else if (q.includes('[YESNO]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace('[YESNO]', '').trim()}</label>
+                              <div class="flex gap-4">
+                                <button onclick="setYesNo('${qId}', true, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">Yes</button>
+                                <button onclick="setYesNo('${qId}', false, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs">No</button>
+                                <input type="hidden" id="${qId}" value="">
+                              </div>`;
+        }
+        else if (q.includes('[GPS]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[GPS]', '').trim()}</label>
+                              <button onclick="captureFieldGPS('${qId}', this)" class="w-full py-4 bg-gray-800 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                <span id="${qId}_icon">📍</span> <span id="${qId}_label">Capture Location</span>
+                              </button>
+                              <input type="hidden" id="${qId}" value="">`;
+        }
+        else if (q.includes('[PHOTO]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[PHOTO]', '').trim()}</label>
+                              <input type="file" accept="image/*" capture="environment" id="${qId}" onchange="handleFormPhoto(this, '${qId}_preview')" class="hidden">
+                              <div onclick="document.getElementById('${qId}').click()" class="w-full h-32 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
+                                <img id="${qId}_preview" class="hidden h-full w-full object-cover">
+                                <span id="${qId}_prompt" class="text-[10px] font-black uppercase tracking-widest opacity-40">Tap to Take Photo</span>
+                              </div>`;
+        }
+        else if (q.includes('[SIGN]')) {
+            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace('[SIGN]', '').trim()}</label>
+                              <canvas id="${qId}_canvas" class="w-full h-32 bg-white rounded-lg"></canvas>
+                              <button onclick="clearCanvas('${qId}_canvas')" class="text-[9px] font-black uppercase text-red-400 mt-2 tracking-widest">Clear Signature</button>`;
+            setTimeout(() => initSignaturePad(`${qId}_canvas`), 100);
+        }
+        
+        container.appendChild(qDiv);
+    });
+}
+
+/**
+ * 10. VEHICLE COMPLIANCE & FLEET LOGIC
+ * High-resolution monitoring of vehicle safety status.
  */
 function checkVehicleStatus() {
-    // PULSE REMOVED: Travel tile now looks standard but active
-    const tr = document.getElementById('travelRow');
-    if (tr) tr.classList.remove('pulse-border'); 
-}
-
-function speak(text) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-}
-/**
- * RESTORED: Full Report Submission & Sync Queue
- */
-async function submitReport() {
-    const fields = document.querySelectorAll('#reportFields input, #reportFields textarea, #reportFields select');
-    const data = {
-        timestamp: new Date().toISOString(),
-        location: state.activeVisit ? state.activeVisit.locationName : 'Unknown',
-        worker: state.settings.workerName,
-        responses: {},
-        photos: { ...state.photoStore } // Includes the EXIF-stripped images
-    };
-
-    fields.forEach(f => {
-        const key = f.dataset.key || f.id;
-        data.responses[key] = f.type === 'checkbox' ? f.checked : f.value;
-    });
-
-    state.pendingUploads.push(data);
-    await saveState();
+    if (!CONFIG.vehEnabled) return;
     
-    showToast("Report Saved to Sync Queue");
-    state.activeVisit = null;
-    state.photoStore = {}; // Clear for next visit
-    navigate('main');
-    forceSync();
-}
-/**
- * FIXED: showSiteInfo (Standardised External Mapping)
- * Resolves confusion between app navigate() and external GPS navigation.
- */
-/**
- * FIXED: showSiteInfo (Corrected Maps Syntax)
- * Resolves the broken URL literal and uses the standard Google Maps Search API.
- */
-function showSiteInfo(id, e) {
-    if (e) e.stopPropagation(); 
-    const l = state.locations.find(x => x.id === id); 
-    if (!l) return;
-
-    document.getElementById('infoTitle').innerText = l.name; 
-    let h = "";
-    if (l.companyName) h += `<p class="text-blue-400 font-bold uppercase text-[10px] tracking-widest">${l.companyName}</p>`;
+    const expiryDate = localStorage.getItem('otg_veh_expiry');
+    const lastCheckDate = localStorage.getItem('otg_veh_last_check');
+    const nagBar = document.getElementById('vehNagBar');
     
-    const navBtn = document.getElementById('btnSiteNav');
-    if (l.address && l.address.length > 3) { 
-        h += `<p class="mt-2 text-white font-bold">${l.address}</p>`;
-        // FIXED: Switched to standard Search API with proper template literal
-        navBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address)}`;
-        navBtn.classList.remove('hidden'); 
-    } else { 
-        navBtn.classList.add('hidden'); 
+    if (!expiryDate) {
+        nagBar.classList.remove('hidden');
+        nagBar.innerText = `⚠️ SETUP REQUIRED: ENTER ${CONFIG.vehTerm} EXPIRY`;
+        return;
     }
-    document.getElementById('siteInfoContent').innerHTML = h;
-    showModal('info');
-}
 
-/**
- * FIXED: Location Manager (Handles both New and Edit modes)
- */
-function openLocModal(id = null) {
-    const title = document.getElementById('locModalTitle');
-    const nameInp = document.getElementById('locName');
-    const busInp = document.getElementById('locBusiness');
-    const addrInp = document.getElementById('locAddr');
-    const idInp = document.getElementById('locId'); // Ensure this hidden input exists in HTML
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
 
-    if (id) {
-        // EDIT MODE: Populate fields from existing data
-        const loc = state.locations.find(l => l.id === id);
-        if (loc) {
-            title.innerText = "Edit Site";
-            if (idInp) idInp.value = id;
-            nameInp.value = loc.name || "";
-            busInp.value = loc.companyName || "";
-            addrInp.value = loc.address || "";
+    // CRITICAL BLOCK: Cannot work if vehicle is illegal
+    if (diffDays <= 0) {
+        document.getElementById('wofBlockModal').classList.remove('hidden');
+        announce(`Critical Alert. Your vehicle ${CONFIG.vehTerm} has expired. Work travel is prohibited.`);
+        return;
+    }
+
+    // WARNING NAG: 14-day countdown
+    if (diffDays <= 14) {
+        nagBar.classList.remove('hidden');
+        nagBar.innerText = `⚠️ ${CONFIG.vehTerm} EXPIRES IN ${diffDays} DAYS`;
+        nagBar.classList.add('bg-orange-600');
+    }
+
+    // PERIODIC CHECK: Maintenance "nag" logic
+    if (lastCheckDate) {
+        const lastCheck = new Date(lastCheckDate);
+        const sinceCheck = Math.ceil((today - lastCheck) / (1000 * 60 * 60 * 24));
+        if (sinceCheck >= CONFIG.vehInterval) {
+            nagBar.classList.remove('hidden');
+            nagBar.innerText = `🛠️ MAINTENANCE CHECK OVERDUE (${sinceCheck} DAYS)`;
+            nagBar.classList.add('bg-blue-600');
         }
+    }
+}
+
+async function updateWof() {
+    const newDate = prompt(`Enter new ${CONFIG.vehTerm} Expiry Date (YYYY-MM-DD):`);
+    if (newDate && !isNaN(Date.parse(newDate))) {
+        localStorage.setItem('otg_veh_expiry', newDate);
+        logSafety("Fleet Update", `${CONFIG.vehTerm} updated to ${newDate}`);
+        alert(`${CONFIG.vehTerm} Updated Successfully.`);
+        location.reload();
     } else {
-        // NEW MODE: Clear all fields
-        title.innerText = "New Destination";
-        if (idInp) idInp.value = "";
-        nameInp.value = ""; busInp.value = ""; addrInp.value = "";
+        alert("Invalid Date Format.");
     }
-    showModal('location');
 }
 
+function startVehicleCheck() {
+    showPage('pageVehicle');
+    const container = document.getElementById('vehChecklist');
+    const items = ['Tires & Tread', 'Lights & Indicators', 'Windscreen/Wipers', 'Oil & Fluid Levels', 'Brakes', 'Safety Kit Present'];
+    
+    container.innerHTML = items.map((item, i) => `
+        <div onclick="toggleCheckItem(this)" class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 active:bg-white/10">
+            <span class="text-xs font-bold uppercase tracking-widest">${item}</span>
+            <div class="w-6 h-6 rounded-full border-2 border-white/20 flex items-center justify-center">
+                <span class="hidden text-green-400 text-xs">✓</span>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML += `<button onclick="submitVehCheck()" class="w-full py-4 mt-6 bg-green-600 rounded-xl font-black uppercase tracking-widest shadow-lg">Confirm All Clear</button>`;
+}
+
+function submitVehCheck() {
+    localStorage.setItem('otg_veh_last_check', new Date().toISOString());
+    logSafety("Vehicle Check", "Full maintenance checklist completed.");
+    announce("Vehicle maintenance check logged. Thank you.");
+    showPage('pageVisit');
+    checkVehicleStatus();
+}
 /**
- * NEW: editTravelSettings (Functional Toggle for Travel Reports)
+ * 11. SECURITY & PIN VERIFICATION
+ * Handles Standard 'Safe' verification and silent Duress alarms.
  */
-function editTravelSettings(e) {
-    if (e) e.stopPropagation();
-    const pref = localStorage.getItem('otg_user_travel_pref') === 'true';
-    if (confirm(`Switch to ${pref ? "Detailed Mode (Full Report)" : "Fast-Sync Mode (No Report)"}?`)) {
-        localStorage.setItem('otg_user_travel_pref', !pref);
-        initLocations();
-        showToast("Travel Preference Updated");
-    }
-}
-    
-async function saveLoc() {
-    const name = document.getElementById('locName').value;
-    const id = document.getElementById('locId')?.value; // Check if we are editing
-    
-    if (!name) return showToast("Site Name is required");
+let pinBuffer = "";
 
-    const locData = {
-        name: name,
-        companyName: document.getElementById('locBusiness').value,
-        address: document.getElementById('locAddr').value,
-        icon: '🏢'
-    };
-
-    if (id) {
-        // GOLDEN FIX: Update existing site instead of duplicating
-        const index = state.locations.findIndex(l => l.id === id);
-        if (index !== -1) {
-            state.locations[index] = { ...state.locations[index], ...locData };
-            showToast("Site details updated");
-        }
-    } else {
-        // ADD MODE: Create new unique ID
-        const newLoc = {
-            id: 'loc_' + Date.now(),
-            ...locData
-        };
-        state.locations.push(newLoc);
-        showToast("Site added to database");
-    }
-
-    await saveState(); // Standardized navigator.storage call
-    closeModal('location');
-    renderLocations();
+function openPinModal(onSuccess) {
+    pinBuffer = "";
+    document.getElementById('pinModal').classList.remove('hidden');
+    state.pinCallback = onSuccess;
+    updatePinDisplay();
 }
 
-/**
- * GOLDEN GATEKEEPER: Validates identity before allowing navigation
- */
-function saveIdentity() {
-    const name = document.getElementById('set_workerName').value;
-    const url = document.getElementById('set_url').value;
-
-    // 1. Requirement Check
-    if (!name || name.length < 2) {
-        showToast("Please enter your full name");
-        return; // Stops navigation if name is missing
-    }
-
-    // 2. Commit to State
-    state.settings.workerName = name;
-    state.settings.googleSheetUrl = url;
-    
-    // 3. Trigger Navigation
-    wizNext('wizStep1', 'wizStep2');
+function updatePinDisplay() {
+    // Visual feedback for PIN entry
+    const dots = "●".repeat(pinBuffer.length) + "○".repeat(4 - pinBuffer.length);
+    const display = document.getElementById('pinDots');
+    if (display) display.innerText = dots;
 }
 
-/**
- * RESTORED: pullLatestData (Handshake via GET)
- */
-async function pullLatestData() {
-    const url = `${CONFIG.url}?action=sync&key=${CONFIG.key}&worker=${encodeURIComponent(state.settings.workerName)}&deviceId=${state.settings.deviceId}`;
+function pressPinKey(key) {
+    if (pinBuffer.length < 4) {
+        pinBuffer += key;
+        updatePinDisplay();
+        if (pinBuffer.length === 4) verifyPin();
+    }
+}
+
+function verifyPin() {
+    // 1. Check Standard PIN
+    if (pinBuffer === state.pins.std) {
+        closePinModal();
+        if (state.pinCallback) state.pinCallback();
+        announce("PIN accepted. Stay safe.");
+    } 
+    // 2. Check Duress PIN (Silent Alarm)
+    else if (pinBuffer === state.pins.duress) {
+        closePinModal();
+        triggerSilentAlarm();
+    } 
+    else {
+        pinBuffer = "";
+        updatePinDisplay();
+        announce("Incorrect PIN. Try again.");
+    }
+}
+
+async function triggerSilentAlarm() {
+    // Disguise the alert as an app crash or exit
+    document.getElementById('mainApp').classList.add('hidden');
+    document.body.style.backgroundColor = "#000";
     
+    // Background SOS log
+    await logSafety("DURESS ALARM", "Silent trigger activated via PIN entry.");
+    
+    // Attempt to notify server with high priority
     try {
-        const response = await fetch(url);
-        const data = await response.json(); 
-        
-        if (data.forms) {
-            state.globalForms = data.forms; // Populates Forms Library
-            state.locations = (data.sites || []).map(s => ({
-                id: 'site_' + s.siteName.replace(/\s/g, ''),
-                name: s.siteName,
-                companyName: s.company,
-                address: s.address,
-                templateName: s.template
-            })).concat(state.locations.filter(x => x.id.startsWith('loc_')));
-            
-            state.meta.backendVersion = data.version; 
-            await saveState();
-            renderLocations();
-        }
-    } catch (e) { console.error("Sync Error:", e); }
+        await fetch(`${CONFIG.url}?action=emergency&key=${CONFIG.key}&worker=${encodeURIComponent(state.worker.name)}`, {mode: 'no-cors'});
+    } catch(e) {}
 }
 
-    /**
- * NEW: renderForms (Populates the Forms Library Modal)
- */
-function renderForms() {
-    const list = document.getElementById('templateList');
-    if (!list) return;
-    list.innerHTML = '';
-
-    // Standard Forms
-    const forms = state.globalForms || [];
-    forms.forEach(f => {
-        const btn = document.createElement('button');
-        btn.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl text-xs font-bold uppercase text-white transition-colors";
-        btn.innerText = f.name;
-        btn.onclick = () => {
-            const fieldArea = document.getElementById('reportFields');
-            buildReportForm(f.name, fieldArea);
-            navigate('report');
-            closeModal('template');
-        };
-        list.appendChild(btn);
-    });
-}
-    
 /**
- * NEW: updateSettings (Saves changes from Settings editor)
+ * 12. POCKET PROTECTION & BATTERY SAVER
+ * Prevents "pocket-dialling" using a 1.5s long-press wake gesture.
  */
-async function updateSettings() {
-    state.settings.workerName = document.getElementById('edit_workerName').value;
-    state.settings.workerPhone = document.getElementById('edit_workerPhone').value;
-    state.settings.workerEmail = document.getElementById('edit_workerEmail').value;
-    state.settings.googleSheetUrl = document.getElementById('set_url').value;
-    
-    await saveState();
-    showToast("Settings Updated");
-    await forceSync(); // Push updates to sheet immediately
-    navigate('main');
-}
+let saverTimer;
 
-    /**
- * RESTORED: Icon Grid Renderer
- * Populates the 'templateList' div with buttons for each form.
- */
-function renderIconGrid(forms) {
-    const list = document.getElementById('templateList');
-    if (!list) return;
-    list.innerHTML = '';
+function setupLongPress(elementId, duration, onComplete) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
 
-    const addBtn = (name, icon, label) => { 
-        const b = document.createElement('button'); 
-        b.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95"; 
-        b.innerHTML = `<div class="text-3xl">${icon}</div><div class="text-[10px] font-bold uppercase text-white">${label}</div>`; 
-        b.onclick = () => {
-            closeModal('template');
-            const fieldArea = document.getElementById('reportFields');
-            buildReportForm(name, fieldArea);
-            navigate('report');
-        }; 
-        list.appendChild(b); 
+    const startPress = (e) => {
+        e.preventDefault();
+        el.classList.add('pressing');
+        const progress = document.getElementById('saverProgress');
+        if (progress) progress.style.width = "100%";
+
+        saverTimer = setTimeout(() => {
+            el.classList.remove('pressing');
+            if (progress) progress.style.width = "0%";
+            onComplete();
+        }, duration);
     };
 
-    if (forms) { 
-        forms.forEach(f => { 
-            let icon = "📋"; 
-            const n = f.name.toLowerCase();
-            if (n.includes('vehicle')) icon = "🚗"; 
-            else if (n.includes('incident')) icon = "⚠️"; 
-            addBtn(f.name, icon, f.name); 
-        }); 
-    }
-}
-
-// UPDATE: Modify your existing showModal('template') to trigger this:
-/**
- * FIXED: Icons Dashboard (Consolidated from renderForms)
- */
-function openQuickMenu() {
-    showModal('template');
-    const list = document.getElementById('templateList');
-    list.innerHTML = ''; // Clear old buttons
-
-    const addBtn = (name, icon) => { 
-        const b = document.createElement('button'); 
-        b.className = "p-4 bg-gray-700 hover:bg-blue-600 rounded-xl flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"; 
-        b.innerHTML = `<div class="text-3xl">${icon}</div><div class="text-[10px] font-bold uppercase text-white">${name}</div>`; 
-        b.onclick = () => {
-            closeModal('template');
-            const fieldArea = document.getElementById('reportFields');
-            buildReportForm(name, fieldArea);
-            navigate('report');
-        }; 
-        list.appendChild(b); 
-    };
-
-    // Populate from spreadsheet forms
-    state.globalForms.forEach(f => {
-        let icon = "📋";
-        if (f.name.toLowerCase().includes('vehicle')) icon = "🚗";
-        addBtn(f.name, icon);
-    });
-}
-
-// Update the Dashboard "Forms" button in HTML (Line 152):
-// Change: onclick="showModal('template')" 
-// To: onclick="openQuickMenu()"
-// --- 6. STARTUP SEQUENCE ---
-
-/**
- * FIXED: preDepart (Conditional PIN Logic)
- * Only requests PIN if an alarm is active.
- */
-function preDepart() {
-    if (!state.activeVisit) return;
-
-    // Check if an alarm state is active
-    const alarmActive = state.activeVisit.isPanic || state.activeVisit.criticalSent;
-
-    const proceedToReport = () => {
-        isMidVisitUpdate = false; 
-        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-        
-        if (l && l.noReport) {
-            submitReport(); 
-        } else {
-            loadFormAndShow(l ? (l.templateName || "(Standard)") : "(Standard)");
+    const endPress = () => {
+        clearTimeout(saverTimer);
+        el.classList.remove('pressing');
+        const progress = document.getElementById('saverProgress');
+        if (progress) {
+            progress.style.transition = "none";
+            progress.style.width = "0%";
+            setTimeout(() => progress.style.transition = "width 1.5s linear", 10);
         }
     };
 
-    if (alarmActive) {
-        // Alarm is active: Require PIN to verify safety
-        withPinVerification(false, proceedToReport);
+    el.addEventListener('pointerdown', startPress);
+    el.addEventListener('pointerup', endPress);
+    el.addEventListener('pointerleave', endPress);
+}
+
+function toggleBatterySaver() {
+    state.isDimmed = !state.isDimmed;
+    const saver = document.getElementById('batterySaver');
+    
+    // Force system-level dark theme for navigation bars
+    document.documentElement.classList.toggle('system-dim', state.isDimmed);
+    
+    if (state.isDimmed) {
+        saver.classList.remove('hidden');
+        saver.style.pointerEvents = "auto"; // Capture all touches
+        announce("Pocket protection active. Hold screen to wake.");
     } else {
-        // Normal departure: Proceed directly to report
-        proceedToReport();
+        saver.classList.add('hidden');
+        saver.style.pointerEvents = "none";
+        announce("System awake.");
     }
 }
 
 /**
- * RESTORED: enterLockedScreen
- * Consolidates all logic for the active/locked visit state.
+ * 13. HEARTBEAT WATCHDOG
+ * Periodic check to see if the worker is overdue.
  */
-function enterLockedScreen() {
-    const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-    if (!l) return;
+function startVisitCountdown() {
+    const timer = setInterval(() => {
+        if (!state.activeVisit) {
+            clearInterval(timer);
+            return;
+        }
 
-    // 1. UI Setup
-    document.getElementById('lockedLocationName').innerText = l.name;
-    navigate('locked');
-
-    // 2. High-Risk Visibility
-    const riskBadge = document.getElementById('highRiskBadge');
-    if (riskBadge) {
-        state.activeVisit.highRisk ? riskBadge.classList.remove('hidden') : riskBadge.classList.add('hidden');
-    }
-
-    // 3. Timer Initialization
-    if (timerInt) clearInterval(timerInt);
-    timerInt = setInterval(tick, 1000);
-
-    // 4. Long-Press Button Glue
-    setupLongPress(document.getElementById('btnDepart'), preDepart); 
-    setupLongPress(document.getElementById('btnExtend'), () => showModal('extend'));
-}
-/**
- * RESTORED: Master Timer (Engine for the Locked Screen)
- */
-function tick() {
-    if (!state.activeVisit) { clearInterval(timerInt); return; }
-    const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
-    const timerEl = document.getElementById('visitTimer');
-    if (timerEl) {
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        timerEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+        const remaining = state.activeVisit.dueOut - Date.now();
+        
+        // Critical verbal warnings
+        if (remaining <= 120000 && remaining > 115000) announce("Two minutes remaining.");
+        if (remaining <= 60000 && remaining > 55000) announce("One minute until safety alarm.");
+        
+        if (remaining <= 0) {
+            clearInterval(timer);
+            triggerSafetyAlarm();
+        }
+    }, 5000);
 }
 
+async function triggerSafetyAlarm() {
+    document.body.classList.add('bg-red-900');
+    announce("Safety alarm activated. Contacting emergency services.");
+    await logSafety("OVERDUE ALARM", "Automatic trigger: Worker failed to check out.");
+}
 /**
- * RESTORED: Long-Press Controller
- * Essential for Start/End Visit buttons to function.
+ * 14. UI NAVIGATION & PAGE MANAGEMENT
+ * Handles smooth transitions between the Visit, Travel, and Vehicle views.
  */
-function setupLongPress(btn, cb) {
-    let t;
+function showPage(pageId) {
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(p => p.classList.remove('active'));
+    
+    const target = document.getElementById(pageId);
+    if (target) {
+        target.classList.add('active');
+        // Close any open navigation menus if applicable
+    }
+}
+
+/**
+ * 15. SPECIALIZED FORM UTILITIES
+ * Logic for capturing signatures and field-specific GPS coordinates.
+ */
+function captureFieldGPS(fieldId, btn) {
+    btn.disabled = true;
+    const label = document.getElementById(`${fieldId}_label`);
+    const icon = document.getElementById(`${fieldId}_icon`);
+    
+    if (label) label.innerText = "Capturing...";
+    
+    // Use the latest high-accuracy state
+    const coords = `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)} (Acc: ${state.gps.acc}m)`;
+    document.getElementById(fieldId).value = coords;
+    
+    if (label) label.innerText = "Location Captured";
+    if (icon) icon.innerText = "✅";
+    announce("Location coordinates captured to form.");
+}
+
+function initSignaturePad(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
     const start = (e) => {
-        if (e.type === 'touchstart') e.preventDefault();
-        btn.classList.add('pressing');
-        t = setTimeout(() => {
-            cb();
-            btn.classList.remove('pressing');
-        }, 1500); // 1.5 second hold requirement
+        drawing = true;
+        ctx.beginPath();
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        ctx.moveTo(x, y);
     };
-    const cancel = () => { clearTimeout(t); btn.classList.remove('pressing'); };
-    btn.onmousedown = btn.ontouchstart = start;
-    btn.onmouseup = btn.ontouchend = btn.onmouseleave = cancel;
+
+    const move = (e) => {
+        if (!drawing) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    };
+
+    const stop = () => drawing = false;
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('touchstart', start, {passive: false});
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('touchmove', move, {passive: false});
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('touchend', stop);
+}
+
+function clearCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 /**
- * RESTORED: PIN Verification Engine
+ * 16. PWA INSTALLATION HANDLERS
+ * Ensures the app can be installed to the home screen for background tracking.
  */
-function withPinVerification(d, callback) {
-    // Note: In worker_template, this logic uses the lock_pin_input
-    const input = document.getElementById('lock_pin_input');
-    if (!input) return;
+function checkIosInstall() {
+    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const isStandalone = window.navigator.standalone === true;
     
-    const check = () => {
-        if (btoa(input.value) === state.settings.pinCode) {
-            input.value = "";
-            callback();
-        } else {
-            showToast("Incorrect PIN");
-        }
-    };
-    // Triggered by the checkPin() call in your HTML
-    check();
-}
-window.onload = async () => {
-    // 1. Restore persistent data
-    loadState(); 
-
-    // 2. Initialize Logic
-    initLocations();
-    initPanicButton();
-
-    // 3. Routing Logic
-    if (!state.settings || !state.settings.workerName) {
-        navigate('setup'); 
-        document.getElementById('setupPage')?.classList.remove('hidden');
-    } else if (state.activeVisit) {
-        navigate('locked'); 
-        if (state.activeVisit.status === 'TRAVELLING') startTravellingPulse();
-    } else {
-        navigate('main');
+    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
+        const modal = document.getElementById('iosInstallModal');
+        if (modal) modal.classList.remove('hidden');
     }
+}
 
-    console.log("🚀 System Initialised: Operational Mode");
-};
+window.addEventListener('beforeinstallprompt', (e) => {
+    // For Android/Chrome installation
+    e.preventDefault();
+    state.installPrompt = e;
+});
+
+function dismissInstall(type) {
+    if (type === 'ios') {
+        const modal = document.getElementById('iosInstallModal');
+        if (modal) modal.classList.add('hidden');
+    }
+    localStorage.setItem('otg_install_dismissed', 'true');
+}
+
+/**
+ * 17. WIZARD NAVIGATION
+ * Logic for moving backwards in the setup process.
+ */
+function prevWiz() {
+    if (state.currentWizStep > 1) {
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
+        state.currentWizStep--;
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.add('active');
+        
+        if (state.currentWizStep === 1) {
+            document.getElementById('btnWizPrev').classList.add('hidden');
+        }
+        document.getElementById('btnWizNext').innerText = "Next Step";
+    }
+}
+
+// Final utility for standard modal closing
+function closePinModal() {
+    document.getElementById('pinModal').classList.add('hidden');
+}
+
 </script>
+
+<div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
+    <div class="flex items-start gap-4">
+        <div class="text-4xl">📲</div>
+        <div class="flex-1">
+            <h3 class="text-lg font-extrabold text-white mb-1">Add to Home Screen</h3>
+            <p class="text-gray-300 text-xs mb-4 font-bold">Required for safety background tracking.</p>
+            <div class="bg-gray-900 rounded-lg p-3 text-xs text-blue-300 flex items-center gap-2 font-bold uppercase tracking-tighter">
+                <span>1. Tap Share</span><span class="text-xl">⎋</span><span>2. 'Add to Home Screen'</span><span class="text-xl">⊕</span>
+            </div>
+        </div>
+        <button onclick="dismissInstall('ios')" class="text-gray-500 font-black">✕</button>
+    </div>
+</div>
+
 </body>
 </html>
-
-
-
-
