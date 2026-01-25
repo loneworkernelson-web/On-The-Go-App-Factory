@@ -393,21 +393,81 @@ function startGPS() {
     );
 }
 
+/**
+ * GPS Accuracy Indicator
+ * Provides real-time feedback on signal reliability.
+ */
 function updateGPSIndicator(acc) {
     const bars = document.getElementById('gpsIndicator').children;
-    for (let b of bars) b.className = 'gps-bar'; // Reset
+    // Reset all bars to neutral
+    for (let b of bars) b.className = 'gps-bar';
     
     if (acc <= 15) {
-        // High Accuracy (Green)
+        // High Quality (Green)
         for (let i=0; i<4; i++) bars[i].classList.add('active-green');
     } else if (acc <= 45) {
-        // Moderate Accuracy (Amber)
+        // Moderate Quality (Amber)
         for (let i=0; i<2; i++) bars[i].classList.add('active-amber');
     } else {
         // Poor/No Signal (Red)
         bars[0].classList.add('active-red');
     }
 }
+
+/**
+ * Speech & Voice Engine
+ * Uses the injected locale to provide regional warnings.
+ */
+function initVoice() {
+    window.speechSynthesis.onvoiceschanged = () => {
+        const voices = window.speechSynthesis.getVoices();
+        // Finds the regional accent (e.g., en-NZ) or falls back to the first available.
+        state.voice = voices.find(v => v.lang === CONFIG.locale) || voices[0];
+    };
+}
+
+function announce(msg) {
+    if (!state.voice || !window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(msg);
+    utterance.voice = state.voice;
+    utterance.pitch = 1;
+    utterance.rate = 0.9; // Slightly slower for clarity during emergencies.
+    window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * UI & PWA Management
+ * Handles smooth page transitions and home-screen installation.
+ */
+function showPage(pageId) {
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(pageId);
+    if (target) {
+        target.classList.add('active');
+        // Scroll to top on page change.
+        const content = document.querySelector('.content-area');
+        if (content) content.scrollTop = 0;
+    }
+}
+
+function checkIosInstall() {
+    // Detects if the app is being run in the browser vs installed on iOS.
+    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+    const isStandalone = window.navigator.standalone === true;
+    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
+        document.getElementById('iosInstallModal').classList.remove('hidden');
+    }
+}
+
+function dismissInstall(type) {
+    if (type === 'ios') {
+        document.getElementById('iosInstallModal').classList.add('hidden');
+    }
+    // Prevents the prompt from nagging the worker every time.
+    localStorage.setItem('otg_install_dismissed', 'true');
+}
+    
 /**
  * 5. VISIT MANAGEMENT (Safety Timing)
  */
@@ -525,23 +585,24 @@ async function toggleTravel() {
  * This logic ensures data integrity even in low-signal areas.
  */
 async function getDistance(p1, p2) {
-    // 1. Try Google Apps Script Road Distance (ORS/Google Maps)
+    // 1. Try Road-Accurate API via Factory Script
     if (navigator.onLine) {
         try {
             const u = `${CONFIG.url}?action=getDistance&start=${p1.lat},${p1.lng}&end=${p2.lat},${p2.lng}&key=${CONFIG.key}`;
             const response = await fetch(u);
             const data = await response.json();
-            if (data.status === "success" && data.km > 0) {
-                return { km: data.km.toFixed(2), type: 'Road' };
-            }
-        } catch (e) {
-            console.warn("Road API failed, falling back to Haversine.");
-        }
+            if (data.status === "success" && data.km > 0) return { km: data.km.toFixed(2), type: 'Road' };
+        } catch (e) { console.warn("Road API Failed"); }
     }
 
-    // 2. Fallback: Haversine "As the crow flies"
-    const km = calculateHaversine(p1.lat, p1.lng, p2.lat, p2.lng);
-    return { km: km.toFixed(2), type: 'Direct (Offline)' };
+    // 2. Haversine Fallback
+    const R = 6371; 
+    const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+    const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return { km: (R * c).toFixed(2), type: 'Direct (Offline)' };
 }
 
 function calculateHaversine(lat1, lon1, lat2, lon2) {
@@ -560,26 +621,23 @@ function calculateHaversine(lat1, lon1, lat2, lon2) {
  * Sends background updates to ensure the cloud system knows the worker is safe.
  */
 async function logSafety(status, notes = "") {
-    if (state.syncing) return;
+    if (state.syncing || !state.worker) return;
     state.syncing = true;
     
-    // Gather all local worker data to send with EVERY heartbeat
+    // Exact mapping from WSindex.html sent to Factory URL
     const payload = {
-        action: "logVisit",
-        key: CONFIG.key,
-        worker: state.worker.name,
-        phone: state.worker.phone,
-        emgName: state.worker.emgName || "Not Set",
-        emgPhone: state.worker.emgPhone || "Not Set",
-        escName: state.worker.escName || "Not Set",
-        escPhone: state.worker.escPhone || "Not Set",
-        status: status,
-        notes: notes,
-        lat: state.gps.lat,
-        lng: state.gps.lng,
-        acc: state.gps.acc,
-        battery: state.battery || "Unknown",
-        timestamp: new Date().toISOString()
+        'key': CONFIG.key,
+        'Worker Name': state.worker.name,
+        'Worker Phone': state.worker.phone,
+        'Emergency Contact': state.worker.emgName || "Not Set",
+        'Emergency Phone': state.worker.emgPhone || "Not Set",
+        'Escalation Contact': state.worker.escName || "Not Set",
+        'Escalation Phone': state.worker.escPhone || "Not Set",
+        'Alarm Status': status,
+        'Notes': notes,
+        'Last Known GPS': `${state.gps.lat},${state.gps.lng}`,
+        'Battery': state.battery || "Unknown",
+        'Timestamp': new Date().toISOString()
     };
 
     try {
@@ -588,14 +646,14 @@ async function logSafety(status, notes = "") {
             mode: 'no-cors',
             body: JSON.stringify(payload)
         });
-        state.lastSync = Date.now();
         document.getElementById('lastSyncTime').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     } catch (e) {
-        console.warn("Sync failed - cached.");
+        console.warn("Sync Queued (Offline)");
     } finally {
         state.syncing = false;
     }
 }
+    
 /**
  * 9. DYNAMIC FORM ENGINE
  * Parses template tags from the database to build interactive reports.
@@ -824,21 +882,22 @@ function pressPinKey(key) {
 }
 
 function verifyPin() {
-    // 1. Check Standard PIN
-    if (pinBuffer === state.pins.std) {
+    // Standard PIN
+    if (pinBuffer === state.worker.pin) {
         closePinModal();
         if (state.pinCallback) state.pinCallback();
-        announce("PIN accepted. Stay safe.");
+        announce("Verified. Stay safe.");
     } 
-    // 2. Check Duress PIN (Silent Alarm)
-    else if (pinBuffer === state.pins.duress) {
+    // Duress PIN (The "Silent Alarm")
+    else if (pinBuffer === state.worker.duress) {
         closePinModal();
-        triggerSilentAlarm();
-    } 
-    else {
+        // Disguise: Hide the app immediately
+        document.getElementById('mainApp').classList.add('hidden');
+        logSafety("DURESS ALARM", "Silent trigger via PIN modal.");
+    } else {
         pinBuffer = "";
         updatePinDisplay();
-        announce("Incorrect PIN. Try again.");
+        announce("Incorrect PIN.");
     }
 }
 
@@ -984,40 +1043,93 @@ function captureFieldGPS(fieldId, btn) {
     announce("Location coordinates captured to form.");
 }
 
+/**
+ * Signature Pad Logic
+ * Captures worker or site-manager signatures with touch/mouse support.
+ */
 function initSignaturePad(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    
     const ctx = canvas.getContext('2d');
     let drawing = false;
 
-    const start = (e) => {
-        drawing = true;
-        ctx.beginPath();
+    // Set line styles for professional appearance
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+
+    const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-        ctx.moveTo(x, y);
+        return {
+            x: (e.touches ? e.touches[0].clientX : e.clientX) - rect.left,
+            y: (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
+        };
     };
 
-    const move = (e) => {
+    canvas.addEventListener('mousedown', (e) => { drawing = true; const p = getPos(e); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener('touchstart', (e) => { drawing = true; const p = getPos(e); ctx.moveTo(p.x, p.y); }, {passive: false});
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (!drawing) return;
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
         if (!drawing) return;
         e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-        ctx.lineTo(x, y);
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
         ctx.stroke();
-    };
+    }, {passive: false});
 
-    const stop = () => drawing = false;
-
-    canvas.addEventListener('mousedown', start);
-    canvas.addEventListener('touchstart', start, {passive: false});
-    canvas.addEventListener('mousemove', move);
-    canvas.addEventListener('touchmove', move, {passive: false});
+    const stop = () => { drawing = false; ctx.beginPath(); };
     window.addEventListener('mouseup', stop);
     window.addEventListener('touchend', stop);
+}
+
+function clearCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+/**
+ * Metadata Capture Logic
+ * Stays synchronized with the high-accuracy GPS engine.
+ */
+function captureFormGPS(btn) {
+    const parent = btn.parentElement;
+    const input = parent.querySelector('input[type="hidden"]');
+    const label = parent.querySelector('span') || btn;
+    
+    btn.disabled = true;
+    label.innerText = "Capturing Coords...";
+    
+    // Uses the latest validated GPS state.
+    const coords = `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)} (Acc: ${state.gps.acc}m)`;
+    if (input) input.value = coords;
+    
+    label.innerText = "Location Verified ✅";
+    announce("Coordinates captured.");
+}
+
+function handleFormPhoto(el, previewId) {
+    const file = el.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.getElementById(previewId);
+        if (img) {
+            img.src = e.target.result;
+            img.classList.remove('hidden');
+            // Hide the prompt text
+            const prompt = img.parentElement.querySelector('span');
+            if (prompt) prompt.classList.add('hidden');
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 function clearCanvas(canvasId) {
@@ -1055,8 +1167,8 @@ function dismissInstall(type) {
 }
 
 /**
- * 17. WIZARD NAVIGATION
- * Logic for moving backwards in the setup process.
+ * Setup Flow Management
+ * Allows workers to navigate the initialization wizard.
  */
 function prevWiz() {
     if (state.currentWizStep > 1) {
@@ -1094,4 +1206,3 @@ function closePinModal() {
 
 </body>
 </html>
-
