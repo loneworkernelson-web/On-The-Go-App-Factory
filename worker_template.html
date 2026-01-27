@@ -299,11 +299,9 @@ const CONFIG = {
 };
 
 /**
- * 2. GLOBAL STATE ENGINE
- */
 let state = {
     worker: null,
-    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
+    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] }, // Added history: []
     activeVisit: null,
     isTravel: false,
     travelStart: null,
@@ -364,7 +362,7 @@ function loadSettings() {
 }
 
 /**
- * 4. SOPHISTICATED GPS ENGINE (High-Accuracy & Signal Strength)
+ * SOPHISTICATED GPS ENGINE (High-Accuracy & Signal Strength)
  */
 function startGPS() {
     if (!("geolocation" in navigator)) {
@@ -380,22 +378,28 @@ function startGPS() {
 
     navigator.geolocation.watchPosition(
         (pos) => {
-            state.gps = {
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                acc: pos.coords.accuracy,
-                last: Date.now()
-            };
+            // UPDATED: Update individual properties so history isn't destroyed
+            state.gps.lat = pos.coords.latitude;
+            state.gps.lng = pos.coords.longitude;
+            state.gps.acc = pos.coords.accuracy;
+            state.gps.last = Date.now();
             
             // Log history for "As-the-crow-flies" fallback calculations
-            state.gps.history.push({ ...state.gps });
+            state.gps.history.push({ 
+                lat: state.gps.lat, 
+                lng: state.gps.lng, 
+                acc: state.gps.acc, 
+                last: state.gps.last 
+            });
+            
+            // Keep only the last 10 points to save memory
             if (state.gps.history.length > 10) state.gps.history.shift();
             
             updateGPSIndicator(pos.coords.accuracy);
             
             // If in an active visit/travel, update the remote server
             if (state.activeVisit || state.isTravel) {
-                throttledSync();
+                logSafety("Active Tracking");
             }
         },
         (err) => {
@@ -1321,6 +1325,7 @@ function checkIosInstall() {
 
 </body>
 </html>
+
 
 
 
