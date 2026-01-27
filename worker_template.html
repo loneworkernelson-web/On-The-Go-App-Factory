@@ -9,6 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="%%PRIMARY_COLOR%%">
+<link rel="manifest" href="manifest.json">
 <link rel="icon" href="%%LOGO_DATA%%">
 
 <script src="https://cdn.tailwindcss.com"></script>
@@ -70,6 +71,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </head>
 <body class="h-full overflow-hidden select-none">
 
+<div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-md transform -translate-y-full transition-transform duration-300" aria-live="polite">
+  <p id="toastText"></p>
+</div>
+
 <div id="batterySaver" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none transition-opacity duration-500">
     <div class="absolute top-0 left-0 h-1 bg-blue-500 opacity-50" id="saverProgress" style="width: 0%"></div>
     <div class="flex flex-col items-center gap-6">
@@ -77,1412 +82,83 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <div class="w-16 h-16 rounded-full bg-white/5 animate-pulse"></div>
         </div>
         <div class="text-center">
-            <p class="text-white/40 text-xs font-black uppercase tracking-[0.3em]">Pocket Protection Active</p>
-            <p class="text-white/20 text-[10px] mt-2 font-bold uppercase">Hold Screen to Wake</p>
+            <h3 class="text-white font-bold text-xl mb-1">Battery Saver Active</h3>
+            <p class="text-gray-400 text-sm">Long press to wake</p>
         </div>
     </div>
+    <button id="wakeButton" class="mt-4 px-6 py-3 bg-blue-600 rounded-xl font-bold" aria-label="Wake device">Wake</button>
 </div>
 
-<div id="setupWizard" class="hidden fixed inset-0 bg-gray-900 z-[90] flex flex-col p-8 pb-12">
-    <div class="flex-1 overflow-y-auto">
+<div id="setupWizard" class="page" id="setupPage">
+    <div class="header-bar">
+        <h1 class="text-xl font-bold">Setup Wizard</h1>
+    </div>
+    <div class="content-area flex flex-col">
         <div id="wizStep1" class="wizard-step active">
-            <h2 class="text-3xl font-black mb-2">Welcome.</h2>
-            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Setup your Safety Profile</p>
-            
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Full Name</label>
-            <input type="text" id="wizName" class="form-input mb-6" placeholder="As per Staff Records">
-            
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Mobile Number</label>
-            <input type="tel" id="wizPhone" class="form-input mb-6" placeholder="021 000 0000">
-
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Email Address</label>
-            <input type="email" id="wizEmail" class="form-input" placeholder="name@%%ORG_NAME%%.org">
+            <h2 class="text-lg font-bold mb-4">Your Identity</h2>
+            <input id="wizName" type="text" placeholder="Full Name" class="form-input">
+            <input id="wizPhone" type="tel" placeholder="Phone Number" class="form-input">
+            <input id="wizEmail" type="email" placeholder="Email Address" class="form-input">
         </div>
-
         <div id="wizStep2" class="wizard-step">
-            <h2 class="text-3xl font-black mb-2">Security.</h2>
-            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Standard & Duress PINs</p>
-            
-            <div class="bg-gray-800/50 p-4 rounded-xl border border-white/10 mb-6">
-                <label class="block text-[10px] font-black text-green-400 uppercase tracking-widest mb-2">Standard PIN</label>
-                <input type="password" id="wizPin" maxlength="4" pattern="\d*" inputmode="numeric" class="form-input text-2xl tracking-[1em] text-center" placeholder="****">
-                <p class="text-[10px] text-gray-400 font-bold mt-2">Used to confirm you are safe.</p>
-            </div>
-
-            <div class="bg-red-900/20 p-4 rounded-xl border border-red-500/30">
-                <label class="block text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">Duress PIN (Silent Alarm)</label>
-                <input type="password" id="wizDuress" maxlength="4" pattern="\d*" inputmode="numeric" class="form-input text-2xl tracking-[1em] text-center border-red-500/30" placeholder="****">
-                <p class="text-[10px] text-red-400/60 font-bold mt-2 italic">Triggers emergency alerts silently.</p>
-            </div>
+            <h2 class="text-lg font-bold mb-4">Security PINs</h2>
+            <input id="wizPin" type="password" placeholder="Standard PIN (4-6 digits)" class="form-input">
+            <input id="wizDuress" type="password" placeholder="Duress PIN (silent alert)" class="form-input">
         </div>
-
         <div id="wizStep3" class="wizard-step">
-            <h2 class="text-3xl font-black mb-2">Contacts.</h2>
-            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Emergency Escalation</p>
-            
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Primary Contact Name</label>
-            <input type="text" id="wizContactName" class="form-input mb-4" placeholder="Manager or Spouse">
-            
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Primary Contact Mobile</label>
-            <input type="tel" id="wizContactPhone" class="form-input" placeholder="021 000 0000">
+            <h2 class="text-lg font-bold mb-4">Emergency Contact</h2>
+            <input id="wizContactName" type="text" placeholder="Contact Name" class="form-input">
+            <input id="wizContactPhone" type="tel" placeholder="Contact Phone" class="form-input">
         </div>
     </div>
-    
-    <div class="flex gap-4 pt-6">
-        <button id="btnWizPrev" onclick="prevWiz()" class="hidden flex-1 py-4 font-black uppercase tracking-widest text-xs border border-white/20 rounded-xl">Back</button>
-        <button id="btnWizNext" onclick="nextWiz()" class="flex-1 py-4 bg-blue-600 font-black uppercase tracking-widest text-xs rounded-xl shadow-lg">Next Step</button>
+    <div class="footer-bar flex justify-between">
+        <button id="btnWizPrev" onclick="prevWiz()" class="hidden px-6 py-3 bg-gray-600 rounded-xl font-bold">Back</button>
+        <button id="btnWizNext" onclick="nextWiz()" class="px-6 py-3 bg-blue-600 rounded-xl font-bold">Next Step</button>
     </div>
 </div>
 
-<div id="mainApp" class="h-full flex flex-col">
-    
-    <header class="header-bar">
-        <div class="flex items-center gap-3">
-            <img src="%%LOGO_DATA%%" class="w-8 h-8 object-contain rounded-sm">
-            <div class="flex flex-col">
-                <span class="text-[10px] font-black uppercase tracking-widest opacity-60">%%ORG_NAME%%</span>
-                <span class="text-xs font-black uppercase tracking-tighter" id="headerWorkerName">Safety On-The-Go</span>
-            </div>
+<div id="mainPage" class="page">
+    <div class="header-bar">
+        <h1 id="headerWorkerName" class="text-xl font-bold">Welcome</h1>
+        <div id="gpsIndicator" class="flex gap-1">
+            <div class="gps-bar"></div>
+            <div class="gps-bar"></div>
+            <div class="gps-bar"></div>
         </div>
-        <div class="flex items-center gap-2">
-            <div class="flex items-end gap-[2px] h-3 mr-2" id="gpsIndicator">
-                <div class="gps-bar"></div>
-                <div class="gps-bar"></div>
-                <div class="gps-bar"></div>
-                <div class="gps-bar"></div>
-            </div>
-            <button onclick="toggleBatterySaver()" class="p-2 opacity-40 active:opacity-100">🌙</button>
-        </div>
-    </header>
-
-    <div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-[10px] font-black py-2 uppercase tracking-widest cursor-pointer shadow-lg z-50" onclick="showPage('pageVehicle')">
-        ⚠️ %%VEHICLE_TERM%% Check Overdue
     </div>
-
-    <main class="content-area">
-        
-        <div id="pageVisit" class="page active">
-            <div class="space-y-6">
-                <div class="p-6 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
-                    <p class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Safety Status</p>
-                    <div class="flex justify-between items-end">
-                        <h2 class="text-4xl font-black tracking-tighter" id="visitStatus">Ready</h2>
-                        <div class="flex flex-col items-end">
-                            <span class="text-[10px] font-bold opacity-40 uppercase">Last Sync</span>
-                            <span class="text-xs font-black" id="lastSyncTime">--:--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <button onclick="showPage('pageTravel')" class="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
-                        <span class="text-2xl">🚗</span>
-                        <span class="text-[10px] font-black uppercase tracking-widest">Travel</span>
-                    </button>
-                    <button onclick="showPage('pageForms')" class="p-6 rounded-2xl bg-white/5 border border-white/10 flex flex-col items-center gap-3 active:scale-95 transition-transform">
-                        <span class="text-2xl">📋</span>
-                        <span class="text-[10px] font-black uppercase tracking-widest">Forms</span>
-                    </button>
-                </div>
-
-                <div id="currentActivity" class="hidden p-6 rounded-2xl bg-blue-600/20 border-2 border-blue-500 shadow-lg">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-widest text-blue-400" id="activityType">Visit Active</p>
-                            <h3 class="text-xl font-black" id="activityName">Location Name</h3>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[10px] font-black uppercase tracking-widest text-red-400">Due Out</p>
-                            <p class="text-xl font-black" id="dueOutTime">--:--</p>
-                        </div>
-                    </div>
-                    <button id="btnSafe" class="long-press-btn w-full py-5 bg-green-600 rounded-xl font-black uppercase tracking-[0.2em] shadow-lg">Hold to Mark Safe</button>
-                </div>
-
-                <button id="btnStartVisit" onclick="startVisit()" class="w-full py-8 bg-blue-600 rounded-2xl font-black text-xl uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all">Start Visit</button>
-            </div>
-        </div>
-
-        <div id="pageTravel" class="page">
-            <h2 class="text-3xl font-black mb-2">Travel.</h2>
-            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">Mileage & Safety</p>
-            
-            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Destination / Purpose</label>
-            <input type="text" id="travelDest" class="form-input mb-8" placeholder="e.g. Nelson Office to Home">
-
-            <button id="btnStartTravel" onclick="toggleTravel()" class="w-full py-8 bg-white/5 border-2 border-white/20 rounded-2xl font-black text-xl uppercase tracking-[0.2em] transition-all">Start Journey</button>
-            
-            <div id="travelStats" class="hidden mt-8 grid grid-cols-2 gap-4">
-                <div class="p-4 bg-white/5 rounded-xl border border-white/10">
-                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Distance</p>
-                    <p class="text-2xl font-black"><span id="liveKm">0.0</span> <span class="text-xs">km</span></p>
-                </div>
-                <div class="p-4 bg-white/5 rounded-xl border border-white/10">
-                    <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Method</p>
-                    <p class="text-sm font-black uppercase" id="distMethod">GPS</p>
-                </div>
-            </div>
-        </div>
-
-        <div id="pageVehicle" class="page">
-            <h2 class="text-3xl font-black mb-2">Fleet.</h2>
-            <p class="text-blue-400 font-bold text-sm mb-8 uppercase tracking-widest">%%VEHICLE_TERM%% & Maintenance</p>
-            
-            <div class="bg-white/5 p-6 rounded-2xl border border-white/10 mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] font-black uppercase tracking-widest opacity-60">Status</span>
-                    <span id="vehStatusBadge" class="px-2 py-1 bg-green-600 rounded text-[9px] font-black uppercase tracking-widest">Compliant</span>
-                </div>
-                <div class="flex justify-between items-end">
-                    <div>
-                        <p class="text-xs font-bold opacity-40 uppercase">%%VEHICLE_TERM%% Expiry</p>
-                        <p class="text-2xl font-black" id="vehExpiryDisp">--/--/--</p>
-                    </div>
-                    <button onclick="updateWof()" class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Update</button>
-                </div>
-            </div>
-
-            <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Safety Checklist</p>
-            <div id="vehChecklist" class="space-y-3">
-                </div>
-        </div>
-
-    </main>
-
-    <footer class="footer-bar flex justify-around items-center">
-        <button onclick="showPage('pageVisit')" class="p-4 opacity-40 active:opacity-100"><span class="text-2xl">🏠</span></button>
-<button id="btnPanic" class="long-press-btn w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform -mt-10 border-4" style="border-color: var(--primary)">
-    <span class="text-white font-black text-xs uppercase tracking-widest pointer-events-none">SOS</span>
-</button>
-        <button onclick="showPage('pageVehicle')" class="p-4 opacity-40 active:opacity-100"><span class="text-2xl">⚙️</span></button>
-    </footer>
-
+    <div class="content-area" id="locationsList">
+        <!-- Rendered tiles -->
+    </div>
+    <div class="footer-bar">
+        <!-- Settings, etc. -->
+    </div>
 </div>
 
-<div id="pinModal" class="hidden fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-8">
-    <h3 class="text-2xl font-black mb-8 uppercase tracking-widest">Enter Safety PIN</h3>
-    <div class="grid grid-cols-3 gap-4 w-full max-w-xs">
-        </div>
+<div id="lockedPage" class="page">
+    <!-- Active visit -->
+    <button id="btnPanic" class="long-press-btn">SOS</button>
+    <div id="visitTimer"></div>
 </div>
 
-<div id="wofBlockModal" class="hidden fixed inset-0 bg-red-950 z-[110] flex flex-col items-center justify-center p-8 text-center">
-    <div class="text-6xl mb-6">🚫</div>
-    <h2 class="text-3xl font-black mb-4 uppercase">VEHICLE GROUNDED</h2>
-    <p class="text-red-200 font-bold mb-8">The %%VEHICLE_TERM%% for your assigned vehicle has expired. For your safety, you cannot proceed with work-related travel until this is updated.</p>
-    <button onclick="startVehicleCheck()" class="w-full py-5 bg-white text-red-950 font-black rounded-xl uppercase tracking-widest">Update %%VEHICLE_TERM%%</button>
+<div id="reportPage" class="page">
+    <div id="reportFields"></div>
 </div>
 
-</body>
-
-<script>
-/**
- * 1. MODERN STORAGE & STATE INITIALIZATION
- * Standardized approach for 2026 browsers.
- */
-const CONFIG = {
-    url: "%%GOOGLE_SHEET_URL%%",
-    key: "%%SECRET_KEY%%",
-    org: "%%ORG_NAME%%",
-    app: "%%APP_NAME%%",
-    isAdv: %%IS_ADVANCED%%,
-    mileage: %%ENABLE_MILEAGE%%,
-    checkin: %%CHECKIN_ENABLED%%,
-    checkinMins: %%CHECKIN_INTERVAL%%,
-    escalation: %%ESCALATION_MINUTES%%,
-    vehEnabled: %%VEHICLE_ENABLED%%,
-    vehInterval: %%VEHICLE_INTERVAL%%,
-    vehTerm: "%%VEHICLE_TERM%%",
-    locale: "%%VOICE_LOCALE%%",
-    prefix: "%%COUNTRY_PREFIX%%",
-    reqTravel: %%REQ_TRAVEL_REPORT%%
-};
-
-/**
- * 2. GLOBAL STATE ENGINE
- * Master data structure exactly as defined in WSindex.html
- */
-let state = {
-    worker: null, // Replaces 'settings' in template for consistency
-    locations: [],
-    selectedLocationId: null,
-    visitDurationMinutes: 0,
-    activeVisit: null,
-    cachedForms: {},
-    pendingUploads: [],
-    globalForms: [],
-    photoStore: {},
-    lowBatSent: false,
-    meta: {},
-    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
-    pins: { std: '', duress: '' },
-    currentWizStep: 1,
-    voice: null,
-    isDimmed: false,
-    syncing: false
-};
-
-    /**
- * 3. GLOBAL CONTROL VARIABLES
- * Required for timing, GPS monitoring, and safety alerts
- */
-let synth; // Speech engine
-let checkinIntervalId; // Are-you-OK timer
-let mainScreenReminderTimer; // UI reminders
-let wakeLock = null; // Prevents screen timeout during visits
-let timerInt; // Main safety countdown interval
-let travellingInterval; // GPS pulse during travel
-let tempPhoto = null; // Buffer for camera
-let sigPad = null; // Signature handler
-let panicTapCount = 0; // SOS tap tracker
-let panicTapTimer; // SOS timeout
-let deferredPrompt; // PWA installation handler
-let isMidVisitUpdate = false; // Flag for "Update Status" reports
-let currentActiveTemplate = ""; // Active form tracking
-let isDrawing = false; // Signature state
-let calculatedDist = null; // Mileage calculation results
-let gpsWarm = false; // GPS pre-warm state
-let gpsWatchId = null; // GPS listener ID
-let lastAlertTime = 0; // Prevents duplicate emergency logs
-let travelTargetName = ""; // Explicit destination tracking
-    
-/**
- * Standardized Persistent Storage Request
- */
-async function requestPersistentStorage() {
-    if (navigator.storage && navigator.storage.persist) {
-        const isPersisted = await navigator.storage.persist();
-        console.log(`Safety Data Persistence: ${isPersisted ? "Guaranteed" : "Best Effort"}`);
-    }
-}
-    
-window.onload = async () => {
-    console.log("OTG Safety Engine v81.36 Initializing...");
-
-    // 1. Request modern persistent storage
-    await requestPersistentStorage();
-    
-    // 2. Load worker settings and identity
-    loadSettings();
-    
-    // 3. Initialize background systems
-    initVoice();
-    checkIosInstall();
-    startGPS();
-    
-    // 4. Battery Monitoring (Critical for Auto-Saver)
-    if ('getBattery' in navigator) {
-        navigator.getBattery().then(function(battery) {
-            const updateBat = () => {
-                state.battery = Math.round(battery.level * 100);
-                // Trigger auto-dim if battery is dangerously low
-                if (battery.level <= 0.20 && !state.isDimmed) {
-                    toggleBatterySaver();
-                    announce("Low Battery. Pocket Protection activated to preserve safety tracking.");
-                }
-            };
-            updateBat();
-            battery.addEventListener('levelchange', updateBat);
-        });
-    // Start the Safety Heartbeat
-    setInterval(tick, 1000);
-    }
-
-    // 5. Worker Status Check
-    if (!state.worker) {
-        // Show Setup Wizard if first run
-        document.getElementById('setupWizard').classList.remove('hidden');
-    } else {
-        // Populate header and perform safety heartbeat
-        const headerName = document.getElementById('headerWorkerName');
-        if (headerName) headerName.innerText = state.worker.name;
-        
-        checkVehicleStatus();
-        
-        // Initial Heartbeat Sync
-        logSafety("System Startup", "Worker App initialized and online.");
-    }
-
-    // 6. Service Worker Registration
-    // This enables the offline "Watchdog" features
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Safety Watchdog Active:', reg.scope))
-            .catch(err => console.warn('Offline Safety Cache Unavailable:', err));
-    }
-};
-
-/**
- * Voice Engine Initialization
- * Resolves the "state is not defined" error in the voice callback.
- */
-function initVoice() {
-    if (!window.speechSynthesis) return;
-
-    const setVoice = () => {
-        const voices = window.speechSynthesis.getVoices();
-        // Uses the specific regional locale injected by the Factory
-        state.voice = voices.find(v => v.lang === CONFIG.locale) || voices[0];
-    };
-
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = setVoice;
-    }
-    setVoice();
-}
-
-function loadSettings() {
-    const saved = localStorage.getItem('otg_user_data');
-    if (saved) {
-        state.worker = JSON.parse(saved);
-        state.pins.std = state.worker.pin || '';
-        state.pins.duress = state.worker.duress || '';
-    }
-}
-
-/**
- * SOPHISTICATED GPS ENGINE (High-Accuracy & Signal Strength)
- */
-function startGPS() {
-    if (!("geolocation" in navigator)) {
-        alert("CRITICAL: GPS is not supported on this device. Safety features will be disabled.");
-        return;
-    }
-
-    const options = {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 10000
-    };
-
-    navigator.geolocation.watchPosition(
-        (pos) => {
-            // UPDATED: Update individual properties so history isn't destroyed
-            state.gps.lat = pos.coords.latitude;
-            state.gps.lng = pos.coords.longitude;
-            state.gps.acc = pos.coords.accuracy;
-            state.gps.last = Date.now();
-            
-            // Log history for "As-the-crow-flies" fallback calculations
-            state.gps.history.push({ 
-                lat: state.gps.lat, 
-                lng: state.gps.lng, 
-                acc: state.gps.acc, 
-                last: state.gps.last 
-            });
-            
-            // Keep only the last 10 points to save memory
-            if (state.gps.history.length > 10) state.gps.history.shift();
-            
-            updateGPSIndicator(pos.coords.accuracy);
-            
-            // If in an active visit/travel, update the remote server
-            if (state.activeVisit || state.isTravel) {
-                logSafety("Active Tracking");
-            }
-        },
-        (err) => {
-            console.warn("GPS Signal Lost:", err.message);
-            updateGPSIndicator(999); // Force Red Indicator
-        },
-        options
-    );
-}
-/**
- * GPS Accuracy Indicator
- * Provides real-time feedback on signal reliability.
- */
-function updateGPSIndicator(acc) {
-    const bars = document.getElementById('gpsIndicator').children;
-    // Reset all bars to neutral
-    for (let b of bars) b.className = 'gps-bar';
-    
-    if (acc <= 15) {
-        // High Quality (Green)
-        for (let i=0; i<4; i++) bars[i].classList.add('active-green');
-    } else if (acc <= 45) {
-        // Moderate Quality (Amber)
-        for (let i=0; i<2; i++) bars[i].classList.add('active-amber');
-    } else {
-        // Poor/No Signal (Red)
-        bars[0].classList.add('active-red');
-    }
-}
-
-function announce(msg) {
-    if (!state.voice || !window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(msg);
-    utterance.voice = state.voice;
-    utterance.pitch = 1;
-    utterance.rate = 0.9; // Slightly slower for clarity during emergencies.
-    window.speechSynthesis.speak(utterance);
-}
-
-/**
- * UI & PWA Management
- * Handles smooth page transitions and home-screen installation.
- */
-function showPage(pageId) {
-    const pages = document.querySelectorAll('.page');
-    pages.forEach(p => p.classList.remove('active'));
-    const target = document.getElementById(pageId);
-    if (target) {
-        target.classList.add('active');
-        // Scroll to top on page change.
-        const content = document.querySelector('.content-area');
-        if (content) content.scrollTop = 0;
-    }
-}
-
-/**
- * The Safety Heartbeat
- * Monitors timers, battery, and safety status every second.
- */
-function tick() {
-    if (!state.activeVisit) return;
-
-    const now = Date.now();
-    const remaining = state.activeVisit.dueOut - now;
-    
-    // 1. Update UI Timer
-    const timerEl = document.getElementById('dueOutTime');
-    if (timerEl) {
-        const mins = Math.floor(Math.abs(remaining) / 60000);
-        const secs = Math.floor((Math.abs(remaining) % 60000) / 1000);
-        timerEl.innerText = `${remaining < 0 ? '-' : ''}${mins}:${secs.toString().padStart(2, '0')}`;
-        
-        // Visual warning if overdue
-        if (remaining < 0) timerEl.classList.add('text-red-500', 'animate-pulse');
-        else timerEl.classList.remove('text-red-500', 'animate-pulse');
-    }
-
-    // 2. 90-Second Critical Warning
-    if (remaining <= 90000 && !state.activeVisit.warn90Sent) {
-        state.activeVisit.warn90Sent = true;
-        announce("Critical Warning. Safety alarm will activate in 90 seconds. Please mark yourself safe.");
-        document.body.classList.add('bg-orange-950');
-        saveState();
-    }
-
-    // 3. Automatic Alarm Trigger
-    if (remaining <= 0 && !state.activeVisit.alarmTriggered) {
-        state.activeVisit.alarmTriggered = true;
-        triggerSafetyAlarm();
-    }
-}
-    
-
-
-function saveState() {
-    localStorage.setItem('otg_user_data', JSON.stringify(state.worker));
-    // Persist current safety state
-    localStorage.setItem('otg_active_safety', JSON.stringify({
-        activeVisit: state.activeVisit,
-        pendingUploads: state.pendingUploads
-    }));
-}
-    
-/**
- * 5. VISIT MANAGEMENT (Safety Timing)
- */
-async function startVisit() {
-    const loc = prompt("Enter Location Name / Site ID:");
-    if (!loc) return;
-
-    // Standard 60-minute visit, but you can add a prompt for duration
-    const durationMins = 60; 
-    const now = Date.now();
-    
-    state.activeVisit = {
-        name: loc,
-        startTime: now,
-        dueOut: now + (durationMins * 60 * 1000),
-        type: 'visit'
-    };
-
-    updateUIForActiveActivity();
-    
-    // Immediate sync to server to start the "Watchdog" timer
-    await logSafety("Visit Start", `Location: ${loc} | Duration: ${durationMins}m`);
-    
-    // Start the local visual countdown
-    startVisitCountdown();
-    
-    // Voice Confirmation
-    announce(`Visit started at ${loc}. You are due out in one hour.`);
-}
-
-function updateUIForActiveActivity() {
-    if (state.activeVisit) {
-        document.getElementById('currentActivity').classList.remove('hidden');
-        document.getElementById('btnStartVisit').classList.add('hidden');
-        document.getElementById('activityName').innerText = state.activeVisit.name;
-        document.getElementById('activityType').innerText = 
-            state.activeVisit.type === 'visit' ? 'Visit Active' : 'Travel Active';
-        
-        const due = new Date(state.activeVisit.dueOut);
-        document.getElementById('dueOutTime').innerText = 
-            due.getHours().toString().padStart(2, '0') + ":" + 
-            due.getMinutes().toString().padStart(2, '0');
-    } else {
-        document.getElementById('currentActivity').classList.add('hidden');
-        document.getElementById('btnStartVisit').classList.remove('hidden');
-    }
-}
-
-    async function endTravel() {
-    const endPoint = { lat: state.gps.lat, lng: state.gps.lng };
-    const distResult = await getDistance(state.travelStart, endPoint);
-    
-    // Store the distance for automatic form injection
-    state.lastTravelKm = distResult.km;
-    
-    // Find any open form fields for distance
-    const distFields = document.querySelectorAll('input[data-key*="Distance"], input[data-key*="KM"]');
-    distFields.forEach(f => f.value = distResult.km);
-
-    state.isTravel = false;
-    logSafety("Travel End", `Dist: ${distResult.km}km (${distResult.type})`);
-    alert(`Journey Finished: ${distResult.km}km`);
-    showPage('pageVisit');
-}
-
-function saveState() {
-    localStorage.setItem('otg_user_data', JSON.stringify(state.worker));
-    // Persist current safety state
-    localStorage.setItem('otg_active_safety', JSON.stringify({
-        activeVisit: state.activeVisit,
-        pendingUploads: state.pendingUploads
-    }));
-}
-    
-/**
- * 6. INTELLIGENT TRAVEL & MILEAGE ENGINE
- */
-async function toggleTravel() {
-    const btn = document.getElementById('btnStartTravel');
-    const dest = document.getElementById('travelDest').value;
-    
-    if (!state.isTravel) {
-        // START JOURNEY
-        if (!dest) { alert("Please enter a destination purpose."); return; }
-        
-        state.isTravel = true;
-        state.travelStart = { 
-            lat: state.gps.lat, 
-            lng: state.gps.lng, 
-            time: Date.now(),
-            dest: dest 
-        };
-
-        // UI Updates
-        btn.innerText = "End Journey";
-        btn.classList.replace('bg-white/5', 'bg-orange-600');
-        document.getElementById('travelStats').classList.remove('hidden');
-        
-        // Safety Sync
-        logSafety("Travel Start", `Destination: ${dest}`);
-        announce(`Journey to ${dest} started.`);
-    } else {
-        // END JOURNEY
-        const endPoint = { lat: state.gps.lat, lng: state.gps.lng };
-        
-        // Sophisticated distance calculation
-        const distResult = await getDistance(state.travelStart, endPoint);
-        
-        state.isTravel = false;
-        btn.innerText = "Start Journey";
-        btn.classList.replace('bg-orange-600', 'bg-white/5');
-        document.getElementById('travelStats').classList.add('hidden');
-        
-        // Final Log with Mileage
-        logSafety("Travel End", `Dest: ${state.travelStart.dest} | Dist: ${distResult.km}km (${distResult.type})`);
-        
-        alert(`Journey Logged: ${distResult.km}km (${distResult.type} distance)`);
-        document.getElementById('travelDest').value = '';
-    }
-}
-
-/**
- * 7. DISTANCE CALCULATION (Road API vs Crow-Flies Fallback)
- * This logic ensures data integrity even in low-signal areas.
- */
-async function getDistance(p1, p2) {
-    // 1. Try Road-Accurate API via Factory Script
-    if (navigator.onLine) {
-        try {
-            const u = `${CONFIG.url}?action=getDistance&start=${p1.lat},${p1.lng}&end=${p2.lat},${p2.lng}&key=${CONFIG.key}`;
-            const response = await fetch(u);
-            const data = await response.json();
-            if (data.status === "success" && data.km > 0) return { km: data.km.toFixed(2), type: 'Road' };
-        } catch (e) { console.warn("Road API Failed"); }
-    }
-
-    // 2. Haversine Fallback
-    const R = 6371; 
-    const dLat = (p2.lat - p1.lat) * Math.PI / 180;
-    const dLon = (p2.lng - p1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return { km: (R * c).toFixed(2), type: 'Direct (Offline)' };
-}
-
-function calculateHaversine(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-/**
- * 8. HEARTBEAT & SYNC ENGINE
- * Sends background updates to ensure the cloud system knows the worker is safe.
- */
-async function logSafety(status, notes = "") {
-    if (state.syncing || !state.worker) return;
-    state.syncing = true;
-    
-    // Exact mapping from WSindex.html logic
-    const payload = {
-        'action': 'logVisit',
-        'key': CONFIG.key,
-        'Worker Name': state.worker.name,
-        'Worker Phone': state.worker.phone,
-        'Emergency Contact Name': state.worker.emgName || "Not Set",
-        'Emergency Contact Number': state.worker.emgPhone || "Not Set",
-        'Escalation Contact Name': state.worker.escName || "Not Set",
-        'Escalation Contact Number': state.worker.escPhone || "Not Set",
-        'Alarm Status': status,
-        'Notes': notes,
-        'Last Known GPS': state.gps.lat + "," + state.gps.lng,
-        'GPS Timestamp': new Date(state.gps.last).toLocaleString(),
-        'Battery Level': state.battery + "%",
-        'App Version': 'v81.36'
-    };
-
-    try {
-        const response = await fetch(CONFIG.url, {
-            method: 'POST',
-            mode: 'no-cors',
-            cache: 'no-cache',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        state.lastSync = Date.now();
-        const timeEl = document.getElementById('lastSyncTime');
-        if (timeEl) {
-            timeEl.innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        }
-    } catch (e) {
-        console.warn("Sync failed - record stored in local cache.", e);
-    } finally {
-        state.syncing = false;
-    }
-}
-    
-function buildReportForm(formName, questions) {
-    const container = document.getElementById('formContainer');
-    if (!container) return;
-    
-    // Header for the specific form
-    container.innerHTML = `<h3 class="text-xl font-black mb-6 uppercase tracking-widest text-blue-400">${formName}</h3>`;
-    
-    questions.forEach((q, index) => {
-        if (!q) return;
-        const qId = `q_${index}`;
-        const qDiv = document.createElement('div');
-        qDiv.className = "mb-6 p-4 bg-white/5 rounded-xl border border-white/10";
-        
-        const upperQ = q.toUpperCase();
-
-        // 1. Section Headings
-        if (upperQ.includes('[HEADING]')) {
-            qDiv.innerHTML = `<p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Section</p>
-                              <p class="text-sm font-black text-white uppercase">${q.replace(/\[HEADING\]/gi, '').trim()}</p>`;
-            qDiv.classList.replace('bg-white/5', 'bg-transparent');
-            qDiv.classList.remove('border');
-        } 
-        // 2. Multi-line Text Areas
-        else if (upperQ.includes('[TEXT]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[TEXT\]/gi, '').trim()}</label>
-                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter detailed notes..."></textarea>`;
-        }
-        // 3. Single-line Text Inputs
-        else if (upperQ.includes('[1TEXT]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[1TEXT\]/gi, '').trim()}</label>
-                              <input type="text" id="${qId}" class="form-input" placeholder="Response...">`;
-        }
-        // 4. Numeric Inputs (Supports [NUMBER] tag or $ shortcut)
-        else if (upperQ.includes('[NUMBER]') || q.trim().startsWith('$')) {
-            const label = q.replace(/\[NUMBER\]/gi, '').replace('$', '').trim();
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
-                              <input type="number" id="${qId}" class="form-input" placeholder="0.00" step="any">`;
-        }
-        // 5. Date Selectors
-        else if (upperQ.includes('[DATE]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[DATE\]/gi, '').trim()}</label>
-                              <input type="date" id="${qId}" class="form-input">`;
-        }
-        // 6. Dropdown Menus
-        // Replace the [DROP] block with this:
-    else if (upperQ.startsWith('[DROP')) {
-    const dropMatch = q.match(/\[DROP\s*,\s*(.*?)\s*\]/i);
-    if (dropMatch) {
-        const options = dropMatch[1].split(',').map(o => o.trim());
-        const label = q.replace(dropMatch[0], '').trim();
-        let optionsHtml = options.map(o => `<option value="${o}">${o}</option>`).join('');
-        qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
-                          <select id="${qId}" class="form-input">${optionsHtml}</select>`;
-    }
-        // 7. Binary Yes/No Toggles
-        else if (upperQ.includes('[YESNO]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace(/\[YESNO\]/gi, '').trim()}</label>
-                              <div class="flex gap-4">
-                                <button type="button" onclick="setYesNo('${qId}', true, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs transition-colors">Yes</button>
-                                <button type="button" onclick="setYesNo('${qId}', false, this)" class="flex-1 py-3 border border-white/20 rounded-lg font-black uppercase text-xs transition-colors">No</button>
-                                <input type="hidden" id="${qId}" value="">
-                              </div>`;
-        }
-        // 8. Checkboxes
-        else if (upperQ.includes('[CHECK]')) {
-            const label = q.replace(/\[CHECK\]/gi, '').trim();
-            qDiv.innerHTML = `<label class="flex items-center gap-4 cursor-pointer p-2 active:bg-white/5 rounded-lg transition-colors">
-                                <input type="checkbox" id="${qId}" class="w-6 h-6 rounded bg-gray-800 border-white/20 text-blue-600 focus:ring-blue-500">
-                                <span class="text-sm font-bold text-gray-200 uppercase tracking-tight">${label}</span>
-                              </label>`;
-        }
-        // 9. GPS Coordinate Capture
-        else if (upperQ.includes('[GPS]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[GPS\]/gi, '').trim()}</label>
-                              <button type="button" onclick="captureFormGPS(this)" class="w-full py-4 bg-gray-800 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-white/5 active:bg-gray-700">
-                                <span class="gps-icon">📍</span> <span class="gps-label">Capture Location</span>
-                              </button>
-                              <input type="hidden" id="${qId}" value="">`;
-        }
-        // 10. Camera/Photo Upload
-        else if (upperQ.includes('[PHOTO]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[PHOTO\]/gi, '').trim()}</label>
-                              <input type="file" accept="image/*" capture="environment" id="${qId}" onchange="handleFormPhoto(this, '${qId}_preview')" class="hidden">
-                              <div onclick="document.getElementById('${qId}').click()" class="w-full h-40 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center overflow-hidden bg-white/5 active:border-blue-500 transition-colors">
-                                <img id="${qId}_preview" class="hidden h-full w-full object-cover">
-                                <div id="${qId}_placeholder" class="flex flex-col items-center">
-                                    <span class="text-2xl mb-2">📸</span>
-                                    <span class="text-[10px] font-black uppercase tracking-widest opacity-40">Tap to Take Photo</span>
-                                </div>
-                              </div>`;
-        }
-        // 11. Digital Signature Pad
-        else if (upperQ.includes('[SIGN]')) {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q.replace(/\[SIGN\]/gi, '').trim()}</label>
-                              <div class="bg-white rounded-lg overflow-hidden">
-                                <canvas id="${qId}_canvas" class="w-full h-32 touch-none"></canvas>
-                              </div>
-                              <div class="flex justify-between items-center mt-2">
-                                <button type="button" onclick="clearCanvas('${qId}_canvas')" class="text-[9px] font-black uppercase text-red-400 tracking-widest">Clear Signature</button>
-                                <span class="text-[8px] text-gray-500 font-bold uppercase">Sign Above</span>
-                              </div>`;
-            // Brief timeout to ensure DOM is rendered before initializing canvas logic
-            setTimeout(() => initSignaturePad(`${qId}_canvas`), 150);
-        }
-        // 12. Default: Textarea for unknown tags
-        else {
-            qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${q}</label>
-                              <textarea id="${qId}" class="form-input h-24" placeholder="Enter response..."></textarea>`;
-        }
-        
-        container.appendChild(qDiv);
-    });
-
-    // Add Final Submission Button
-    const submitBtn = document.createElement('button');
-    submitBtn.className = "w-full py-6 mt-8 bg-blue-600 rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all mb-12";
-    submitBtn.innerText = "Submit Report";
-    submitBtn.onclick = () => submitReport(formName);
-    container.appendChild(submitBtn);
-}
-
-    /**
- * Robust Report Submission
- * Packages form data and handles offline caching.
- */
-async function submitReport(type) {
-    const fields = document.querySelectorAll('#formContainer [id^="q_"]');
-    const formData = {};
-    
-    fields.forEach(f => {
-        const label = f.parentElement.querySelector('label')?.innerText || "Field";
-        if (f.type === 'checkbox') formData[label] = f.checked;
-        else if (f.tagName === 'SELECT') formData[label] = f.value;
-        else formData[label] = f.value;
-    });
-
-    const payload = {
-        action: 'submitReport',
-        reportType: type,
-        data: formData,
-        worker: state.worker.name,
-        timestamp: new Date().toISOString()
-    };
-
-    if (navigator.onLine) {
-        await logSafety(`Report: ${type}`, JSON.stringify(formData));
-        alert("Report submitted successfully.");
-    } else {
-        // Cache for later if offline
-        state.pendingUploads.push(payload);
-        saveState();
-        alert("Report saved offline. It will sync when signal returns.");
-    }
-    showPage('pageVisit');
-}
-/**
- * 10. VEHICLE COMPLIANCE & FLEET LOGIC
- * High-resolution monitoring of vehicle safety status.
- */
-function checkVehicleStatus() {
-    if (!CONFIG.vehEnabled) return;
-    
-    const expiryDate = localStorage.getItem('otg_veh_expiry');
-    const lastCheckDate = localStorage.getItem('otg_veh_last_check');
-    const nagBar = document.getElementById('vehNagBar');
-    
-    if (!expiryDate) {
-        nagBar.classList.remove('hidden');
-        nagBar.innerText = `⚠️ SETUP REQUIRED: ENTER ${CONFIG.vehTerm} EXPIRY`;
-        return;
-    }
-
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-
-    // CRITICAL BLOCK: Cannot work if vehicle is illegal
-    if (diffDays <= 0) {
-        document.getElementById('wofBlockModal').classList.remove('hidden');
-        announce(`Critical Alert. Your vehicle ${CONFIG.vehTerm} has expired. Work travel is prohibited.`);
-        return;
-    }
-
-    // WARNING NAG: 14-day countdown
-    if (diffDays <= 14) {
-        nagBar.classList.remove('hidden');
-        nagBar.innerText = `⚠️ ${CONFIG.vehTerm} EXPIRES IN ${diffDays} DAYS`;
-        nagBar.classList.add('bg-orange-600');
-    }
-
-    // PERIODIC CHECK: Maintenance "nag" logic
-    if (lastCheckDate) {
-        const lastCheck = new Date(lastCheckDate);
-        const sinceCheck = Math.ceil((today - lastCheck) / (1000 * 60 * 60 * 24));
-        if (sinceCheck >= CONFIG.vehInterval) {
-            nagBar.classList.remove('hidden');
-            nagBar.innerText = `🛠️ MAINTENANCE CHECK OVERDUE (${sinceCheck} DAYS)`;
-            nagBar.classList.add('bg-blue-600');
-        }
-    }
-}
-
-async function updateWof() {
-    const newDate = prompt(`Enter new ${CONFIG.vehTerm} Expiry Date (YYYY-MM-DD):`);
-    if (newDate && !isNaN(Date.parse(newDate))) {
-        localStorage.setItem('otg_veh_expiry', newDate);
-        logSafety("Fleet Update", `${CONFIG.vehTerm} updated to ${newDate}`);
-        alert(`${CONFIG.vehTerm} Updated Successfully.`);
-        location.reload();
-    } else {
-        alert("Invalid Date Format.");
-    }
-}
-
-function startVehicleCheck() {
-    showPage('pageVehicle');
-    const container = document.getElementById('vehChecklist');
-    const items = ['Tires & Tread', 'Lights & Indicators', 'Windscreen/Wipers', 'Oil & Fluid Levels', 'Brakes', 'Safety Kit Present'];
-    
-    container.innerHTML = items.map((item, i) => `
-        <div onclick="toggleCheckItem(this)" class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 active:bg-white/10">
-            <span class="text-xs font-bold uppercase tracking-widest">${item}</span>
-            <div class="w-6 h-6 rounded-full border-2 border-white/20 flex items-center justify-center">
-                <span class="hidden text-green-400 text-xs">✓</span>
-            </div>
-        </div>
-    `).join('');
-    
-    container.innerHTML += `<button onclick="submitVehCheck()" class="w-full py-4 mt-6 bg-green-600 rounded-xl font-black uppercase tracking-widest shadow-lg">Confirm All Clear</button>`;
-}
-
-function submitVehCheck() {
-    localStorage.setItem('otg_veh_last_check', new Date().toISOString());
-    logSafety("Vehicle Check", "Full maintenance checklist completed.");
-    announce("Vehicle maintenance check logged. Thank you.");
-    showPage('pageVisit');
-    checkVehicleStatus();
-}
-/**
- * 11. SECURITY & PIN VERIFICATION
- * Handles Standard 'Safe' verification and silent Duress alarms.
- */
-let pinBuffer = "";
-
-function openPinModal(onSuccess) {
-    pinBuffer = "";
-    const modal = document.getElementById('pinModal');
-    modal.classList.remove('hidden');
-    state.pinCallback = onSuccess;
-    
-    // Build Digital Keypad
-    const keypadContainer = modal.querySelector('.grid');
-    if (keypadContainer) {
-        keypadContainer.innerHTML = "";
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].forEach(key => {
-            const btn = document.createElement('button');
-            btn.className = "h-16 rounded-xl bg-white/10 border border-white/10 text-xl font-black active:bg-blue-600 transition-colors";
-            btn.innerText = key;
-            btn.onclick = () => {
-                if (key === 'C') {
-                    pinBuffer = "";
-                } else if (key === 'OK') {
-                    verifyPin();
-                } else {
-                    if (pinBuffer.length < 4) pinBuffer += key;
-                    if (pinBuffer.length === 4) setTimeout(verifyPin, 200);
-                }
-                updatePinDisplay();
-            };
-            keypadContainer.appendChild(btn);
-        });
-    }
-    updatePinDisplay();
-}
-
-function updatePinDisplay() {
-    const dots = document.getElementById('pinDots');
-    if (dots) dots.innerText = "●".repeat(pinBuffer.length) + "○".repeat(4 - pinBuffer.length);
-}
-function updatePinDisplay() {
-    // Visual feedback for PIN entry
-    const dots = "●".repeat(pinBuffer.length) + "○".repeat(4 - pinBuffer.length);
-    const display = document.getElementById('pinDots');
-    if (display) display.innerText = dots;
-}
-
-function pressPinKey(key) {
-    if (pinBuffer.length < 4) {
-        pinBuffer += key;
-        updatePinDisplay();
-        if (pinBuffer.length === 4) verifyPin();
-    }
-}
-
-function verifyPin() {
-    // Standard PIN
-    if (pinBuffer === state.worker.pin) {
-        closePinModal();
-        if (state.pinCallback) state.pinCallback();
-        announce("Verified. Stay safe.");
-    } 
-    // Duress PIN (The "Silent Alarm")
-    else if (pinBuffer === state.worker.duress) {
-        closePinModal();
-        // Disguise: Hide the app immediately
-        document.getElementById('mainApp').classList.add('hidden');
-        logSafety("DURESS ALARM", "Silent trigger via PIN modal.");
-    } else {
-        pinBuffer = "";
-        updatePinDisplay();
-        announce("Incorrect PIN.");
-    }
-}
-
-async function triggerSilentAlarm() {
-    // Disguise the alert as an app crash or exit
-    document.getElementById('mainApp').classList.add('hidden');
-    document.body.style.backgroundColor = "#000";
-    
-    // Background SOS log
-    await logSafety("DURESS ALARM", "Silent trigger activated via PIN entry.");
-    
-    // Attempt to notify server with high priority
-    try {
-        await fetch(`${CONFIG.url}?action=emergency&key=${CONFIG.key}&worker=${encodeURIComponent(state.worker.name)}`, {mode: 'no-cors'});
-    } catch(e) {}
-}
-
-/**
- * 12. POCKET PROTECTION & BATTERY SAVER
- * Prevents "pocket-dialling" using a 1.5s long-press wake gesture.
- */
-let saverTimer;
-
-function setupLongPress(elementId, duration, onComplete) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-
-    const startPress = (e) => {
-        e.preventDefault();
-        el.classList.add('pressing');
-        const progress = document.getElementById('saverProgress');
-        if (progress) progress.style.width = "100%";
-
-        saverTimer = setTimeout(() => {
-            el.classList.remove('pressing');
-            if (progress) progress.style.width = "0%";
-            onComplete();
-        }, duration);
-    };
-
-    const endPress = () => {
-        clearTimeout(saverTimer);
-        el.classList.remove('pressing');
-        const progress = document.getElementById('saverProgress');
-        if (progress) {
-            progress.style.transition = "none";
-            progress.style.width = "0%";
-            setTimeout(() => progress.style.transition = "width 1.5s linear", 10);
-        }
-    };
-
-    el.addEventListener('pointerdown', startPress);
-    el.addEventListener('pointerup', endPress);
-    el.addEventListener('pointerleave', endPress);
-}
-
-function toggleBatterySaver() {
-    state.isDimmed = !state.isDimmed;
-    const saver = document.getElementById('batterySaver');
-    
-    // Force system-level dark theme for navigation bars
-    document.documentElement.classList.toggle('system-dim', state.isDimmed);
-    
-    if (state.isDimmed) {
-        saver.classList.remove('hidden');
-        saver.style.pointerEvents = "auto"; // Capture all touches
-        announce("Pocket protection active. Hold screen to wake.");
-    } else {
-        saver.classList.add('hidden');
-        saver.style.pointerEvents = "none";
-        announce("System awake.");
-    }
-}
-
-/**
- * 13. HEARTBEAT WATCHDOG
- * Periodic check to see if the worker is overdue.
- */
-function startVisitCountdown() {
-    const timer = setInterval(() => {
-        if (!state.activeVisit) {
-            clearInterval(timer);
-            return;
-        }
-
-        const remaining = state.activeVisit.dueOut - Date.now();
-        
-        // Verbal Warnings
-        if (remaining <= 300000 && !state.activeVisit.warn5Sent) { // 5 Mins
-            state.activeVisit.warn5Sent = true;
-            announce("Five minutes until safety check-in.");
-        }
-        if (remaining <= 90000 && !state.activeVisit.warn90Sent) { // 90 Seconds
-            state.activeVisit.warn90Sent = true;
-            announce("Critical Warning. Safety alarm will activate in 90 seconds. Please mark yourself safe.");
-            // Trigger visual alert
-            document.body.classList.add('bg-orange-950');
-        }
-        
-        if (remaining <= 0) {
-            clearInterval(timer);
-            triggerSafetyAlarm();
-        }
-    }, 5000);
-    // Auto-dim screen after 10 seconds of inactivity
-setTimeout(() => {
-    if (state.activeVisit && !state.isDimmed) {
-        toggleBatterySaver();
-    }
-}, 10000);
-}
-async function triggerSafetyAlarm() {
-    document.body.classList.add('bg-red-900');
-    announce("Safety alarm activated. Contacting emergency services.");
-    await logSafety("OVERDUE ALARM", "Automatic trigger: Worker failed to check out.");
-}
-/**
- * 14. UI NAVIGATION & PAGE MANAGEMENT
- * Handles smooth transitions between the Visit, Travel, and Vehicle views.
- */
-function showPage(pageId) {
-    const pages = document.querySelectorAll('.page');
-    pages.forEach(p => p.classList.remove('active'));
-    
-    const target = document.getElementById(pageId);
-    if (target) {
-        target.classList.add('active');
-        // Close any open navigation menus if applicable
-    }
-}
-
-/**
- * 15. SPECIALIZED FORM UTILITIES
- * Logic for capturing signatures and field-specific GPS coordinates.
- */
-function captureFieldGPS(fieldId, btn) {
-    btn.disabled = true;
-    const label = document.getElementById(`${fieldId}_label`);
-    const icon = document.getElementById(`${fieldId}_icon`);
-    
-    if (label) label.innerText = "Capturing...";
-    
-    // Use the latest high-accuracy state
-    const coords = `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)} (Acc: ${state.gps.acc}m)`;
-    document.getElementById(fieldId).value = coords;
-    
-    if (label) label.innerText = "Location Captured";
-    if (icon) icon.innerText = "✅";
-    announce("Location coordinates captured to form.");
-}
-
-/**
- * Signature Pad Logic
- * Captures worker or site-manager signatures with touch/mouse support.
- */
-function initSignaturePad(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-
-    // Set line styles for professional appearance
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-
-    const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: (e.touches ? e.touches[0].clientX : e.clientX) - rect.left,
-            y: (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
-        };
-    };
-
-    canvas.addEventListener('mousedown', (e) => { drawing = true; const p = getPos(e); ctx.moveTo(p.x, p.y); });
-    canvas.addEventListener('touchstart', (e) => { drawing = true; const p = getPos(e); ctx.moveTo(p.x, p.y); }, {passive: false});
-    
-    canvas.addEventListener('mousemove', (e) => {
-        if (!drawing) return;
-        const p = getPos(e);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-    });
-    
-    canvas.addEventListener('touchmove', (e) => {
-        if (!drawing) return;
-        e.preventDefault();
-        const p = getPos(e);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-    }, {passive: false});
-
-    const stop = () => { drawing = false; ctx.beginPath(); };
-    window.addEventListener('mouseup', stop);
-    window.addEventListener('touchend', stop);
-}
-
-function clearCanvas(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-/**
- * Metadata Capture Logic
- * Stays synchronized with the high-accuracy GPS engine.
- */
-function captureFormGPS(btn) {
-    const parent = btn.parentElement;
-    const input = parent.querySelector('input[type="hidden"]');
-    const label = parent.querySelector('span') || btn;
-    
-    btn.disabled = true;
-    label.innerText = "Capturing Coords...";
-    
-    // Uses the latest validated GPS state.
-    const coords = `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)} (Acc: ${state.gps.acc}m)`;
-    if (input) input.value = coords;
-    
-    label.innerText = "Location Verified ✅";
-    announce("Coordinates captured.");
-}
-
-function handleFormPhoto(el, previewId) {
-    const file = el.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = document.getElementById(previewId);
-        if (img) {
-            img.src = e.target.result;
-            img.classList.remove('hidden');
-            // Hide the prompt text
-            const prompt = img.parentElement.querySelector('span');
-            if (prompt) prompt.classList.add('hidden');
-        }
-    };
-    reader.readAsDataURL(file);
-}
-
-function clearCanvas(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-/**
- * 16. PWA INSTALLATION HANDLERS
- * Ensures the app can be installed to the home screen for background tracking.
- */
-function checkIosInstall() {
-    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-    const isStandalone = window.navigator.standalone === true;
-    
-    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
-        const modal = document.getElementById('iosInstallModal');
-        if (modal) modal.classList.remove('hidden');
-    }
-}
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    // For Android/Chrome installation
-    e.preventDefault();
-    state.installPrompt = e;
-});
-
-function dismissInstall(type) {
-    if (type === 'ios') {
-        const modal = document.getElementById('iosInstallModal');
-        if (modal) modal.classList.add('hidden');
-    }
-    localStorage.setItem('otg_install_dismissed', 'true');
-}
-
-/**
- * Setup Flow Management
- * Allows workers to navigate the initialization wizard.
- */
-function prevWiz() {
-    if (state.currentWizStep > 1) {
-        document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
-        state.currentWizStep--;
-        document.getElementById(`wizStep${state.currentWizStep}`).classList.add('active');
-        
-        if (state.currentWizStep === 1) {
-            document.getElementById('btnWizPrev').classList.add('hidden');
-        }
-        document.getElementById('btnWizNext').innerText = "Next Step";
-    }
-}
-
-/**
- * Setup Wizard Navigation
- * Advances the user through Identity, Security, and Contact steps.
- */
-function nextWiz() {
-    if (state.currentWizStep < 3) {
-        document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
-        state.currentWizStep++;
-        document.getElementById(`wizStep${state.currentWizStep}`).classList.add('active');
-        
-        // Show the 'Back' button after the first step
-        if (state.currentWizStep === 2) {
-            document.getElementById('btnWizPrev').classList.remove('hidden');
-        }
-        
-        // Change button text on the final step
-        if (state.currentWizStep === 3) {
-            document.getElementById('btnWizNext').innerText = "Finish Setup";
-        }
-    } else {
-        saveWizard();
- }
-}
-
-function saveWizard() {
-    const workerData = {
-        name: document.getElementById('wizName').value,
-        phone: document.getElementById('wizPhone').value,
-        email: document.getElementById('wizEmail').value,
-        pin: document.getElementById('wizPin').value,
-        duress: document.getElementById('wizDuress').value,
-        emgName: document.getElementById('wizContactName').value,
-        emgPhone: document.getElementById('wizContactPhone').value
-    };
-    
-    if (!workerData.name || !workerData.pin) {
-        alert("Please complete all required fields.");
-        return;
-    }
-    
-    state.worker = workerData;
-    state.pins.std = workerData.pin;
-    state.pins.duress = workerData.duress;
-    
-    saveState();
-    document.getElementById('setupWizard').classList.add('hidden');
-    document.getElementById('headerWorkerName').innerText = workerData.name;
-    announce(`Welcome ${workerData.name}. System is now active.`);
-    logSafety("Setup Complete", "Worker profile initialized.");
-}
-/**
- * Final Utility Functions
- * These handle the closing of modals and the dismissal of installation prompts.
- */
-function closePinModal() {
-    const modal = document.getElementById('pinModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-function dismissInstall(type) {
-    if (type === 'ios') {
-        const iosModal = document.getElementById('iosInstallModal');
-        if (iosModal) iosModal.classList.add('hidden');
-    }
-    // Ensures the user isn't nagged again after dismissing
-    localStorage.setItem('otg_install_dismissed', 'true');
-}
-
-/**
- * iOS Installation Watchdog
- * Checks if the app is run as a PWA and shows the 'Add to Home Screen' prompt if needed.
- */
-function checkIosInstall() {
-    const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-    const isStandalone = window.navigator.standalone === true;
-    
-    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
-        const modal = document.getElementById('iosInstallModal');
-        if (modal) modal.classList.remove('hidden');
-    }
-}
-
-// Bind the SOS button to a 3-second long-press
-setupLongPress('btnPanic', 3000, () => {
-    triggerPanic();
-});
-
-async function triggerPanic() {
-    document.body.classList.add('bg-red-900');
-    announce("Panic alarm activated. Emergency services and your manager are being notified.");
-    await logSafety("EMERGENCY - PANIC BUTTON", "Manual SOS trigger activated.");
-}
-</script>
-
+<div id="pinModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 p-6 rounded-xl w-80">
+        <h3 class="text-lg font-bold mb-4">Enter PIN</h3>
+        <input id="pinInput" type="password" class="form-input mb-4">
+        <button id="btnPinConfirm" class="w-full py-3 bg-blue-600 rounded-xl font-bold">Confirm</button>
+    </div>
+</div>
+
+<div id="groundedModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 p-6 rounded-xl w-80">
+        <h3 class="text-lg font-bold mb-4">Vehicle Grounded</h3>
+        <p class="text-gray-300 mb-4">WOF or Rego expired. Cannot proceed.</p>
+        <button onclick="closeModal('grounded')" class="w-full py-3 bg-red-600 rounded-xl font-bold">OK</button>
+    </div>
+</div>
 
 <div id="iosInstallModal" class="hidden fixed bottom-6 left-4 right-4 bg-gray-800 border-2 border-blue-500 rounded-2xl p-6 shadow-2xl z-[100]">
     <div class="flex items-start gap-4">
@@ -1498,6 +174,542 @@ async function triggerPanic() {
     </div>
 </div>
 
+<script>
+// Globals and State
+let state = loadState() || { currentWizStep: 1, worker: {}, pins: {}, activeVisit: null, pendingUploads: [], locations: [], globalForms: [], photoStore: {}, settings: {}, vehicle: { wofExpiry: '', regoExpiry: '' } };
+let dimTimer;
+let isDimmed = false;
+const DIM_DELAY = 10000; // 10 seconds
+let checkinIntervalId;
+let travellingInterval;
+let timerInt;
+let deferredPrompt;
+let lastAlertTime = 0;
+let lastGPS = null; // Store last GPS for payload
+const synth = new Tone.Synth().toDestination(); // For audible alarms
+
+// State Persistence
+function loadState() {
+    try {
+        const saved = localStorage.getItem('loneWorkerState');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Decode PINs
+            if (parsed.pins) {
+                parsed.pins.std = atob(parsed.pins.std);
+                parsed.pins.duress = atob(parsed.pins.duress);
+            }
+            return parsed;
+        }
+    } catch (e) {
+        console.error('Load state failed', e);
+    }
+    return null;
+}
+
+function saveState() {
+    try {
+        const toSave = { ...state };
+        // Base64 PINs
+        if (toSave.pins) {
+            toSave.pins.std = btoa(toSave.pins.std);
+            toSave.pins.duress = btoa(toSave.pins.duress);
+        }
+        localStorage.setItem('loneWorkerState', JSON.stringify(toSave));
+    } catch (e) {
+        console.error('Save state failed', e);
+    }
+}
+
+// Navigation
+function navigate(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(page + 'Page').classList.add('active');
+    resetInactivityTimer();
+}
+
+// Modals
+function showModal(id) {
+    document.getElementById(id + 'Modal').classList.remove('hidden');
+}
+
+function closeModal(id) {
+    document.getElementById(id + 'Modal').classList.add('hidden');
+}
+
+// Toast
+function showToast(text) {
+    document.getElementById('toastText').innerText = text;
+    document.getElementById('toastMsg').classList.add('show');
+    setTimeout(() => document.getElementById('toastMsg').classList.remove('show'), 3000);
+}
+
+// Voice Announce (Web Speech, fallback toast)
+function announce(text) {
+    if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        speechSynthesis.speak(utter);
+    } else {
+        showToast(text);
+    }
+}
+
+// Logging with full metadata
+async function logSafety(type, message) {
+    console.log(`[${type}] ${message}`);
+    const payload = {
+        type,
+        message,
+        timestamp: new Date().toISOString(),
+        worker: state.worker.name,
+        emergencyContact: `${state.worker.emgName} (${state.worker.emgPhone})`,
+        battery: await getBatteryPercent(),
+        gps: lastGPS || 'Unknown'
+    };
+    state.pendingUploads.push(payload);
+    if (state.pendingUploads.length > 50) state.pendingUploads.shift();
+    saveState();
+    forceSync();
+}
+
+async function getBatteryPercent() {
+    if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        return Math.floor(battery.level * 100) + '%';
+    }
+    return 'Unknown';
+}
+
+// Long-Press Setup
+function setupLongPress(elementId, duration, callback) {
+    const btn = document.getElementById(elementId);
+    let timer;
+    btn.addEventListener('touchstart', e => {
+        e.preventDefault();
+        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
+        timer = setTimeout(callback, duration);
+    }, { passive: false });
+    ['touchend', 'touchcancel'].forEach(ev => btn.addEventListener(ev, () => {
+        clearTimeout(timer);
+        btn.classList.remove('pressing', 'holding');
+    }));
+}
+
+// Inactivity Dim Mode
+function resetInactivityTimer() {
+    clearTimeout(dimTimer);
+    if (state.activeVisit) {
+        dimTimer = setTimeout(activateDimMode, DIM_DELAY);
+    }
+    deactivateDimMode();
+}
+
+function activateDimMode() {
+    if (!state.activeVisit) return;
+    document.documentElement.classList.add('system-dim');
+    document.body.classList.add('system-dim');
+    isDimmed = true;
+    document.getElementById('batterySaver').classList.remove('hidden');
+    document.getElementById('saverProgress').style.width = '100%';
+}
+
+function deactivateDimMode() {
+    document.documentElement.classList.remove('system-dim');
+    document.body.classList.remove('system-dim');
+    isDimmed = false;
+    document.getElementById('batterySaver').classList.add('hidden');
+    document.getElementById('saverProgress').style.width = '0%';
+}
+
+// Battery saver wake (dedicated button)
+document.getElementById('wakeButton').addEventListener('touchstart', e => {
+    e.preventDefault();
+    let wakeTimer = setTimeout(() => {
+        deactivateDimMode();
+        resetInactivityTimer();
+    }, 1500);
+    ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => clearTimeout(wakeTimer), { once: true }));
+});
+
+// GPS Monitoring
+function startGPSMonitoring() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(pos => {
+            lastGPS = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            updateGPSBars(pos);
+        }, console.error, { enableHighAccuracy: true });
+    }
+}
+
+function updateGPSBars(pos) {
+    const accuracy = pos.coords.accuracy;
+    const bars = document.querySelectorAll('.gps-bar');
+    bars.forEach(b => b.classList.remove('active-red', 'active-amber', 'active-green'));
+    if (accuracy > 50) bars.forEach(b => b.classList.add('active-red'));
+    else if (accuracy > 20) bars.forEach(b => b.classList.add('active-amber'));
+    else bars.forEach(b => b.classList.add('active-green'));
+}
+
+// Capture GPS
+function captureGPS(btn) {
+    if (!navigator.geolocation) return showToast("GPS Not Supported");
+    btn.innerText = "⌛...";
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            const input = btn.nextElementSibling;
+            if (input) input.value = coords;
+            showToast("Location Captured");
+            btn.innerText = "GPS";
+        },
+        err => {
+            showToast("GPS Error: Enable location");
+            btn.innerText = "GPS";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+// Check-in Timer
+function startCheckinTimer() {
+    if (checkinIntervalId) clearInterval(checkinIntervalId);
+    checkinIntervalId = setInterval(() => {
+        if (state.activeVisit) {
+            const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
+            const timerEl = document.getElementById('visitTimer');
+            if (timerEl) timerEl.innerText = `${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+}
+
+// Travelling Pulse
+function startTravellingPulse() {
+    if (travellingInterval) clearInterval(travellingInterval);
+    travellingInterval = setInterval(() => {
+        if (state.activeVisit.status === 'TRAVELLING') {
+            captureGPS(/* button for pulse */); // Send pulse
+        }
+    }, 120000); // 2 min
+}
+
+// Report Form Building
+function buildReportForm(templateName, fieldArea) {
+    fieldArea.innerHTML = ''; // Clear
+    // Restore full parser
+    const template = state.globalForms.find(f => f.name === templateName) || { fields: '[TEXT|Notes] [GPS|Location] [PHOTO|Photo1] [SIGN|Signature] [NUMBER|Quantity]' };
+    const tags = template.fields.match(/\[\w+\|.*?\]/g) || [];
+    tags.forEach(tag => {
+        const [type, label] = tag.slice(1, -1).split('|');
+        let elem;
+        switch (type) {
+            case 'TEXT':
+                elem = document.createElement('input');
+                elem.type = 'text';
+                break;
+            case 'GPS':
+                elem = document.createElement('button');
+                elem.innerText = 'Capture GPS';
+                elem.onclick = () => captureGPS(elem);
+                const gpsInput = document.createElement('input');
+                elem.nextElementSibling = gpsInput;
+                fieldArea.appendChild(gpsInput);
+                break;
+            case 'PHOTO':
+                elem = document.createElement('input');
+                elem.type = 'file';
+                elem.accept = 'image/*';
+                elem.onchange = e => handlePhoto(e.target, label);
+                break;
+            case 'SIGN':
+                elem = document.createElement('canvas');
+                initSigPad(elem);
+                break;
+            case 'NUMBER':
+                elem = document.createElement('input');
+                elem.type = 'number';
+                break;
+            case 'DROP':
+                elem = document.createElement('select');
+                label.split(',').forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.trim();
+                    option.text = opt.trim();
+                    elem.appendChild(option);
+                });
+                break;
+            default:
+                elem = document.createElement('input');
+                elem.type = 'text';
+        }
+        elem.classList.add('form-input');
+        elem.placeholder = label;
+        fieldArea.appendChild(elem);
+    });
+}
+
+function handlePhoto(input, key) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => compressImg(e.target.result, key);
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function compressImg(data, key) {
+    const img = new Image();
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = Math.min(600 / img.width, 600 / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        state.photoStore[key] = canvas.toDataURL('image/jpeg', 0.4);
+        showToast(`Photo optimized for ${key}`);
+    };
+    img.src = data;
+}
+
+function initSigPad(canvas) {
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let lastPoint;
+    canvas.addEventListener('touchstart', e => {
+        drawing = true;
+        lastPoint = { x: e.touches[0].clientX - canvas.offsetLeft, y: e.touches[0].clientY - canvas.offsetTop };
+    });
+    canvas.addEventListener('touchmove', e => {
+        if (!drawing) return;
+        const currentPoint = { x: e.touches[0].clientX - canvas.offsetLeft, y: e.touches[0].clientY - canvas.offsetTop };
+        ctx.beginPath();
+        ctx.moveTo(lastPoint.x, lastPoint.y);
+        ctx.lineTo(currentPoint.x, currentPoint.y);
+        ctx.stroke();
+        lastPoint = currentPoint;
+    });
+    canvas.addEventListener('touchend', () => drawing = false);
+}
+
+// Submit Report
+async function submitReport() {
+    const fields = document.querySelectorAll('#reportFields input, #reportFields select');
+    const data = {
+        timestamp: new Date().toISOString(),
+        location: state.activeVisit.locationName || 'Unknown',
+        worker: state.worker.name,
+        responses: {},
+        photos: { ...state.photoStore }
+    };
+    fields.forEach(f => data.responses[f.placeholder] = f.value);
+    state.pendingUploads.push(data);
+    if (state.pendingUploads.length > 50) state.pendingUploads.shift(); // Cap
+    saveState();
+    showToast("Report Queued");
+    state.activeVisit = null;
+    state.photoStore = {};
+    navigate('main');
+    forceSync();
+}
+
+// Force Sync
+async function forceSync() {
+    if (!navigator.onLine || !state.settings.googleSheetUrl) return;
+    for (const payload of state.pendingUploads) {
+        try {
+            const response = await fetch(state.settings.googleSheetUrl, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                state.pendingUploads = state.pendingUploads.filter(p => p !== payload);
+            } else {
+                throw new Error('Sync failed');
+            }
+        } catch (e) {
+            console.error(e);
+            return; // Stop on failure
+        }
+    }
+    saveState();
+}
+
+// PIN Verification
+function withPinVerification(allowDuress, callback) {
+    showModal('pin');
+    const input = document.getElementById('pinInput');
+    input.value = '';
+    input.focus();
+    document.getElementById('btnPinConfirm').onclick = () => {
+        const value = input.value.trim();
+        closeModal('pin');
+        if (value === state.pins.std) callback();
+        else if (allowDuress && value === state.pins.duress) triggerPanic(true); // Silent duress
+        else showToast("Incorrect PIN");
+    };
+}
+
+// Pre Depart
+function preDepart() {
+    if (!state.activeVisit) return;
+    const alarmActive = state.activeVisit.isPanic || state.activeVisit.criticalSent;
+    const proceed = () => {
+        // Load form or submit
+        submitReport();
+    };
+    alarmActive ? withPinVerification(false, proceed) : proceed();
+}
+
+// Enter Locked Screen
+function enterLockedScreen() {
+    navigate('locked');
+    startCheckinTimer();
+    setupLongPress('btnDepart', 1500, preDepart);
+}
+
+// Trigger Panic
+async function triggerPanic(duress = false) {
+    document.body.classList.add('bg-red-900');
+    announce(duress ? "Duress activated silently." : "Panic alarm activated.");
+    synth.triggerAttackRelease('C4', '8n'); // Audible alarm
+    await logSafety(duress ? "DURESS" : "PANIC", "Alert triggered.");
+    // Send to backend
+}
+
+// Safety Heartbeat (tick)
+function tick() {
+    if (state.activeVisit) {
+        const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
+        if (remaining <= 90 && !state.activeVisit.warningSent) {
+            announce("Warning: 90 seconds remaining. Check out soon.");
+            synth.triggerAttackRelease('A4', '4n'); // Warning beep
+            state.activeVisit.warningSent = true;
+        }
+        if (remaining <= 0 && !state.activeVisit.criticalSent) {
+            triggerPanic();
+            state.activeVisit.criticalSent = true;
+        }
+    }
+}
+
+// Vehicle Check
+function checkVehicleStatus() {
+    const now = new Date();
+    const wofDate = new Date(state.vehicle.wofExpiry);
+    const regoDate = new Date(state.vehicle.regoExpiry);
+    if (wofDate < now || regoDate < now) {
+        showModal('grounded');
+        return true; // Grounded
+    }
+    return false;
+}
+
+// Render Locations
+function renderLocations() {
+    const list = document.getElementById('locationsList');
+    list.innerHTML = '';
+    state.locations.forEach(loc => {
+        const tile = document.createElement('button');
+        tile.classList.add('p-4 bg-gray-700 rounded-xl');
+        tile.innerText = loc.name;
+        tile.onclick = () => {
+            if (checkVehicleStatus()) return;
+            state.activeVisit = { locationName: loc.name, startTime: Date.now(), duration: 3600 }; // Example 1hr
+            enterLockedScreen();
+        };
+        list.appendChild(tile);
+    });
+}
+
+// Wizard Navigation
+function prevWiz() {
+    if (state.currentWizStep > 1) {
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
+        state.currentWizStep--;
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.add('active');
+        if (state.currentWizStep === 1) document.getElementById('btnWizPrev').classList.add('hidden');
+        document.getElementById('btnWizNext').innerText = "Next Step";
+        saveState(); // Per-step save
+    }
+}
+
+function nextWiz() {
+    if (state.currentWizStep < 3) {
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
+        state.currentWizStep++;
+        document.getElementById(`wizStep${state.currentWizStep}`).classList.add('active');
+        if (state.currentWizStep === 2) document.getElementById('btnWizPrev').classList.remove('hidden');
+        if (state.currentWizStep === 3) document.getElementById('btnWizNext').innerText = "Finish Setup";
+        saveState();
+    } else {
+        saveWizard();
+    }
+}
+
+function saveWizard() {
+    const workerData = {
+        name: document.getElementById('wizName').value,
+        phone: document.getElementById('wizPhone').value,
+        email: document.getElementById('wizEmail').value,
+        pin: document.getElementById('wizPin').value,
+        duress: document.getElementById('wizDuress').value,
+        emgName: document.getElementById('wizContactName').value,
+        emgPhone: document.getElementById('wizContactPhone').value
+    };
+    if (!workerData.name || !workerData.pin || !workerData.duress || !workerData.phone || !workerData.email || !workerData.emgName || !workerData.emgPhone) return alert("Complete all required fields.");
+    state.worker = workerData;
+    state.pins.std = workerData.pin;
+    state.pins.duress = workerData.duress;
+    saveState();
+    document.getElementById('setupWizard').classList.add('hidden');
+    document.getElementById('headerWorkerName').innerText = workerData.name;
+    announce(`Welcome ${workerData.name}. System is now active.`);
+    logSafety("Setup Complete", "Worker profile initialized.");
+    navigate('main');
+}
+
+// Dismiss Install
+function dismissInstall(type) {
+    if (type === 'ios') document.getElementById('iosInstallModal').classList.add('hidden');
+    localStorage.setItem('otg_install_dismissed', 'true');
+}
+
+// Check iOS Install
+function checkIosInstall() {
+    const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    const isStandalone = navigator.standalone === true;
+    if (isIos && !isStandalone && !localStorage.getItem('otg_install_dismissed')) {
+        document.getElementById('iosInstallModal').classList.remove('hidden');
+    }
+}
+
+// PWA Setup
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show install banner if not dismissed
+});
+
+// On Load
+window.onload = () => {
+    state = loadState() || state; // Restore
+    checkIosInstall();
+    startGPSMonitoring();
+    if (!state.worker.name) {
+        document.getElementById('setupWizard').classList.remove('hidden');
+    } else {
+        navigate(state.activeVisit ? 'locked' : 'main');
+        if (state.activeVisit) enterLockedScreen();
+        renderLocations();
+    }
+    document.addEventListener('touchstart', resetInactivityTimer, { passive: true });
+    if (state.activeVisit) {
+        timerInt = setInterval(tick, 1000);
+    }
+    setupLongPress('btnPanic', 3000, triggerPanic);
+    console.log("System Initialised");
+};
+</script>
+
 </body>
 </html>
-
