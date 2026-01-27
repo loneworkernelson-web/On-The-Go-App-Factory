@@ -1423,9 +1423,35 @@ function nextWiz() {
         }
     } else {
         saveWizard();
-    }
+ }
 }
 
+function saveWizard() {
+    const workerData = {
+        name: document.getElementById('wizName').value,
+        phone: document.getElementById('wizPhone').value,
+        email: document.getElementById('wizEmail').value,
+        pin: document.getElementById('wizPin').value,
+        duress: document.getElementById('wizDuress').value,
+        emgName: document.getElementById('wizContactName').value,
+        emgPhone: document.getElementById('wizContactPhone').value
+    };
+    
+    if (!workerData.name || !workerData.pin) {
+        alert("Please complete all required fields.");
+        return;
+    }
+    
+    state.worker = workerData;
+    state.pins.std = workerData.pin;
+    state.pins.duress = workerData.duress;
+    
+    saveState();
+    document.getElementById('setupWizard').classList.add('hidden');
+    document.getElementById('headerWorkerName').innerText = workerData.name;
+    announce(`Welcome ${workerData.name}. System is now active.`);
+    logSafety("Setup Complete", "Worker profile initialized.");
+}
 /**
  * Final Utility Functions
  * These handle the closing of modals and the dismissal of installation prompts.
@@ -1459,6 +1485,17 @@ function checkIosInstall() {
         if (modal) modal.classList.remove('hidden');
     }
 }
+
+// Bind the SOS button to a 3-second long-press
+setupLongPress('btnPanic', 3000, () => {
+    triggerPanic();
+});
+
+async function triggerPanic() {
+    document.body.classList.add('bg-red-900');
+    announce("Panic alarm activated. Emergency services and your manager are being notified.");
+    await logSafety("EMERGENCY - PANIC BUTTON", "Manual SOS trigger activated.");
+}
 </script>
 
 
@@ -1478,5 +1515,3 @@ function checkIosInstall() {
 
 </body>
 </html>
-
-
