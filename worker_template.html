@@ -276,8 +276,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <script>
 /**
- * 1. FACTORY CONFIGURATION
- * Placeholders for the OTG Factory build process.
+ * 1. MODERN STORAGE & STATE INITIALIZATION
+ * Standardized approach for 2026 browsers.
  */
 const CONFIG = {
     url: "%%GOOGLE_SHEET_URL%%",
@@ -297,10 +297,7 @@ const CONFIG = {
     reqTravel: %%REQ_TRAVEL_REPORT%%
 };
 
-/**
- * 2. GLOBAL STATE ENGINE
- * Defined at the top level to ensure global availability.
- */
+// GLOBAL STATE: Must be declared first to prevent ReferenceErrors
 let state = {
     worker: null,
     gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
@@ -312,45 +309,70 @@ let state = {
     voice: null,
     isDimmed: false,
     syncing: false,
-    battery: 100,
-    lastSync: 0
+    battery: 100
 };
-    
+
 /**
- * 3. INITIALIZATION
- * Re-aligned with WSindex.html logic to prevent ReferenceErrors.
+ * Standardized Persistent Storage Request
  */
+async function requestPersistentStorage() {
+    if (navigator.storage && navigator.storage.persist) {
+        const isPersisted = await navigator.storage.persist();
+        console.log(`Safety Data Persistence: ${isPersisted ? "Guaranteed" : "Best Effort"}`);
+    }
+}
+    
 window.onload = async () => {
     console.log("OTG Safety Engine v81.36 Initializing...");
+
+    // 1. Request modern persistent storage
+    await requestPersistentStorage();
     
-    // Load local storage into state
+    // 2. Load worker settings and identity
     loadSettings();
     
-    // Initialize secondary engines
+    // 3. Initialize background systems
     initVoice();
     checkIosInstall();
     startGPS();
     
-    // Safety check for Worker Setup
+    // 4. Battery Monitoring (Critical for Auto-Saver)
+    if ('getBattery' in navigator) {
+        navigator.getBattery().then(function(battery) {
+            const updateBat = () => {
+                state.battery = Math.round(battery.level * 100);
+                // Trigger auto-dim if battery is dangerously low
+                if (battery.level <= 0.20 && !state.isDimmed) {
+                    toggleBatterySaver();
+                    announce("Low Battery. Pocket Protection activated to preserve safety tracking.");
+                }
+            };
+            updateBat();
+            battery.addEventListener('levelchange', updateBat);
+        });
+    }
+
+    // 5. Worker Status Check
     if (!state.worker) {
+        // Show Setup Wizard if first run
         document.getElementById('setupWizard').classList.remove('hidden');
     } else {
+        // Populate header and perform safety heartbeat
         const headerName = document.getElementById('headerWorkerName');
         if (headerName) headerName.innerText = state.worker.name;
         
-        // Restore active visits if they exist in state
-        if (state.activeVisit) {
-            updateUIForActiveActivity();
-            startVisitCountdown();
-        }
-        
         checkVehicleStatus();
+        
+        // Initial Heartbeat Sync
+        logSafety("System Startup", "Worker App initialized and online.");
     }
-    
-    // Register Service Worker for Offline Persistence
+
+    // 6. Service Worker Registration
+    // This enables the offline "Watchdog" features
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
-            .catch(err => console.warn('Offline mode unavailable:', err));
+            .then(reg => console.log('Safety Watchdog Active:', reg.scope))
+            .catch(err => console.warn('Offline Safety Cache Unavailable:', err));
     }
 };
 
@@ -1333,6 +1355,7 @@ function checkIosInstall() {
 
 </body>
 </html>
+
 
 
 
