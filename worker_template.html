@@ -297,21 +297,54 @@ const CONFIG = {
     reqTravel: %%REQ_TRAVEL_REPORT%%
 };
 
-// GLOBAL STATE: Must be declared first to prevent ReferenceErrors
+/**
+ * 2. GLOBAL STATE ENGINE
+ * Master data structure exactly as defined in WSindex.html
+ */
 let state = {
-    worker: null,
-    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
+    worker: null, // Replaces 'settings' in template for consistency
+    locations: [],
+    selectedLocationId: null,
+    visitDurationMinutes: 0,
     activeVisit: null,
-    isTravel: false,
-    travelStart: null,
+    cachedForms: {},
+    pendingUploads: [],
+    globalForms: [],
+    photoStore: {},
+    lowBatSent: false,
+    meta: {},
+    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
     pins: { std: '', duress: '' },
     currentWizStep: 1,
     voice: null,
     isDimmed: false,
-    syncing: false,
-    battery: 100
+    syncing: false
 };
 
+    /**
+ * 3. GLOBAL CONTROL VARIABLES
+ * Required for timing, GPS monitoring, and safety alerts
+ */
+let synth; // Speech engine
+let checkinIntervalId; // Are-you-OK timer
+let mainScreenReminderTimer; // UI reminders
+let wakeLock = null; // Prevents screen timeout during visits
+let timerInt; // Main safety countdown interval
+let travellingInterval; // GPS pulse during travel
+let tempPhoto = null; // Buffer for camera
+let sigPad = null; // Signature handler
+let panicTapCount = 0; // SOS tap tracker
+let panicTapTimer; // SOS timeout
+let deferredPrompt; // PWA installation handler
+let isMidVisitUpdate = false; // Flag for "Update Status" reports
+let currentActiveTemplate = ""; // Active form tracking
+let isDrawing = false; // Signature state
+let calculatedDist = null; // Mileage calculation results
+let gpsWarm = false; // GPS pre-warm state
+let gpsWatchId = null; // GPS listener ID
+let lastAlertTime = 0; // Prevents duplicate emergency logs
+let travelTargetName = ""; // Explicit destination tracking
+    
 /**
  * Standardized Persistent Storage Request
  */
@@ -1355,6 +1388,7 @@ function checkIosInstall() {
 
 </body>
 </html>
+
 
 
 
