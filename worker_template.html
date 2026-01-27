@@ -533,6 +533,43 @@ function showPage(pageId) {
     }
 }
 
+/**
+ * The Safety Heartbeat
+ * Monitors timers, battery, and safety status every second.
+ */
+function tick() {
+    if (!state.activeVisit) return;
+
+    const now = Date.now();
+    const remaining = state.activeVisit.dueOut - now;
+    
+    // 1. Update UI Timer
+    const timerEl = document.getElementById('dueOutTime');
+    if (timerEl) {
+        const mins = Math.floor(Math.abs(remaining) / 60000);
+        const secs = Math.floor((Math.abs(remaining) % 60000) / 1000);
+        timerEl.innerText = `${remaining < 0 ? '-' : ''}${mins}:${secs.toString().padStart(2, '0')}`;
+        
+        // Visual warning if overdue
+        if (remaining < 0) timerEl.classList.add('text-red-500', 'animate-pulse');
+        else timerEl.classList.remove('text-red-500', 'animate-pulse');
+    }
+
+    // 2. 90-Second Critical Warning
+    if (remaining <= 90000 && !state.activeVisit.warn90Sent) {
+        state.activeVisit.warn90Sent = true;
+        announce("Critical Warning. Safety alarm will activate in 90 seconds. Please mark yourself safe.");
+        document.body.classList.add('bg-orange-950');
+        saveState();
+    }
+
+    // 3. Automatic Alarm Trigger
+    if (remaining <= 0 && !state.activeVisit.alarmTriggered) {
+        state.activeVisit.alarmTriggered = true;
+        triggerSafetyAlarm();
+    }
+}
+    
 function checkIosInstall() {
     // Detects if the app is being run in the browser vs installed on iOS.
     const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
@@ -1390,14 +1427,3 @@ function checkIosInstall() {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
