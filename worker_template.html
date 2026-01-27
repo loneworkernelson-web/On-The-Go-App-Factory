@@ -579,6 +579,15 @@ function checkIosInstall() {
     }
 }
 
+function saveState() {
+    localStorage.setItem('otg_user_data', JSON.stringify(state.worker));
+    // Persist current safety state
+    localStorage.setItem('otg_active_safety', JSON.stringify({
+        activeVisit: state.activeVisit,
+        pendingUploads: state.pendingUploads
+    }));
+}
+
 function dismissInstall(type) {
     if (type === 'ios') {
         document.getElementById('iosInstallModal').classList.add('hidden');
@@ -836,7 +845,6 @@ function buildReportForm(formName, questions) {
         qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">${label}</label>
                           <select id="${qId}" class="form-input">${optionsHtml}</select>`;
     }
-}
         // 7. Binary Yes/No Toggles
         else if (upperQ.includes('[YESNO]')) {
             qDiv.innerHTML = `<label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">${q.replace(/\[YESNO\]/gi, '').trim()}</label>
@@ -903,7 +911,41 @@ function buildReportForm(formName, questions) {
     submitBtn.onclick = () => submitReport(formName);
     container.appendChild(submitBtn);
 }
+
+    /**
+ * Robust Report Submission
+ * Packages form data and handles offline caching.
+ */
+async function submitReport(type) {
+    const fields = document.querySelectorAll('#formContainer [id^="q_"]');
+    const formData = {};
     
+    fields.forEach(f => {
+        const label = f.parentElement.querySelector('label')?.innerText || "Field";
+        if (f.type === 'checkbox') formData[label] = f.checked;
+        else if (f.tagName === 'SELECT') formData[label] = f.value;
+        else formData[label] = f.value;
+    });
+
+    const payload = {
+        action: 'submitReport',
+        reportType: type,
+        data: formData,
+        worker: state.worker.name,
+        timestamp: new Date().toISOString()
+    };
+
+    if (navigator.onLine) {
+        await logSafety(`Report: ${type}`, JSON.stringify(formData));
+        alert("Report submitted successfully.");
+    } else {
+        // Cache for later if offline
+        state.pendingUploads.push(payload);
+        saveState();
+        alert("Report saved offline. It will sync when signal returns.");
+    }
+    showPage('pageVisit');
+}
 /**
  * 10. VEHICLE COMPLIANCE & FLEET LOGIC
  * High-resolution monitoring of vehicle safety status.
@@ -1427,3 +1469,4 @@ function checkIosInstall() {
 
 </body>
 </html>
+
