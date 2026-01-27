@@ -276,8 +276,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <script>
 /**
- * 1. FACTORY INJECTION CONFIGURATION
- * These %%PLACEHOLDERS%% are replaced by the Factory during the build process.
+ * 1. FACTORY CONFIGURATION
+ * Placeholders for the OTG Factory build process.
  */
 const CONFIG = {
     url: "%%GOOGLE_SHEET_URL%%",
@@ -294,14 +294,16 @@ const CONFIG = {
     vehTerm: "%%VEHICLE_TERM%%",
     locale: "%%VOICE_LOCALE%%",
     prefix: "%%COUNTRY_PREFIX%%",
-    reqTravel: %%REQ_TRAVEL_REPORT%%,
-    logo: "%%LOGO_DATA%%"
+    reqTravel: %%REQ_TRAVEL_REPORT%%
 };
 
 /**
+ * 2. GLOBAL STATE ENGINE
+ * Defined at the top level to ensure global availability.
+ */
 let state = {
     worker: null,
-    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] }, // Added history: []
+    gps: { lat: 0, lng: 0, acc: 0, last: 0, history: [] },
     activeVisit: null,
     isTravel: false,
     travelStart: null,
@@ -310,47 +312,66 @@ let state = {
     voice: null,
     isDimmed: false,
     syncing: false,
-    installPrompt: null
+    battery: 100,
+    lastSync: 0
 };
-
+    
 /**
- * 3. INITIALIZATION & PWA LIFESTYLE
+ * 3. INITIALIZATION
+ * Re-aligned with WSindex.html logic to prevent ReferenceErrors.
  */
 window.onload = async () => {
     console.log("OTG Safety Engine v81.36 Initializing...");
+    
+    // Load local storage into state
     loadSettings();
+    
+    // Initialize secondary engines
     initVoice();
     checkIosInstall();
     startGPS();
     
+    // Safety check for Worker Setup
     if (!state.worker) {
         document.getElementById('setupWizard').classList.remove('hidden');
     } else {
-        document.getElementById('headerWorkerName').innerText = state.worker.name;
+        const headerName = document.getElementById('headerWorkerName');
+        if (headerName) headerName.innerText = state.worker.name;
+        
+        // Restore active visits if they exist in state
+        if (state.activeVisit) {
+            updateUIForActiveActivity();
+            startVisitCountdown();
+        }
+        
         checkVehicleStatus();
-        syncData(); // Initial heartbeat
     }
     
-    // Register Service Worker for Offline Safety
+    // Register Service Worker for Offline Persistence
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Safety Watchdog Active:', reg.scope))
-            .catch(err => console.warn('Offline Mode Disabled:', err));
+            .catch(err => console.warn('Offline mode unavailable:', err));
     }
-    if ('getBattery' in navigator) {
-    navigator.getBattery().then(function(battery) {
-        const updateBat = () => {
-            state.battery = Math.round(battery.level * 100);
-            if (battery.level <= 0.20 && !state.isDimmed) {
-                toggleBatterySaver();
-                announce("Low Battery. Auto-dimming for safety.");
-            }
-        };
-        updateBat();
-        battery.addEventListener('levelchange', updateBat);
-    });
-}
 };
+
+/**
+ * Voice Engine Initialization
+ * Resolves the "state is not defined" error in the voice callback.
+ */
+function initVoice() {
+    if (!window.speechSynthesis) return;
+
+    const setVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        // Uses the specific regional locale injected by the Factory
+        state.voice = voices.find(v => v.lang === CONFIG.locale) || voices[0];
+    };
+
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = setVoice;
+    }
+    setVoice();
+}
 
 function loadSettings() {
     const saved = localStorage.getItem('otg_user_data');
@@ -428,18 +449,6 @@ function updateGPSIndicator(acc) {
         // Poor/No Signal (Red)
         bars[0].classList.add('active-red');
     }
-}
-
-/**
- * Speech & Voice Engine
- * Uses the injected locale to provide regional warnings.
- */
-function initVoice() {
-    window.speechSynthesis.onvoiceschanged = () => {
-        const voices = window.speechSynthesis.getVoices();
-        // Finds the regional accent (e.g., en-NZ) or falls back to the first available.
-        state.voice = voices.find(v => v.lang === CONFIG.locale) || voices[0];
-    };
 }
 
 function announce(msg) {
@@ -1324,6 +1333,7 @@ function checkIosInstall() {
 
 </body>
 </html>
+
 
 
 
