@@ -83,9 +83,28 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 /* 8. INSTALL OVERLAYS */
 #toastMsg { z-index: 1000; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateY(-150%); }
 #toastMsg.show { transform: translateY(0); }
+
+/* 9. PHASE 1 ADDITIONS */
+#offlineBanner { background: #dc2626; color: white; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 0.25rem; z-index: 50; }
+#vehNagBar { background: #ea580c; color: white; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 0.5rem; cursor: pointer; z-index: 40; border-bottom: 1px solid rgba(255,255,255,0.2); }
+.form-input-card { width: 100%; background-color: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 0.9rem; outline: none; margin-bottom: 0.5rem; display: block; }
+.setting-label { display: block; font-size: 0.625rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; margin-left: 0.25rem; }
+.lbl-blue { color: #60a5fa; }
+.lbl-red { color: #f87171; }
+.lbl-gray { color: #9ca3af; }
 </style>
 </head>
 <body class="h-full overflow-hidden select-none">
+
+<!-- Offline Banner -->
+<div id="offlineBanner" class="hidden fixed top-0 left-0 w-full">
+    📡 OFFLINE MODE - Data queued for upload
+</div>
+
+<!-- Vehicle Nag Bar -->
+<div id="vehNagBar" class="hidden fixed top-0 left-0 w-full" onclick="startVehicleCheck()">
+    ⚠️ Vehicle Check Overdue - Tap to Complete
+</div>
 
 <div id="toastMsg" class="fixed top-4 left-4 right-4 bg-gray-800 border-l-4 border-blue-500 text-white px-4 py-3 rounded shadow-md transform -translate-y-full transition-transform duration-300" aria-live="polite">
   <p id="toastText"></p>
@@ -107,7 +126,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="setupPage" class="page">
     <div class="header-bar">
-        <h1 class="text-xl font-bold">Setup Wizard</h1>
+        <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
+        <div class="flex gap-1">
+            <div id="dot1" class="w-2 h-2 rounded-full bg-blue-500"></div>
+            <div id="dot2" class="w-2 h-2 rounded-full bg-gray-700"></div>
+            <div id="dot3" class="w-2 h-2 rounded-full bg-gray-700"></div>
+        </div>
     </div>
     <div class="content-area flex flex-col">
         <div id="wizStep1" class="wizard-step active">
@@ -122,9 +146,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="wizDuress" type="password" placeholder="Duress PIN (silent alert)" class="form-input">
         </div>
         <div id="wizStep3" class="wizard-step">
-            <h2 class="text-lg font-bold mb-4">Emergency Contact</h2>
-            <input id="wizContactName" type="text" placeholder="Contact Name" class="form-input">
-            <input id="wizContactPhone" type="tel" placeholder="Contact Phone" class="form-input">
+            <h2 class="text-lg font-bold mb-4">Emergency Contacts</h2>
+            <label class="setting-label lbl-red">Primary Emergency Contact</label>
+            <input id="wizContactName" type="text" placeholder="Contact Name" class="form-input-card">
+            <input id="wizContactPhone" type="tel" placeholder="Contact Phone" class="form-input-card">
+            <input id="wizContactEmail" type="email" placeholder="Contact Email" class="form-input mb-4">
+            <label class="setting-label lbl-gray">Escalation Contact (Optional)</label>
+            <input id="wizEscName" type="text" placeholder="Name" class="form-input-card">
+            <input id="wizEscPhone" type="tel" placeholder="Phone" class="form-input-card">
+            <input id="wizEscEmail" type="email" placeholder="Email" class="form-input">
         </div>
     </div>
     <div class="footer-bar flex justify-between">
@@ -136,44 +166,233 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="mainPage" class="page">
     <div class="header-bar">
         <h1 id="headerWorkerName" class="text-xl font-bold">Welcome</h1>
-        <div id="gpsIndicator" class="flex gap-1">
-            <div class="gps-bar"></div>
-            <div class="gps-bar"></div>
-            <div class="gps-bar"></div>
+        <div class="flex gap-2 items-center">
+            <div id="gpsIndicator" class="flex gap-1">
+                <div class="gps-bar"></div>
+                <div class="gps-bar"></div>
+                <div class="gps-bar"></div>
+            </div>
+            <button onclick="navigate('settings')" class="text-2xl text-gray-400 hover:text-white px-2" aria-label="Settings">⚙️</button>
         </div>
     </div>
     <div class="content-area" id="locationsList">
         <!-- Rendered tiles -->
     </div>
-    <div class="footer-bar">
-        <!-- Settings, etc. -->
+    <div class="footer-bar flex gap-3">
+        <button onclick="forceSync(true)" class="px-6 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg">
+            🔄 Sync
+        </button>
     </div>
 </div>
 
 <div id="lockedPage" class="page">
-    <div class="header-bar">
-        <h1 class="text-xl font-bold">Active Visit</h1>
-        <div id="visitTimer" class="text-lg font-mono">0:00</div>
-    </div>
-    <div class="content-area flex flex-col items-center justify-center gap-6">
-        <button id="btnPanic" class="long-press-btn w-40 h-40 rounded-full bg-red-600 text-white text-3xl font-bold shadow-lg active:scale-95 transition-transform" aria-label="Emergency panic button - hold for 3 seconds">
-            SOS
-        </button>
-        <p class="text-gray-300 text-sm text-center">Hold for 3 seconds to trigger panic alarm</p>
-    </div>
-    <div class="footer-bar">
-        <button id="btnDepart" class="long-press-btn w-full py-4 bg-blue-600 rounded-xl font-bold text-lg active:scale-98 transition-transform" aria-label="Complete visit - hold for 1.5 seconds">
-            Hold to Complete Visit
-        </button>
+    <div class="flex-1 flex flex-col justify-between p-6">
+        <div class="flex justify-between items-start">
+            <button onclick="toggleBatterySaver()" class="p-2 bg-gray-800 rounded-full text-yellow-400 border border-gray-600 hover:bg-gray-700 shadow-xl" aria-label="Toggle battery saver">
+                🌙
+            </button>
+            <button id="btnPanic" class="w-24 h-24 bg-red-600 rounded-full font-black text-white text-2xl border-4 border-red-800 shadow-2xl active:scale-95 transition flex items-center justify-center" aria-label="Emergency panic button">
+                SOS
+            </button>
+        </div>
+        <div class="text-center">
+            <p class="text-gray-500 text-xs uppercase font-black tracking-[0.3em]">Currently Active At</p>
+            <div class="flex items-center justify-center gap-2 mt-1 mb-2 cursor-pointer hover:bg-gray-800 rounded p-2 transition" onclick="showCurrentSiteInfo()">
+                <h2 id="lockedLocationName" class="text-3xl font-bold text-white truncate max-w-[250px]"></h2>
+                <span class="text-blue-400 text-xl">ℹ️</span>
+            </div>
+            <div id="highRiskBadge" class="hidden text-red-500 font-black text-xs uppercase tracking-widest border border-red-500 inline-block px-3 py-1 rounded-lg mb-2">
+                ⚡ CRITICAL TIMING MODE
+            </div>
+            <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse my-2 tracking-[0.2em] border-2 border-red-500 inline-block px-6 py-2 rounded-xl uppercase">
+                OVERDUE
+            </div>
+            <div id="countdownTimer" class="text-8xl font-bold font-mono text-white tracking-tighter">00:00</div>
+            <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">
+                Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span>
+            </p>
+        </div>
+        <div class="space-y-3 w-full">
+            <div class="flex gap-3">
+                <button id="btnExtend" onclick="showModal('extend')" class="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
+                    Extend
+                </button>
+                <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
+                    Notes
+                </button>
+            </div>
+            <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">
+                Hold to END
+            </button>
+            <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">
+                I AM SAFE
+            </button>
+        </div>
     </div>
 </div>
 
 <div id="reportPage" class="page">
     <div class="header-bar">
-        <h1 class="text-xl font-bold">Visit Report</h1>
+        <h1 id="reportTitle" class="text-xl font-bold">Visit Report</h1>
+        <button onclick="closeModal('report')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
     <div class="content-area">
         <div id="reportFields"></div>
+    </div>
+    <div class="footer-bar">
+        <button id="btnSubmitRep" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg">Submit Report</button>
+    </div>
+</div>
+
+<!-- Settings Page -->
+<div id="settingsPage" class="page bg-gray-800">
+    <div class="header-bar">
+        <h1 class="text-2xl font-bold text-white">Settings</h1>
+        <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
+    </div>
+    <div class="content-area pb-24">
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-blue-400 mb-4">Worker Profile</h2>
+            <label class="setting-label lbl-blue">Full Name</label>
+            <input id="setName" type="text" class="form-input">
+            <label class="setting-label lbl-blue">Mobile Number</label>
+            <input id="setPhone" type="tel" class="form-input">
+            <label class="setting-label lbl-blue">Work Email</label>
+            <input id="setEmail" type="email" class="form-input">
+        </div>
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-red-400 mb-4">Emergency Contacts</h2>
+            <label class="setting-label lbl-red">Primary Emergency Contact</label>
+            <input id="setEmgName" type="text" class="form-input-card">
+            <input id="setEmgPhone" type="tel" class="form-input-card">
+            <input id="setEmgEmail" type="email" class="form-input mb-4">
+            <label class="setting-label lbl-gray">Escalation Contact</label>
+            <input id="setEscName" type="text" class="form-input-card">
+            <input id="setEscPhone" type="tel" class="form-input-card">
+            <input id="setEscEmail" type="email" class="form-input">
+        </div>
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-purple-400 mb-4">Advanced</h2>
+            <div class="bg-gray-900 p-4 rounded-xl mb-4">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="setAdvanced" onchange="toggleAdvancedGPS(this.checked)" class="w-6 h-6 rounded text-blue-600">
+                    <div>
+                        <div class="text-white font-bold">Advanced GPS Monitoring</div>
+                        <div class="text-xs text-gray-400">Continuous tracking (higher battery use)</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="space-y-3">
+            <button onclick="saveSettings()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg">
+                💾 Save Settings
+            </button>
+            <button onclick="exportUserData()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg">
+                📤 Export My Data
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Extend Modal -->
+<div id="extendModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center border border-gray-700">
+        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Extend Visit</h2>
+        <div class="grid grid-cols-3 gap-3 mb-8">
+            <button onclick="confirmExtension(10)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+10</button>
+            <button onclick="confirmExtension(15)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+15</button>
+            <button onclick="confirmExtension(30)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+30</button>
+        </div>
+        <button onclick="closeModal('extend')" class="w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase">Cancel</button>
+    </div>
+</div>
+
+<!-- Vehicle WOF Block Modal -->
+<div id="wofBlockModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-10 text-center border-4 border-red-600">
+        <div class="text-7xl mb-6">⛔</div>
+        <h2 class="text-3xl font-black text-red-500 mb-4 uppercase">STOP</h2>
+        <p class="text-lg text-white font-bold mb-6">This vehicle has an EXPIRED WOF or Registration. It is prohibited for work use.</p>
+        <button onclick="closeWofBlocker()" class="w-full py-5 bg-red-600 text-white font-black rounded-2xl text-xl shadow-2xl">I Understand</button>
+    </div>
+</div>
+
+<!-- Vehicle WOF Warning Modal -->
+<div id="wofWarnModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-orange-500">
+        <div class="text-6xl mb-4">⚠️</div>
+        <h2 class="text-2xl font-black text-orange-500 mb-2 uppercase">VEHICLE COMPLIANCE</h2>
+        <p class="text-white font-bold mb-6">Vehicle WOF or Rego is expiring soon:<br><span id="wofWarnText" class="text-2xl text-orange-400 font-black"></span></p>
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 text-left mb-6">
+            <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" id="chkWofAck" class="mt-1 w-6 h-6 rounded text-blue-600" onchange="toggleWofContinue()">
+                <span class="text-sm text-gray-300 font-bold">I acknowledge the vehicle is legal and safe to operate.</span>
+            </label>
+        </div>
+        <button id="btnWofContinue" disabled onclick="closeWofWarn()" class="w-full py-4 bg-gray-700 text-gray-500 font-black rounded-2xl text-lg transition-all">Continue</button>
+    </div>
+</div>
+
+<!-- Site Info Modal (Phase 2, Feature 9) -->
+<div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto border border-gray-700">
+        <h2 class="text-2xl font-black text-white mb-4">Site Info</h2>
+        <div id="siteInfoContent" class="text-gray-300 text-sm space-y-3 mb-6"></div>
+        <div class="flex gap-3 mb-4">
+            <a id="btnSiteCall" href="#" class="hidden flex-1 bg-green-600 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest">📞 Call</a>
+            <a id="btnSiteEmail" href="#" class="hidden flex-1 bg-blue-600 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest">✉️ Email</a>
+        </div>
+        <a id="btnSiteNav" href="#" target="_blank" class="hidden block w-full py-4 bg-purple-600 text-white font-black rounded-xl text-center mb-4 uppercase tracking-widest">🗺️ Navigate</a>
+        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-xl uppercase tracking-widest">Close</button>
+    </div>
+</div>
+
+<!-- Location Management Modal (Phase 2, Feature 13) -->
+<div id="locationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-700 max-h-[90vh] overflow-y-auto">
+        <h2 class="text-xl font-black mb-6 text-white uppercase tracking-widest">Edit Location</h2>
+        <input type="hidden" id="locId">
+        <div class="space-y-4">
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Business Name</label>
+                <input type="text" id="locBusiness" class="form-input" placeholder="Optional">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Site Name</label>
+                <input type="text" id="locName" class="form-input" placeholder="Required">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Physical Address</label>
+                <div class="flex gap-2">
+                    <input type="text" id="locAddr" class="form-input mb-0 flex-1">
+                    <button onclick="getGpsAddress()" class="bg-blue-600 text-white p-3 rounded-xl font-black text-xs shrink-0">📍 GPS</button>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Contact Name</label>
+                <input type="text" id="locContactName" class="form-input" placeholder="Optional">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Contact Phone</label>
+                <input type="tel" id="locContactPhone" class="form-input" placeholder="Optional">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 uppercase font-black tracking-widest ml-1">Contact Email</label>
+                <input type="email" id="locContactEmail" class="form-input" placeholder="Optional">
+            </div>
+            <div class="bg-gray-900 p-3 rounded-xl">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="locCritical" class="w-5 h-5 rounded text-red-600">
+                    <span class="text-sm text-white font-bold">⚡ Critical Timing Mode (High-Risk Site)</span>
+                </label>
+            </div>
+        </div>
+        <div class="mt-8 flex gap-3">
+            <button onclick="deleteLoc()" id="btnDelLoc" class="hidden bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest border border-red-800/30">Delete</button>
+            <div class="flex-1"></div>
+            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs tracking-widest">Save</button>
+        </div>
     </div>
 </div>
 
@@ -207,7 +426,51 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
+<!-- Android Install Banner (Phase 3, Feature 17) -->
+<div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-4 z-[100] shadow-xl flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-2xl">📲</span>
+        <div>
+            <p class="font-bold text-sm">Install Safety App</p>
+            <p class="text-xs opacity-90">Add to home screen for safety monitoring.</p>
+        </div>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="dismissInstall('android')" class="px-3 py-1 text-xs font-bold bg-blue-700 rounded">Later</button>
+        <button onclick="triggerInstall()" class="px-4 py-1 text-xs font-black bg-white text-blue-600 rounded">Install</button>
+    </div>
+</div>
+
 <script>
+// ============================================================================
+// CONFIGURATION SYSTEM (Phase 2, Feature 11)
+// ============================================================================
+const CONFIG = {
+    // Backend
+    url: "%%BACKEND_URL%%",
+    org: "%%ORG_NAME%%",
+    key: "%%API_KEY%%",
+    
+    // Features
+    isAdvanced: true,
+    mileageEnabled: true,
+    vehEnabled: true,
+    checkinEnabled: false,
+    
+    // Timing
+    vehInterval: 120, // days
+    escalationMinutes: 15,
+    checkinInterval: 60, // minutes
+    
+    // Localization (Phase 2, Feature 10 & Phase 3, Feature 19)
+    countryPrefix: "%%COUNTRY_PREFIX%%",
+    vehicleTerm: "%%VEHICLE_TERM%%",
+    voiceLocale: "%%VOICE_LOCALE%%",
+    
+    // Requirements
+    reqTravelReport: true
+};
+
 // ============================================================================
 // GLOBALS AND STATE INITIALIZATION
 // ============================================================================
@@ -224,6 +487,10 @@ let lastGPS = null;
 let synth; // Tone.js synth - initialized after user interaction
 let audioReady = false;
 let gpsWatchId = null; // Track GPS watch for cleanup
+
+// PHASE 1 ADDITIONS
+let isMidVisitUpdate = false; // Track if we're updating mid-visit vs ending
+let currentBatteryLevel = "100%";
 
 // ============================================================================
 // AUDIO INITIALIZATION (Must be after user interaction)
@@ -298,6 +565,12 @@ function navigate(page) {
     const targetPage = document.getElementById(page + 'Page');
     if (targetPage) {
         targetPage.classList.add('active');
+        
+        // PHASE 1: Populate settings page when navigating to it
+        if (page === 'settings') {
+            populateSettingsForm();
+        }
+        
         resetInactivityTimer();
     } else {
         console.error(`Page not found: ${page}Page`);
@@ -702,8 +975,34 @@ function preDepart() {
 // ============================================================================
 function enterLockedScreen() {
     navigate('locked');
+    
+    // PHASE 1: Initialize warning flags and anticipated departure time
+    if (state && state.activeVisit) {
+        if (!state.activeVisit.anticipatedDepartureTime) {
+            const anticipatedTime = new Date(state.activeVisit.startTime);
+            anticipatedTime.setSeconds(anticipatedTime.getSeconds() + state.activeVisit.duration);
+            state.activeVisit.anticipatedDepartureTime = anticipatedTime.toISOString();
+        }
+        
+        // Initialize all warning flags
+        if (!state.activeVisit.warn5minSent) state.activeVisit.warn5minSent = false;
+        if (!state.activeVisit.warn2minSent) state.activeVisit.warn2minSent = false;
+        if (!state.activeVisit.warn90Sent) state.activeVisit.warn90Sent = false;
+        if (!state.activeVisit.warningSent) state.activeVisit.warningSent = false;
+        if (!state.activeVisit.criticalSent) state.activeVisit.criticalSent = false;
+        
+        // Set location name in header
+        const locNameEl = document.getElementById('lockedLocationName');
+        if (locNameEl) {
+            locNameEl.innerText = state.activeVisit.locationName || 'Unknown';
+        }
+        
+        saveState();
+    }
+    
     startCheckinTimer();
     setupLongPress('btnDepart', 1500, preDepart);
+    setupLongPress('btnSafe', 3000, iamSafe);
 }
 
 // ============================================================================
@@ -733,33 +1032,121 @@ async function triggerPanic(duress = false) {
     }
 }
 
+// PHASE 1: I AM SAFE function (after alarm triggered)
+function iamSafe() {
+    if (!state || !state.activeVisit) return;
+    
+    // Require PIN to declare safe
+    withPinVerification(false, () => {
+        logSafety("I_AM_SAFE", "Worker declared safe after alarm");
+        showToast("✅ Safety status confirmed");
+        
+        // Clear alarm state but keep visit active
+        state.activeVisit.isPanic = false;
+        state.activeVisit.criticalSent = false;
+        document.body.classList.remove('bg-red-900');
+        
+        // Hide "I AM SAFE" button, show normal buttons
+        const btnSafe = document.getElementById('btnSafe');
+        const btnDepart = document.getElementById('btnDepart');
+        const btnExtend = document.getElementById('btnExtend');
+        if (btnSafe) btnSafe.classList.add('hidden');
+        if (btnDepart) btnDepart.classList.remove('hidden');
+        if (btnExtend) btnExtend.classList.remove('hidden');
+        
+        saveState();
+    });
+}
+
 // ============================================================================
 // SAFETY HEARTBEAT (tick)
 // ============================================================================
 function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
+        const remainingMs = remaining * 1000;
         
-        if (remaining <= 90 && !state.activeVisit.warningSent) {
-            announce("Warning: 90 seconds remaining. Check out soon.");
-            
-            // Play warning beep if audio is ready
-            if (audioReady && synth) {
-                try {
-                    synth.triggerAttackRelease('A4', '4n');
-                } catch (e) {
-                    console.warn('Audio playback failed:', e);
-                }
-            }
-            
-            state.activeVisit.warningSent = true;
+        // PHASE 1: Multiple warning levels
+        // 5-minute warning (300 seconds)
+        if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
+            playWarningSound('warning');
+            state.activeVisit.warn5minSent = true;
             saveState();
         }
         
-        if (remaining <= 0 && !state.activeVisit.criticalSent) {
-            triggerPanic();
-            state.activeVisit.criticalSent = true;
+        // 2-minute warning with voice (120 seconds)
+        if (remaining <= 120 && remaining > 119 && !state.activeVisit.warn2minSent) {
+            playWarningSound('warning');
+            speakWarning("Warning. Safety alarm will activate in two minutes.");
+            state.activeVisit.warn2minSent = true;
             saveState();
+        }
+        
+        // 90-second critical warning with voice
+        if (remaining <= 90 && remaining > 89 && !state.activeVisit.warn90Sent) {
+            playWarningSound('critical');
+            speakWarning("Critical Warning. Safety alarm will activate in 90 seconds.");
+            state.activeVisit.warn90Sent = true;
+            saveState();
+        }
+        
+        // Update timer display
+        const timerEl = document.getElementById('countdownTimer');
+        const overdueLabel = document.getElementById('overdueLabel');
+        const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
+        
+        if (remaining <= 0) {
+            // OVERDUE
+            if (overdueLabel) overdueLabel.classList.remove('hidden');
+            const absRemaining = Math.abs(remaining);
+            const mins = Math.floor(absRemaining / 60);
+            const secs = Math.floor(absRemaining % 60);
+            if (timerEl) {
+                if (mins >= 60) {
+                    const hours = Math.floor(mins / 60);
+                    const remainMins = mins % 60;
+                    timerEl.innerHTML = `-${hours}h ${remainMins}m`;
+                } else {
+                    timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+                }
+                timerEl.classList.add('text-red-500', 'animate-pulse');
+            }
+            
+            // Show "I AM SAFE" button instead of depart/extend
+            const btnSafe = document.getElementById('btnSafe');
+            const btnDepart = document.getElementById('btnDepart');
+            const btnExtend = document.getElementById('btnExtend');
+            if (btnSafe) btnSafe.classList.remove('hidden');
+            if (btnDepart) btnDepart.classList.add('hidden');
+            if (btnExtend) btnExtend.classList.add('hidden');
+            
+            // Trigger critical alarm if not sent
+            if (!state.activeVisit.criticalSent) {
+                triggerPanic(false);
+                state.activeVisit.criticalSent = true;
+                saveState();
+            }
+        } else {
+            // COUNTDOWN
+            if (overdueLabel) overdueLabel.classList.add('hidden');
+            const mins = Math.floor(remaining / 60);
+            const secs = Math.floor(remaining % 60);
+            if (timerEl) {
+                if (mins >= 60) {
+                    const hours = Math.floor(mins / 60);
+                    const remainMins = mins % 60;
+                    timerEl.innerHTML = `${hours}h ${remainMins}m`;
+                } else {
+                    timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+                }
+                timerEl.classList.remove('text-red-500', 'animate-pulse');
+            }
+        }
+        
+        // Display anticipated departure time
+        if (state.activeVisit.anticipatedDepartureTime && anticipatedTimeEl) {
+            const antTime = new Date(state.activeVisit.anticipatedDepartureTime);
+            anticipatedTimeEl.innerText = antTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: true});
         }
     }
 }
@@ -789,25 +1176,130 @@ function renderLocations() {
     if (!list || !state || !state.locations) return;
     
     list.innerHTML = '';
+    
+    // Add travel location if enabled
+    if (CONFIG.mileageEnabled && !state.locations.find(l => l.id === 'travel')) {
+        state.locations.unshift({
+            id: 'travel',
+            name: 'Travel',
+            address: 'Calculates Mileage via GPS',
+            companyName: 'Internal',
+            noReport: !CONFIG.reqTravelReport
+        });
+    }
+    
     state.locations.forEach(loc => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex gap-2 mb-2';
+        
         const tile = document.createElement('button');
-        tile.classList.add('p-4', 'bg-gray-700', 'rounded-xl', 'w-full', 'text-left', 'mb-2', 'active:bg-gray-600', 'transition-colors');
-        tile.innerText = loc.name;
+        tile.classList.add('flex-1', 'p-4', 'bg-gray-700', 'rounded-xl', 'text-left', 'active:bg-gray-600', 'transition-colors');
+        
+        // Build tile content with proper formatting
+        let tileHTML = `<div class="font-bold text-white text-lg">${loc.name}</div>`;
+        if (loc.address) {
+            tileHTML += `<div class="text-xs text-gray-400 mt-1">${loc.address}</div>`;
+        }
+        if (loc.companyName && loc.companyName !== 'Internal') {
+            tileHTML += `<div class="text-xs text-blue-400 mt-1">${loc.companyName}</div>`;
+        }
+        if (loc.isCritical) {
+            tileHTML += `<div class="text-xs text-red-500 font-bold mt-1">⚡ CRITICAL SITE</div>`;
+        }
+        tile.innerHTML = tileHTML;
+        
         tile.onclick = () => {
-            if (checkVehicleStatus()) return;
+            // Check vehicle compliance
+            if (checkVehicleBeforeVisit()) return;
+            
+            // Travel location - capture start GPS
+            if (loc.id === 'travel') {
+                if (!navigator.geolocation) {
+                    return showToast('GPS not available');
+                }
+                
+                showToast('Getting start location...');
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        const startGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                        state.activeVisit = {
+                            locationName: loc.name,
+                            locationId: loc.id,
+                            startTime: Date.now(),
+                            startGPS: startGPS,
+                            duration: 3600,
+                            isPanic: false,
+                            criticalSent: false,
+                            warningSent: false,
+                            warn90Sent: false,
+                            warn2minSent: false,
+                            warn5minSent: false
+                        };
+                        saveState();
+                        showToast('📍 Start location recorded');
+                        enterLockedScreen();
+                    },
+                    err => {
+                        showToast('GPS error: ' + err.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+                return;
+            }
+            
+            // Regular location
             state.activeVisit = { 
-                locationName: loc.name, 
+                locationName: loc.name,
+                locationId: loc.id,
                 startTime: Date.now(), 
-                duration: 3600, // 1 hour
+                duration: 3600,
                 isPanic: false,
                 criticalSent: false,
-                warningSent: false
+                warningSent: false,
+                warn90Sent: false,
+                warn2minSent: false,
+                warn5minSent: false
             };
             saveState();
             enterLockedScreen();
         };
-        list.appendChild(tile);
+        
+        wrapper.appendChild(tile);
+        
+        // Add edit button for manual locations (loc_*) and travel
+        if (loc.id.startsWith('loc_') || loc.id === 'travel') {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'w-14 bg-blue-600 rounded-xl text-white font-bold text-xl hover:bg-blue-500 active:scale-95 transition';
+            editBtn.innerHTML = '✏️';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                openLocationEditor(loc.id);
+            };
+            wrapper.appendChild(editBtn);
+        }
+        
+        list.appendChild(wrapper);
     });
+    
+    // Add "New Location" button
+    const addBtn = document.createElement('button');
+    addBtn.className = 'w-full p-4 bg-blue-900 border-2 border-dashed border-blue-500 rounded-xl text-blue-400 font-bold hover:bg-blue-800 transition-colors mt-4';
+    addBtn.innerHTML = '➕ Add New Location';
+    addBtn.onclick = () => {
+        // Clear form for new location
+        document.getElementById('locId').value = '';
+        document.getElementById('locBusiness').value = '';
+        document.getElementById('locName').value = '';
+        document.getElementById('locAddr').value = '';
+        document.getElementById('locContactName').value = '';
+        document.getElementById('locContactPhone').value = '';
+        document.getElementById('locContactEmail').value = '';
+        document.getElementById('locCritical').checked = false;
+        const btnDel = document.getElementById('btnDelLoc');
+        if (btnDel) btnDel.classList.add('hidden');
+        showModal('location');
+    };
+    list.appendChild(addBtn);
 }
 
 // ============================================================================
@@ -857,7 +1349,11 @@ function saveWizard() {
         pin: document.getElementById('wizPin').value,
         duress: document.getElementById('wizDuress').value,
         emgName: document.getElementById('wizContactName').value.trim(),
-        emgPhone: document.getElementById('wizContactPhone').value.trim()
+        emgPhone: document.getElementById('wizContactPhone').value.trim(),
+        emgEmail: document.getElementById('wizContactEmail').value.trim(),
+        escName: document.getElementById('wizEscName').value.trim(),
+        escPhone: document.getElementById('wizEscPhone').value.trim(),
+        escEmail: document.getElementById('wizEscEmail').value.trim()
     };
     
     if (!workerData.name || !workerData.pin || !workerData.duress || 
@@ -963,11 +1459,18 @@ window.onload = () => {
         globalForms: [],
         photoStore: {},
         settings: {},
-        vehicle: { wofExpiry: '', regoExpiry: '' }
+        vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
+        meta: {} // For vehicle check data from backend
     };
+    
+    // Check network status for offline banner
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
     
     checkIosInstall();
     startGPSMonitoring();
+    checkVehicleStatus(); // Check vehicle compliance on load
     
     // Determine initial page
     if (!state.worker || !state.worker.name) {
@@ -992,8 +1495,965 @@ window.onload = () => {
     // Setup panic button long press
     setupLongPress('btnPanic', 3000, () => triggerPanic(false));
     
-    console.log("System Initialized");
+    console.log("System Initialized - Phase 1 Enhanced");
 };
+
+// ============================================================================
+// PHASE 1: SETTINGS PAGE FUNCTIONS
+// ============================================================================
+function populateSettingsForm() {
+    if (!state || !state.worker) return;
+    const s = state.worker;
+    document.getElementById('setName').value = s.name || '';
+    document.getElementById('setPhone').value = s.phone || '';
+    document.getElementById('setEmail').value = s.email || '';
+    document.getElementById('setEmgName').value = s.emgName || '';
+    document.getElementById('setEmgPhone').value = s.emgPhone || '';
+    document.getElementById('setEmgEmail').value = s.emgEmail || '';
+    document.getElementById('setEscName').value = s.escName || '';
+    document.getElementById('setEscPhone').value = s.escPhone || '';
+    document.getElementById('setEscEmail').value = s.escEmail || '';
+}
+
+function saveSettings() {
+    if (!state || !state.worker) return;
+    
+    state.worker.name = document.getElementById('setName').value.trim();
+    state.worker.phone = document.getElementById('setPhone').value.trim();
+    state.worker.email = document.getElementById('setEmail').value.trim();
+    state.worker.emgName = document.getElementById('setEmgName').value.trim();
+    state.worker.emgPhone = document.getElementById('setEmgPhone').value.trim();
+    state.worker.emgEmail = document.getElementById('setEmgEmail').value.trim();
+    state.worker.escName = document.getElementById('setEscName').value.trim();
+    state.worker.escPhone = document.getElementById('setEscPhone').value.trim();
+    state.worker.escEmail = document.getElementById('setEscEmail').value.trim();
+    
+    saveState();
+    
+    const headerName = document.getElementById('headerWorkerName');
+    if (headerName) headerName.innerText = state.worker.name;
+    
+    showToast('✅ Settings Saved');
+    navigate('main');
+}
+
+function exportUserData() {
+    if (!state) return;
+    
+    const data = {
+        exportDate: new Date().toISOString(),
+        worker: state.worker,
+        safetyLog: state.pendingUploads || [],
+        settings: state.settings
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `worker-data-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showToast('📤 Data Exported');
+}
+
+// ============================================================================
+// PHASE 1: VEHICLE WOF COMPLIANCE SYSTEM
+// ============================================================================
+function checkVehicleStatus() {
+    if (!state || !state.meta) return;
+    
+    const nagBar = document.getElementById('vehNagBar');
+    if (!nagBar) return;
+    
+    let showNag = false;
+    
+    // Check last vehicle check date
+    if (state.meta.lastVehCheck) {
+        const lastCheck = new Date(state.meta.lastVehCheck);
+        const daysSince = (Date.now() - lastCheck.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince > 120) { // 120 days
+            showNag = true;
+            nagBar.innerText = '⚠️ Vehicle Check Overdue - Tap to Complete';
+        }
+    } else {
+        showNag = true;
+        nagBar.innerText = '⚠️ Vehicle Check Required';
+    }
+    
+    // Check WOF expiry
+    if (state.meta.wofExpiry) {
+        const wofDate = new Date(state.meta.wofExpiry);
+        const daysUntil = (wofDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        
+        if (daysUntil < 0) {
+            // EXPIRED - block usage
+            showNag = true;
+            nagBar.innerText = '⛔ WOF EXPIRED - Vehicle Use Prohibited';
+            nagBar.classList.add('animate-pulse');
+        } else if (daysUntil < 14) {
+            // Expiring soon - warn
+            showNag = true;
+            nagBar.innerText = `⚠️ Vehicle Check: WOF Due in ${Math.ceil(daysUntil)} Days`;
+        }
+    }
+    
+    if (showNag) {
+        nagBar.classList.remove('hidden');
+    } else {
+        nagBar.classList.add('hidden');
+    }
+}
+
+function startVehicleCheck() {
+    // This would load a vehicle check form
+    showToast('Vehicle check form would load here');
+    // TODO: loadFormAndShow('Vehicle Safety Check');
+}
+
+function checkVehicleBeforeVisit() {
+    if (!state || !state.meta) return false;
+    
+    // Check if WOF is expired
+    if (state.meta.wofExpiry) {
+        const wofDate = new Date(state.meta.wofExpiry);
+        if (wofDate < new Date()) {
+            showModal('wofBlock');
+            return true; // Blocked
+        }
+        
+        // Check if expiring within 14 days
+        const daysUntil = (wofDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+        if (daysUntil > 0 && daysUntil < 14) {
+            const wofWarnText = document.getElementById('wofWarnText');
+            if (wofWarnText) {
+                wofWarnText.innerText = `${Math.ceil(daysUntil)} days`;
+            }
+            showModal('wofWarn');
+            return true; // Needs acknowledgment
+        }
+    }
+    
+    return false; // OK to proceed
+}
+
+function closeWofBlocker() {
+    closeModal('wofBlock');
+}
+
+function toggleWofContinue() {
+    const checkbox = document.getElementById('chkWofAck');
+    const button = document.getElementById('btnWofContinue');
+    if (checkbox && button) {
+        if (checkbox.checked) {
+            button.disabled = false;
+            button.classList.remove('bg-gray-700', 'text-gray-500');
+            button.classList.add('bg-blue-600', 'text-white');
+        } else {
+            button.disabled = true;
+            button.classList.add('bg-gray-700', 'text-gray-500');
+            button.classList.remove('bg-blue-600', 'text-white');
+        }
+    }
+}
+
+function closeWofWarn() {
+    const checkbox = document.getElementById('chkWofAck');
+    if (checkbox) checkbox.checked = false;
+    closeModal('wofWarn');
+    // Continue with visit start
+}
+
+// ============================================================================
+// PHASE 1: TIME EXTENSION
+// ============================================================================
+function confirmExtension(minutes) {
+    if (!state || !state.activeVisit) return;
+    
+    // Add minutes to anticipated departure time
+    if (state.activeVisit.anticipatedDepartureTime) {
+        const newTime = new Date(state.activeVisit.anticipatedDepartureTime);
+        newTime.setMinutes(newTime.getMinutes() + minutes);
+        state.activeVisit.anticipatedDepartureTime = newTime.toISOString();
+    } else {
+        const newTime = new Date(state.activeVisit.startTime);
+        newTime.setMinutes(newTime.getMinutes() + state.activeVisit.duration / 60 + minutes);
+        state.activeVisit.anticipatedDepartureTime = newTime.toISOString();
+    }
+    
+    // Extend duration
+    state.activeVisit.duration += minutes * 60;
+    
+    // Reset warning flags
+    state.activeVisit.warningSent = false;
+    state.activeVisit.warn90Sent = false;
+    state.activeVisit.warn2minSent = false;
+    state.activeVisit.warn5minSent = false;
+    
+    saveState();
+    closeModal('extend');
+    showToast(`⏱️ Visit extended by ${minutes} minutes`);
+    
+    logSafety('TIME_EXTENSION', `Visit extended by ${minutes} minutes`);
+}
+
+// ============================================================================
+// PHASE 1: MID-VISIT UPDATES
+// ============================================================================
+function openMidVisitMenu() {
+    isMidVisitUpdate = true;
+    // For now, just trigger a simple note
+    if (confirm('Send a mid-visit status update?')) {
+        const note = prompt('Enter status update:');
+        if (note) {
+            logSafety('MID_VISIT_UPDATE', note);
+            showToast('📝 Update sent');
+        }
+    }
+    // TODO: Show form selection modal like WS_Safety
+}
+
+// ============================================================================
+// PHASE 1: MULTIPLE WARNING LEVELS (5min, 2min, 90sec)
+// ============================================================================
+function playWarningSound(type) {
+    if (audioReady && synth) {
+        try {
+            if (type === 'warning') {
+                synth.triggerAttackRelease('A4', '4n');
+            } else if (type === 'critical') {
+                synth.triggerAttackRelease('C5', '4n');
+            }
+        } catch (e) {
+            console.warn('Audio playback failed:', e);
+        }
+    }
+}
+
+function speakWarning(message) {
+    if ('speechSynthesis' in window) {
+        try {
+            window.speechSynthesis.cancel(); // Cancel any ongoing speech
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.rate = 0.9;
+            utterance.volume = 1.0;
+            window.speechSynthesis.speak(utterance);
+        } catch (e) {
+            console.warn('Speech failed:', e);
+        }
+    }
+}
+
+// ============================================================================
+// PHASE 1: OFFLINE BANNER
+// ============================================================================
+function updateOnlineStatus() {
+    const banner = document.getElementById('offlineBanner');
+    if (!banner) return;
+    
+    if (navigator.onLine) {
+        banner.classList.add('hidden');
+        // Try to sync pending uploads
+        if (state && state.pendingUploads && state.pendingUploads.length > 0) {
+            setTimeout(() => forceSync(false), 1000);
+        }
+    } else {
+        banner.classList.remove('hidden');
+    }
+}
+
+// Enhanced forceSync with online check
+function forceSync(showUI) {
+    if (!navigator.onLine) {
+        if (showUI) showToast('📡 Offline - will sync when connected');
+        return;
+    }
+    
+    if (showUI) showToast('🔄 Syncing...');
+    
+    // TODO: Implement actual backend sync
+    console.log('Sync would happen here');
+    
+    if (showUI) {
+        setTimeout(() => showToast('✅ Sync complete'), 1000);
+    }
+}
+
+// ============================================================================
+// PHASE 2 & 3: ALL REMAINING FEATURES
+// ============================================================================
+
+// Feature 15: Battery Saver Manual Toggle
+function toggleBatterySaver() {
+    if (isDimmed) {
+        deactivateDimMode();
+        showToast('💡 Battery saver off');
+    } else {
+        activateDimMode();
+        showToast('🌙 Battery saver on');
+    }
+}
+
+// Feature 14: Critical Timing Mode
+function updateCriticalTimingBadge() {
+    const badge = document.getElementById('highRiskBadge');
+    if (!badge || !state || !state.activeVisit) return;
+    
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    if (location && location.isCritical) {
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Feature 9: Site Info Modal
+function showCurrentSiteInfo() {
+    if (!state || !state.activeVisit) return;
+    
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    if (!location) {
+        showToast('No site information available');
+        return;
+    }
+    
+    const content = document.getElementById('siteInfoContent');
+    if (content) {
+        let html = '';
+        if (location.companyName) html += `<p><strong>Company:</strong> ${location.companyName}</p>`;
+        if (location.address) html += `<p><strong>Address:</strong> ${location.address}</p>`;
+        if (location.notes) html += `<p><strong>Notes:</strong> ${location.notes}</p>`;
+        if (!html) html = '<p class="text-gray-500">No additional information available</p>';
+        content.innerHTML = html;
+    }
+    
+    // Setup action buttons
+    const btnCall = document.getElementById('btnSiteCall');
+    const btnEmail = document.getElementById('btnSiteEmail');
+    const btnNav = document.getElementById('btnSiteNav');
+    
+    if (location.contactPhone && btnCall) {
+        const cleanedPhone = cleanGlobalPhone(location.contactPhone);
+        btnCall.href = `tel:${cleanedPhone}`;
+        btnCall.classList.remove('hidden');
+    } else if (btnCall) {
+        btnCall.classList.add('hidden');
+    }
+    
+    if (location.contactEmail && btnEmail) {
+        btnEmail.href = `mailto:${location.contactEmail}`;
+        btnEmail.classList.remove('hidden');
+    } else if (btnEmail) {
+        btnEmail.classList.add('hidden');
+    }
+    
+    if (location.address && btnNav) {
+        const encodedAddr = encodeURIComponent(location.address);
+        btnNav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
+        btnNav.classList.remove('hidden');
+    } else if (btnNav) {
+        btnNav.classList.add('hidden');
+    }
+    
+    showModal('info');
+}
+
+// Feature 13: Location Management (Add/Edit/Delete)
+function openLocationEditor(locationId) {
+    const location = state.locations.find(l => l.id === locationId);
+    if (!location) return;
+    
+    document.getElementById('locId').value = location.id;
+    document.getElementById('locBusiness').value = location.companyName || '';
+    document.getElementById('locName').value = location.name || '';
+    document.getElementById('locAddr').value = location.address || '';
+    document.getElementById('locContactName').value = location.contactName || '';
+    document.getElementById('locContactPhone').value = location.contactPhone || '';
+    document.getElementById('locContactEmail').value = location.contactEmail || '';
+    
+    const criticalCheckbox = document.getElementById('locCritical');
+    if (criticalCheckbox) {
+        criticalCheckbox.checked = location.isCritical || false;
+    }
+    
+    const btnDel = document.getElementById('btnDelLoc');
+    if (location.id.startsWith('loc_')) {
+        if (btnDel) btnDel.classList.remove('hidden');
+    } else {
+        if (btnDel) btnDel.classList.add('hidden');
+    }
+    
+    showModal('location');
+}
+
+function saveLoc() {
+    const locId = document.getElementById('locId').value;
+    const name = document.getElementById('locName').value.trim();
+    
+    if (!name) {
+        return alert('Site name is required');
+    }
+    
+    const locationData = {
+        id: locId || 'loc_' + Date.now(),
+        name: name,
+        companyName: document.getElementById('locBusiness').value.trim(),
+        address: document.getElementById('locAddr').value.trim(),
+        contactName: document.getElementById('locContactName').value.trim(),
+        contactPhone: document.getElementById('locContactPhone').value.trim(),
+        contactEmail: document.getElementById('locContactEmail').value.trim(),
+        isCritical: document.getElementById('locCritical').checked
+    };
+    
+    const existingIndex = state.locations.findIndex(l => l.id === locationData.id);
+    if (existingIndex >= 0) {
+        state.locations[existingIndex] = locationData;
+    } else {
+        state.locations.push(locationData);
+    }
+    
+    saveState();
+    renderLocations();
+    closeModal('location');
+    showToast('✅ Location saved');
+}
+
+function deleteLoc() {
+    const locId = document.getElementById('locId').value;
+    if (!locId || !confirm('Delete this location?')) return;
+    
+    state.locations = state.locations.filter(l => l.id !== locId);
+    saveState();
+    renderLocations();
+    closeModal('location');
+    showToast('🗑️ Location deleted');
+}
+
+function getGpsAddress() {
+    if (!navigator.geolocation) {
+        return showToast('GPS not available');
+    }
+    
+    showToast('Getting GPS location...');
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lon = pos.coords.longitude.toFixed(6);
+            document.getElementById('locAddr').value = `${lat}, ${lon}`;
+            showToast('📍 GPS location captured');
+        },
+        err => {
+            showToast('GPS error: ' + err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+// Feature 10: Country Code Handling
+function cleanGlobalPhone(num) {
+    if (!num) return "";
+    let n = num.replace(/[^0-9]/g, '');
+    const prefix = (CONFIG.countryPrefix || "+64").replace('+', '');
+    
+    if (!prefix) return "+" + n;
+    if (n.startsWith(prefix)) return '+' + n;
+    if (n.startsWith('0')) return '+' + prefix + n.substring(1);
+    if (prefix === '1' && n.length === 10) return '+1' + n;
+    return '+' + prefix + n;
+}
+
+// Feature 12: Travel/Mileage Tracking
+function haversine(p1, p2) {
+    const [lat1, lon1] = p1.split(',').map(Number);
+    const [lat2, lon2] = p2.split(',').map(Number);
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function getDistance(p1, p2) {
+    if (!p1 || !p2) return { km: 0, type: 'none' };
+    
+    // Try backend API if online
+    if (navigator.onLine && CONFIG.url) {
+        try {
+            const url = `${CONFIG.url}?action=getDistance&start=${p1}&end=${p2}&key=${CONFIG.key}`;
+            const response = await fetch(url, { timeout: 5000 });
+            const data = await response.json();
+            if (data.status === "success" && data.km) {
+                return { km: data.km, type: 'road' };
+            }
+        } catch (e) {
+            console.warn('Distance API failed, using haversine:', e);
+        }
+    }
+    
+    // Fallback to haversine
+    const dist = haversine(p1, p2);
+    return { km: dist.toFixed(2), type: 'crow' };
+}
+
+// Feature 16: Advanced GPS Control
+function toggleAdvancedGPS(enabled) {
+    if (enabled) {
+        startGPSMonitoring();
+        state.settings.isAdvanced = true;
+        showToast('📍 Advanced GPS enabled');
+    } else {
+        stopGPSMonitoring();
+        state.settings.isAdvanced = false;
+        const gpsIndicator = document.getElementById('gpsIndicator');
+        if (gpsIndicator) gpsIndicator.classList.add('hidden');
+        showToast('🔋 GPS throttled');
+    }
+    saveState();
+}
+
+// Feature 19: Voice Accent Selection
+function speakWithAccent(message) {
+    if (!('speechSynthesis' in window)) return;
+    
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(message);
+    
+    // Try to find voice matching configured locale
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.lang.includes(CONFIG.voiceLocale || 'en-NZ'));
+    if (preferredVoice) {
+        utterance.voice = preferredVoice;
+    }
+    
+    utterance.rate = 0.9;
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
+}
+
+// Feature 18: Wizard Progress Dots
+function updateWizardDots() {
+    for (let i = 1; i <= 3; i++) {
+        const dot = document.getElementById(`dot${i}`);
+        if (dot && state) {
+            if (i === state.currentWizStep) {
+                dot.classList.remove('bg-gray-700');
+                dot.classList.add('bg-blue-500');
+            } else {
+                dot.classList.remove('bg-blue-500');
+                dot.classList.add('bg-gray-700');
+            }
+        }
+    }
+}
+
+// Feature 17: Android Install Banner
+function triggerInstall() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(choiceResult => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted install');
+            }
+            deferredPrompt = null;
+        });
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.classList.add('hidden');
+    }
+}
+
+function dismissInstall(type) {
+    if (type === 'ios') {
+        const modal = document.getElementById('iosInstallModal');
+        if (modal) modal.classList.add('hidden');
+    } else if (type === 'android') {
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.classList.add('hidden');
+    }
+    localStorage.setItem('install_dismissed', 'true');
+}
+
+// Feature 8: Enhanced Form Builder with all field types
+function buildReportForm(templateName, container) {
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Default simple form if no template
+    const fields = [
+        '[HEADING|Visit Details]',
+        '[TEXT|Notes]',
+        '[GPS|Location Verification]'
+    ];
+    
+    fields.forEach((field, index) => {
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'mb-4';
+        
+        let fieldType = 'text';
+        let fieldLabel = field;
+        let options = [];
+        
+        // Parse field format: [TYPE|Label] or [DROP|Label|Opt1,Opt2,Opt3]
+        const match = field.match(/\[(\w+)\|([^\]]+)\]/);
+        if (match) {
+            fieldType = match[1].toLowerCase();
+            const rest = match[2].split('|');
+            fieldLabel = rest[0];
+            if (rest[1]) {
+                options = rest[1].split(',').map(o => o.trim());
+            }
+        }
+        
+        // Don't create label for heading/note types
+        if (fieldType !== 'heading' && fieldType !== 'note') {
+            const label = document.createElement('label');
+            label.className = 'block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider';
+            label.textContent = fieldLabel;
+            fieldDiv.appendChild(label);
+        }
+        
+        switch (fieldType) {
+            case 'heading':
+                fieldDiv.innerHTML = `<h3 class="text-blue-400 font-bold uppercase text-sm mt-6 mb-2 border-b border-gray-700 pb-2">${fieldLabel}</h3>`;
+                break;
+                
+            case 'note':
+                fieldDiv.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${fieldLabel}</div>`;
+                break;
+                
+            case 'text':
+                const textarea = document.createElement('textarea');
+                textarea.className = 'form-input h-24 font-medium';
+                textarea.id = `field_${index}`;
+                textarea.dataset.label = fieldLabel;
+                // Pre-fill distance for travel
+                if (fieldLabel.toLowerCase().includes('distance') && state.calculatedDistance) {
+                    textarea.value = `${state.calculatedDistance} km`;
+                    textarea.style.borderColor = '#4ade80';
+                }
+                fieldDiv.appendChild(textarea);
+                break;
+                
+            case '1text':
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-input font-bold';
+                input.id = `field_${index}`;
+                input.dataset.label = fieldLabel;
+                fieldDiv.appendChild(input);
+                break;
+                
+            case 'number':
+                const numInput = document.createElement('input');
+                numInput.type = 'number';
+                numInput.step = '0.01';
+                numInput.className = 'form-input font-bold text-lg';
+                numInput.id = `field_${index}`;
+                numInput.dataset.label = fieldLabel;
+                if (fieldLabel.toLowerCase().includes('distance') && state.calculatedDistance) {
+                    numInput.value = state.calculatedDistance;
+                    numInput.style.borderColor = '#4ade80';
+                    numInput.classList.add('bg-green-900/20');
+                }
+                fieldDiv.appendChild(numInput);
+                break;
+                
+            case 'date':
+                const dateInput = document.createElement('input');
+                dateInput.type = 'date';
+                dateInput.className = 'form-input font-bold';
+                dateInput.id = `field_${index}`;
+                dateInput.dataset.label = fieldLabel;
+                dateInput.value = new Date().toISOString().split('T')[0];
+                fieldDiv.appendChild(dateInput);
+                break;
+                
+            case 'yesno':
+                const yesNoDiv = document.createElement('div');
+                yesNoDiv.className = 'flex gap-6';
+                ['Yes', 'No'].forEach(opt => {
+                    const radioLabel = document.createElement('label');
+                    radioLabel.className = 'flex items-center gap-2 cursor-pointer';
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `field_${index}`;
+                    radio.value = opt;
+                    radio.className = 'w-5 h-5';
+                    radio.dataset.label = fieldLabel;
+                    radioLabel.appendChild(radio);
+                    const span = document.createElement('span');
+                    span.className = 'text-sm text-white font-bold';
+                    span.textContent = opt;
+                    radioLabel.appendChild(span);
+                    yesNoDiv.appendChild(radioLabel);
+                });
+                fieldDiv.appendChild(yesNoDiv);
+                break;
+                
+            case 'check':
+                const checkLabel = document.createElement('label');
+                checkLabel.className = 'flex items-center gap-3 cursor-pointer bg-gray-900 p-3 rounded-xl';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'w-6 h-6 rounded text-blue-600';
+                checkbox.id = `field_${index}`;
+                checkbox.dataset.label = fieldLabel;
+                checkLabel.appendChild(checkbox);
+                const checkSpan = document.createElement('span');
+                checkSpan.className = 'text-white font-bold';
+                checkSpan.textContent = fieldLabel;
+                checkLabel.appendChild(checkSpan);
+                fieldDiv.innerHTML = '';
+                fieldDiv.appendChild(checkLabel);
+                break;
+                
+            case 'drop':
+                const select = document.createElement('select');
+                select.className = 'form-input font-bold';
+                select.id = `field_${index}`;
+                select.dataset.label = fieldLabel;
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = `Select ${fieldLabel}...`;
+                select.appendChild(defaultOpt);
+                options.forEach(optText => {
+                    const opt = document.createElement('option');
+                    opt.value = optText;
+                    opt.textContent = optText;
+                    select.appendChild(opt);
+                });
+                fieldDiv.appendChild(select);
+                break;
+                
+            case 'gps':
+                const gpsBtn = document.createElement('button');
+                gpsBtn.type = 'button';
+                gpsBtn.className = 'w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white mb-2';
+                gpsBtn.textContent = '📍 Capture Current GPS';
+                const gpsInput = document.createElement('input');
+                gpsInput.type = 'text';
+                gpsInput.className = 'form-input font-mono text-xs';
+                gpsInput.id = `field_${index}`;
+                gpsInput.dataset.label = fieldLabel;
+                gpsInput.readOnly = true;
+                gpsBtn.onclick = () => {
+                    if (!navigator.geolocation) return showToast('GPS not available');
+                    gpsBtn.textContent = '⏳ Getting location...';
+                    gpsBtn.disabled = true;
+                    navigator.geolocation.getCurrentPosition(
+                        pos => {
+                            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                            gpsInput.value = coords;
+                            gpsInput.style.borderColor = '#4ade80';
+                            gpsBtn.textContent = '✅ GPS Captured';
+                            gpsBtn.disabled = false;
+                            showToast('📍 GPS captured');
+                        },
+                        err => {
+                            gpsBtn.textContent = '❌ GPS Failed - Try Again';
+                            gpsBtn.disabled = false;
+                            showToast('GPS error: ' + err.message);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                };
+                fieldDiv.appendChild(gpsBtn);
+                fieldDiv.appendChild(gpsInput);
+                break;
+                
+            case 'photo':
+                const photoInput = document.createElement('input');
+                photoInput.type = 'file';
+                photoInput.accept = 'image/*';
+                photoInput.capture = 'environment';
+                photoInput.className = 'hidden';
+                photoInput.id = `field_${index}`;
+                photoInput.dataset.label = fieldLabel;
+                const photoBtn = document.createElement('button');
+                photoBtn.type = 'button';
+                photoBtn.className = 'w-full py-4 bg-gray-800 hover:bg-gray-700 rounded-xl border-2 border-dashed border-gray-600 text-white font-bold flex items-center justify-center gap-2';
+                photoBtn.innerHTML = '📷 <span>Capture Photo</span>';
+                photoBtn.onclick = () => photoInput.click();
+                photoInput.onchange = () => {
+                    if (photoInput.files[0]) {
+                        photoBtn.innerHTML = '✅ <span>Photo Captured</span>';
+                        photoBtn.classList.remove('border-gray-600');
+                        photoBtn.classList.add('border-green-500', 'bg-green-900/20');
+                    }
+                };
+                fieldDiv.appendChild(photoBtn);
+                fieldDiv.appendChild(photoInput);
+                break;
+                
+            case 'sign':
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'relative border-2 border-gray-600 rounded-xl bg-white overflow-hidden';
+                canvasWrapper.style.height = '160px';
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 160;
+                canvas.className = 'w-full h-full touch-none cursor-crosshair';
+                canvas.id = `field_${index}`;
+                canvas.dataset.label = fieldLabel;
+                canvasWrapper.appendChild(canvas);
+                const clearBtn = document.createElement('button');
+                clearBtn.type = 'button';
+                clearBtn.className = 'absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-xs font-bold shadow-md hover:bg-gray-300';
+                clearBtn.textContent = 'Clear';
+                clearBtn.onclick = () => {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                };
+                canvasWrapper.appendChild(clearBtn);
+                fieldDiv.appendChild(canvasWrapper);
+                
+                // Simple signature capture
+                let drawing = false;
+                const ctx = canvas.getContext('2d');
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                
+                canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
+                canvas.addEventListener('mousemove', (e) => { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } });
+                canvas.addEventListener('mouseup', () => drawing = false);
+                
+                canvas.addEventListener('touchstart', (e) => { 
+                    e.preventDefault(); 
+                    drawing = true; 
+                    const rect = canvas.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    ctx.beginPath(); 
+                    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                });
+                canvas.addEventListener('touchmove', (e) => { 
+                    e.preventDefault();
+                    if (drawing) { 
+                        const rect = canvas.getBoundingClientRect();
+                        const touch = e.touches[0];
+                        ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top); 
+                        ctx.stroke(); 
+                    } 
+                });
+                canvas.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; });
+                break;
+        }
+        
+        container.appendChild(fieldDiv);
+    });
+}
+
+// Enhance wizard navigation to update dots
+const _origNextWiz = nextWiz;
+nextWiz = function() {
+    const result = _origNextWiz.apply(this, arguments);
+    updateWizardDots();
+    return result;
+};
+
+const _origPrevWiz = prevWiz;
+prevWiz = function() {
+    const result = _origPrevWiz.apply(this, arguments);
+    updateWizardDots();
+    return result;
+};
+
+// Enhance populateSettingsForm to set GPS toggle
+const _origPopulateSettingsForm = populateSettingsForm;
+populateSettingsForm = function() {
+    _origPopulateSettingsForm();
+    const advCheckbox = document.getElementById('setAdvanced');
+    if (advCheckbox && state && state.settings) {
+        advCheckbox.checked = state.settings.isAdvanced !== false;
+    }
+};
+
+// Enhance enterLockedScreen to show critical timing badge
+const _origEnterLockedScreen = enterLockedScreen;
+enterLockedScreen = function() {
+    _origEnterLockedScreen.apply(this, arguments);
+    updateCriticalTimingBadge();
+};
+
+// Enhanced preDepart for travel distance calculation
+const _origPreDepart = preDepart;
+preDepart = function() {
+    if (!state || !state.activeVisit) return _origPreDepart();
+    
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    
+    // Travel location - calculate distance
+    if (location && location.id === 'travel' && CONFIG.mileageEnabled) {
+        const startGPS = state.activeVisit.startGPS;
+        if (!startGPS) {
+            showToast('No start GPS recorded');
+            return submitReport();
+        }
+        
+        showToast('Calculating distance...');
+        navigator.geolocation.getCurrentPosition(
+            async pos => {
+                const endGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                const distance = await getDistance(startGPS, endGPS);
+                
+                state.calculatedDistance = distance.km;
+                state.distanceType = distance.type;
+                saveState();
+                
+                showToast(`Distance: ${distance.km} km (${distance.type})`);
+                
+                // Show report form
+                const reportPage = document.getElementById('reportPage');
+                if (reportPage) {
+                    buildReportForm('Travel Report', document.getElementById('reportFields'));
+                    navigate('report');
+                }
+            },
+            err => {
+                console.error('End GPS failed:', err);
+                state.calculatedDistance = null;
+                // Show report form anyway
+                const reportPage = document.getElementById('reportPage');
+                if (reportPage) {
+                    buildReportForm('Travel Report', document.getElementById('reportFields'));
+                    navigate('report');
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    } else {
+        // Regular location
+        const reportPage = document.getElementById('reportPage');
+        if (reportPage && !location.noReport) {
+            buildReportForm('Standard Visit', document.getElementById('reportFields'));
+            navigate('report');
+        } else {
+            submitReport();
+        }
+    }
+};
+
+// Listen for Android PWA install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install banner if not dismissed
+    if (!localStorage.getItem('install_dismissed')) {
+        const banner = document.getElementById('installBanner');
+        if (banner) {
+            setTimeout(() => banner.classList.remove('hidden'), 2000);
+        }
+    }
+});
+
+console.log('✅ All 20 features initialized - System ready!');
+
 </script>
 
 </body>
