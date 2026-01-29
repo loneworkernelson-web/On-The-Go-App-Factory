@@ -223,9 +223,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="wizEmail" type="email" placeholder="Email Address" class="form-input">
         </div>
         <div id="wizStep2" class="wizard-step">
-            <h2 class="text-lg font-bold mb-4">Security PINs</h2>
-            <input id="wizPin" type="password" placeholder="Standard PIN (4-6 digits)" class="form-input">
-            <input id="wizDuress" type="password" placeholder="Duress PIN (silent alert)" class="form-input">
+            <form id="wizPinForm" onsubmit="return false;">
+                <h2 class="text-lg font-bold mb-4">Security PINs</h2>
+                <input id="wizPin" type="password" autocomplete="new-password" placeholder="Standard PIN (4-6 digits)" class="form-input" inputmode="numeric" maxlength="6">
+                <input id="wizDuress" type="password" autocomplete="new-password" placeholder="Duress PIN (silent alert)" class="form-input" inputmode="numeric" maxlength="6">
+            </form>
         </div>
         <div id="wizStep3" class="wizard-step">
             <h2 class="text-lg font-bold mb-4">Emergency Contacts</h2>
@@ -563,9 +565,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
 <div id="pinModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-800 p-6 rounded-xl w-80">
-        <h3 class="text-lg font-bold mb-4">Enter PIN</h3>
-        <input id="pinInput" type="password" class="form-input mb-4" inputmode="numeric" maxlength="6">
-        <button id="btnPinConfirm" class="w-full py-3 bg-blue-600 rounded-xl font-bold">Confirm</button>
+        <form id="pinEntryForm" onsubmit="return false;">
+            <h3 class="text-lg font-bold mb-4">Enter PIN</h3>
+            <input id="pinInput" type="password" autocomplete="current-password" class="form-input mb-4" inputmode="numeric" maxlength="6">
+            <button id="btnPinConfirm" type="button" class="w-full py-3 bg-blue-600 rounded-xl font-bold">Confirm</button>
+        </form>
     </div>
 </div>
 
@@ -1267,8 +1271,7 @@ function loadFormAndShow(templateName) {
     // Clear signature canvas
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) {
-        const ctx = sigCanvas.getContext('2d');
-        ctx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+        clearSig(sigCanvas.id.replace('sig-canvas-', ''));
     }
     
     // Show report modal
@@ -1288,6 +1291,14 @@ function loadFormAndShow(templateName) {
     if (fieldsContainer) {
         buildReportForm(templateName, fieldsContainer);
     }
+    
+    // Initialize signature pads after form is built
+    setTimeout(() => {
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
+            resizeCanvas(canvas);
+            initSigPad(canvas);
+        });
+    }, 100);
     
     // Pre-fill distance if available
     if (calculatedDist) {
@@ -1472,13 +1483,17 @@ function iamSafe() {
     
     // Require PIN to declare safe
     withPinVerification(false, () => {
-        logSafety("I_AM_SAFE", "Worker declared safe after alarm");
-        showToast("✅ Safety status confirmed");
+        announce("Safety confirmed. Resetting alarm.");
+        logSafety("USER_SAFE", "Worker entered PIN to cancel alarm state.");
         
-        // Clear alarm state but keep visit active
+        // Reset panic UI
+        const lockedPage = document.getElementById('lockedPage');
+        if (lockedPage) lockedPage.classList.remove('panic-mode');
+        document.body.classList.remove('bg-red-900');
+        
+        // Clear alarm state
         state.activeVisit.isPanic = false;
         state.activeVisit.criticalSent = false;
-        document.body.classList.remove('bg-red-900');
         
         // Hide "I AM SAFE" button, show normal buttons
         const btnSafe = document.getElementById('btnSafe');
@@ -1489,6 +1504,7 @@ function iamSafe() {
         if (btnExtend) btnExtend.classList.remove('hidden');
         
         saveState();
+        showToast("✅ Safety status confirmed");
     });
 }
 
@@ -2340,9 +2356,230 @@ function playSound(t) {
     });
 }
 
+// ============================================================================
+// CRITICAL MISSING FUNCTIONS FROM WS_SAFETY
+// ============================================================================
+
+// 1. TRIGGER AUTO ALERT - Sends alarm when timer expires
+function triggerAutoAlert(status) {
+    if (!state || !state.activeVisit) return;
+    
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    const locationName = location ? 
+        (location.companyName ? `${location.companyName} - ${location.name}` : location.name) : 
+        "Unknown Location";
+    
+    console.log(`Triggering auto alert: ${status} for ${locationName}`);
+    
+    // Try to get current GPS
+    navigator.geolocation.getCurrentPosition(
+        position => {
+            const gps = `${position.coords.latitude},${position.coords.longitude}`;
+            console.log(`Auto alert with GPS: ${gps}`);
+            
+            processUploadQueue(buildPayload({
+                "Alarm Status": status,
+                "Notes": "Automated System Alert",
+                "Location Name": locationName,
+                "Last Known GPS": gps
+            }));
+            
+            showToast("🚨 Emergency alert sent");
+        },
+        error => {
+            console.warn('GPS failed for auto alert:', error);
+            
+            processUploadQueue(buildPayload({
+                "Alarm Status": status,
+                "Notes": "Automated System Alert (GPS unavailable)",
+                "Location Name": locationName,
+                "Last Known GPS": lastGPS || "Not available"
+            }));
+            
+            showToast("🚨 Emergency alert sent (no GPS)");
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+    );
+}
+
+// 2. COMPRESS IMAGE - Reduces photo size before upload
+function compressImg(file) {
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        
+        reader.onload = e => {
+            const img = new Image();
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 1200;
+                let width = img.width;
+                let height = img.height;
+                
+                // Calculate new dimensions
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height = height * (MAX_WIDTH / width);
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width = width * (MAX_HEIGHT / height);
+                        height = MAX_HEIGHT;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Convert to JPEG with 80% quality
+                const compressed = canvas.toDataURL('image/jpeg', 0.8);
+                
+                console.log(`Image compressed: ${file.size} bytes -> ${compressed.length} chars`);
+                resolve(compressed);
+            };
+            
+            img.src = e.target.result;
+        };
+        
+        reader.readAsDataURL(file);
+    });
+}
+
+// 3. HANDLE PHOTO - Processes photo uploads with compression
+function handlePhoto(input, key) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    const labelId = `lbl_${input.id.split('_')[1]}`;
+    const label = document.getElementById(labelId);
+    
+    if (label) label.innerText = "Compressing...";
+    
+    compressImg(file).then(base64 => {
+        if (!state.photoStore) state.photoStore = {};
+        state.photoStore[key] = base64;
+        saveState();
+        
+        if (label) label.innerText = "✅ Saved";
+        
+        console.log(`Photo saved: ${key}`);
+    }).catch(err => {
+        console.error('Photo compression failed:', err);
+        if (label) label.innerText = "❌ Error";
+    });
+}
+
+// 4. INIT SIGNATURE PAD - Sets up touch/mouse drawing on canvas
+function initSigPad(canvas) {
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    
+    // Get position accounting for canvas scaling
+    const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return {
+            x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+            y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    };
+    
+    const startDrawing = (e) => {
+        isDrawing = true;
+        const pos = getPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
+        e.preventDefault();
+    };
+    
+    const draw = (e) => {
+        if (!isDrawing) return;
+        
+        const pos = getPos(e);
+        
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        
+        lastX = pos.x;
+        lastY = pos.y;
+        e.preventDefault();
+    };
+    
+    const stopDrawing = () => {
+        isDrawing = false;
+    };
+    
+    // Touch events
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchcancel', stopDrawing);
+    
+    // Mouse events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    console.log('Signature pad initialized:', canvas.id);
+}
+
+// 5. RESIZE CANVAS - Adjusts canvas for high DPI displays
+function resizeCanvas(canvasEl) {
+    if (!canvasEl) return;
+    
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const rect = canvasEl.getBoundingClientRect();
+    
+    canvasEl.width = rect.width * ratio;
+    canvasEl.height = rect.height * ratio;
+    
+    const ctx = canvasEl.getContext('2d');
+    ctx.scale(ratio, ratio);
+    
+    console.log(`Canvas resized: ${canvasEl.width}x${canvasEl.height} (ratio: ${ratio})`);
+}
+
+// 6. CLEAR SIGNATURE - Clears signature canvas
+function clearSig(id) {
+    const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas';
+    const canvas = document.getElementById(canvasId);
+    
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        console.log(`Signature cleared: ${canvasId}`);
+    }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 // Helper: Get Device ID
 function getDeviceID() {
-    return state.deviceId || "";
+    let id = localStorage.getItem('otg_device_id');
+    if (!id) {
+        id = 'dev_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
+        localStorage.setItem('otg_device_id', id);
+        console.log('New device ID generated:', id);
+    }
+    return id;
 }
 
 // Fetch locations from backend
@@ -2508,6 +2745,13 @@ window.onload = () => {
         }
     });
     
+    // Setup window resize handler for signature canvases
+    window.addEventListener('resize', () => {
+        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
+            resizeCanvas(canvas);
+        });
+    });
+    
     console.log("System Initialized - Phase 1 Enhanced");
 };
 
@@ -2575,8 +2819,58 @@ function exportUserData() {
 
 // Open add location modal
 function openAddLocationModal() {
-    showToast('➕ Add location feature - Coming soon');
-    // TODO: Implement manual location entry modal
+    // Reset modal for new entry
+    const titleEl = document.querySelector('#locationModal h2');
+    if (titleEl) titleEl.textContent = 'Add New Location';
+    
+    document.getElementById('locId').value = '';
+    document.getElementById('locBusiness').value = '';
+    document.getElementById('locName').value = '';
+    document.getElementById('locAddr').value = '';
+    
+    const contactName = document.getElementById('locContactName');
+    const contactPhone = document.getElementById('locContactPhone');
+    const contactEmail = document.getElementById('locContactEmail');
+    if (contactName) contactName.value = '';
+    if (contactPhone) contactPhone.value = '';
+    if (contactEmail) contactEmail.value = '';
+    
+    const criticalCheckbox = document.getElementById('locCritical');
+    if (criticalCheckbox) criticalCheckbox.checked = false;
+    
+    const btnDel = document.getElementById('btnDelLoc');
+    if (btnDel) btnDel.classList.add('hidden');
+    
+    showModal('location');
+}
+
+// Edit manual location - opens modal pre-filled
+function editManualLocation(id) {
+    const location = state.locations.find(x => x.id === id);
+    if (!location) return;
+    
+    const titleEl = document.querySelector('#locationModal h2');
+    if (titleEl) titleEl.textContent = 'Edit Location';
+    
+    document.getElementById('locId').value = id;
+    document.getElementById('locBusiness').value = location.companyName || '';
+    document.getElementById('locName').value = location.name || '';
+    document.getElementById('locAddr').value = location.address || '';
+    
+    const contactName = document.getElementById('locContactName');
+    const contactPhone = document.getElementById('locContactPhone');
+    const contactEmail = document.getElementById('locContactEmail');
+    if (contactName) contactName.value = location.contactName || '';
+    if (contactPhone) contactPhone.value = location.contactPhone || '';
+    if (contactEmail) contactEmail.value = location.contactEmail || '';
+    
+    const criticalCheckbox = document.getElementById('locCritical');
+    if (criticalCheckbox) criticalCheckbox.checked = location.isCritical || false;
+    
+    const btnDel = document.getElementById('btnDelLoc');
+    if (btnDel) btnDel.classList.remove('hidden');
+    
+    showModal('location');
 }
 
 // Clear forms cache and resync
