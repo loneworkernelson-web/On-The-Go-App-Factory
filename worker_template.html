@@ -1701,6 +1701,12 @@ function saveWizard() {
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
+    
+    // Initialize deviceId if not present
+    if (!state.deviceId) {
+        state.deviceId = getDeviceID();
+    }
+    
     saveState();
     
     const setupPage = document.getElementById('setupPage');
@@ -1712,6 +1718,10 @@ function saveWizard() {
     announce(`Welcome ${workerData.name}. System is now active.`);
     logSafety("Setup Complete", "Worker profile initialized.");
     navigate('main');
+    
+    // CRITICAL: Sync with backend after wizard completion
+    console.log('Wizard complete - syncing with backend...');
+    forceSync(true);
 }
 
 // ============================================================================
@@ -2412,6 +2422,13 @@ window.onload = () => {
         meta: {} // For vehicle check data from backend
     };
     
+    // CRITICAL: Initialize deviceId if not present
+    if (!state.deviceId) {
+        state.deviceId = getDeviceID();
+        saveState();
+        console.log('Device ID initialized:', state.deviceId);
+    }
+    
     // GROK FIX #2: Cap pending uploads queue to prevent memory issues
     if (state.pendingUploads && state.pendingUploads.length > 100) {
         console.warn('Queue too large, keeping only last 100 items');
@@ -2438,10 +2455,10 @@ window.onload = () => {
             enterLockedScreen();
         }
         
-        // GROK FIX #1: Fetch locations from backend if empty
+        // GROK FIX #1: Use forceSync to fetch locations (proper handshake)
         if (!state.locations || state.locations.length === 0) {
-            console.log('No locations in state, fetching from backend...');
-            fetchLocationsFromBackend();
+            console.log('No locations in state, syncing with backend...');
+            forceSync(false); // Silent sync on load
         } else {
             renderLocations();
         }
@@ -2842,20 +2859,129 @@ function updateOnlineStatus() {
 
 // Enhanced forceSync with online check
 function forceSync(showUI) {
+    // Require worker name
+    if (!state || !state.worker || !state.worker.name) {
+        console.warn('Cannot sync: No worker name');
+        return;
+    }
+    
     if (!navigator.onLine) {
         if (showUI) showToast('📡 Offline - will sync when connected');
         return;
     }
     
-    if (showUI) showToast('🔄 Syncing...');
-    
-    // TODO: Implement actual backend sync
-    console.log('Sync would happen here');
-    
+    // Show sync banner
     if (showUI) {
-        setTimeout(() => showToast('✅ Sync complete'), 1000);
+        const banner = document.getElementById('uploadBanner');
+        if (banner) banner.classList.remove('hidden');
     }
+    
+    const deviceId = getDeviceID();
+    const workerName = state.worker.name;
+    
+    console.log(`Syncing for worker: ${workerName}, device: ${deviceId}`);
+    
+    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(workerName)}&key=${CONFIG.key}&deviceId=${deviceId}`)
+        .then(r => r.json())
+        .then(data => {
+            console.log('Sync response:', data);
+            
+            // Hide banner
+            const banner = document.getElementById('uploadBanner');
+            if (banner) banner.classList.add('hidden');
+            
+            // Check for errors
+            if (data.status === "error") {
+                if (showUI) {
+                    if (data.message && data.message.includes("ACCESS DENIED")) {
+                        alert("⛔ ACCESS DENIED\n\n" + data.message);
+                        startWizard();
+                    } else {
+                        alert("❌ Sync Error: " + (data.message || 'Unknown error'));
+                    }
+                }
+                return;
+            }
+            
+            // Process locations from backend (comes as "sites" array)
+            const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
+            
+            const backendSites = (data.sites || []).map(s => ({
+                id: 'site_' + s.siteName.replace(/\s/g, ''),
+                name: s.siteName,
+                address: s.address,
+                companyName: s.company,
+                templateName: s.template,
+                noReport: false,
+                contactName: s.contactName,
+                contactPhone: s.contactPhone,
+                contactEmail: s.contactEmail,
+                notes: s.notes,
+                isCritical: s.critical || false
+            }));
+            
+            // Add travel if mileage enabled
+            if (CONFIG.mileageEnabled) {
+                backendSites.unshift({
+                    id: 'travel',
+                    name: 'Travel',
+                    address: 'Calculates Mileage via GPS',
+                    noReport: !CONFIG.reqTravelReport,
+                    companyName: 'Internal',
+                    templateName: 'Travel Report'
+                });
+            }
+            
+            // Merge: backend sites + manual locations
+            state.locations = backendSites.concat(existingManual);
+            
+            // Update forms data
+            state.globalForms = data.forms || [];
+            state.cachedForms = data.cachedTemplates || {};
+            state.meta = data.meta || {};
+            
+            // Ensure standard forms exist
+            if (!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
+                state.cachedForms["Standard Visit Note"] = [
+                    {type: 'note', text: 'Standard Check-in'}
+                ];
+            }
+            
+            if (CONFIG.mileageEnabled && !state.cachedForms['Travel Report']) {
+                state.cachedForms['Travel Report'] = [
+                    {type: 'number', text: 'Distance (km)'},
+                    {type: 'text', text: 'Details'},
+                    {type: 'photo', text: 'Odometer'}
+                ];
+            }
+            
+            // Apply user preference for travel report
+            const travelLoc = state.locations.find(x => x.id === 'travel');
+            const userPref = localStorage.getItem('otg_user_travel_pref');
+            if (travelLoc && userPref !== null) {
+                travelLoc.noReport = (userPref === 'true');
+            }
+            
+            saveState();
+            renderLocations();
+            checkVehicleStatus();
+            
+            if (showUI) {
+                showToast(`✅ Sync complete - ${state.locations.length} locations`);
+            }
+            
+            console.log(`Sync complete: ${state.locations.length} locations loaded`);
+        })
+        .catch(e => {
+            console.error('Sync failed:', e);
+            const banner = document.getElementById('uploadBanner');
+            if (banner) banner.classList.add('hidden');
+            if (showUI) {
+                showToast('❌ Sync failed - ' + e.message);
+            }
+        });
 }
+
 
 // ============================================================================
 // PHASE 2 & 3: ALL REMAINING FEATURES
