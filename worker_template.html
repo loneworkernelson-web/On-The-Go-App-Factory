@@ -3152,16 +3152,27 @@ function updateOnlineStatus() {
 
 // Enhanced forceSync with online check
 function forceSync(showUI) {
+    console.log('forceSync called with showUI:', showUI);
+    console.log('state:', state);
+    console.log('state.worker:', state?.worker);
+    console.log('state.worker.name:', state?.worker?.name);
+    
     // Require worker name
     if (!state || !state.worker || !state.worker.name) {
-        console.warn('Cannot sync: No worker name');
+        console.error('❌ Cannot sync: No worker name');
+        console.error('state exists:', !!state);
+        console.error('state.worker exists:', !!state?.worker);
+        console.error('state.worker.name exists:', !!state?.worker?.name);
         return;
     }
     
     if (!navigator.onLine) {
         if (showUI) showToast('📡 Offline - will sync when connected');
+        console.warn('Cannot sync: Offline');
         return;
     }
+    
+    console.log('✅ Sync checks passed, proceeding...');
     
     // Show sync banner
     if (showUI) {
@@ -4255,4 +4266,3 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
-
