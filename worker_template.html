@@ -257,12 +257,28 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="navigate('settings')" class="text-2xl text-gray-400 hover:text-white px-2" aria-label="Settings">⚙️</button>
         </div>
     </div>
+    
+    <!-- Sync Banner -->
+    <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 font-bold uppercase tracking-widest mx-4 mt-4">
+        <div class="spinner"></div>
+        <span>Syncing...</span>
+    </div>
+    
     <div class="content-area">
-        <!-- Travel location (full width) -->
-        <div id="travelRow"></div>
+        <!-- Sync and Add buttons row with travel tile -->
+        <div class="flex gap-2 mb-4">
+            <button onclick="forceSync(true)" id="btnSync" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">
+                ↻
+            </button>
+            <button onclick="openAddLocationModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">
+                +
+            </button>
+            <!-- Travel location (flexible width) -->
+            <div id="travelRow" class="flex-1"></div>
+        </div>
         
         <!-- Regular locations (grid) -->
-        <div id="locationList" class="grid grid-cols-2 gap-3 mt-3"></div>
+        <div id="locationList" class="grid grid-cols-2 gap-3"></div>
     </div>
     <div class="footer-bar">
         <!-- Critical Timing Mode Toggle -->
@@ -366,6 +382,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="navigate('main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
     <div class="content-area pb-24">
+        <!-- Restart Wizard Prompt -->
+        <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded mb-4">
+            <p class="text-xs text-blue-200 font-bold">Re-run the setup wizard to change details?</p>
+            <button onclick="startWizard()" class="mt-2 text-xs bg-blue-600 px-2 py-1 rounded font-bold">Restart Wizard</button>
+        </div>
+        
         <div class="mb-6">
             <h2 class="text-xl font-bold text-blue-400 mb-4">Worker Profile</h2>
             <label class="setting-label lbl-blue">Full Name</label>
@@ -398,12 +420,40 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 </label>
             </div>
         </div>
+        
+        <!-- System Info Section -->
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-gray-400 mb-4">System Info</h2>
+            <div class="setting-card border-gray-600">
+                <label class="setting-label lbl-gray">Backend Connection</label>
+                <input id="setBackendUrl" disabled class="form-input-card text-xs font-mono text-gray-400 mb-2" value="">
+                <div class="flex gap-2 mb-3">
+                    <div class="flex-1">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">App Version</div>
+                        <div id="appVersion" class="text-sm font-mono text-blue-400">v1.0.0</div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Backend Version</div>
+                        <div id="backendVersion" class="text-sm font-mono text-green-400">...</div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-[10px] text-gray-500 uppercase font-bold mb-1">Sync Status</div>
+                        <div id="syncStatus" class="text-sm font-mono text-gray-400">Checking...</div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="forceSync(true)" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Force Sync</button>
+                    <button onclick="clearFormsCache()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">Clear Cache</button>
+                </div>
+            </div>
+        </div>
+        
         <div class="space-y-3">
             <button onclick="saveSettings()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg">
                 💾 Save Settings
             </button>
-            <button onclick="exportUserData()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg">
-                📤 Export My Data
+            <button onclick="clearData()" class="w-full py-4 bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold rounded-xl shadow-lg uppercase">
+                Reset App Data
             </button>
         </div>
     </div>
@@ -743,6 +793,7 @@ function navigate(page) {
         // PHASE 1: Populate settings page when navigating to it
         if (page === 'settings') {
             populateSettingsForm();
+            updateSystemInfo(); // Update backend connection status
         }
         
         resetInactivityTimer();
@@ -2503,6 +2554,78 @@ function exportUserData() {
     URL.revokeObjectURL(url);
     
     showToast('📤 Data Exported');
+}
+
+// Open add location modal
+function openAddLocationModal() {
+    showToast('➕ Add location feature - Coming soon');
+    // TODO: Implement manual location entry modal
+}
+
+// Clear forms cache and resync
+function clearFormsCache() {
+    if (!state) return;
+    state.cachedForms = {};
+    state.globalForms = [];
+    saveState();
+    showToast('🔄 Clearing cache and resyncing...');
+    setTimeout(() => forceSync(true), 500);
+}
+
+// Clear all app data
+function clearData() {
+    if (confirm('⚠️ WARNING: This will erase ALL app data including settings, locations, and queued uploads.\n\nAre you absolutely sure?')) {
+        if (confirm('⚠️ FINAL WARNING: There is NO UNDO. All data will be permanently deleted.\n\nContinue?')) {
+            localStorage.clear();
+            showToast('🗑️ All data cleared - Reloading...');
+            setTimeout(() => location.reload(), 1000);
+        }
+    }
+}
+
+// Update system info on settings page  
+function updateSystemInfo() {
+    const backendUrl = document.getElementById('setBackendUrl');
+    if (backendUrl) {
+        backendUrl.value = CONFIG.url || 'Not configured';
+    }
+    
+    const backendVersion = document.getElementById('backendVersion');
+    const syncStatus = document.getElementById('syncStatus');
+    
+    // Try to ping backend for version
+    if (CONFIG.url && navigator.onLine) {
+        fetch(`${CONFIG.url}?action=ping&key=${CONFIG.key}`, { 
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (backendVersion) {
+                    backendVersion.textContent = data.version || 'v1.0';
+                    backendVersion.className = 'text-sm font-mono text-green-400';
+                }
+                if (syncStatus) {
+                    syncStatus.textContent = 'Connected ✓';
+                    syncStatus.className = 'text-sm font-mono text-green-400';
+                }
+            })
+            .catch(e => {
+                if (backendVersion) {
+                    backendVersion.textContent = 'Unknown';
+                    backendVersion.className = 'text-sm font-mono text-yellow-400';
+                }
+                if (syncStatus) {
+                    syncStatus.textContent = 'Offline';
+                    syncStatus.className = 'text-sm font-mono text-red-400';
+                }
+            });
+    } else {
+        if (syncStatus) {
+            syncStatus.textContent = 'No network';
+            syncStatus.className = 'text-sm font-mono text-gray-400';
+        }
+    }
 }
 
 // ============================================================================
