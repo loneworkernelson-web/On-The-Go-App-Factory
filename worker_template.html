@@ -897,12 +897,6 @@ async function getBatteryPercent() {
     return 'Unknown';
 }
 
-// Placeholder for backend sync
-function forceSync() {
-    // TODO: Implement backend synchronization
-    console.log('Sync triggered - pending uploads:', state.pendingUploads.length);
-}
-
 // Placeholder for report submission
 function submitReport() {
     const d = gatherFormData();
@@ -1604,21 +1598,6 @@ function tick() {
 // ============================================================================
 // VEHICLE CHECK
 // ============================================================================
-function checkVehicleStatus() {
-    if (!state || !state.vehicle) return false;
-    
-    const now = new Date();
-    const wofDate = new Date(state.vehicle.wofExpiry);
-    const regoDate = new Date(state.vehicle.regoExpiry);
-    
-    if (wofDate < now || regoDate < now) {
-        showModal('grounded');
-        return true; // Grounded
-    }
-    return false;
-}
-
-// ============================================================================
 // RENDER LOCATIONS
 // ============================================================================
 function renderLocations() {
@@ -1743,14 +1722,6 @@ function saveWizard() {
 // ============================================================================
 // INSTALL PROMPTS
 // ============================================================================
-function dismissInstall(type) {
-    if (type === 'ios') {
-        const modal = document.getElementById('iosInstallModal');
-        if (modal) modal.classList.add('hidden');
-    }
-    localStorage.setItem('otg_install_dismissed', 'true');
-}
-
 function checkIosInstall() {
     const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
     
@@ -2306,6 +2277,7 @@ function processUploadQueue(d) {
                 setTimeout(() => processUploadQueue(), delay);
             }
         });
+}
 }
 
 
@@ -3601,386 +3573,6 @@ function dismissInstall(type) {
 }
 
 // Feature 8: Enhanced Form Builder with all field types
-function buildReportForm(templateName, container) {
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    // Default simple form if no template
-    const fields = [
-        '[HEADING|Visit Details]',
-        '[TEXT|Notes]',
-        '[GPS|Location Verification]'
-    ];
-    
-    fields.forEach((field, index) => {
-        const fieldDiv = document.createElement('div');
-        fieldDiv.className = 'mb-4';
-        
-        let fieldType = 'text';
-        let fieldLabel = field;
-        let options = [];
-        
-        // Parse field format: [TYPE|Label] or [DROP|Label|Opt1,Opt2,Opt3]
-        const match = field.match(/\[(\w+)\|([^\]]+)\]/);
-        if (match) {
-            fieldType = match[1].toLowerCase();
-            const rest = match[2].split('|');
-            fieldLabel = rest[0];
-            if (rest[1]) {
-                options = rest[1].split(',').map(o => o.trim());
-            }
-        }
-        
-        // Don't create label for heading/note types
-        if (fieldType !== 'heading' && fieldType !== 'note') {
-            const label = document.createElement('label');
-            label.className = 'block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider';
-            label.textContent = fieldLabel;
-            fieldDiv.appendChild(label);
-        }
-        
-        switch (fieldType) {
-            case 'heading':
-                fieldDiv.innerHTML = `<h3 class="text-blue-400 font-bold uppercase text-sm mt-6 mb-2 border-b border-gray-700 pb-2">${fieldLabel}</h3>`;
-                break;
-                
-            case 'note':
-                fieldDiv.innerHTML = `<div class="bg-blue-900/20 border-l-2 border-blue-500 p-3 text-xs text-blue-200 italic font-medium">${fieldLabel}</div>`;
-                break;
-                
-            case 'text':
-                const textarea = document.createElement('textarea');
-                textarea.className = 'form-input h-24 font-medium';
-                textarea.id = `field_${index}`;
-                textarea.dataset.label = fieldLabel;
-                // Pre-fill distance for travel
-                if (fieldLabel.toLowerCase().includes('distance') && state.calculatedDistance) {
-                    textarea.value = `${state.calculatedDistance} km`;
-                    textarea.style.borderColor = '#4ade80';
-                }
-                fieldDiv.appendChild(textarea);
-                break;
-                
-            case '1text':
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'form-input font-bold';
-                input.id = `field_${index}`;
-                input.dataset.label = fieldLabel;
-                fieldDiv.appendChild(input);
-                break;
-                
-            case 'number':
-                const numInput = document.createElement('input');
-                numInput.type = 'number';
-                numInput.step = '0.01';
-                numInput.className = 'form-input font-bold text-lg';
-                numInput.id = `field_${index}`;
-                numInput.dataset.label = fieldLabel;
-                if (fieldLabel.toLowerCase().includes('distance') && state.calculatedDistance) {
-                    numInput.value = state.calculatedDistance;
-                    numInput.style.borderColor = '#4ade80';
-                    numInput.classList.add('bg-green-900/20');
-                }
-                fieldDiv.appendChild(numInput);
-                break;
-                
-            case 'date':
-                const dateInput = document.createElement('input');
-                dateInput.type = 'date';
-                dateInput.className = 'form-input font-bold';
-                dateInput.id = `field_${index}`;
-                dateInput.dataset.label = fieldLabel;
-                dateInput.value = new Date().toISOString().split('T')[0];
-                fieldDiv.appendChild(dateInput);
-                break;
-                
-            case 'yesno':
-                const yesNoDiv = document.createElement('div');
-                yesNoDiv.className = 'flex gap-6';
-                ['Yes', 'No'].forEach(opt => {
-                    const radioLabel = document.createElement('label');
-                    radioLabel.className = 'flex items-center gap-2 cursor-pointer';
-                    const radio = document.createElement('input');
-                    radio.type = 'radio';
-                    radio.name = `field_${index}`;
-                    radio.value = opt;
-                    radio.className = 'w-5 h-5';
-                    radio.dataset.label = fieldLabel;
-                    radioLabel.appendChild(radio);
-                    const span = document.createElement('span');
-                    span.className = 'text-sm text-white font-bold';
-                    span.textContent = opt;
-                    radioLabel.appendChild(span);
-                    yesNoDiv.appendChild(radioLabel);
-                });
-                fieldDiv.appendChild(yesNoDiv);
-                break;
-                
-            case 'check':
-                const checkLabel = document.createElement('label');
-                checkLabel.className = 'flex items-center gap-3 cursor-pointer bg-gray-900 p-3 rounded-xl';
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'w-6 h-6 rounded text-blue-600';
-                checkbox.id = `field_${index}`;
-                checkbox.dataset.label = fieldLabel;
-                checkLabel.appendChild(checkbox);
-                const checkSpan = document.createElement('span');
-                checkSpan.className = 'text-white font-bold';
-                checkSpan.textContent = fieldLabel;
-                checkLabel.appendChild(checkSpan);
-                fieldDiv.innerHTML = '';
-                fieldDiv.appendChild(checkLabel);
-                break;
-                
-            case 'drop':
-                const select = document.createElement('select');
-                select.className = 'form-input font-bold';
-                select.id = `field_${index}`;
-                select.dataset.label = fieldLabel;
-                const defaultOpt = document.createElement('option');
-                defaultOpt.value = '';
-                defaultOpt.textContent = `Select ${fieldLabel}...`;
-                select.appendChild(defaultOpt);
-                options.forEach(optText => {
-                    const opt = document.createElement('option');
-                    opt.value = optText;
-                    opt.textContent = optText;
-                    select.appendChild(opt);
-                });
-                fieldDiv.appendChild(select);
-                break;
-                
-            case 'gps':
-                const gpsBtn = document.createElement('button');
-                gpsBtn.type = 'button';
-                gpsBtn.className = 'w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white mb-2';
-                gpsBtn.textContent = '📍 Capture Current GPS';
-                const gpsInput = document.createElement('input');
-                gpsInput.type = 'text';
-                gpsInput.className = 'form-input font-mono text-xs';
-                gpsInput.id = `field_${index}`;
-                gpsInput.dataset.label = fieldLabel;
-                gpsInput.readOnly = true;
-                gpsBtn.onclick = () => {
-                    if (!navigator.geolocation) return showToast('GPS not available');
-                    gpsBtn.textContent = '⏳ Getting location...';
-                    gpsBtn.disabled = true;
-                    navigator.geolocation.getCurrentPosition(
-                        pos => {
-                            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-                            gpsInput.value = coords;
-                            gpsInput.style.borderColor = '#4ade80';
-                            gpsBtn.textContent = '✅ GPS Captured';
-                            gpsBtn.disabled = false;
-                            showToast('📍 GPS captured');
-                        },
-                        err => {
-                            gpsBtn.textContent = '❌ GPS Failed - Try Again';
-                            gpsBtn.disabled = false;
-                            showToast('GPS error: ' + err.message);
-                        },
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                };
-                fieldDiv.appendChild(gpsBtn);
-                fieldDiv.appendChild(gpsInput);
-                break;
-                
-            case 'photo':
-                const photoInput = document.createElement('input');
-                photoInput.type = 'file';
-                photoInput.accept = 'image/*';
-                photoInput.capture = 'environment';
-                photoInput.className = 'hidden';
-                photoInput.id = `field_${index}`;
-                photoInput.dataset.label = fieldLabel;
-                const photoBtn = document.createElement('button');
-                photoBtn.type = 'button';
-                photoBtn.className = 'w-full py-4 bg-gray-800 hover:bg-gray-700 rounded-xl border-2 border-dashed border-gray-600 text-white font-bold flex items-center justify-center gap-2';
-                photoBtn.innerHTML = '📷 <span>Capture Photo</span>';
-                photoBtn.onclick = () => photoInput.click();
-                photoInput.onchange = () => {
-                    if (photoInput.files[0]) {
-                        photoBtn.innerHTML = '✅ <span>Photo Captured</span>';
-                        photoBtn.classList.remove('border-gray-600');
-                        photoBtn.classList.add('border-green-500', 'bg-green-900/20');
-                    }
-                };
-                fieldDiv.appendChild(photoBtn);
-                fieldDiv.appendChild(photoInput);
-                break;
-                
-            case 'sign':
-                const canvasWrapper = document.createElement('div');
-                canvasWrapper.className = 'relative border-2 border-gray-600 rounded-xl bg-white overflow-hidden';
-                canvasWrapper.style.height = '160px';
-                const canvas = document.createElement('canvas');
-                canvas.width = 400;
-                canvas.height = 160;
-                canvas.className = 'w-full h-full touch-none cursor-crosshair';
-                canvas.id = `field_${index}`;
-                canvas.dataset.label = fieldLabel;
-                canvasWrapper.appendChild(canvas);
-                const clearBtn = document.createElement('button');
-                clearBtn.type = 'button';
-                clearBtn.className = 'absolute bottom-2 right-2 bg-gray-200 text-gray-600 px-3 py-1 rounded text-xs font-bold shadow-md hover:bg-gray-300';
-                clearBtn.textContent = 'Clear';
-                clearBtn.onclick = () => {
-                    const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                };
-                canvasWrapper.appendChild(clearBtn);
-                fieldDiv.appendChild(canvasWrapper);
-                
-                // Simple signature capture
-                let drawing = false;
-                const ctx = canvas.getContext('2d');
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.lineCap = 'round';
-                
-                canvas.addEventListener('mousedown', (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); });
-                canvas.addEventListener('mousemove', (e) => { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } });
-                canvas.addEventListener('mouseup', () => drawing = false);
-                
-                canvas.addEventListener('touchstart', (e) => { 
-                    e.preventDefault(); 
-                    drawing = true; 
-                    const rect = canvas.getBoundingClientRect();
-                    const touch = e.touches[0];
-                    ctx.beginPath(); 
-                    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
-                });
-                canvas.addEventListener('touchmove', (e) => { 
-                    e.preventDefault();
-                    if (drawing) { 
-                        const rect = canvas.getBoundingClientRect();
-                        const touch = e.touches[0];
-                        ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top); 
-                        ctx.stroke(); 
-                    } 
-                });
-                canvas.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; });
-                break;
-        }
-        
-        container.appendChild(fieldDiv);
-    });
-}
-
-// Enhance wizard navigation to update dots
-const _origNextWiz = nextWiz;
-nextWiz = function() {
-    const result = _origNextWiz.apply(this, arguments);
-    updateWizardDots();
-    return result;
-};
-
-const _origPrevWiz = prevWiz;
-prevWiz = function() {
-    const result = _origPrevWiz.apply(this, arguments);
-    updateWizardDots();
-    return result;
-};
-
-// Enhance populateSettingsForm to set GPS toggle
-const _origPopulateSettingsForm = populateSettingsForm;
-populateSettingsForm = function() {
-    _origPopulateSettingsForm();
-    const advCheckbox = document.getElementById('setAdvanced');
-    if (advCheckbox && state && state.settings) {
-        advCheckbox.checked = state.settings.isAdvanced !== false;
-    }
-};
-
-// Enhance enterLockedScreen to show critical timing badge AND request wake lock
-const _origEnterLockedScreen = enterLockedScreen;
-enterLockedScreen = function() {
-    _origEnterLockedScreen.apply(this, arguments);
-    updateCriticalTimingBadge();
-    requestWakeLock(); // Also request wake lock when visit starts
-};
-
-// Enhanced preDepart for travel distance calculation
-const _origPreDepart = preDepart;
-preDepart = function() {
-    if (!state || !state.activeVisit) return _origPreDepart();
-    
-    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
-    
-    // Travel location - calculate distance
-    if (location && location.id === 'travel' && CONFIG.mileageEnabled) {
-        const startGPS = state.activeVisit.startGPS;
-        if (!startGPS) {
-            showToast('No start GPS recorded');
-            return submitReport();
-        }
-        
-        showToast('Calculating distance...');
-        navigator.geolocation.getCurrentPosition(
-            async pos => {
-                const endGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
-                const distance = await getDistance(startGPS, endGPS);
-                
-                state.calculatedDistance = distance.km;
-                state.distanceType = distance.type;
-                saveState();
-                
-                showToast(`Distance: ${distance.km} km (${distance.type})`);
-                
-                // Show report form
-                const reportPage = document.getElementById('reportPage');
-                if (reportPage) {
-                    buildReportForm('Travel Report', document.getElementById('reportFields'));
-                    navigate('report');
-                }
-            },
-            err => {
-                console.error('End GPS failed:', err);
-                state.calculatedDistance = null;
-                // Show report form anyway
-                const reportPage = document.getElementById('reportPage');
-                if (reportPage) {
-                    buildReportForm('Travel Report', document.getElementById('reportFields'));
-                    navigate('report');
-                }
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    } else {
-        // Regular location
-        const reportPage = document.getElementById('reportPage');
-        if (reportPage && !location.noReport) {
-            buildReportForm('Standard Visit', document.getElementById('reportFields'));
-            navigate('report');
-        } else {
-            submitReport();
-        }
-    }
-};
-
-// Listen for Android PWA install prompt
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    // Show install banner if not dismissed
-    if (!localStorage.getItem('install_dismissed')) {
-        const banner = document.getElementById('installBanner');
-        if (banner) {
-            setTimeout(() => banner.classList.remove('hidden'), 2000);
-        }
-    }
-});
-
-console.log('✅ All 20 features initialized - System ready!');
-
-// ============================================================================
-// NEW FEATURES: SHAKE-TO-ALERT, VOLUME PANIC, SLIDE-TO-WAKE, WAKE LOCK
-// ============================================================================
 
 // ====== FEATURE 1: SHAKE-TO-ALERT (Covert Panic) ======
 
@@ -4617,26 +4209,22 @@ checkVehicleStatus = function() {
     }
 };
 
-// BUG FIX 6: Fetch locations from backend if empty
-const _origOnload = window.onload;
-window.onload = function() {
-    if (_origOnload) _origOnload();
-    
-    // If locations are empty, fetch from backend
-    if (state && (!state.locations || state.locations.length === 0)) {
-        console.log('Locations empty - fetching from backend...');
-        // TODO: Implement backend fetch
-        // fetchLocationsFromBackend();
-    }
-    
-    // Initialize new features
-    initShakeDetection();
-    initVolumeDetection();
-    initSlideToWake();
-    
-    // Check for signature canvas and apply fix
-    setTimeout(initSigPadFix, 1000);
-};
+// Initialize new features after main onload
+(function() {
+    const _origOnload = window.onload;
+    window.onload = function() {
+        if (_origOnload) _origOnload();
+        
+        // Initialize additional panic features
+        initShakeDetection();
+        initVolumeDetection();
+        initSlideToWake();
+        
+        // Check for signature canvas and apply fix
+        setTimeout(initSigPadFix, 1000);
+    };
+})();
+
 
 // Enhanced SOS with lock check
 const _origSetupLongPress = setupLongPress;
@@ -4668,4 +4256,3 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
-
