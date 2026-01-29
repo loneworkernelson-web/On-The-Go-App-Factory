@@ -332,8 +332,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <button id="btnExtend" onclick="showModal('extend')" class="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
                     Extend
                 </button>
-                <button onclick="openMidVisitMenu()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
-                    Notes
+                <button onclick="openFormsLibrary()" class="flex-1 py-4 bg-violet-900 hover:bg-violet-800 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
+                    Forms
                 </button>
             </div>
             <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">
@@ -850,9 +850,85 @@ function forceSync() {
 
 // Placeholder for report submission
 function submitReport() {
-    // TODO: Implement report submission
-    console.log('Report submitted');
-    navigate('main');
+    const d = gatherFormData();
+    let photoCount = 0;
+    const photoMap = {};
+    
+    // Process photos
+    Object.keys(state.photoStore || {}).forEach((key, index) => {
+        photoCount++;
+        const token = `{{PHOTO_${photoCount}}}`;
+        photoMap[`Photo ${photoCount}`] = state.photoStore[key];
+        
+        if (d.custom[key] !== undefined) {
+            d.custom[key] = token;
+            d.jsonPayload[key] = token;
+        }
+    });
+    
+    // Build form data object
+    const fd = {
+        ...d.custom,
+        "Visit Report Data": JSON.stringify(d.jsonPayload),
+        "Template Name": currentActiveTemplate
+    };
+    
+    // Add distance if available
+    if (d.custom && d.custom["Distance (km)"]) {
+        fd["Distance"] = d.custom["Distance (km)"];
+    }
+    
+    // Add photos
+    Object.entries(photoMap).forEach(([k, v]) => {
+        fd[k] = v;
+    });
+    
+    // Add signature
+    if (d.sig) fd["Signature"] = d.sig;
+    
+    // Determine alarm status
+    let alarmStatus;
+    if (!state.activeVisit) {
+        alarmStatus = "DATA_ENTRY_ONLY";
+    } else if (isMidVisitUpdate) {
+        alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
+    } else {
+        alarmStatus = "DEPARTED";
+    }
+    
+    // Send to backend
+    processUploadQueue(buildPayload({
+        ...fd,
+        "Alarm Status": alarmStatus,
+        "Notes": d.notes || ""
+    }));
+    
+    // Handle UI
+    if (!isMidVisitUpdate) {
+        // End visit
+        state.activeVisit = null;
+        state.selectedLocationId = null;
+        state.visitDurationMinutes = 0;
+        
+        // Clear photos
+        state.photoStore = {};
+        
+        // Stop timer
+        if (timerInt) {
+            clearInterval(timerInt);
+            timerInt = null;
+        }
+        
+        saveState();
+        closeModal('report');
+        navigate('main');
+        renderLocations();
+        showToast('✅ Visit completed');
+    } else {
+        // Mid-visit update
+        closeModal('report');
+        showToast('✅ Update sent');
+    }
 }
 
 // ============================================================================
@@ -1135,14 +1211,133 @@ function withPinVerification(allowDuress, callback) {
 // ============================================================================
 // PRE-DEPART
 // ============================================================================
+// Load form modal and show it
+function loadFormAndShow(templateName) {
+    // Clear signature canvas
+    const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
+    if (sigCanvas) {
+        const ctx = sigCanvas.getContext('2d');
+        ctx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+    }
+    
+    // Show report modal
+    showModal('report');
+    
+    // Set title
+    const title = templateName === '(Standard)' ? 'Status Update' : templateName;
+    const titleEl = document.getElementById('reportTitle');
+    if (titleEl) {
+        titleEl.textContent = isMidVisitUpdate ? `Update: ${title}` : title;
+    }
+    
+    currentActiveTemplate = templateName;
+    
+    // Build form fields
+    const fieldsContainer = document.getElementById('reportFields');
+    if (fieldsContainer) {
+        buildReportForm(templateName, fieldsContainer);
+    }
+    
+    // Pre-fill distance if available
+    if (calculatedDist) {
+        const distInput = document.querySelector('[data-key*="Distance"]') || 
+                         document.querySelector('[data-key*="KM"]') ||
+                         document.querySelector('[data-key*="distance"]');
+        if (distInput) {
+            distInput.value = calculatedDist.km;
+            distInput.style.border = '2px solid #4ade80';
+            distInput.classList.add('bg-green-900/20');
+        }
+    }
+    
+    // Setup submit button
+    const btn = document.getElementById('btnSubmitRep');
+    if (btn) {
+        // Clone to remove old listeners
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        if (!state.activeVisit) {
+            // Data entry only
+            newBtn.textContent = 'SUBMIT REPORT';
+            newBtn.classList.remove('long-press-btn');
+            newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
+            newBtn.onclick = submitReport;
+        } else if (isMidVisitUpdate) {
+            // Mid-visit update
+            newBtn.textContent = 'SEND UPDATE';
+            newBtn.classList.remove('long-press-btn');
+            newBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
+            newBtn.onclick = submitReport;
+        } else {
+            // End visit
+            newBtn.textContent = 'HOLD TO SUBMIT & END';
+            newBtn.classList.add('long-press-btn');
+            setupLongPress(newBtn, 2000, submitReport);
+        }
+    }
+}
+
 function preDepart() {
     if (!state || !state.activeVisit) return;
-    const alarmActive = state.activeVisit.isPanic || state.activeVisit.criticalSent;
-    const proceed = () => {
+    
+    isMidVisitUpdate = false;
+    
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    
+    if (!location) {
+        showToast('⚠️ Location not found');
+        return;
+    }
+    
+    // For travel locations - calculate distance
+    if (location.id === 'travel' || location.isTravel) {
+        // Check if report is required
+        if (location.noReport) {
+            submitReport();
+            return;
+        }
+        
+        const btnDepart = document.getElementById('btnDepart');
+        if (btnDepart) btnDepart.textContent = 'Getting GPS...';
+        
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const endGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                const startGPS = state.activeVisit.startGPS;
+                
+                if (startGPS && endGPS) {
+                    try {
+                        calculatedDist = await getDistance(startGPS, endGPS);
+                        console.log('Distance calculated:', calculatedDist);
+                    } catch (err) {
+                        console.error('Distance calc error:', err);
+                        const dist = haversine(startGPS, endGPS);
+                        calculatedDist = { km: dist.toFixed(2), type: 'crow', offline: true };
+                    }
+                }
+                
+                if (btnDepart) btnDepart.textContent = 'HOLD TO END';
+                loadFormAndShow(location.templateName || '(Standard)');
+            },
+            (err) => {
+                console.error('GPS error:', err);
+                if (btnDepart) btnDepart.textContent = 'HOLD TO END';
+                calculatedDist = null;
+                loadFormAndShow(location.templateName || '(Standard)');
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    } else if (location.noReport) {
+        // Regular location with no report required
         submitReport();
-    };
-    alarmActive ? withPinVerification(false, proceed) : proceed();
+    } else {
+        // Regular location with report required
+        calculatedDist = null;
+        loadFormAndShow(location.templateName || '(Standard)');
+    }
 }
+
 
 // ============================================================================
 // ENTER LOCKED SCREEN
@@ -1872,9 +2067,8 @@ let gpsWarm = false;
 let travelTargetName = "";
 let panicTapCount = 0;
 let panicTapTimer;
-let currentBatteryLevel = "100%";
 
-// Note: currentActiveTemplate and isMidVisitUpdate already declared earlier in file
+// Note: currentBatteryLevel, currentActiveTemplate and isMidVisitUpdate already declared earlier in file
 
 // 1. BUILD PAYLOAD - Constructs proper data structure for backend
 function buildPayload(d) {
