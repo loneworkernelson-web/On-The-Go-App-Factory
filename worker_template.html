@@ -866,12 +866,19 @@ function announce(text) {
 // ============================================================================
 async function logSafety(type, message) {
     console.log(`[${type}] ${message}`);
+    
+    // Don't try to upload if worker not set up yet
+    if (!state || !state.worker || !state.worker.name) {
+        console.log('Skipping log upload - worker not initialized yet');
+        return;
+    }
+    
     try {
         const payload = {
             type,
             message,
             timestamp: new Date().toISOString(),
-            worker: state.worker.name || 'Unknown',
+            worker: state.worker.name,
             emergencyContact: `${state.worker.emgName || 'N/A'} (${state.worker.emgPhone || 'N/A'})`,
             battery: await getBatteryPercent(),
             gps: lastGPS || 'Unknown'
@@ -879,7 +886,7 @@ async function logSafety(type, message) {
         state.pendingUploads.push(payload);
         if (state.pendingUploads.length > 50) state.pendingUploads.shift();
         saveState();
-        forceSync();
+        processUploadQueue(); // Use processUploadQueue instead of forceSync
     } catch (e) {
         console.error('Log safety failed:', e);
     }
@@ -3162,8 +3169,18 @@ function updateOnlineStatus() {
 
 // Enhanced forceSync with online check
 function forceSync(showUI) {
+    console.log('🔵 forceSync CALLED - showUI:', showUI);
+    console.log('   state exists:', !!state);
+    console.log('   state.worker exists:', !!state?.worker);
+    console.log('   state.worker.name:', state?.worker?.name);
+    
     // Simple check - return silently if no worker
-    if (!state || !state.worker || !state.worker.name) return;
+    if (!state || !state.worker || !state.worker.name) {
+        console.log('❌ forceSync EXITING - No worker name');
+        return;
+    }
+    
+    console.log('✅ forceSync PROCEEDING with worker:', state.worker.name);
     
     // Show banner immediately
     if (showUI) {
