@@ -1716,7 +1716,17 @@ function saveWizard() {
     
     // CRITICAL: Sync with backend after wizard completion
     console.log('Wizard complete - syncing with backend...');
-    forceSync(true);
+    console.log('About to call forceSync(true)...');
+    console.log('forceSync function exists:', typeof forceSync);
+    console.log('state.worker:', state.worker);
+    
+    try {
+        forceSync(true);
+        console.log('forceSync call completed');
+    } catch (error) {
+        console.error('ERROR calling forceSync:', error);
+        console.error('Error stack:', error.stack);
+    }
 }
 
 // ============================================================================
@@ -3152,29 +3162,10 @@ function updateOnlineStatus() {
 
 // Enhanced forceSync with online check
 function forceSync(showUI) {
-    console.log('forceSync called with showUI:', showUI);
-    console.log('state:', state);
-    console.log('state.worker:', state?.worker);
-    console.log('state.worker.name:', state?.worker?.name);
+    // Simple check - return silently if no worker
+    if (!state || !state.worker || !state.worker.name) return;
     
-    // Require worker name
-    if (!state || !state.worker || !state.worker.name) {
-        console.error('❌ Cannot sync: No worker name');
-        console.error('state exists:', !!state);
-        console.error('state.worker exists:', !!state?.worker);
-        console.error('state.worker.name exists:', !!state?.worker?.name);
-        return;
-    }
-    
-    if (!navigator.onLine) {
-        if (showUI) showToast('📡 Offline - will sync when connected');
-        console.warn('Cannot sync: Offline');
-        return;
-    }
-    
-    console.log('✅ Sync checks passed, proceeding...');
-    
-    // Show sync banner
+    // Show banner immediately
     if (showUI) {
         const banner = document.getElementById('uploadBanner');
         if (banner) banner.classList.remove('hidden');
@@ -3183,7 +3174,7 @@ function forceSync(showUI) {
     const deviceId = getDeviceID();
     const workerName = state.worker.name;
     
-    console.log(`Syncing for worker: ${workerName}, device: ${deviceId}`);
+    console.log(`🔄 Syncing for worker: ${workerName}, device: ${deviceId}`);
     
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(workerName)}&key=${CONFIG.key}&deviceId=${deviceId}`)
         .then(r => r.json())
@@ -3194,12 +3185,12 @@ function forceSync(showUI) {
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
             
-            // Check for errors
+            // Handle errors
             if (data.status === "error") {
                 if (showUI) {
                     if (data.message && data.message.includes("ACCESS DENIED")) {
                         alert("⛔ ACCESS DENIED\n\n" + data.message);
-                        startWizard();
+                        // startWizard(); // Commented - we handle this differently
                     } else {
                         alert("❌ Sync Error: " + (data.message || 'Unknown error'));
                     }
@@ -3207,7 +3198,7 @@ function forceSync(showUI) {
                 return;
             }
             
-            // Process locations from backend (comes as "sites" array)
+            // Process locations
             const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
             
             const backendSites = (data.sites || []).map(s => ({
@@ -3224,7 +3215,7 @@ function forceSync(showUI) {
                 isCritical: s.critical || false
             }));
             
-            // Add travel if mileage enabled
+            // Add travel tile
             if (CONFIG.mileageEnabled) {
                 backendSites.unshift({
                     id: 'travel',
@@ -3236,19 +3227,17 @@ function forceSync(showUI) {
                 });
             }
             
-            // Merge: backend sites + manual locations
+            // Merge locations
             state.locations = backendSites.concat(existingManual);
             
-            // Update forms data
+            // Update forms and meta
             state.globalForms = data.forms || [];
             state.cachedForms = data.cachedTemplates || {};
             state.meta = data.meta || {};
             
             // Ensure standard forms exist
             if (!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
-                state.cachedForms["Standard Visit Note"] = [
-                    {type: 'note', text: 'Standard Check-in'}
-                ];
+                state.cachedForms["Standard Visit Note"] = [{type: 'note', text: 'Standard Check-in'}];
             }
             
             if (CONFIG.mileageEnabled && !state.cachedForms['Travel Report']) {
@@ -3259,30 +3248,27 @@ function forceSync(showUI) {
                 ];
             }
             
-            // Apply user preference for travel report
+            // Handle travel preferences
             const travelLoc = state.locations.find(x => x.id === 'travel');
             const userPref = localStorage.getItem('otg_user_travel_pref');
             if (travelLoc && userPref !== null) {
                 travelLoc.noReport = (userPref === 'true');
             }
             
+            // Save and render
             saveState();
             renderLocations();
             checkVehicleStatus();
             
-            if (showUI) {
-                showToast(`✅ Sync complete - ${state.locations.length} locations`);
-            }
+            if (showUI) showToast('✅ Sync Complete!');
             
-            console.log(`Sync complete: ${state.locations.length} locations loaded`);
+            console.log(`✅ Sync complete: ${state.locations.length} locations loaded`);
         })
         .catch(e => {
             console.error('Sync failed:', e);
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
-            if (showUI) {
-                showToast('❌ Sync failed - ' + e.message);
-            }
+            if (showUI) showToast('❌ Sync failed: ' + e.message);
         });
 }
 
