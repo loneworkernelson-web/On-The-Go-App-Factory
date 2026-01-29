@@ -2217,31 +2217,59 @@ function processUploadQueue(d) {
     
     if (state.pendingUploads.length === 0) return;
     
-    const fd = new FormData();
+    console.log(`Processing ${state.pendingUploads.length} queued uploads...`);
+    
     const currentUpload = state.pendingUploads[0];
     
+    // IMPORTANT: NO action parameter needed for POST!
+    // Backend doPost() only checks key, then calls handleWorkerPost()
+    const url = CONFIG.url;
+    
+    const fd = new FormData();
     for (let k in currentUpload) {
         fd.append(k, currentUpload[k]);
     }
     
-    console.log('Uploading to backend...', Object.keys(currentUpload));
+    console.log('Uploading to:', url);
+    console.log('Data fields:', Object.keys(currentUpload));
+    console.log('Worker:', currentUpload['Worker Name']);
+    console.log('Key (first 10 chars):', currentUpload.key?.substring(0, 10));
+    console.log('Key length:', currentUpload.key?.length);
     
-    fetch(CONFIG.url, { 
+    fetch(url, { 
         method: 'POST', 
         body: fd,
-        // GROK FIX #3: Add timeout
         signal: AbortSignal.timeout(30000) // 30 second timeout
     })
         .then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.text(); // Get response text for debugging
+            return r.json(); // Parse as JSON
         })
-        .then(responseText => {
-            console.log('Upload successful:', responseText);
+        .then(data => {
+            console.log('Upload response:', data);
             
-            // Remove from queue
-            state.pendingUploads.shift();
-            saveState();
+            if (data.status === 'error') {
+                console.error('❌ BACKEND REJECTED');
+                
+                if (data.message) {
+                    console.error('Error message:', data.message);
+                    showToast(`❌ Backend: ${data.message}`);
+                } else {
+                    console.error('No error message - likely KEY MISMATCH');
+                    console.error('Check: CONFIG.key must match backend CONFIG.MASTER_KEY or CONFIG.WORKER_KEY');
+                    showToast('❌ Backend rejected - check key');
+                }
+                
+                // Remove from queue to avoid infinite retry
+                state.pendingUploads.shift();
+                saveState();
+            } else {
+                console.log('✅ Upload successful');
+                
+                // Remove from queue
+                state.pendingUploads.shift();
+                saveState();
+            }
             
             // Process next item
             if (state.pendingUploads.length > 0) {
@@ -2278,6 +2306,7 @@ function processUploadQueue(d) {
                 setTimeout(() => processUploadQueue(), delay);
             }
         });
+}
 }
 
 
