@@ -1866,15 +1866,15 @@ function startVisit() {
 // CRITICAL FUNCTIONS EXTRACTED FROM WS_SAFETY (MISSING IN ORIGINAL BUILD)
 // ============================================================================
 
-// Critical variables needed by these functions
+// Critical variables needed by these functions (new ones only, avoid duplicates)
 let calculatedDist = null;
-let currentActiveTemplate = "";
-let isMidVisitUpdate = false;
 let gpsWarm = false;
 let travelTargetName = "";
 let panicTapCount = 0;
 let panicTapTimer;
 let currentBatteryLevel = "100%";
+
+// Note: currentActiveTemplate and isMidVisitUpdate already declared earlier in file
 
 // 1. BUILD PAYLOAD - Constructs proper data structure for backend
 function buildPayload(d) {
@@ -1929,11 +1929,22 @@ function buildPayload(d) {
 // 2. PROCESS UPLOAD QUEUE - Sends queued data to backend
 function processUploadQueue(d) {
     if (d) {
+        // GROK FIX #2: Cap queue at 100 items to prevent memory issues
+        if (state.pendingUploads.length >= 100) {
+            console.warn('Queue full (100 items), removing oldest');
+            state.pendingUploads.shift();
+        }
+        
         state.pendingUploads.push(d);
         saveState();
     }
     
-    if (!navigator.onLine || state.pendingUploads.length === 0) return;
+    if (!navigator.onLine) {
+        console.log('Offline, data queued for later');
+        return;
+    }
+    
+    if (state.pendingUploads.length === 0) return;
     
     const fd = new FormData();
     const currentUpload = state.pendingUploads[0];
@@ -1942,17 +1953,62 @@ function processUploadQueue(d) {
         fd.append(k, currentUpload[k]);
     }
     
-    fetch(CONFIG.url, { method: 'POST', body: fd })
+    console.log('Uploading to backend...', Object.keys(currentUpload));
+    
+    fetch(CONFIG.url, { 
+        method: 'POST', 
+        body: fd,
+        // GROK FIX #3: Add timeout
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+    })
         .then(r => {
-            if (!r.ok) throw new Error();
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.text(); // Get response text for debugging
+        })
+        .then(responseText => {
+            console.log('Upload successful:', responseText);
+            
+            // Remove from queue
             state.pendingUploads.shift();
             saveState();
-            if (state.pendingUploads.length > 0) processUploadQueue();
+            
+            // Process next item
+            if (state.pendingUploads.length > 0) {
+                console.log(`${state.pendingUploads.length} items remaining in queue`);
+                setTimeout(() => processUploadQueue(), 500); // Small delay between uploads
+            } else {
+                console.log('Queue empty - all uploads complete');
+            }
         })
         .catch(e => {
-            console.warn("Upload Failed, data queued.");
+            console.error("Upload failed:", e.message);
+            
+            // GROK FIX #3: Retry logic with exponential backoff
+            if (!currentUpload._retryCount) currentUpload._retryCount = 0;
+            currentUpload._retryCount++;
+            
+            if (currentUpload._retryCount >= 3) {
+                console.error('Max retries reached, removing item from queue');
+                state.pendingUploads.shift();
+                saveState();
+                
+                // Try next item
+                if (state.pendingUploads.length > 0) {
+                    setTimeout(() => processUploadQueue(), 1000);
+                }
+            } else {
+                // Retry with exponential backoff: 2s, 4s, 8s
+                const delay = Math.pow(2, currentUpload._retryCount) * 1000;
+                console.log(`Retry ${currentUpload._retryCount}/3 in ${delay}ms`);
+                
+                state.pendingUploads[0] = currentUpload; // Update with retry count
+                saveState();
+                
+                setTimeout(() => processUploadQueue(), delay);
+            }
         });
 }
+
 
 // 3. GATHER FORM DATA - Collects all form field values
 function gatherFormData() {
@@ -2034,6 +2090,64 @@ function getDeviceID() {
     return state.deviceId || "";
 }
 
+// Fetch locations from backend
+async function fetchLocationsFromBackend() {
+    if (!CONFIG.url || !state || !state.worker || !state.worker.name) {
+        console.warn('Cannot fetch locations: missing config or worker data');
+        renderLocations(); // Render with empty list
+        return;
+    }
+    
+    try {
+        showToast('📡 Fetching locations...');
+        
+        const url = `${CONFIG.url}?action=getLocations&worker=${encodeURIComponent(state.worker.name)}&deviceId=${state.deviceId}&key=${CONFIG.key}`;
+        
+        console.log('Fetching from:', url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        console.log('Location fetch response:', data);
+        
+        if (data.status === 'success' && data.locations && Array.isArray(data.locations)) {
+            // Merge with existing locations (don't overwrite travel tile)
+            const existingTravel = state.locations.find(l => l.id === 'travel');
+            
+            state.locations = data.locations.filter(l => l.id !== 'travel');
+            
+            // Re-add travel if it existed
+            if (existingTravel) {
+                state.locations.unshift(existingTravel);
+            }
+            
+            saveState();
+            renderLocations();
+            showToast(`✅ ${data.locations.length} locations loaded`);
+            
+            console.log('Locations updated:', state.locations.length);
+        } else {
+            console.warn('Invalid response format:', data);
+            renderLocations(); // Render with what we have
+            showToast('⚠️ No locations from backend');
+        }
+    } catch (err) {
+        console.error('Location fetch failed:', err);
+        renderLocations(); // Render with what we have (at least travel tile)
+        showToast('⚠️ Offline - using cached locations');
+    }
+}
+
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
@@ -2053,6 +2167,13 @@ window.onload = () => {
         meta: {} // For vehicle check data from backend
     };
     
+    // GROK FIX #2: Cap pending uploads queue to prevent memory issues
+    if (state.pendingUploads && state.pendingUploads.length > 100) {
+        console.warn('Queue too large, keeping only last 100 items');
+        state.pendingUploads = state.pendingUploads.slice(-100);
+        saveState();
+    }
+    
     // Check network status for offline banner
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
@@ -2071,7 +2192,14 @@ window.onload = () => {
         if (state.activeVisit) {
             enterLockedScreen();
         }
-        renderLocations();
+        
+        // GROK FIX #1: Fetch locations from backend if empty
+        if (!state.locations || state.locations.length === 0) {
+            console.log('No locations in state, fetching from backend...');
+            fetchLocationsFromBackend();
+        } else {
+            renderLocations();
+        }
         
         // Quick Wins initialization
         updateDurationDisplay(); // Set initial duration display
@@ -2086,8 +2214,37 @@ window.onload = () => {
         timerInt = setInterval(tick, 1000);
     }
     
-    // Setup panic button long press
-    setupLongPress('btnPanic', 3000, () => triggerPanic(false));
+    // Setup panic button handler (wire up SOS button)
+    const btnPanic = document.getElementById('btnPanic');
+    if (btnPanic) {
+        btnPanic.onclick = () => {
+            panicTapCount++;
+            clearTimeout(panicTapTimer);
+            
+            if (panicTapCount === 3) {
+                panicTapCount = 0;
+                triggerPanic(false);
+            } else {
+                panicTapTimer = setTimeout(() => {
+                    panicTapCount = 0;
+                }, 2000);
+            }
+        };
+    }
+    
+    // GROK FIX #3: Process upload queue with retry on page load
+    if (navigator.onLine && state.pendingUploads && state.pendingUploads.length > 0) {
+        console.log(`Processing ${state.pendingUploads.length} queued uploads...`);
+        processUploadQueue();
+    }
+    
+    // Retry failed uploads when coming back online
+    window.addEventListener('online', () => {
+        if (state.pendingUploads && state.pendingUploads.length > 0) {
+            console.log('Back online, processing queue...');
+            setTimeout(() => processUploadQueue(), 1000);
+        }
+    });
     
     console.log("System Initialized - Phase 1 Enhanced");
 };
