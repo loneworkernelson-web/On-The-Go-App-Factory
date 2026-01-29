@@ -92,6 +92,38 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .lbl-blue { color: #60a5fa; }
 .lbl-red { color: #f87171; }
 .lbl-gray { color: #9ca3af; }
+
+/* Duration slider styling */
+.slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.slider-thumb::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+}
+
 </style>
 </head>
 <body class="h-full overflow-hidden select-none">
@@ -214,13 +246,46 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="navigate('settings')" class="text-2xl text-gray-400 hover:text-white px-2" aria-label="Settings">⚙️</button>
         </div>
     </div>
-    <div class="content-area" id="locationsList">
-        <!-- Rendered tiles -->
+    <div class="content-area">
+        <!-- Travel location (full width) -->
+        <div id="travelRow"></div>
+        
+        <!-- Regular locations (grid) -->
+        <div id="locationList" class="grid grid-cols-2 gap-3 mt-3"></div>
     </div>
-    <div class="footer-bar flex gap-3">
-        <button onclick="forceSync(true)" class="px-6 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg">
-            🔄 Sync
-        </button>
+    <div class="footer-bar">
+        <!-- Critical Timing Mode Toggle -->
+        <div class="flex justify-end items-center gap-2 mb-2">
+            <span class="text-[10px] font-bold text-gray-500 tracking-widest" id="lblHighRisk">Critical timing mode</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="chkHighRisk" class="sr-only peer" onchange="toggleHighRiskUI()">
+                <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+            </label>
+        </div>
+        
+        <!-- Duration Slider -->
+        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+            <div class="flex justify-between mb-2 font-black tracking-tighter">
+                <span class="text-gray-400 text-[10px]">TIME</span>
+                <span id="durationDisplay" class="text-xs text-blue-400">0 mins</span>
+            </div>
+            <input id="durationSlider" type="range" min="0" max="31" value="0" 
+                   class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" 
+                   oninput="updateDurationDisplay()">
+        </div>
+        
+        <!-- Forms Button + Hold to Start Button -->
+        <div class="flex gap-4">
+            <button id="btnForms" onclick="openFormsLibrary()" 
+                    class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl border border-violet-700/50 shadow-lg active:scale-95 transition text-xs tracking-widest">
+                Forms
+            </button>
+            <button type="button" id="btnStart" 
+                    class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" 
+                    disabled>
+                Hold to Start
+            </button>
+        </div>
     </div>
 </div>
 
@@ -506,6 +571,18 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 // ============================================================================
 // CONFIGURATION SYSTEM (Phase 2, Feature 11)
 // ============================================================================
+// Duration mapping: 32 steps from 0 to 8 hours (480 minutes)
+// Slider positions 0-31 map to these durations in minutes
+const DURATION_MAP = [
+    0, 10, 15, 20, 30, 45,     // 0-5: Quick visits (0-45 min)
+    60, 75, 90, 105, 120,       // 6-10: Short visits (1-2 hours)
+    135, 150, 165, 180,         // 11-14: Medium visits (2-3 hours)
+    195, 210, 225, 240,         // 15-18: Long visits (3-4 hours)
+    255, 270, 285, 300,         // 19-22: Extended visits (4-5 hours)
+    315, 330, 345, 360,         // 23-26: Very long visits (5-6 hours)
+    390, 420, 450, 480          // 27-31: Maximum visits (6-8 hours)
+];
+
 const CONFIG = {
     // Backend
     url: "%%GOOGLE_SHEET_URL%%",
@@ -1258,134 +1335,36 @@ function checkVehicleStatus() {
 // RENDER LOCATIONS
 // ============================================================================
 function renderLocations() {
-    const list = document.getElementById('locationsList');
-    if (!list || !state || !state.locations) return;
+    const list = document.getElementById('locationList');
+    const travelRow = document.getElementById('travelRow');
+    
+    if (!list || !travelRow) {
+        console.error('Location containers not found!');
+        return;
+    }
     
     list.innerHTML = '';
+    travelRow.innerHTML = '';
     
-    // Add travel location if enabled
-    if (CONFIG.mileageEnabled && !state.locations.find(l => l.id === 'travel')) {
-        state.locations.unshift({
-            id: 'travel',
-            name: 'Travel',
-            address: 'Calculates Mileage via GPS',
-            companyName: 'Internal',
-            noReport: !CONFIG.reqTravelReport
-        });
+    // ALWAYS render travel tile first (hard-coded)
+    const travelTile = createTravelTile();
+    travelRow.appendChild(travelTile);
+    
+    // Render regular locations
+    if (!state || !state.locations) {
+        state = state || {};
+        state.locations = [];
     }
     
     state.locations.forEach(loc => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'flex gap-2 mb-2';
+        if (!loc || loc.id === 'travel') return; // Skip travel (already rendered)
         
-        const tile = document.createElement('button');
-        tile.classList.add('flex-1', 'p-4', 'bg-gray-700', 'rounded-xl', 'text-left', 'active:bg-gray-600', 'transition-colors');
-        
-        // Build tile content with proper formatting
-        let tileHTML = `<div class="font-bold text-white text-lg">${loc.name}</div>`;
-        if (loc.address) {
-            tileHTML += `<div class="text-xs text-gray-400 mt-1">${loc.address}</div>`;
-        }
-        if (loc.companyName && loc.companyName !== 'Internal') {
-            tileHTML += `<div class="text-xs text-blue-400 mt-1">${loc.companyName}</div>`;
-        }
-        if (loc.isCritical) {
-            tileHTML += `<div class="text-xs text-red-500 font-bold mt-1">⚡ CRITICAL SITE</div>`;
-        }
-        tile.innerHTML = tileHTML;
-        
-        tile.onclick = () => {
-            // Check vehicle compliance
-            if (checkVehicleBeforeVisit()) return;
-            
-            // Travel location - capture start GPS
-            if (loc.id === 'travel') {
-                if (!navigator.geolocation) {
-                    return showToast('GPS not available');
-                }
-                
-                showToast('Getting start location...');
-                navigator.geolocation.getCurrentPosition(
-                    pos => {
-                        const startGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
-                        state.activeVisit = {
-                            locationName: loc.name,
-                            locationId: loc.id,
-                            startTime: Date.now(),
-                            startGPS: startGPS,
-                            duration: 3600,
-                            isPanic: false,
-                            criticalSent: false,
-                            warningSent: false,
-                            warn90Sent: false,
-                            warn2minSent: false,
-                            warn5minSent: false
-                        };
-                        saveState();
-                        showToast('📍 Start location recorded');
-                        enterLockedScreen();
-                    },
-                    err => {
-                        showToast('GPS error: ' + err.message);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-                return;
-            }
-            
-            // Regular location
-            state.activeVisit = { 
-                locationName: loc.name,
-                locationId: loc.id,
-                startTime: Date.now(), 
-                duration: 3600,
-                isPanic: false,
-                criticalSent: false,
-                warningSent: false,
-                warn90Sent: false,
-                warn2minSent: false,
-                warn5minSent: false
-            };
-            saveState();
-            enterLockedScreen();
-        };
-        
-        wrapper.appendChild(tile);
-        
-        // Add edit button for manual locations (loc_*) and travel
-        if (loc.id.startsWith('loc_') || loc.id === 'travel') {
-            const editBtn = document.createElement('button');
-            editBtn.className = 'w-14 bg-blue-600 rounded-xl text-white font-bold text-xl hover:bg-blue-500 active:scale-95 transition';
-            editBtn.innerHTML = '✏️';
-            editBtn.onclick = (e) => {
-                e.stopPropagation();
-                openLocationEditor(loc.id);
-            };
-            wrapper.appendChild(editBtn);
-        }
-        
-        list.appendChild(wrapper);
+        const tile = createLocationTile(loc);
+        list.appendChild(tile);
     });
     
-    // Add "New Location" button
-    const addBtn = document.createElement('button');
-    addBtn.className = 'w-full p-4 bg-blue-900 border-2 border-dashed border-blue-500 rounded-xl text-blue-400 font-bold hover:bg-blue-800 transition-colors mt-4';
-    addBtn.innerHTML = '➕ Add New Location';
-    addBtn.onclick = () => {
-        // Clear form for new location
-        document.getElementById('locId').value = '';
-        document.getElementById('locBusiness').value = '';
-        document.getElementById('locName').value = '';
-        document.getElementById('locAddr').value = '';
-        document.getElementById('locContactName').value = '';
-        document.getElementById('locContactPhone').value = '';
-        document.getElementById('locContactEmail').value = '';
-        document.getElementById('locCritical').checked = false;
-        const btnDel = document.getElementById('btnDelLoc');
-        if (btnDel) btnDel.classList.add('hidden');
-        showModal('location');
-    };
-    list.appendChild(addBtn);
+    // Update button state after rendering
+    updateArrivedButtonState();
 }
 
 // ============================================================================
@@ -1531,6 +1510,259 @@ window.addEventListener('beforeunload', () => {
 });
 
 // ============================================================================
+// QUICK WINS: DURATION SLIDER, FORMS BUTTON, HOLD TO START, TRAVEL TILE
+// ============================================================================
+
+// Update duration display when slider moves
+function updateDurationDisplay() {
+    const slider = document.getElementById('durationSlider');
+    if (!slider) return;
+    
+    const sliderValue = parseInt(slider.value);
+    const minutes = DURATION_MAP[sliderValue];
+    
+    const display = document.getElementById('durationDisplay');
+    if (display) {
+        if (minutes >= 60) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            display.textContent = mins > 0 ? `${hours} hr ${mins} min` : `${hours} hr`;
+        } else {
+            display.textContent = `${minutes} min`;
+        }
+    }
+    
+    // Store selected duration
+    if (!state) state = {};
+    state.visitDurationMinutes = minutes;
+    
+    // Update button state
+    updateArrivedButtonState();
+}
+
+// Update "Hold to Start" button state
+function updateArrivedButtonState() {
+    const btn = document.getElementById('btnStart');
+    if (!btn) return;
+    
+    const hasLocation = state && state.selectedLocationId;
+    const hasDuration = state && state.visitDurationMinutes > 0;
+    
+    if (hasLocation && hasDuration) {
+        btn.disabled = false;
+        btn.classList.remove('bg-gray-700', 'text-gray-500');
+        btn.classList.add('bg-blue-600', 'text-white');
+        btn.textContent = state.selectedLocationId === 'travel' ? 'Hold to Travel' : 'Hold to Start';
+    } else {
+        btn.disabled = true;
+        btn.classList.add('bg-gray-700', 'text-gray-500');
+        btn.classList.remove('bg-blue-600', 'text-white');
+        btn.textContent = 'Hold to Start';
+    }
+}
+
+// Open forms library modal
+function openFormsLibrary() {
+    showToast('📋 Forms library - Coming soon');
+    // TODO: Implement forms library modal
+    // This will show available form templates
+}
+
+// Toggle high-risk/critical timing mode
+function toggleHighRiskUI() {
+    const checkbox = document.getElementById('chkHighRisk');
+    if (!checkbox) return;
+    
+    if (checkbox.checked) {
+        showToast('⚡ Critical timing mode ON - Zero grace period');
+    } else {
+        showToast('✅ Critical timing mode OFF');
+    }
+    
+    // Store preference
+    if (state) {
+        state.highRiskMode = checkbox.checked;
+        saveState();
+    }
+}
+
+// Create travel tile (always present)
+function createTravelTile() {
+    const isSel = state && state.selectedLocationId === 'travel';
+    const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
+    
+    const tile = document.createElement('div');
+    tile.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${
+        isSel 
+            ? 'border-white scale-[1.02] ring-2 ring-purple-400' 
+            : 'border-gray-700 hover:border-white/20'
+    } bg-gradient-to-r from-indigo-600 to-purple-700`;
+    
+    tile.innerHTML = `
+        <div class="flex items-center gap-2">
+            <div class="text-xl">🚗</div>
+            <div>
+                <div class="text-sm font-bold text-white tracking-tight leading-none">Travelling</div>
+                <div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">
+                    ${noReport ? 'Report optional' : 'Report required'}
+                </div>
+            </div>
+        </div>
+        <button class="text-white/40 hover:text-white text-xs p-1" 
+                onclick="event.stopPropagation(); editTravelSettings();">
+            ⚙️
+        </button>
+    `;
+    
+    tile.onclick = () => {
+        if (state.selectedLocationId === 'travel') {
+            state.selectedLocationId = null;
+        } else {
+            state.selectedLocationId = 'travel';
+        }
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    
+    return tile;
+}
+
+// Edit travel settings (report required toggle)
+function editTravelSettings() {
+    const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
+    
+    const confirmed = confirm(
+        noReport 
+            ? 'Currently: Report OPTIONAL\n\nChange to require report after travel?' 
+            : 'Currently: Report REQUIRED\n\nChange to make report optional?'
+    );
+    
+    if (confirmed) {
+        localStorage.setItem('otg_user_travel_pref', (!noReport).toString());
+        renderLocations();
+        showToast('✅ Travel settings updated');
+    }
+}
+
+// Create regular location tile
+function createLocationTile(loc) {
+    const isSel = state && state.selectedLocationId === loc.id;
+    
+    const tile = document.createElement('div');
+    tile.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${
+        isSel 
+            ? 'border-blue-500 bg-blue-900/40' 
+            : 'border-gray-700 bg-gray-800 hover:bg-gray-750'
+    }`;
+    
+    let icon = "🏢";
+    if (loc.name && loc.name.toLowerCase().includes("home")) icon = "🏠";
+    
+    tile.innerHTML = `
+        <div class="flex justify-between items-start">
+            <span class="text-2xl">${icon}</span>
+            ${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) 
+                ? `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}', event)">ℹ️</button>` 
+                : ''}
+        </div>
+        <div>
+            ${loc.companyName ? `<div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName}</div>` : ''}
+            <div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div>
+        </div>
+    `;
+    
+    tile.onclick = () => {
+        if (state.selectedLocationId === loc.id) {
+            state.selectedLocationId = null;
+        } else {
+            state.selectedLocationId = loc.id;
+        }
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    
+    return tile;
+}
+
+// Setup long-press for "Hold to Start" button
+function setupHoldToStart() {
+    const btn = document.getElementById('btnStart');
+    if (!btn) return;
+    
+    let pressTimer;
+    let pressStartTime;
+    
+    const startPress = (e) => {
+        if (btn.disabled) return;
+        
+        pressStartTime = Date.now();
+        pressTimer = setTimeout(() => {
+            // Long press completed (1.5 seconds)
+            startVisit();
+        }, 1500);
+        
+        // Visual feedback
+        btn.classList.add('scale-95');
+    };
+    
+    const endPress = (e) => {
+        clearTimeout(pressTimer);
+        btn.classList.remove('scale-95');
+        
+        const pressDuration = Date.now() - pressStartTime;
+        if (pressDuration < 1500 && pressDuration > 100) {
+            // Released too early
+            showToast('Hold button for 1.5 seconds to start');
+        }
+    };
+    
+    const cancelPress = (e) => {
+        clearTimeout(pressTimer);
+        btn.classList.remove('scale-95');
+    };
+    
+    // Touch events
+    btn.addEventListener('touchstart', startPress);
+    btn.addEventListener('touchend', endPress);
+    btn.addEventListener('touchcancel', cancelPress);
+    
+    // Mouse events (for desktop testing)
+    btn.addEventListener('mousedown', startPress);
+    btn.addEventListener('mouseup', endPress);
+    btn.addEventListener('mouseleave', cancelPress);
+}
+
+// Start visit (called after long-press)
+function startVisit() {
+    if (!state || !state.selectedLocationId) {
+        showToast('⚠️ Select a location first');
+        return;
+    }
+    
+    if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
+        showToast('⚠️ Set visit duration first');
+        return;
+    }
+    
+    const location = state.locations ? state.locations.find(l => l.id === state.selectedLocationId) : null;
+    
+    if (!location && state.selectedLocationId !== 'travel') {
+        showToast('⚠️ Location not found');
+        return;
+    }
+    
+    // For travel, create temporary location object
+    const loc = location || {
+        id: 'travel',
+        name: '🚗 Travelling',
+        isTravel: true
+    };
+    
+    // Enter locked screen (start visit)
+    enterLockedScreen(loc);
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 window.onload = () => {
@@ -1568,6 +1800,10 @@ window.onload = () => {
             enterLockedScreen();
         }
         renderLocations();
+        
+        // Quick Wins initialization
+        updateDurationDisplay(); // Set initial duration display
+        setupHoldToStart(); // Setup long-press handler for start button
     }
     
     // Setup touch interaction for inactivity timer
