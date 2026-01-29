@@ -124,6 +124,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     transform: scale(1.1);
 }
 
+/* Panic mode styling */
+.panic-mode {
+    background: #991b1b !important;
+    animation: panic-pulse 2s infinite;
+}
+
+@keyframes panic-pulse {
+    0%, 100% { background: #991b1b; }
+    50% { background: #dc2626; }
+}
+
 </style>
 </head>
 <body class="h-full overflow-hidden select-none">
@@ -1141,18 +1152,19 @@ function enterLockedScreen() {
     
     // PHASE 1: Initialize warning flags and anticipated departure time
     if (state && state.activeVisit) {
+        // anticipatedDepartureTime should already be set by startVisit()
+        // but fallback just in case
         if (!state.activeVisit.anticipatedDepartureTime) {
-            const anticipatedTime = new Date(state.activeVisit.startTime);
-            anticipatedTime.setSeconds(anticipatedTime.getSeconds() + state.activeVisit.duration);
-            state.activeVisit.anticipatedDepartureTime = anticipatedTime.toISOString();
+            const durationMs = (state.activeVisit.duration || 3600) * 1000;
+            state.activeVisit.anticipatedDepartureTime = state.activeVisit.startTime + durationMs;
         }
         
         // Initialize all warning flags
-        if (!state.activeVisit.warn5minSent) state.activeVisit.warn5minSent = false;
-        if (!state.activeVisit.warn2minSent) state.activeVisit.warn2minSent = false;
-        if (!state.activeVisit.warn90Sent) state.activeVisit.warn90Sent = false;
-        if (!state.activeVisit.warningSent) state.activeVisit.warningSent = false;
-        if (!state.activeVisit.criticalSent) state.activeVisit.criticalSent = false;
+        if (state.activeVisit.warn5minSent === undefined) state.activeVisit.warn5minSent = false;
+        if (state.activeVisit.warn2minSent === undefined) state.activeVisit.warn2minSent = false;
+        if (state.activeVisit.warn90Sent === undefined) state.activeVisit.warn90Sent = false;
+        if (state.activeVisit.warningSent === undefined) state.activeVisit.warningSent = false;
+        if (state.activeVisit.criticalSent === undefined) state.activeVisit.criticalSent = false;
         
         // Set location name in header
         const locNameEl = document.getElementById('lockedLocationName');
@@ -1163,9 +1175,22 @@ function enterLockedScreen() {
         saveState();
     }
     
+    // Setup long-press handlers for buttons
+    const btnDepart = document.getElementById('btnDepart');
+    if (btnDepart) setupLongPress(btnDepart, 2000, preDepart);
+    
+    const btnExtend = document.getElementById('btnExtend');
+    if (btnExtend) setupLongPress(btnExtend, 1500, () => showModal('extend'));
+    
+    const btnSafe = document.getElementById('btnSafe');
+    if (btnSafe) setupLongPress(btnSafe, 2000, iamSafe);
+    
+    // Start the countdown timer
+    if (!timerInt) {
+        timerInt = setInterval(tick, 1000);
+    }
+    
     startCheckinTimer();
-    setupLongPress('btnDepart', 1500, preDepart);
-    setupLongPress('btnSafe', 3000, iamSafe);
 }
 
 // ============================================================================
@@ -1758,8 +1783,255 @@ function startVisit() {
         isTravel: true
     };
     
-    // Enter locked screen (start visit)
-    enterLockedScreen(loc);
+    // Calculate anticipated departure time
+    const startTime = Date.now();
+    const durationMs = state.visitDurationMinutes * 60 * 1000;
+    const anticipatedDepartureTime = startTime + durationMs;
+    
+    // For travel locations, capture start GPS
+    if (loc.id === 'travel' || loc.isTravel) {
+        showToast('📍 Getting start location...');
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const startGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                
+                state.activeVisit = {
+                    locationId: loc.id,
+                    locationName: loc.name,
+                    startTime: startTime,
+                    duration: state.visitDurationMinutes * 60,
+                    anticipatedDepartureTime: anticipatedDepartureTime,
+                    startGPS: startGPS,
+                    highRisk: state.highRiskMode || false,
+                    isPanic: false,
+                    criticalSent: false,
+                    warningSent: false,
+                    warn90Sent: false,
+                    warn2minSent: false,
+                    warn5minSent: false
+                };
+                
+                saveState();
+                enterLockedScreen(loc);
+            },
+            err => {
+                showToast('⚠️ GPS error - starting without location');
+                
+                state.activeVisit = {
+                    locationId: loc.id,
+                    locationName: loc.name,
+                    startTime: startTime,
+                    duration: state.visitDurationMinutes * 60,
+                    anticipatedDepartureTime: anticipatedDepartureTime,
+                    startGPS: null,
+                    highRisk: state.highRiskMode || false,
+                    isPanic: false,
+                    criticalSent: false,
+                    warningSent: false,
+                    warn90Sent: false,
+                    warn2minSent: false,
+                    warn5minSent: false
+                };
+                
+                saveState();
+                enterLockedScreen(loc);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    } else {
+        // Regular location - no GPS needed
+        state.activeVisit = {
+            locationId: loc.id,
+            locationName: loc.name,
+            startTime: startTime,
+            duration: state.visitDurationMinutes * 60,
+            anticipatedDepartureTime: anticipatedDepartureTime,
+            startGPS: null,
+            highRisk: state.highRiskMode || false,
+            isPanic: false,
+            criticalSent: false,
+            warningSent: false,
+            warn90Sent: false,
+            warn2minSent: false,
+            warn5minSent: false
+        };
+        
+        saveState();
+        enterLockedScreen(loc);
+    }
+}
+
+
+// ============================================================================
+// CRITICAL FUNCTIONS EXTRACTED FROM WS_SAFETY (MISSING IN ORIGINAL BUILD)
+// ============================================================================
+
+// Critical variables needed by these functions
+let calculatedDist = null;
+let currentActiveTemplate = "";
+let isMidVisitUpdate = false;
+let gpsWarm = false;
+let travelTargetName = "";
+let panicTapCount = 0;
+let panicTapTimer;
+let currentBatteryLevel = "100%";
+
+// 1. BUILD PAYLOAD - Constructs proper data structure for backend
+function buildPayload(d) {
+    let dt = "";
+    let ln = "Unknown Site";
+    let la = "No Address Provided";
+    
+    if (state.activeVisit) {
+        if (state.activeVisit.anticipatedDepartureTime) {
+            dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
+        }
+        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
+        if (l) {
+            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
+            la = l.address || "No Address";
+        }
+    } else if (state.selectedLocationId) {
+        const l = state.locations.find(x => x.id === state.selectedLocationId);
+        if (l) {
+            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
+            la = l.address || "No Address";
+        }
+    }
+    
+    let gps = d['Last Known GPS'] || "";
+    if (!gps && state.activeVisit && state.activeVisit.startGPS) {
+        gps = state.activeVisit.startGPS;
+    }
+    
+    return {
+        'key': CONFIG.key,
+        'Worker Name': state.worker?.name || "",
+        'Worker Phone Number': state.worker?.phone || "",
+        'Worker Email': state.worker?.email || "",
+        'Emergency Contact Name': state.worker?.emgName || "",
+        'Emergency Contact Number': state.worker?.emgPhone || "",
+        'Emergency Contact Email': state.worker?.emgEmail || "",
+        'Escalation Contact Name': state.worker?.escName || "",
+        'Escalation Contact Number': state.worker?.escPhone || "",
+        'Escalation Contact Email': state.worker?.escEmail || "",
+        'Battery Level': currentBatteryLevel,
+        'Location Name': ln,
+        'Location Address': la,
+        'Anticipated Departure Time': dt,
+        'Timestamp': new Date().toISOString(),
+        'deviceId': state.deviceId || "",
+        'Last Known GPS': gps,
+        ...d
+    };
+}
+
+// 2. PROCESS UPLOAD QUEUE - Sends queued data to backend
+function processUploadQueue(d) {
+    if (d) {
+        state.pendingUploads.push(d);
+        saveState();
+    }
+    
+    if (!navigator.onLine || state.pendingUploads.length === 0) return;
+    
+    const fd = new FormData();
+    const currentUpload = state.pendingUploads[0];
+    
+    for (let k in currentUpload) {
+        fd.append(k, currentUpload[k]);
+    }
+    
+    fetch(CONFIG.url, { method: 'POST', body: fd })
+        .then(r => {
+            if (!r.ok) throw new Error();
+            state.pendingUploads.shift();
+            saveState();
+            if (state.pendingUploads.length > 0) processUploadQueue();
+        })
+        .catch(e => {
+            console.warn("Upload Failed, data queued.");
+        });
+}
+
+// 3. GATHER FORM DATA - Collects all form field values
+function gatherFormData() {
+    const d = { custom: {}, notes: '', sig: null, jsonPayload: {} };
+    
+    const sn = document.getElementById('rep_notes');
+    if (sn) d.notes = sn.value;
+    
+    document.querySelectorAll('[data-key]').forEach(el => {
+        const k = el.getAttribute('data-key');
+        let v = el.value;
+        
+        if (el.type === 'checkbox') {
+            v = el.checked ? 'Yes' : 'No';
+        } else if (el.type === 'radio') {
+            if (!el.checked) return;
+            v = el.value;
+        }
+        
+        d.custom[k] = v;
+        d.jsonPayload[k] = v;
+    });
+    
+    const c = document.querySelector('canvas[id^="sig-canvas-"]');
+    if (c) d.sig = c.toDataURL('image/png');
+    
+    return d;
+}
+
+// 4. RENDER PANIC STATE - Changes UI to panic mode
+function renderPanicState() {
+    const lockedPage = document.getElementById('lockedPage');
+    if (lockedPage) lockedPage.classList.add('panic-mode');
+    
+    const btnDepart = document.getElementById('btnDepart');
+    if (btnDepart) btnDepart.classList.add('hidden');
+    
+    const btnExtend = document.getElementById('btnExtend');
+    if (btnExtend) btnExtend.classList.add('hidden');
+    
+    const btnSafe = document.getElementById('btnSafe');
+    if (btnSafe) {
+        btnSafe.classList.remove('hidden');
+        setupLongPress(btnSafe, 2000, iamSafe);
+    }
+}
+
+// 5. WARM UP GPS - Pre-warms GPS for faster first capture
+function warmUpGps() {
+    if (gpsWarm) return;
+    gpsWarm = true;
+    
+    navigator.geolocation.getCurrentPosition(
+        () => {},
+        (err) => {
+            if (err.code === 1) showToast("📍 GPS Permission Required");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    
+    setTimeout(() => {
+        gpsWarm = false;
+    }, 30000);
+}
+
+// 6. PLAY SOUND - Audio feedback for events
+function playSound(t) {
+    initAudio().then(() => {
+        const n = Tone.now();
+        if (t === 'arrive') synth.triggerAttackRelease("C4", "8n", n);
+        if (t === 'depart') synth.triggerAttackRelease("G4", "8n", n);
+        if (t === 'warning') synth.triggerAttackRelease("E5", "16n", n);
+        if (t === 'panic') synth.triggerAttackRelease("G5", "16n", n);
+    });
+}
+
+// Helper: Get Device ID
+function getDeviceID() {
+    return state.deviceId || "";
 }
 
 // ============================================================================
@@ -1993,27 +2265,41 @@ function closeWofWarn() {
 // PHASE 1: TIME EXTENSION
 // ============================================================================
 function confirmExtension(minutes) {
-    if (!state || !state.activeVisit) return;
+    const updateTime = () => {
+        // Add minutes to anticipated departure time
+        const currentDue = state.activeVisit.anticipatedDepartureTime;
+        const newDue = currentDue + (minutes * 60000);
+        
+        state.activeVisit.anticipatedDepartureTime = newDue;
+        
+        // Reset warning flags
+        state.activeVisit.warningSent = false;
+        state.activeVisit.warn90Sent = false;
+        state.activeVisit.warn2minSent = false;
+        state.activeVisit.warn5minSent = false;
+        
+        saveState();
+        
+        // Send update to backend
+        processUploadQueue(buildPayload({
+            'Alarm Status': 'EXTENDED',
+            'Notes': `Extended ${minutes}m`
+        }));
+        
+        showToast(`✅ Visit extended by ${minutes} minutes`);
+        closeModal('extend');
+    };
     
-    // Add minutes to anticipated departure time
-    if (state.activeVisit.anticipatedDepartureTime) {
-        const newTime = new Date(state.activeVisit.anticipatedDepartureTime);
-        newTime.setMinutes(newTime.getMinutes() + minutes);
-        state.activeVisit.anticipatedDepartureTime = newTime.toISOString();
+    const now = Date.now();
+    const dueTime = state.activeVisit.anticipatedDepartureTime;
+    
+    // If overdue or in panic, require PIN
+    if (dueTime < now || state.activeVisit.isPanic) {
+        withPinVerification(false, updateTime);
     } else {
-        const newTime = new Date(state.activeVisit.startTime);
-        newTime.setMinutes(newTime.getMinutes() + state.activeVisit.duration / 60 + minutes);
-        state.activeVisit.anticipatedDepartureTime = newTime.toISOString();
+        updateTime();
     }
-    
-    // Extend duration
-    state.activeVisit.duration += minutes * 60;
-    
-    // Reset warning flags
-    state.activeVisit.warningSent = false;
-    state.activeVisit.warn90Sent = false;
-    state.activeVisit.warn2minSent = false;
-    state.activeVisit.warn5minSent = false;
+}
     
     saveState();
     closeModal('extend');
