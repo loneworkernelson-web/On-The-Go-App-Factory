@@ -2725,7 +2725,14 @@ window.onload = () => {
         // GROK FIX #1: Use forceSync to fetch locations (proper handshake)
         if (!state.locations || state.locations.length === 0) {
             console.log('No locations in state, syncing with backend...');
-            forceSync(false); // Silent sync on load
+            // Use setTimeout to ensure forceSync is defined (it's defined later in script)
+            setTimeout(() => {
+                if (typeof forceSync === 'function') {
+                    forceSync(false); // Silent sync on load
+                } else {
+                    console.error('forceSync not defined yet!');
+                }
+            }, 100);
         } else {
             renderLocations();
         }
