@@ -2934,6 +2934,19 @@ function updateSystemInfo() {
     const backendVersion = document.getElementById('backendVersion');
     const syncStatus = document.getElementById('syncStatus');
     
+    // Skip ping if key hasn't been injected by factory yet
+    if (!CONFIG.key || CONFIG.key.includes('%%')) {
+        if (backendVersion) {
+            backendVersion.textContent = 'Pending factory injection';
+            backendVersion.className = 'text-sm font-mono text-yellow-400';
+        }
+        if (syncStatus) {
+            syncStatus.textContent = 'Template mode (needs deployment)';
+            syncStatus.className = 'text-sm font-mono text-yellow-400';
+        }
+        return;
+    }
+    
     // Try to ping backend for version
     if (CONFIG.url && navigator.onLine) {
         fetch(`${CONFIG.url}?action=ping&key=${CONFIG.key}`, { 
@@ -3187,6 +3200,16 @@ function forceSync(showUI) {
     console.log('   state exists:', !!state);
     console.log('   state.worker exists:', !!state?.worker);
     console.log('   state.worker.name:', state?.worker?.name);
+    console.log('   CONFIG.key:', CONFIG.key?.substring(0, 15) + '...');
+    
+    // Check if key has been injected by factory
+    if (!CONFIG.key || CONFIG.key.includes('%%')) {
+        console.log('❌ forceSync EXITING - Worker key not injected by factory yet');
+        if (showUI) {
+            showToast('⚠️ Template mode - awaiting deployment');
+        }
+        return;
+    }
     
     // Simple check - return silently if no worker
     if (!state || !state.worker || !state.worker.name) {
