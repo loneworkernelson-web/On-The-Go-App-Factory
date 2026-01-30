@@ -652,7 +652,7 @@ const CONFIG = {
     // Backend
     url: "%%GOOGLE_SHEET_URL%%",
     org: "%%ORG_NAME%%",
-    key: "%%SECRET_KEY%%",
+    key: "%%WORKER_KEY%%",  // Factory injects worker-specific key (wk_xxxxx)
     
     // Features
     isAdvanced: true,
@@ -748,18 +748,7 @@ function loadState() {
     try {
         const saved = localStorage.getItem('loneWorkerState');
         if (saved) {
-            const parsed = JSON.parse(saved);
-            // Decode PINs
-            if (parsed.pins && parsed.pins.std && parsed.pins.duress) {
-                try {
-                    parsed.pins.std = atob(parsed.pins.std);
-                    parsed.pins.duress = atob(parsed.pins.duress);
-                } catch (e) {
-                    console.error('PIN decode failed:', e);
-                    parsed.pins = { std: '', duress: '' };
-                }
-            }
-            return parsed;
+            return JSON.parse(saved);
         }
     } catch (e) {
         console.error('Load state failed:', e);
@@ -769,17 +758,7 @@ function loadState() {
 
 function saveState() {
     try {
-        const toSave = { ...state };
-        // Base64 PINs (only if they exist)
-        if (toSave.pins && toSave.pins.std && toSave.pins.duress) {
-            try {
-                toSave.pins.std = btoa(toSave.pins.std);
-                toSave.pins.duress = btoa(toSave.pins.duress);
-            } catch (e) {
-                console.error('PIN encode failed:', e);
-            }
-        }
-        localStorage.setItem('loneWorkerState', JSON.stringify(toSave));
+        localStorage.setItem('loneWorkerState', JSON.stringify(state));
     } catch (e) {
         console.error('Save state failed:', e);
     }
@@ -1178,10 +1157,15 @@ function buildReportForm(templateName, fieldArea) {
     const template = state.globalForms.find(f => f.name === templateName) || { 
         fields: '[TEXT|Notes] [GPS|Location] [PHOTO|Photo1] [SIGN|Signature] [NUMBER|Quantity]' 
     };
-    const tags = template.fields.match(/\[\w+\|.*?\]/g) || [];
+    const tags = template.fields.match(/\[[\w$]+\|.*?\]/g) || [];
     
     tags.forEach(tag => {
-        const [type, label] = tag.slice(1, -1).split('|');
+        // Parse field: [TYPE|Label] or [DROP|Label|Option1,Option2,Option3]
+        const parts = tag.slice(1, -1).split('|');
+        const type = parts[0];
+        const label = parts[1];
+        const options = parts[2] ? parts[2].split(',').map(o => o.trim()) : [];
+        
         const fieldId = `field_${label.replace(/\s/g, '_')}`;
         
         const wrapper = document.createElement('div');
@@ -1199,6 +1183,57 @@ function buildReportForm(templateName, fieldArea) {
             input.className = 'form-input';
             input.rows = 3;
             wrapper.appendChild(input);
+            
+        } else if (type === '1TEXT') {
+            // Single-line text input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = fieldId;
+            input.className = 'form-input';
+            wrapper.appendChild(input);
+            
+        } else if (type === 'DROP') {
+            // Dropdown select
+            const select = document.createElement('select');
+            select.id = fieldId;
+            select.className = 'form-input';
+            
+            // Add placeholder option
+            const placeholderOpt = document.createElement('option');
+            placeholderOpt.value = '';
+            placeholderOpt.text = '-- Select --';
+            select.appendChild(placeholderOpt);
+            
+            // Add options
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.text = opt;
+                select.appendChild(option);
+            });
+            
+            wrapper.appendChild(select);
+            
+        } else if (type === '$' || type === 'CURRENCY') {
+            // Currency input with symbol
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = 'flex items-center';
+            
+            const symbol = document.createElement('span');
+            symbol.className = 'px-3 py-2 bg-gray-700 border border-r-0 border-gray-600 rounded-l text-sm';
+            symbol.innerText = '$'; // Can be regionalized via CONFIG
+            
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = '0.01';
+            input.id = fieldId;
+            input.className = 'form-input rounded-l-none';
+            input.placeholder = '0.00';
+            
+            inputWrapper.appendChild(symbol);
+            inputWrapper.appendChild(input);
+            wrapper.appendChild(inputWrapper);
+            
         } else if (type === 'GPS') {
             const btnGPS = document.createElement('button');
             btnGPS.innerText = 'Capture GPS';
@@ -1210,6 +1245,7 @@ function buildReportForm(templateName, fieldArea) {
             input.readOnly = true;
             wrapper.appendChild(btnGPS);
             wrapper.appendChild(input);
+            
         } else if (type === 'PHOTO') {
             const input = document.createElement('input');
             input.type = 'file';
@@ -1217,21 +1253,41 @@ function buildReportForm(templateName, fieldArea) {
             input.capture = 'environment';
             input.id = fieldId;
             input.className = 'form-input';
+            input.onchange = () => handlePhoto(input, label);
             wrapper.appendChild(input);
+            
         } else if (type === 'NUMBER') {
             const input = document.createElement('input');
             input.type = 'number';
             input.id = fieldId;
             input.className = 'form-input';
             wrapper.appendChild(input);
+            
         } else if (type === 'SIGN') {
             const canvas = document.createElement('canvas');
-            canvas.id = fieldId;
+            canvas.id = `sig-canvas-${label.replace(/\s/g, '_')}`;
             canvas.width = 300;
             canvas.height = 150;
-            canvas.className = 'border-2 border-gray-600 rounded';
+            canvas.className = 'border-2 border-gray-600 rounded bg-white';
+            canvas.style.touchAction = 'none';
+            
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'mt-2 px-3 py-1 bg-gray-600 text-white rounded text-sm';
+            clearBtn.innerText = 'Clear';
+            clearBtn.onclick = () => clearSig(label.replace(/\s/g, '_'));
+            
             wrapper.appendChild(canvas);
-            // TODO: Add signature capture logic
+            wrapper.appendChild(clearBtn);
+            
+            // Initialize signature pad after adding to DOM
+            setTimeout(() => {
+                const canvasEl = document.getElementById(`sig-canvas-${label.replace(/\s/g, '_')}`);
+                if (canvasEl) {
+                    resizeCanvas(canvasEl);
+                    initSigPad(canvasEl);
+                }
+            }, 100);
         }
         
         fieldArea.appendChild(wrapper);
@@ -1643,6 +1699,37 @@ function renderLocations() {
 // ============================================================================
 // WIZARD NAVIGATION
 // ============================================================================
+function startWizard() {
+    // Show setup page
+    const setupPage = document.getElementById('setupPage');
+    if (setupPage) setupPage.classList.add('active');
+    
+    // Hide all other pages
+    document.querySelectorAll('.page').forEach(p => {
+        if (p.id !== 'setupPage') p.classList.remove('active');
+    });
+    
+    // Reset to step 1
+    state.currentWizStep = 1;
+    
+    // Hide all wizard steps
+    document.querySelectorAll('[id^="wizStep"]').forEach(step => {
+        step.classList.remove('active');
+    });
+    
+    // Show step 1
+    const step1 = document.getElementById('wizStep1');
+    if (step1) step1.classList.add('active');
+    
+    // Reset buttons
+    const btnPrev = document.getElementById('btnWizPrev');
+    const btnNext = document.getElementById('btnWizNext');
+    if (btnPrev) btnPrev.classList.add('hidden');
+    if (btnNext) btnNext.classList.remove('hidden');
+    
+    console.log('Wizard started');
+}
+
 function prevWiz() {
     if (!state || state.currentWizStep <= 1) return;
     
@@ -2188,111 +2275,38 @@ function buildPayload(d) {
 // 2. PROCESS UPLOAD QUEUE - Sends queued data to backend
 function processUploadQueue(d) {
     if (d) {
-        // GROK FIX #2: Cap queue at 100 items to prevent memory issues
-        if (state.pendingUploads.length >= 100) {
-            console.warn('Queue full (100 items), removing oldest');
-            state.pendingUploads.shift();
-        }
-        
         state.pendingUploads.push(d);
         saveState();
     }
     
-    if (!navigator.onLine) {
-        console.log('Offline, data queued for later');
-        return;
-    }
-    
-    if (state.pendingUploads.length === 0) return;
-    
-    console.log(`Processing ${state.pendingUploads.length} queued uploads...`);
-    
-    const currentUpload = state.pendingUploads[0];
-    
-    // IMPORTANT: NO action parameter needed for POST!
-    // Backend doPost() only checks key, then calls handleWorkerPost()
-    const url = CONFIG.url;
+    if (!navigator.onLine || state.pendingUploads.length === 0) return;
     
     const fd = new FormData();
+    const currentUpload = state.pendingUploads[0];
+    
     for (let k in currentUpload) {
         fd.append(k, currentUpload[k]);
     }
     
-    console.log('Uploading to:', url);
-    console.log('Data fields:', Object.keys(currentUpload));
-    console.log('Worker:', currentUpload['Worker Name']);
-    console.log('Key (first 10 chars):', currentUpload.key?.substring(0, 10));
-    console.log('Key length:', currentUpload.key?.length);
+    console.log('Uploading to backend...', Object.keys(currentUpload));
     
-    fetch(url, { 
-        method: 'POST', 
-        body: fd,
-        signal: AbortSignal.timeout(30000) // 30 second timeout
-    })
+    fetch(CONFIG.url, { method: 'POST', body: fd })
         .then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json(); // Parse as JSON
+            return r.json();
         })
         .then(data => {
             console.log('Upload response:', data);
             
-            if (data.status === 'error') {
-                console.error('❌ BACKEND REJECTED');
-                
-                if (data.message) {
-                    console.error('Error message:', data.message);
-                    showToast(`❌ Backend: ${data.message}`);
-                } else {
-                    console.error('No error message - likely KEY MISMATCH');
-                    console.error('Check: CONFIG.key must match backend CONFIG.MASTER_KEY or CONFIG.WORKER_KEY');
-                    showToast('❌ Backend rejected - check key');
-                }
-                
-                // Remove from queue to avoid infinite retry
-                state.pendingUploads.shift();
-                saveState();
-            } else {
-                console.log('✅ Upload successful');
-                
-                // Remove from queue
-                state.pendingUploads.shift();
-                saveState();
-            }
+            state.pendingUploads.shift();
+            saveState();
             
-            // Process next item
             if (state.pendingUploads.length > 0) {
-                console.log(`${state.pendingUploads.length} items remaining in queue`);
-                setTimeout(() => processUploadQueue(), 500); // Small delay between uploads
-            } else {
-                console.log('Queue empty - all uploads complete');
+                processUploadQueue();
             }
         })
         .catch(e => {
-            console.error("Upload failed:", e.message);
-            
-            // GROK FIX #3: Retry logic with exponential backoff
-            if (!currentUpload._retryCount) currentUpload._retryCount = 0;
-            currentUpload._retryCount++;
-            
-            if (currentUpload._retryCount >= 3) {
-                console.error('Max retries reached, removing item from queue');
-                state.pendingUploads.shift();
-                saveState();
-                
-                // Try next item
-                if (state.pendingUploads.length > 0) {
-                    setTimeout(() => processUploadQueue(), 1000);
-                }
-            } else {
-                // Retry with exponential backoff: 2s, 4s, 8s
-                const delay = Math.pow(2, currentUpload._retryCount) * 1000;
-                console.log(`Retry ${currentUpload._retryCount}/3 in ${delay}ms`);
-                
-                state.pendingUploads[0] = currentUpload; // Update with retry count
-                saveState();
-                
-                setTimeout(() => processUploadQueue(), delay);
-            }
+            console.warn('Upload failed, data queued:', e.message);
         });
 }
 
