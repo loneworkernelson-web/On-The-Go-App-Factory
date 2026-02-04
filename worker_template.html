@@ -1237,13 +1237,18 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input'); input.type = 'date';
                 break;
             case 'DROP':
-                input = document.createElement('select');
-                ["-- Select --", "OK", "Issue", "N/A"].forEach(o => {
-                    const opt = document.createElement('option');
-                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
-                    input.appendChild(opt);
-                });
-                break;
+    input = document.createElement('select');
+    // Intelligent Parsing: [DROP|Opt1,Opt2] Label
+    const dropParts = type.split('|');
+    const options = dropParts.length > 1 ? dropParts[1].split(',') : ["OK", "Issue", "N/A"];
+    
+    ["-- Select --", ...options].forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = (o === "-- Select --") ? "" : o;
+        opt.text = o;
+        input.appendChild(opt);
+    });
+    break;
             case 'YES/NO':
                 input = document.createElement('select');
                 ["-- Select --", "Yes", "No"].forEach(o => {
@@ -1970,27 +1975,7 @@ function openFormsLibrary() {
     }
     showModal('formsLibrary');
 }
-    // 3. Populate the list with available templates
-    forms.forEach(form => {
-        const div = document.createElement('div');
-        div.className = 'p-5 mb-3 bg-white/5 border border-white/10 rounded-2xl flex justify-between items-center active:scale-95 transition-all';
-        div.innerHTML = `
-            <div class="flex flex-col">
-                <span class="text-xs font-black uppercase tracking-tight">${form.name}</span>
-                <span class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">${form.questions.length} Fields</span>
-            </div>
-            <div class="text-lg">📄</div>
-        `;
-        div.onclick = () => {
-            closeModal('formsLibrary');
-            buildReportForm(form.name, document.getElementById('reportFields'));
-            navigate('report');
-        };
-        list.appendChild(div);
-    });
 
-    showModal('formsLibrary');
-}
 // Toggle high-risk/critical timing mode
 function toggleHighRiskUI() {
     const checkbox = document.getElementById('chkHighRisk');
@@ -2134,12 +2119,17 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
+    // 1. Safe audio unlock (doesn't block UI if audio fails)
     try {
-        await Tone.start(); // Unlock audio on user gesture
-    } catch (e) { console.warn("Audio Context Failed"); }
+        await Promise.race([
+            Tone.start(),
+            new Promise(r => setTimeout(r, 500))
+        ]);
+        console.log("🔊 Audio active");
+    } catch (e) { console.warn("Audio skipped"); }
 
-    if (!state.selectedLocationId || state.visitDurationMinutes <= 0) {
-        showToast('⚠️ Select site and duration first');
+    if (!state.selectedLocationId || !state.visitDurationMinutes) {
+        showToast('⚠️ Select site and duration');
         return;
     }
 
@@ -2479,15 +2469,15 @@ function initSigPad(canvas) {
     let isDrawing = false;
     
     const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : e;
-        // Use the ratio to map touch points to the internal resolution
-        const ratio = window.devicePixelRatio || 1;
-        return {
-            x: (touch.clientX - rect.left) * (canvas.width / (rect.width * ratio)),
-            y: (touch.clientY - rect.top) * (canvas.height / (rect.height * ratio))
-        };
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    const ratio = window.devicePixelRatio || 1; // SCALE FIX
+    return {
+        // Map the touch point based on the physical-to-logical ratio
+        x: (touch.clientX - rect.left) * (canvas.width / (rect.width * ratio)),
+        y: (touch.clientY - rect.top) * (canvas.height / (rect.height * ratio))
     };
+};
     
     const startDrawing = (e) => {
         isDrawing = true;
@@ -3987,6 +3977,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
