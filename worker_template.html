@@ -964,24 +964,32 @@ function submitReport() {
 // ============================================================================
 // LONG-PRESS INTERACTION
 // ============================================================================
+/**
+ * Unified Long-Press Utility with Safety Lock
+ * Handles visual progress and prevents accidental triggers on wake.
+ */
 function setupLongPress(elementId, duration, callback) {
     const btn = document.getElementById(elementId);
-    if (!btn) {
-        console.error(`Long press button not found: ${elementId}`);
-        return;
-    }
+    if (!btn) return;
     
     let timer;
     
-    btn.addEventListener('touchstart', e => {
-        e.preventDefault();
+    btn.addEventListener('touchstart', (e) => {
+        // SAFETY GUARD: Prevent accidental SOS if the screen just woke up
+        if (elementId === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
+            showToast('⏳ Wait... screen just woke');
+            return;
+        }
+
+        // Visual feedback
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
+        
         timer = setTimeout(() => {
-            callback();
             btn.classList.remove('pressing', 'holding');
+            callback();
         }, duration);
-    }, { passive: false });
-    
+    }, { passive: true });
+
     ['touchend', 'touchcancel', 'touchmove'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
@@ -4202,53 +4210,13 @@ checkVehicleStatus = function() {
     }
 };
 
-// Initialize new features after main onload
-(function() {
-    const _origOnload = window.onload;
-    window.onload = function() {
-        if (_origOnload) _origOnload();
-        
-        // Initialize additional panic features
-        initShakeDetection();
-        initVolumeDetection();
-        initSlideToWake();
-        
-        // Check for signature canvas and apply fix
-        setTimeout(initSigPadFix, 1000);
-    };
-})();
-
-
-// Enhanced SOS with lock check
-const _origSetupLongPress = setupLongPress;
-setupLongPress = function(elementId, duration, callback) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    element.addEventListener('touchstart', (e) => {
-        // Check if SOS is locked (just woke from dim)
-        if (elementId === 'btnPanic' && isSosLocked) {
-            showToast('⏳ Wait... screen just woke', 1000);
-            return;
-        }
-        
-        // Original long-press logic
-        let longPressTimer = setTimeout(() => {
-            callback();
-        }, duration);
-        
-        ['touchend', 'touchcancel', 'touchmove'].forEach(ev => {
-            document.addEventListener(ev, () => clearTimeout(longPressTimer), { once: true });
-        });
-    });
-};
-
 console.log('✅ All new features and bug fixes initialized!');
 
 </script>
 
 </body>
 </html>
+
 
 
 
