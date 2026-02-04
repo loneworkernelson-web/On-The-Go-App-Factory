@@ -1955,7 +1955,7 @@ function openFormsLibrary() {
     if (forms.length === 0) {
         const confirmSync = confirm("Forms library is empty. Would you like to sync with the server now?");
         if (confirmSync) {
-            syncLibrary();
+            forceSync(true);
         }
         return;
     }
@@ -2061,12 +2061,13 @@ function editTravelSettings() {
 // Create regular location tile
 function createLocationTile(loc) {
     const isSel = state && state.selectedLocationId === loc.id;
+    const isCritical = loc.isCritical || false; // NEW check
     
     const tile = document.createElement('div');
     tile.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${
         isSel 
             ? 'border-blue-500 bg-blue-900/40' 
-            : 'border-gray-700 bg-gray-800 hover:bg-gray-750'
+            : (isCritical ? 'border-red-900/50 bg-red-950/20' : 'border-gray-700 bg-gray-800 hover:bg-gray-750')
     }`;
     
     let icon = "🏢";
@@ -2139,12 +2140,15 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
-    // 1. CRITICAL: Unlocks audio for background alarms
+    // 1. Unlocks audio for background alarms
     await Tone.start();
     console.log("🔊 Audio context active");
 
-    if (!state.selectedLocationId || state.visitDurationMinutes <= 0) return;
+    if (!state.selectedLocationId) {
+        showToast('⚠️ Select a location first');
+        return;
     }
+    
     if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
         showToast('⚠️ Set visit duration first');
         return;
@@ -2158,19 +2162,18 @@ async function startVisit() {
         return;
     }
 
-    // 2. Prepare Safety Data
+    // 2. Prepare Safety Object
     const startTime = Date.now();
     const durationSec = state.visitDurationMinutes * 60;
     const dueOut = startTime + (durationSec * 1000);
 
-    // Initialize the safety object with all necessary flags
-    const activeVisit = {
+    state.activeVisit = {
         locationId: loc.id,
         locationName: loc.name,
         startTime: startTime,
         duration: durationSec,
         dueOut: dueOut,
-        anticipatedDepartureTime: new Date(dueOut).toISOString(),
+        anticipatedDepartureTime: dueOut,
         startGPS: lastGPS || "0,0",
         highRisk: state.highRiskMode || false,
         isPanic: false,
@@ -2181,29 +2184,15 @@ async function startVisit() {
         warn5minSent: false
     };
 
-    // 3. Handle GPS for Travel
-    if (loc.id === 'travel' || loc.isTravel) {
-        showToast('📍 Updating travel coordinates...');
-        // We use the last known high-accuracy position from the watchPosition engine
-        activeVisit.startGPS = lastGPS || "0,0";
-    }
-
-    // 4. Update State and Transition
-    state.activeVisit = activeVisit;
     saveState();
 
-    // 5. Audit Trail & Announcements
+    // 3. UI Transition & Logging
     const activityType = loc.id === 'travel' ? "Travel" : "Visit";
     announce(`${activityType} to ${loc.name} started.`);
     logSafety("ARRIVED", `${activityType} started at ${loc.name}`);
     
-    // Warm up audio and start timers
-    if (typeof initAudio === 'function') await initAudio();
     enterLockedScreen();
-    announce("Safety timer active.");
-    logSafety("ARRIVED", `Monitoring started for ${state.activeVisit.locationName}`);
 }
-
 // ============================================================================
 // CRITICAL FUNCTIONS EXTRACTED FROM WS_SAFETY (MISSING IN ORIGINAL BUILD)
 // ============================================================================
@@ -4012,28 +4001,8 @@ function exitLockedScreen() {
     releaseWakeLock();
 }
 
-// ====== BUG FIXES ======
-
-// BUG FIX 1: Cap pending uploads queue
-const _origLogSafety = logSafety;
-logSafety = function(type, note) {
-    _origLogSafety.apply(this, arguments);
-    
-    // Cap at 50 entries to prevent memory issues
-    if (state && state.pendingUploads && state.pendingUploads.length > 50) {
-        state.pendingUploads.shift(); // Remove oldest
-    }
-};
-
-// BUG FIX 2: Sync with retry and exponential backoff
-let syncRetryCount = 0;
-const maxRetries = 3;
-
-const _origForceSync = forceSync;
-
-console.log('✅ All new features and bug fixes initialized!');
-
 </script>
 
 </body>
 </html>
+
