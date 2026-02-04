@@ -305,15 +305,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
         
         <!-- Forms Button + Hold to Start Button -->
-       <button id="btnForms" class="flex-none w-24 py-4 ...">Forms</button>
-
-    <button id="btnForms" onclick="openFormsLibrary()" class="flex-none w-24 py-4 ...">Forms</button>
-            <button type="button" id="btnStart" 
-                    class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" 
-                    disabled>
-                Hold to Start
-            </button>
-        </div>
+<div class="flex gap-4 items-stretch h-16">
+    <button id="btnForms" onclick="openFormsLibrary()" 
+            class="flex-none w-24 bg-indigo-950 text-indigo-300 font-black rounded-2xl border border-indigo-700/50 shadow-lg active:scale-95 transition text-[10px] uppercase tracking-widest">
+        Forms
+    </button>
+    <button type="button" id="btnStart" 
+            class="long-press-btn flex-1 bg-gray-700 text-gray-500 font-black rounded-2xl text-xl shadow-lg transition-all uppercase tracking-tighter" 
+            disabled>
+        Hold to Start
+    </button>
+</div>
     </div>
 </div>
 
@@ -344,16 +346,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span>
             </p>
         </div>
-        <div class="space-y-3 w-full">
-            <div class="flex gap-3">
-                <button id="btnExtend" onclick="showModal('extend')" class="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
-                    Extend
-                </button>
-                <button onclick="openFormsLibrary()" class="flex flex-col items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
-    <span class="text-xl">📋</span>
-    <span class="text-[10px] font-bold uppercase tracking-tighter">Forms</span>
-</button>
-            </div>
+        <div class="flex gap-3 h-16">
+    <button id="btnExtend" onclick="showModal('extend')" class="flex-1 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
+        Extend
+    </button>
+    <button onclick="openFormsLibrary()" class="w-24 bg-violet-950 text-violet-300 font-black rounded-2xl border border-violet-800/50 flex flex-col items-center justify-center">
+        <span class="text-lg">📋</span>
+        <span class="text-[8px] uppercase tracking-tighter">Forms</span>
+    </button>
+</div>
             <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">
                 Hold to END
             </button>
@@ -633,16 +634,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
-    <div id="formsLibraryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<div id="formsLibraryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-700 max-h-[80vh] flex flex-col">
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-black text-white uppercase tracking-widest">Forms Library</h2>
-            <button onclick="closeModal('formsLibrary')" class="text-2xl text-gray-400 hover:text-white">×</button>
+            <h2 class="text-xl font-black text-white uppercase tracking-widest text-blue-400">Safety Forms</h2>
+            <button onclick="closeModal('formsLibrary')" class="text-2xl text-gray-400">×</button>
         </div>
-        
-        <div id="formsLibraryList" class="flex-1 overflow-y-auto space-y-3 pr-2">
-            </div>
-        
+        <div id="formsLibraryList" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
         <button onclick="closeModal('formsLibrary')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase tracking-widest">Close</button>
     </div>
 </div>
@@ -1161,146 +1159,75 @@ function startTravellingPulse() {
     }, 120000); // 2 minutes
 }
 
-// ============================================================================
-// REPORT FORM BUILDING
-// ============================================================================
+/**
+ * REWRITTEN: High-Integrity Form Builder
+ * Prevents .match() errors by using the new array-based question format.
+ *
+ */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
-    fieldArea.innerHTML = ''; // Clear
-    const template = state.globalForms.find(f => f.name === templateName) || { 
-        fields: '[TEXT|Notes] [GPS|Location] [PHOTO|Photo1] [SIGN|Signature] [NUMBER|Quantity]' 
-    };
-    const tags = template.fields.match(/\[[\w$]+\|.*?\]/g) || [];
+    fieldArea.innerHTML = ''; 
+
+    // Find the template in the state updated by the sync
+    const template = state.globalForms.find(f => f.name === templateName) || 
+                     { name: templateName, questions: ["Notes", "Signature"] };
     
-    tags.forEach(tag => {
-        // Parse field: [TYPE|Label] or [DROP|Label|Option1,Option2,Option3]
-        const parts = tag.slice(1, -1).split('|');
-        const type = parts[0];
-        const label = parts[1];
-        const options = parts[2] ? parts[2].split(',').map(o => o.trim()) : [];
-        
+    const questions = template.questions || [];
+
+    questions.forEach(label => {
         const fieldId = `field_${label.replace(/\s/g, '_')}`;
-        
         const wrapper = document.createElement('div');
-        wrapper.className = 'mb-4';
+        wrapper.className = 'mb-5'; // Slightly larger gap for mobile spacing
         
         const labelEl = document.createElement('label');
-        labelEl.className = 'block text-sm font-bold mb-2';
+        labelEl.className = 'block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-2 ml-1';
         labelEl.innerText = label;
-        labelEl.htmlFor = fieldId;
         wrapper.appendChild(labelEl);
+
+        const lowerLabel = label.toLowerCase();
         
-        if (type === 'TEXT') {
-            const input = document.createElement('textarea');
-            input.id = fieldId;
-            input.className = 'form-input';
-            input.rows = 3;
-            wrapper.appendChild(input);
-            
-        } else if (type === '1TEXT') {
-            // Single-line text input
+        // 1. PHOTO DETECTION
+        if (lowerLabel.includes('photo')) {
             const input = document.createElement('input');
-            input.type = 'text';
-            input.id = fieldId;
-            input.className = 'form-input';
-            wrapper.appendChild(input);
-            
-        } else if (type === 'DROP') {
-            // Dropdown select
-            const select = document.createElement('select');
-            select.id = fieldId;
-            select.className = 'form-input';
-            
-            // Add placeholder option
-            const placeholderOpt = document.createElement('option');
-            placeholderOpt.value = '';
-            placeholderOpt.text = '-- Select --';
-            select.appendChild(placeholderOpt);
-            
-            // Add options
-            options.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.text = opt;
-                select.appendChild(option);
-            });
-            
-            wrapper.appendChild(select);
-            
-        } else if (type === '$' || type === 'CURRENCY') {
-            // Currency input with symbol
-            const inputWrapper = document.createElement('div');
-            inputWrapper.className = 'flex items-center';
-            
-            const symbol = document.createElement('span');
-            symbol.className = 'px-3 py-2 bg-gray-700 border border-r-0 border-gray-600 rounded-l text-sm';
-            symbol.innerText = '$'; // Can be regionalized via CONFIG
-            
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.step = '0.01';
-            input.id = fieldId;
-            input.className = 'form-input rounded-l-none';
-            input.placeholder = '0.00';
-            
-            inputWrapper.appendChild(symbol);
-            inputWrapper.appendChild(input);
-            wrapper.appendChild(inputWrapper);
-            
-        } else if (type === 'GPS') {
-            const btnGPS = document.createElement('button');
-            btnGPS.innerText = 'Capture GPS';
-            btnGPS.className = 'px-4 py-2 bg-blue-600 rounded mb-2';
-            btnGPS.onclick = () => captureGPS(btnGPS);
-            const input = document.createElement('input');
-            input.id = fieldId;
-            input.className = 'form-input';
-            input.readOnly = true;
-            wrapper.appendChild(btnGPS);
-            wrapper.appendChild(input);
-            
-        } else if (type === 'PHOTO') {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.capture = 'environment';
-            input.id = fieldId;
-            input.className = 'form-input';
+            input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+            input.id = fieldId; input.className = 'form-input bg-white/5 border-white/10';
             input.onchange = () => handlePhoto(input, label);
             wrapper.appendChild(input);
             
-        } else if (type === 'NUMBER') {
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.id = fieldId;
-            input.className = 'form-input';
-            wrapper.appendChild(input);
-            
-        } else if (type === 'SIGN') {
+        // 2. SIGNATURE DETECTION
+        } else if (lowerLabel.includes('signature')) {
             const canvas = document.createElement('canvas');
             canvas.id = `sig-canvas-${label.replace(/\s/g, '_')}`;
-            canvas.width = 300;
-            canvas.height = 150;
-            canvas.className = 'border-2 border-gray-600 rounded bg-white';
-            canvas.style.touchAction = 'none';
-            
-            const clearBtn = document.createElement('button');
-            clearBtn.type = 'button';
-            clearBtn.className = 'mt-2 px-3 py-1 bg-gray-600 text-white rounded text-sm';
-            clearBtn.innerText = 'Clear';
-            clearBtn.onclick = () => clearSig(label.replace(/\s/g, '_'));
-            
+            canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
             wrapper.appendChild(canvas);
-            wrapper.appendChild(clearBtn);
-            
-            // Initialize signature pad after adding to DOM
-            setTimeout(() => {
-                const canvasEl = document.getElementById(`sig-canvas-${label.replace(/\s/g, '_')}`);
-                if (canvasEl) {
-                    resizeCanvas(canvasEl);
-                    initSigPad(canvasEl);
-                }
-            }, 100);
+            setTimeout(() => { initSigPad(canvas); }, 200);
+
+        // 3. GPS DETECTION
+        } else if (lowerLabel.includes('gps') || lowerLabel.includes('location')) {
+            const btn = document.createElement('button');
+            btn.className = 'w-full py-4 bg-blue-900/40 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
+            btn.innerText = '📍 Capture GPS';
+            btn.onclick = (e) => { e.preventDefault(); captureGPS(btn); };
+            const input = document.createElement('input');
+            input.id = fieldId; input.className = 'form-input opacity-40 text-xs'; 
+            input.readOnly = true; input.setAttribute('data-key', label);
+            wrapper.appendChild(btn);
+            wrapper.appendChild(input);
+
+        // 4. LONG TEXT DETECTION
+        } else if (lowerLabel.includes('notes') || lowerLabel.includes('details') || lowerLabel.includes('description')) {
+            const input = document.createElement('textarea');
+            input.id = fieldId; input.className = 'form-input min-h-[100px]'; 
+            input.setAttribute('data-key', label);
+            wrapper.appendChild(input);
+
+        // 5. NUMERIC/TEXT FALLBACK
+        } else {
+            const input = document.createElement('input');
+            input.type = (lowerLabel.includes('km') || lowerLabel.includes('number') || lowerLabel.includes('odo')) ? 'number' : 'text';
+            input.id = fieldId; input.className = 'form-input';
+            input.setAttribute('data-key', label);
+            wrapper.appendChild(input);
         }
         
         fieldArea.appendChild(wrapper);
@@ -2983,9 +2910,8 @@ function checkVehicleStatus() {
 }
 
 function startVehicleCheck() {
-    // This would load a vehicle check form
-    showToast('Vehicle check form would load here');
-    // TODO: loadFormAndShow('Vehicle Safety Check');
+    isMidVisitUpdate = true; // Allows submitting without ending a visit
+    loadFormAndShow('Vehicle Safety Check'); // Matches your spreadsheet template name
 }
 
 function checkVehicleBeforeVisit() {
@@ -4019,5 +3945,6 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
