@@ -376,7 +376,6 @@ function handleResolvePost(p) {
         sheet.appendRow(row);
     }
 }
-
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
@@ -524,7 +523,7 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     let mapHtml = "";
     if (p['Last Known GPS']) {
         const gps = p['Last Known GPS'];
-        // FIXED: Switched to standard Google Maps Search API
+        // Corrected URL interpolation
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
@@ -984,6 +983,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
