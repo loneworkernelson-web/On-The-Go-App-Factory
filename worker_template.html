@@ -1929,25 +1929,47 @@ function updateArrivedButtonState() {
 }
 
 /**
- * Renders the dynamic library of forms from the spreadsheet.
+ * Renders the Forms Library in a Two-Column Grid.
  */
 function openFormsLibrary() {
     const list = document.getElementById('formsLibraryList');
     if (!list) return;
 
-    // 1. Clear the list
     list.innerHTML = '';
     const forms = state.globalForms || [];
 
-    // 2. If no forms exist, trigger a sync instead of showing an empty list
     if (forms.length === 0) {
-        const confirmSync = confirm("Forms library is empty. Would you like to sync with the server now?");
-        if (confirmSync) {
-            forceSync(true);
-        }
-        return;
-    }
+        list.innerHTML = '<div class="p-8 text-center opacity-40 text-xs font-bold uppercase tracking-widest">No templates available.</div>';
+    } else {
+        // Apply Two-Column Grid
+        list.className = "grid grid-cols-2 gap-3 overflow-y-auto pr-2";
+        
+        forms.forEach(form => {
+            const row = document.createElement('div');
+            // Styled as a professional "Tile"
+            row.className = 'p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center active:scale-95 transition-all aspect-square';
+            
+            // Intelligence: Assign an icon based on form name
+            let icon = "📋";
+            if (form.name.toLowerCase().includes('vehicle')) icon = "🚗";
+            if (form.name.toLowerCase().includes('audit')) icon = "🔍";
+            if (form.name.toLowerCase().includes('incident')) icon = "⚠️";
 
+            row.innerHTML = `
+                <div class="text-3xl mb-2">${icon}</div>
+                <div class="text-[10px] font-black uppercase tracking-tight text-white leading-tight">${form.name}</div>
+                <div class="text-[8px] text-blue-400 font-bold uppercase mt-1">${form.questions.length} Checks</div>
+            `;
+            row.onclick = () => {
+                closeModal('formsLibrary');
+                buildReportForm(form.name, document.getElementById('reportFields'));
+                navigate('report');
+            };
+            list.appendChild(row);
+        });
+    }
+    showModal('formsLibrary');
+}
     // 3. Populate the list with available templates
     forms.forEach(form => {
         const div = document.createElement('div');
@@ -2113,29 +2135,20 @@ function setupHoldToStart() {
  */
 async function startVisit() {
     try {
-        await Tone.start(); // Ensure this completes
-        console.log("🔊 Audio active");
-    } catch (e) { console.warn("Audio context failed to start", e); }
+        await Tone.start(); // Unlock audio on user gesture
+    } catch (e) { console.warn("Audio Context Failed"); }
 
-    if (!state.selectedLocationId || !state.visitDurationMinutes) {
-        showToast('⚠️ Select site and time first');
-        return;
-    }
-    
-    if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
-        showToast('⚠️ Set visit duration first');
+    if (!state.selectedLocationId || state.visitDurationMinutes <= 0) {
+        showToast('⚠️ Select site and duration first');
         return;
     }
 
     const loc = state.locations.find(l => l.id === state.selectedLocationId) || 
                 (state.selectedLocationId === 'travel' ? { id: 'travel', name: '🚗 Travelling', isTravel: true } : null);
 
-    if (!loc) {
-        showToast('⚠️ Location not found');
-        return;
-    }
+    if (!loc) return;
 
-    // 2. Prepare Safety Object
+    // Correctly initialize the Active Visit object
     const startTime = Date.now();
     const durationSec = state.visitDurationMinutes * 60;
     const dueOut = startTime + (durationSec * 1000);
@@ -2159,13 +2172,13 @@ async function startVisit() {
 
     saveState();
 
-    // 3. UI Transition & Logging
     const activityType = loc.id === 'travel' ? "Travel" : "Visit";
     announce(`${activityType} to ${loc.name} started.`);
     logSafety("ARRIVED", `${activityType} started at ${loc.name}`);
     
     enterLockedScreen();
 }
+    
 // ============================================================================
 // CRITICAL FUNCTIONS EXTRACTED FROM WS_SAFETY (MISSING IN ORIGINAL BUILD)
 // ============================================================================
@@ -2640,7 +2653,7 @@ window.onload = () => {
         saveState();
     }
 
-    // 3. UI Primary Paint (Render Travel Tile Immediately)
+    // 3. UI Primary Paint
     updateOnlineStatus();
     checkIosInstall();
     startGPSMonitoring();
@@ -2653,8 +2666,10 @@ window.onload = () => {
         // Standard worker startup
         navigate(state.activeVisit ? 'locked' : 'main');
         
-        // CRITICAL: Always render UI before attempting network sync
+        // CRITICAL: Render UI and bind button logic
         renderLocations(); 
+        setupHoldToStart(); // FIX: Binds the Start button logic
+        checkVehicleStatus(); // FIX: Initialises the orange compliance bar
         
         if (state.activeVisit) {
             enterLockedScreen();
@@ -2662,7 +2677,6 @@ window.onload = () => {
         }
 
         // 4. Managed Background Sync
-        // Only sync if we have a real key; avoids backend error noise
         const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
         if (!isTemplate && navigator.onLine) {
             forceSync(false); // Silent background sync
@@ -2674,7 +2688,7 @@ window.onload = () => {
     initVolumeDetection();
     initSlideToWake();
     
-    // Bind the standard SOS button behavior
+    // Bind the standard SOS button behavior (3-tap fail-safe)
     const btnPanic = document.getElementById('btnPanic');
     if (btnPanic) {
         btnPanic.onclick = () => {
@@ -2698,6 +2712,7 @@ window.onload = () => {
     
     console.log("OTG Safety Engine: System Online.");
 };
+    
 // ============================================================================
 // PHASE 1: SETTINGS PAGE FUNCTIONS
 // ============================================================================
@@ -2937,10 +2952,10 @@ function checkVehicleStatus() {
 }
 
 function startVehicleCheck() {
-    isMidVisitUpdate = true; // Allows submitting without ending a visit
-    loadFormAndShow('Vehicle Safety Check'); // Matches your spreadsheet template name
+    isMidVisitUpdate = true; // Prevents the form from ending a visit session
+    // Ensure this matches the EXACT name in your spreadsheet 'Templates' tab
+    loadFormAndShow('Vehicle Safety Check'); 
 }
-
 function checkVehicleBeforeVisit() {
     if (!state || !state.meta) return false;
     
@@ -3972,6 +3987,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
