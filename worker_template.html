@@ -305,11 +305,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
         
         <!-- Forms Button + Hold to Start Button -->
-        <div class="flex gap-4">
-            <button id="btnForms" onclick="openFormsLibrary()" 
-                    class="flex-none w-24 py-4 bg-violet-900 text-violet-300 font-bold rounded-xl border border-violet-700/50 shadow-lg active:scale-95 transition text-xs tracking-widest">
-                Forms
-            </button>
+       <button id="btnForms" class="flex-none w-24 py-4 ...">Forms</button>
+
+    <button id="btnForms" onclick="openFormsLibrary()" class="flex-none w-24 py-4 ...">Forms</button>
             <button type="button" id="btnStart" 
                     class="long-press-btn flex-1 py-4 bg-gray-700 text-gray-500 font-bold rounded-xl text-xl shadow-lg transition-all tracking-tight" 
                     disabled>
@@ -635,6 +633,19 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
+    <div id="formsLibraryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-700 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-black text-white uppercase tracking-widest">Forms Library</h2>
+            <button onclick="closeModal('formsLibrary')" class="text-2xl text-gray-400 hover:text-white">×</button>
+        </div>
+        
+        <div id="formsLibraryList" class="flex-1 overflow-y-auto space-y-3 pr-2">
+            </div>
+        
+        <button onclick="closeModal('formsLibrary')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase tracking-widest">Close</button>
+    </div>
+</div>
 <script>
 // ============================================================================
 // CONFIGURATION SYSTEM (Phase 2, Feature 11)
@@ -2123,13 +2134,16 @@ async function updateSystemInfo() {
  * Connects the UI to the Safety Engine using the Long-Press Utility.
  */
 function setupHoldToStart() {
-    // Uses the utility function to handle timing and CSS classes
+    const btn = document.getElementById('btnStart');
+    if (!btn) return;
+    
+    // Use the unified long-press utility
     setupLongPress('btnStart', 1500, () => {
-        const btn = document.getElementById('btnStart');
-        
-        // Safety Check: Ensure the button isn't disabled (e.g., missing location)
-        if (btn && !btn.disabled) {
+        // Re-verify selection at the moment of trigger
+        if (state.selectedLocationId && state.visitDurationMinutes > 0) {
             startVisit();
+        } else {
+            showToast('⚠️ Please select a site and duration');
         }
     });
 }
@@ -4005,4 +4019,5 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
