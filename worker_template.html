@@ -2672,10 +2672,10 @@ async function fetchLocationsFromBackend() {
 }
 
 // ============================================================================
-// INITIALIZATION
+// HIGH-INTEGRITY INITIALIZATION (Safety-Critical Patch)
 // ============================================================================
 window.onload = () => {
-    // Initialize state from storage or create new
+    // 1. Establish State Integrity
     state = loadState() || {
         currentWizStep: 1,
         worker: {},
@@ -2683,116 +2683,74 @@ window.onload = () => {
         activeVisit: null,
         pendingUploads: [],
         locations: [],
-        globalForms: [],
         photoStore: {},
-        settings: {},
-        vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
-        meta: {} // For vehicle check data from backend
+        vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null }
     };
-    
-    // CRITICAL: Initialize deviceId if not present
+
+    // 2. Ensure Device Identity
     if (!state.deviceId) {
         state.deviceId = getDeviceID();
         saveState();
-        console.log('Device ID initialized:', state.deviceId);
     }
-    
-    // GROK FIX #2: Cap pending uploads queue to prevent memory issues
-    if (state.pendingUploads && state.pendingUploads.length > 100) {
-        console.warn('Queue too large, keeping only last 100 items');
-        state.pendingUploads = state.pendingUploads.slice(-100);
-        saveState();
-    }
-    
-    // Check network status for offline banner
+
+    // 3. UI Primary Paint (Render Travel Tile Immediately)
     updateOnlineStatus();
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    
     checkIosInstall();
     startGPSMonitoring();
-    checkVehicleStatus(); // Check vehicle compliance on load
     
-    // Determine initial page
     if (!state.worker || !state.worker.name) {
+        // Force Setup Wizard if identity is missing
         const setupPage = document.getElementById('setupPage');
         if (setupPage) setupPage.classList.add('active');
     } else {
+        // Standard worker startup
         navigate(state.activeVisit ? 'locked' : 'main');
+        
+        // CRITICAL: Always render UI before attempting network sync
+        renderLocations(); 
+        
         if (state.activeVisit) {
             enterLockedScreen();
+            timerInt = setInterval(tick, 1000);
         }
-        
-        // GROK FIX #1: Use forceSync to fetch locations (proper handshake)
-        if (!state.locations || state.locations.length === 0) {
-            console.log('No locations in state, syncing with backend...');
-            // Use setTimeout to ensure forceSync is defined (it's defined later in script)
-            setTimeout(() => {
-                if (typeof forceSync === 'function') {
-                    forceSync(false); // Silent sync on load
-                } else {
-                    console.error('forceSync not defined yet!');
-                }
-            }, 100);
-        } else {
-            renderLocations();
+
+        // 4. Managed Background Sync
+        // Only sync if we have a real key; avoids backend error noise
+        const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
+        if (!isTemplate && navigator.onLine) {
+            forceSync(false); // Silent background sync
         }
-        
-        // Quick Wins initialization
-        updateDurationDisplay(); // Set initial duration display
-        setupHoldToStart(); // Setup long-press handler for start button
     }
+
+    // 5. Initialize Secondary Safety Controllers
+    initShakeDetection();
+    initVolumeDetection();
+    initSlideToWake();
     
-    // Setup touch interaction for inactivity timer
-    document.addEventListener('touchstart', resetInactivityTimer, { passive: true });
-    
-    // Resume timers if there's an active visit
-    if (state.activeVisit) {
-        timerInt = setInterval(tick, 1000);
-    }
-    
-    // Setup panic button handler (wire up SOS button)
+    // Bind the standard SOS button behavior
     const btnPanic = document.getElementById('btnPanic');
     if (btnPanic) {
         btnPanic.onclick = () => {
             panicTapCount++;
             clearTimeout(panicTapTimer);
-            
             if (panicTapCount === 3) {
                 panicTapCount = 0;
                 triggerPanic(false);
             } else {
-                panicTapTimer = setTimeout(() => {
-                    panicTapCount = 0;
-                }, 2000);
+                panicTapTimer = setTimeout(() => { panicTapCount = 0; }, 2000);
             }
         };
     }
-    
-    // GROK FIX #3: Process upload queue with retry on page load
-    if (navigator.onLine && state.pendingUploads && state.pendingUploads.length > 0) {
-        console.log(`Processing ${state.pendingUploads.length} queued uploads...`);
-        processUploadQueue();
-    }
-    
-    // Retry failed uploads when coming back online
-    window.addEventListener('online', () => {
-        if (state.pendingUploads && state.pendingUploads.length > 0) {
-            console.log('Back online, processing queue...');
-            setTimeout(() => processUploadQueue(), 1000);
-        }
-    });
-    
-    // Setup window resize handler for signature canvases
-    window.addEventListener('resize', () => {
-        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
-            resizeCanvas(canvas);
-        });
-    });
-    
-    console.log("System Initialized - Phase 1 Enhanced");
-};
 
+    // 6. Maintenance & Queue Management
+    window.addEventListener('online', () => {
+        if (state.pendingUploads.length > 0) setTimeout(processUploadQueue, 1000);
+    });
+    
+    document.addEventListener('touchstart', resetInactivityTimer, { passive: true });
+    
+    console.log("OTG Safety Engine: System Online.");
+};
 // ============================================================================
 // PHASE 1: SETTINGS PAGE FUNCTIONS
 // ============================================================================
@@ -3202,7 +3160,7 @@ function forceSync(showUI) {
     console.log('   state.worker exists:', !!state?.worker);
     console.log('   state.worker.name:', state?.worker?.name);
     console.log('   CONFIG.key:', CONFIG.key?.substring(0, 15) + '...');
-    
+    renderLocations();
     // Check if key has been injected by factory
     if (!CONFIG.key || CONFIG.key.includes('%%')) {
         console.log('❌ forceSync EXITING - Worker key not injected by factory yet');
@@ -3321,6 +3279,7 @@ function forceSync(showUI) {
         })
         .catch(e => {
             console.error('Sync failed:', e);
+            renderLocations();
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
             if (showUI) showToast('❌ Sync failed: ' + e.message);
@@ -4302,5 +4261,6 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
+
 
 
