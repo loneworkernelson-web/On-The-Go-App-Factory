@@ -67,12 +67,43 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) { 
       try {
-          if(e.parameter.action === 'resolve') handleResolvePost(e.parameter); 
-          else handleWorkerPost(e.parameter);
+          const p = e.parameter;
+          if(p.action === 'resolve') handleResolvePost(p); 
+          else if(p.action === 'registerDevice') return sendJSON(handleRegisterDevice(p)); // NEW
+          else handleWorkerPost(p);
+          
           return sendJSON({status:"success"});
       } catch(err) { return sendJSON({status:"error", message: err.toString()}); } 
       finally { lock.releaseLock(); }
   } else { return sendJSON({status:"error", message:"Busy"}); }
+}
+
+/**
+ * Handles the secure registration of a new device ID.
+ */
+function handleRegisterDevice(p) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stSheet = ss.getSheetByName('Staff');
+    const workerName = (p['Worker Name'] || "").trim();
+    const deviceId = p['deviceId'];
+
+    if (!stSheet) return {status: "error", message: "Staff sheet missing"};
+
+    const data = stSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][0].toString().toLowerCase() === workerName.toLowerCase()) {
+            const registeredId = data[i][4];
+            if (!registeredId || registeredId === "") {
+                stSheet.getRange(i + 1, 5).setValue(deviceId); // Bind ID
+                return {status: "success", message: "Device bound successfully"};
+            } else if (registeredId === deviceId) {
+                return {status: "success", message: "Device already registered"};
+            } else {
+                return {status: "error", message: "DEVICE MISMATCH: Identity locked to another phone."};
+            }
+        }
+    }
+    return {status: "error", message: "Worker not found in Staff list."};
 }
 
 // ==========================================
@@ -333,10 +364,34 @@ function handleResolvePost(p) {
         }
     }
     if (!rowUpdated) {
-        const ts = new Date();
-        sheet.appendRow([ts.toISOString(), Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd"), workerName, "", "", "", "", "", "", "", p['Alarm Status'], p['Notes'], "HQ Dashboard", "", "", "", "N/A", "", "", "", "", "", "", "", ""]);
-    }
+    const row = [
+        ts.toISOString(),                    // A: Timestamp
+        dateStr,                             // B: Date
+        workerName,                          // C: Worker Name
+        p['Worker Phone Number'],            // D: Worker Phone
+        p['Emergency Contact Name'],         // E: EMG Name
+        p['Emergency Contact Number'],       // F: EMG Phone
+        p['Emergency Contact Email'],        // G: EMG Email
+        p['Escalation Contact Name'],        // H: ESC Name
+        p['Escalation Contact Number'],      // I: ESC Phone
+        p['Escalation Contact Email'],       // J: ESC Email
+        p['Alarm Status'],                   // K: Status
+        polishedNotes,                       // L: Notes
+        p['Location Name'],                  // M: Site Name
+        p['Location Address'],               // N: Site Address
+        p['Last Known GPS'],                 // O: GPS Coord
+        p['Timestamp'],                      // P: GPS Timestamp (Device)
+        p['Battery Level'],                  // Q: Battery
+        p1,                                  // R: Photo 1
+        distanceValue,                       // S: Distance (km)
+        p['Visit Report Data'],              // T: JSON Data
+        p['Anticipated Departure Time'],      // U: Due Out
+        sig,                                 // V: Signature
+        p2, p3, p4                           // W, X, Y: Extra Photos
+    ];
+    sheet.appendRow(row);
 }
+
 
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -434,12 +489,34 @@ function handleWorkerPost(p, e) {
             }
         }
 
-        if (!rowUpdated) {
-            // Mapping extracted distanceValue to Index 18 (Column S)
-            const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], polishedNotes, p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, distanceValue, p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
-            sheet.appendRow(row);
-        }
-    }
+if (!rowUpdated) {
+    const row = [
+        ts.toISOString(),                    // A: Timestamp
+        dateStr,                             // B: Date
+        workerName,                          // C: Worker Name
+        p['Worker Phone Number'],            // D: Worker Phone
+        p['Emergency Contact Name'],         // E: EMG Name
+        p['Emergency Contact Number'],       // F: EMG Phone
+        p['Emergency Contact Email'],        // G: EMG Email
+        p['Escalation Contact Name'],        // H: ESC Name
+        p['Escalation Contact Number'],      // I: ESC Phone
+        p['Escalation Contact Email'],       // J: ESC Email
+        p['Alarm Status'],                   // K: Status
+        polishedNotes,                       // L: Notes
+        p['Location Name'],                  // M: Site Name
+        p['Location Address'],               // N: Site Address
+        p['Last Known GPS'],                 // O: GPS Coord
+        p['Timestamp'],                      // P: GPS Timestamp (Device)
+        p['Battery Level'],                  // Q: Battery
+        p1,                                  // R: Photo 1
+        distanceValue,                       // S: Distance (km)
+        p['Visit Report Data'],              // T: JSON Data
+        p['Anticipated Departure Time'],      // U: Due Out
+        sig,                                 // V: Signature
+        p2, p3, p4                           // W, X, Y: Extra Photos
+    ];
+    sheet.appendRow(row);
+}
 
     // 4. Status Update and Notifications
     updateStaffStatus(p);
@@ -968,4 +1045,5 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
