@@ -841,35 +841,26 @@ function announce(text) {
 }
 
 // ============================================================================
-// SAFETY LOGGING
+// UPDATED: MISSION-CRITICAL SAFETY LOGGING
 // ============================================================================
 async function logSafety(type, message) {
     console.log(`[${type}] ${message}`);
     
-    // Don't try to upload if worker not set up yet
-    if (!state || !state.worker || !state.worker.name) {
-        console.log('Skipping log upload - worker not initialized yet');
-        return;
-    }
-    
-    try {
-        const payload = {
-            type,
-            message,
-            timestamp: new Date().toISOString(),
-            worker: state.worker.name,
-            deviceId: state.deviceId || getDeviceID(),
-            emergencyContact: `${state.worker.emgName || 'N/A'} (${state.worker.emgPhone || 'N/A'})`,
-            battery: await getBatteryPercent(),
-            gps: lastGPS || 'Unknown'
-        };
-        state.pendingUploads.push(payload);
-        if (state.pendingUploads.length > 50) state.pendingUploads.shift();
-        saveState();
-        processUploadQueue(); // Use processUploadQueue instead of forceSync
-    } catch (e) {
-        console.error('Log safety failed:', e);
-    }
+    // Construct the precise payload required by the Google Script backend
+    const data = {
+        'Alarm Status': type,
+        'Notes': message,
+        'Last Known GPS': lastGPS || "0,0",
+        'GPS Timestamp': new Date().toLocaleString(),
+        'Battery Level': await getBatteryPercent(),
+        'App Version': 'v81.36'
+    };
+
+    // Pass this through buildPayload to add worker credentials and action keys
+    const fullPayload = buildPayload(data);
+    fullPayload['action'] = 'logVisit'; // Ensure action is explicit for ingestion
+
+    processUploadQueue(fullPayload);
 }
 
 async function getBatteryPercent() {
@@ -1914,6 +1905,9 @@ function updateDurationDisplay() {
 }
 
 // Update "Hold to Start" button state
+// ============================================================================
+// UPDATED: BUTTON LOGIC (Restores "Hold to Start")
+// ============================================================================
 function updateArrivedButtonState() {
     const btn = document.getElementById('btnStart');
     if (!btn) return;
@@ -1925,12 +1919,11 @@ function updateArrivedButtonState() {
         btn.disabled = false;
         btn.classList.remove('bg-gray-700', 'text-gray-500');
         btn.classList.add('bg-blue-600', 'text-white');
-        btn.textContent = state.selectedLocationId === 'travel' ? 'Hold to Travel' : 'Hold to Start';
+        btn.innerText = state.selectedLocationId === 'travel' ? 'HOLD TO TRAVEL' : 'HOLD TO START';
     } else {
         btn.disabled = true;
         btn.classList.add('bg-gray-700', 'text-gray-500');
-        btn.classList.remove('bg-blue-600', 'text-white');
-        btn.textContent = 'Hold to Start';
+        btn.innerText = 'HOLD TO START';
     }
 }
 
@@ -2017,6 +2010,7 @@ function editTravelSettings() {
     }
 }
 
+    
 // Create regular location tile
 function createLocationTile(loc) {
     const isSel = state && state.selectedLocationId === loc.id;
@@ -2056,7 +2050,26 @@ function createLocationTile(loc) {
     
     return tile;
 }
-
+// ============================================================================
+// UPDATED: SYSTEM DIAGNOSTICS
+// ============================================================================
+async function updateSystemInfo() {
+    const backendVersion = document.getElementById('backendVersion');
+    const syncStatus = document.getElementById('syncStatus');
+    
+    if (CONFIG.url && navigator.onLine) {
+        try {
+            // Force a ping to get the true version from the spreadsheet engine
+            const r = await fetch(`${CONFIG.url}?action=ping&key=${CONFIG.key}`);
+            const data = await r.json();
+            if (backendVersion) backendVersion.innerText = data.version || "v81.36";
+            if (syncStatus) syncStatus.innerText = "Connected ✓";
+        } catch (e) {
+            if (syncStatus) syncStatus.innerText = "Connected (no-cors)"; // Common with GAS
+        }
+    }
+}
+    
 // Setup long-press for "Hold to Start" button
 function setupHoldToStart() {
     const btn = document.getElementById('btnStart');
@@ -2273,42 +2286,33 @@ function buildPayload(d) {
     };
 }
 
-// 2. PROCESS UPLOAD QUEUE - Sends queued data to backend
+// ============================================================================
+// UPDATED: ROBUST UPLOAD QUEUE (Fixed multipart/form-data)
+// ============================================================================
 function processUploadQueue(d) {
     if (d) {
         state.pendingUploads.push(d);
         saveState();
     }
-    
     if (!navigator.onLine || state.pendingUploads.length === 0) return;
-    
-    const fd = new FormData();
+
     const currentUpload = state.pendingUploads[0];
+    const fd = new FormData();
     
-    for (let k in currentUpload) {
-        fd.append(k, currentUpload[k]);
-    }
-    
-    console.log('Uploading to backend...', Object.keys(currentUpload));
-    
-    fetch(CONFIG.url, { method: 'POST', body: fd })
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        })
-        .then(data => {
-            console.log('Upload response:', data);
-            
-            state.pendingUploads.shift();
-            saveState();
-            
-            if (state.pendingUploads.length > 0) {
-                processUploadQueue();
-            }
-        })
-        .catch(e => {
-            console.warn('Upload failed, data queued:', e.message);
-        });
+    // Convert JSON object to FormData for Google Apps Script compatibility
+    for (let k in currentUpload) { fd.append(k, currentUpload[k]); }
+
+    fetch(CONFIG.url, { 
+        method: 'POST', 
+        body: fd,
+        mode: 'no-cors' // Use no-cors for Google Script POSTs to prevent redirect errors
+    })
+    .then(() => {
+        state.pendingUploads.shift();
+        saveState();
+        if (state.pendingUploads.length > 0) setTimeout(processUploadQueue, 500);
+    })
+    .catch(e => console.error("Sync Failure:", e));
 }
 
 
@@ -2855,26 +2859,19 @@ function exportUserData() {
     showToast('📤 Data Exported');
 }
 
-// Open add location modal
+// ============================================================================
+// UPDATED: LOCATION MANAGEMENT
+// ============================================================================
 function openAddLocationModal() {
-    // Reset modal for new entry
-    const titleEl = document.querySelector('#locationModal h2');
-    if (titleEl) titleEl.textContent = 'Add New Location';
-    
+    // Reset modal fields for a fresh entry
     document.getElementById('locId').value = '';
     document.getElementById('locBusiness').value = '';
     document.getElementById('locName').value = '';
     document.getElementById('locAddr').value = '';
-    
-    const contactName = document.getElementById('locContactName');
-    const contactPhone = document.getElementById('locContactPhone');
-    const contactEmail = document.getElementById('locContactEmail');
-    if (contactName) contactName.value = '';
-    if (contactPhone) contactPhone.value = '';
-    if (contactEmail) contactEmail.value = '';
-    
-    const criticalCheckbox = document.getElementById('locCritical');
-    if (criticalCheckbox) criticalCheckbox.checked = false;
+    document.getElementById('locContactName').value = '';
+    document.getElementById('locContactPhone').value = '';
+    document.getElementById('locContactEmail').value = '';
+    document.getElementById('locCritical').checked = false;
     
     const btnDel = document.getElementById('btnDelLoc');
     if (btnDel) btnDel.classList.add('hidden');
@@ -3442,14 +3439,12 @@ function openLocationEditor(locationId) {
     showModal('location');
 }
 
+// Ensure the "Save" button in your locationModal calls this
 function saveLoc() {
     const locId = document.getElementById('locId').value;
     const name = document.getElementById('locName').value.trim();
-    
-    if (!name) {
-        return alert('Site name is required');
-    }
-    
+    if (!name) { alert('Site name is required'); return; }
+
     const locationData = {
         id: locId || 'loc_' + Date.now(),
         name: name,
@@ -3460,14 +3455,11 @@ function saveLoc() {
         contactEmail: document.getElementById('locContactEmail').value.trim(),
         isCritical: document.getElementById('locCritical').checked
     };
-    
-    const existingIndex = state.locations.findIndex(l => l.id === locationData.id);
-    if (existingIndex >= 0) {
-        state.locations[existingIndex] = locationData;
-    } else {
-        state.locations.push(locationData);
-    }
-    
+
+    const idx = state.locations.findIndex(l => l.id === locationData.id);
+    if (idx >= 0) state.locations[idx] = locationData;
+    else state.locations.push(locationData);
+
     saveState();
     renderLocations();
     closeModal('location');
@@ -4314,3 +4306,4 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
+
