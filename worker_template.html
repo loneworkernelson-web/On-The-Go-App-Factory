@@ -223,11 +223,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="wizEmail" type="email" placeholder="Email Address" class="form-input">
         </div>
         <div id="wizStep2" class="wizard-step">
-            <form id="wizPinForm" onsubmit="return false;">
-                <h2 class="text-lg font-bold mb-4">Security PINs</h2>
-                <input id="wizPin" type="password" autocomplete="new-password" placeholder="Standard PIN (4-6 digits)" class="form-input" inputmode="numeric" maxlength="6">
-                <input id="wizDuress" type="password" autocomplete="new-password" placeholder="Duress PIN (silent alert)" class="form-input" inputmode="numeric" maxlength="6">
-            </form>
+<form id="wizPinForm" onsubmit="return false;">
+    <input type="text" name="username" autocomplete="username" value="Worker" class="hidden" style="display:none !important;">
+    <h2 class="text-lg font-bold mb-4">Security PINs</h2>
+    <input id="wizPin" type="password" autocomplete="new-password" placeholder="Standard PIN (4-6 digits)" class="form-input" inputmode="numeric" maxlength="6">
+    <input id="wizDuress" type="password" autocomplete="new-password" placeholder="Duress PIN (silent alert)" class="form-input" inputmode="numeric" maxlength="6">
+</form>
         </div>
         <div id="wizStep3" class="wizard-step">
             <h2 class="text-lg font-bold mb-4">Emergency Contacts</h2>
@@ -350,9 +351,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <button id="btnExtend" onclick="showModal('extend')" class="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
                     Extend
                 </button>
-                <button onclick="openFormsLibrary()" class="flex-1 py-4 bg-violet-900 hover:bg-violet-800 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
-                    Forms
-                </button>
+                <button onclick="openFormsLibrary()" class="flex flex-col items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+    <span class="text-xl">📋</span>
+    <span class="text-[10px] font-bold uppercase tracking-tighter">Forms</span>
+</button>
             </div>
             <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">
                 Hold to END
@@ -566,9 +568,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="pinModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-800 p-6 rounded-xl w-80">
         <form id="pinEntryForm" onsubmit="return false;">
-            <h3 class="text-lg font-bold mb-4">Enter PIN</h3>
-            <input id="pinInput" type="password" autocomplete="current-password" class="form-input mb-4" inputmode="numeric" maxlength="6">
-            <button id="btnPinConfirm" type="button" class="w-full py-3 bg-blue-600 rounded-xl font-bold">Confirm</button>
+    <input type="text" name="username" autocomplete="username" value="Worker" class="hidden" style="display:none !important;">
+    <h3 class="text-lg font-bold mb-4">Enter PIN</h3>
+    <input id="pinInput" type="password" autocomplete="current-password" class="form-input mb-4" inputmode="numeric" maxlength="6">
+    <button id="btnPinConfirm" type="button" class="w-full py-3 bg-blue-600 rounded-xl font-bold">Confirm</button>
         </form>
     </div>
 </div>
@@ -1814,6 +1817,10 @@ function saveWizard() {
     };
     
     processUploadQueue(regPayload);
+// NEW: Immediately fetch sites and forms so the app is ready to use
+    setTimeout(() => {
+        syncLibrary();
+    }, 1000); 
 }
 
 // ============================================================================
@@ -1929,37 +1936,47 @@ function updateArrivedButtonState() {
 }
 
 /**
- * Renders the Forms Library from state data.
- *
+ * Renders the dynamic library of forms from the spreadsheet.
+ */
+/**
+ * UI Controller: Opens the Forms Library Modal
  */
 function openFormsLibrary() {
     const list = document.getElementById('formsLibraryList');
     if (!list) return;
 
+    // 1. Clear the list
     list.innerHTML = '';
+    const forms = state.globalForms || [];
 
-    const allForms = state.globalForms || [];
-    
-    if (allForms.length === 0) {
-        list.innerHTML = '<div class="p-8 text-center opacity-40 text-xs font-bold">No templates available.</div>';
-    } else {
-        allForms.forEach(form => {
-            const row = document.createElement('div');
-            row.className = 'p-5 mb-3 bg-white/5 border border-white/10 rounded-2xl flex justify-between items-center active:scale-95 transition-transform';
-            row.innerHTML = `
-                <div class="flex flex-col">
-                    <span class="text-xs font-black uppercase tracking-tight">${form.name}</span>
-                    <span class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">${form.questions.length} Fields</span>
-                </div>
-                <div class="text-lg">📋</div>
-            `;
-            row.onclick = () => {
-                buildReportForm(form.name, document.getElementById('reportFields'));
-                navigate('report');
-            };
-            list.appendChild(row);
-        });
+    // 2. If no forms exist, trigger a sync instead of showing an empty list
+    if (forms.length === 0) {
+        const confirmSync = confirm("Forms library is empty. Would you like to sync with the server now?");
+        if (confirmSync) {
+            syncLibrary();
+        }
+        return;
     }
+
+    // 3. Populate the list with available templates
+    forms.forEach(form => {
+        const div = document.createElement('div');
+        div.className = 'p-5 mb-3 bg-white/5 border border-white/10 rounded-2xl flex justify-between items-center active:scale-95 transition-all';
+        div.innerHTML = `
+            <div class="flex flex-col">
+                <span class="text-xs font-black uppercase tracking-tight">${form.name}</span>
+                <span class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">${form.questions.length} Fields</span>
+            </div>
+            <div class="text-lg">📄</div>
+        `;
+        div.onclick = () => {
+            closeModal('formsLibrary');
+            buildReportForm(form.name, document.getElementById('reportFields'));
+            navigate('report');
+        };
+        list.appendChild(div);
+    });
+
     showModal('formsLibrary');
 }
 // Toggle high-risk/critical timing mode
@@ -2120,10 +2137,11 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
-    // 1. Validation
-    if (!state || !state.selectedLocationId) {
-        showToast('⚠️ Select a location first');
-        return;
+    // 1. CRITICAL: Unlocks audio for background alarms
+    await Tone.start();
+    console.log("🔊 Audio context active");
+
+    if (!state.selectedLocationId || state.visitDurationMinutes <= 0) return;
     }
     if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
         showToast('⚠️ Set visit duration first');
@@ -2180,6 +2198,8 @@ async function startVisit() {
     // Warm up audio and start timers
     if (typeof initAudio === 'function') await initAudio();
     enterLockedScreen();
+    announce("Safety timer active.");
+    logSafety("ARRIVED", `Monitoring started for ${state.activeVisit.locationName}`);
 }
 
 // ============================================================================
@@ -2245,9 +2265,10 @@ function buildPayload(d) {
     };
 }
 
-// ============================================================================
-// UPDATED: ROBUST UPLOAD QUEUE (Fixed multipart/form-data)
-// ============================================================================
+/**
+ * ROBUST SYNC ENGINE - GAS COMPATIBLE
+ * Handles the 'opaque' responses required by Google Apps Script.
+ */
 function processUploadQueue(d) {
     if (d) {
         state.pendingUploads.push(d);
@@ -2257,23 +2278,27 @@ function processUploadQueue(d) {
 
     const currentUpload = state.pendingUploads[0];
     const fd = new FormData();
-    
-    // Convert JSON object to FormData for Google Apps Script compatibility
     for (let k in currentUpload) { fd.append(k, currentUpload[k]); }
 
+    // Use 'no-cors' to allow the POST to reach Google without a pre-flight failure
     fetch(CONFIG.url, { 
         method: 'POST', 
-        body: fd,
-        mode: 'no-cors' // Use no-cors for Google Script POSTs to prevent redirect errors
-    })
-    .then(() => {
+        body: fd, 
+        mode: 'no-cors' 
+    }).then(() => {
+        // Since we can't read the response in no-cors, we assume success 
+        // if the fetch doesn't throw.
         state.pendingUploads.shift();
         saveState();
-        if (state.pendingUploads.length > 0) setTimeout(processUploadQueue, 500);
-    })
-    .catch(e => console.error("Sync Failure:", e));
+        if (state.pendingUploads.length > 0) {
+            setTimeout(processUploadQueue, 500);
+        } else {
+            console.log("✅ Sync Queue Cleared");
+            // Optional: Re-ping to update sites after registration
+            if (currentUpload.action === 'registerDevice') forceSync(false);
+        }
+    }).catch(e => console.warn("Network deferred:", e));
 }
-
 
 // 3. GATHER FORM DATA - Collects all form field values
 function gatherFormData() {
@@ -4224,6 +4249,7 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
+
 
 
 
