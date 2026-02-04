@@ -887,45 +887,53 @@ async function getBatteryPercent() {
     return 'Unknown';
 }
 
-// Placeholder for report submission
+/**
+ * REWRITTEN: High-Integrity Report Submission
+ * Correctly maps stripped form labels to the backend payload and handles UI transitions.
+ */
 function submitReport() {
+    showToast('📤 Processing report...');
+    
+    // 1. Gather Data from the UI
     const d = gatherFormData();
     let photoCount = 0;
     const photoMap = {};
     
-    // Process photos
-    Object.keys(state.photoStore || {}).forEach((key, index) => {
+    // 2. Process Photos
+    // Iterates through stored base64 images and creates tokens for the spreadsheet
+    Object.keys(state.photoStore || {}).forEach((key) => {
         photoCount++;
         const token = `{{PHOTO_${photoCount}}}`;
         photoMap[`Photo ${photoCount}`] = state.photoStore[key];
         
+        // Map the token to the specific custom field if it exists
         if (d.custom[key] !== undefined) {
             d.custom[key] = token;
             d.jsonPayload[key] = token;
         }
     });
     
-    // Build form data object
+    // 3. Build Form Data Object
     const fd = {
         ...d.custom,
         "Visit Report Data": JSON.stringify(d.jsonPayload),
         "Template Name": currentActiveTemplate
     };
     
-    // Add distance if available
-    if (d.custom && d.custom["Distance (km)"]) {
-        fd["Distance"] = d.custom["Distance (km)"];
+    // 4. Intelligence: Automated Distance Extraction
+    // Scans for 'Distance', 'KM', or 'Odo' in the clean labels to populate the 'Distance' column
+    for (let key in d.custom) {
+        if (/km|odo|dist/i.test(key)) {
+            const val = parseFloat(d.custom[key]);
+            if (!isNaN(val)) fd["Distance"] = val;
+        }
     }
     
-    // Add photos
-    Object.entries(photoMap).forEach(([k, v]) => {
-        fd[k] = v;
-    });
-    
-    // Add signature
+    // 5. Attach Media
+    Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; });
     if (d.sig) fd["Signature"] = d.sig;
     
-    // Determine alarm status
+    // 6. Determine Backend Status
     let alarmStatus;
     if (!state.activeVisit) {
         alarmStatus = "DATA_ENTRY_ONLY";
@@ -935,24 +943,22 @@ function submitReport() {
         alarmStatus = "DEPARTED";
     }
     
-    // Send to backend
+    // 7. Handshake with Backend
     processUploadQueue(buildPayload({
         ...fd,
         "Alarm Status": alarmStatus,
         "Notes": d.notes || ""
     }));
     
-    // Handle UI
+    // 8. Visual and Logic Reset
     if (!isMidVisitUpdate) {
-        // End visit
+        // End the Safety Session
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
+        state.photoStore = {}; // Purge local media cache for privacy
         
-        // Clear photos
-        state.photoStore = {};
-        
-        // Stop timer
+        // Stop the safety heartbeat
         if (timerInt) {
             clearInterval(timerInt);
             timerInt = null;
@@ -961,12 +967,13 @@ function submitReport() {
         saveState();
         closeModal('report');
         navigate('main');
-        renderLocations();
-        showToast('✅ Visit completed');
+        renderLocations(); // Refresh UI to clear selections
+        showToast('✅ Safety Session Completed');
     } else {
-        // Mid-visit update
+        // Mid-visit update remains in the locked state
         closeModal('report');
-        showToast('✅ Update sent');
+        showToast('✅ Update Logged');
+        isMidVisitUpdate = false; // Reset flag
     }
 }
 
@@ -1161,79 +1168,122 @@ function startTravellingPulse() {
 
 /**
  * REWRITTEN: High-Integrity Form Builder
- * Prevents .match() errors by using the new array-based question format.
- *
+ * Parses [TYPE] tags, strips them from labels, and builds the correct UI.
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
     fieldArea.innerHTML = ''; 
 
-    // Find the template in the state updated by the sync
     const template = state.globalForms.find(f => f.name === templateName) || 
                      { name: templateName, questions: ["Notes", "Signature"] };
     
     const questions = template.questions || [];
 
     questions.forEach(label => {
-        const fieldId = `field_${label.replace(/\s/g, '_')}`;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'mb-5'; // Slightly larger gap for mobile spacing
+        // 1. Parse tag and clean label
+        const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/);
+        let type = tagMatch ? tagMatch[1].toUpperCase() : "TEXT";
+        let cleanLabel = tagMatch ? tagMatch[2] : label;
         
+        const fieldId = `field_${cleanLabel.replace(/\s/g, '_')}`;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-6'; 
+
+        // 2. Handle Heading
+        if (type === 'HEADING' || type === 'HEAD') {
+            const h = document.createElement('h3');
+            h.className = 'text-blue-400 font-black text-[10px] uppercase tracking-[0.25em] mb-4 border-b border-blue-500/20 pb-2 mt-6';
+            h.innerText = cleanLabel;
+            wrapper.appendChild(h);
+            fieldArea.appendChild(wrapper);
+            return;
+        }
+
+        // 3. Render Label
         const labelEl = document.createElement('label');
-        labelEl.className = 'block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-2 ml-1';
-        labelEl.innerText = label;
+        labelEl.className = 'block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
+        labelEl.innerText = cleanLabel;
         wrapper.appendChild(labelEl);
 
-        const lowerLabel = label.toLowerCase();
-        
-        // 1. PHOTO DETECTION
-        if (lowerLabel.includes('photo')) {
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-            input.id = fieldId; input.className = 'form-input bg-white/5 border-white/10';
-            input.onchange = () => handlePhoto(input, label);
-            wrapper.appendChild(input);
-            
-        // 2. SIGNATURE DETECTION
-        } else if (lowerLabel.includes('signature')) {
-            const canvas = document.createElement('canvas');
-            canvas.id = `sig-canvas-${label.replace(/\s/g, '_')}`;
-            canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
-            wrapper.appendChild(canvas);
-            setTimeout(() => { initSigPad(canvas); }, 200);
+        let input;
 
-        // 3. GPS DETECTION
-        } else if (lowerLabel.includes('gps') || lowerLabel.includes('location')) {
-            const btn = document.createElement('button');
-            btn.className = 'w-full py-4 bg-blue-900/40 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
-            btn.innerText = '📍 Capture GPS';
-            btn.onclick = (e) => { e.preventDefault(); captureGPS(btn); };
-            const input = document.createElement('input');
-            input.id = fieldId; input.className = 'form-input opacity-40 text-xs'; 
-            input.readOnly = true; input.setAttribute('data-key', label);
-            wrapper.appendChild(btn);
-            wrapper.appendChild(input);
+        // 4. Input Factory
+        switch(type) {
+            case 'PHOTO':
+                input = document.createElement('input');
+                input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+                input.onchange = () => handlePhoto(input, cleanLabel);
+                // Progress Label
+                const status = document.createElement('div');
+                status.id = `lbl_${fieldId}`; status.className = 'text-[9px] text-blue-400 font-bold mt-1 uppercase';
+                wrapper.appendChild(input); wrapper.appendChild(status);
+                input = null; // Prevent double adding
+                break;
+            case 'NUMBER':
+                input = document.createElement('input'); input.type = 'number';
+                break;
+            case '$':
+            case 'CURRENCY':
+                const wrap = document.createElement('div'); wrap.className = 'flex items-center';
+                const sym = document.createElement('span');
+                sym.className = 'px-4 py-3 bg-gray-800 border border-r-0 border-white/10 rounded-l-xl text-blue-400 font-black text-sm';
+                sym.innerText = '$';
+                input = document.createElement('input'); input.type = 'number'; input.step = '0.01';
+                input.className = 'rounded-l-none';
+                wrap.appendChild(sym); wrap.appendChild(input);
+                wrapper.appendChild(wrap);
+                break;
+            case 'DATE':
+                input = document.createElement('input'); input.type = 'date';
+                break;
+            case 'DROP':
+                input = document.createElement('select');
+                ["-- Select --", "OK", "Issue", "N/A"].forEach(o => {
+                    const opt = document.createElement('option');
+                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
+                    input.appendChild(opt);
+                });
+                break;
+            case 'YES/NO':
+                input = document.createElement('select');
+                ["-- Select --", "Yes", "No"].forEach(o => {
+                    const opt = document.createElement('option');
+                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
+                    input.appendChild(opt);
+                });
+                break;
+            case 'SIGNATURE':
+            case 'SIGN':
+                const canvas = document.createElement('canvas');
+                canvas.id = `sig-canvas-${cleanLabel.replace(/\s/g, '_')}`;
+                canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
+                wrapper.appendChild(canvas);
+                setTimeout(() => { initSigPad(canvas); }, 200);
+                break;
+            case 'GPS':
+                const btn = document.createElement('button');
+                btn.className = 'w-full py-4 bg-blue-900/30 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
+                btn.innerText = '📍 Capture GPS';
+                btn.onclick = (e) => { e.preventDefault(); captureGPS(btn); };
+                wrapper.appendChild(btn);
+                input = document.createElement('input'); input.readOnly = true; input.className = 'opacity-40';
+                break;
+            case 'TEXT':
+                input = document.createElement('textarea'); input.rows = 3;
+                break;
+            default:
+                input = document.createElement('input'); input.type = 'text';
+        }
 
-        // 4. LONG TEXT DETECTION
-        } else if (lowerLabel.includes('notes') || lowerLabel.includes('details') || lowerLabel.includes('description')) {
-            const input = document.createElement('textarea');
-            input.id = fieldId; input.className = 'form-input min-h-[100px]'; 
-            input.setAttribute('data-key', label);
-            wrapper.appendChild(input);
-
-        // 5. NUMERIC/TEXT FALLBACK
-        } else {
-            const input = document.createElement('input');
-            input.type = (lowerLabel.includes('km') || lowerLabel.includes('number') || lowerLabel.includes('odo')) ? 'number' : 'text';
-            input.id = fieldId; input.className = 'form-input';
-            input.setAttribute('data-key', label);
+        if (input) {
+            input.id = fieldId;
+            input.className = (input.className || '') + ' form-input';
+            input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
         }
-        
         fieldArea.appendChild(wrapper);
     });
 }
-
 // ============================================================================
 // PIN VERIFICATION
 // ============================================================================
@@ -2062,12 +2112,13 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
-    // 1. Unlocks audio for background alarms
-    await Tone.start();
-    console.log("🔊 Audio context active");
+    try {
+        await Tone.start(); // Ensure this completes
+        console.log("🔊 Audio active");
+    } catch (e) { console.warn("Audio context failed to start", e); }
 
-    if (!state.selectedLocationId) {
-        showToast('⚠️ Select a location first');
+    if (!state.selectedLocationId || !state.visitDurationMinutes) {
+        showToast('⚠️ Select site and time first');
         return;
     }
     
@@ -2409,19 +2460,19 @@ function handlePhoto(input, key) {
 // 4. INIT SIGNATURE PAD - Sets up touch/mouse drawing on canvas
 function initSigPad(canvas) {
     if (!canvas) return;
+    resizeCanvas(canvas); // Ensure resolution is set before drawing
     
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
-    let lastX = 0;
-    let lastY = 0;
     
-    // Get position accounting for canvas scaling
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches ? e.touches[0] : e;
+        // Use the ratio to map touch points to the internal resolution
+        const ratio = window.devicePixelRatio || 1;
         return {
-            x: (touch.clientX - rect.left) * (canvas.width / rect.width),
-            y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+            x: (touch.clientX - rect.left) * (canvas.width / (rect.width * ratio)),
+            y: (touch.clientY - rect.top) * (canvas.height / (rect.height * ratio))
         };
     };
     
@@ -2473,18 +2524,13 @@ function initSigPad(canvas) {
 
 // 5. RESIZE CANVAS - Adjusts canvas for high DPI displays
 function resizeCanvas(canvasEl) {
-    if (!canvasEl) return;
-    
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const ratio = window.devicePixelRatio || 1;
     const rect = canvasEl.getBoundingClientRect();
-    
+    // Set the internal resolution to match the physical pixels
     canvasEl.width = rect.width * ratio;
     canvasEl.height = rect.height * ratio;
-    
     const ctx = canvasEl.getContext('2d');
     ctx.scale(ratio, ratio);
-    
-    console.log(`Canvas resized: ${canvasEl.width}x${canvasEl.height} (ratio: ${ratio})`);
 }
 
 // 6. CLEAR SIGNATURE - Clears signature canvas
@@ -3926,6 +3972,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
