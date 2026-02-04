@@ -1773,46 +1773,42 @@ function saveWizard() {
         escEmail: document.getElementById('wizEscEmail').value.trim()
     };
     
-    if (!workerData.name || !workerData.pin || !workerData.duress || 
-        !workerData.phone || !workerData.email || 
-        !workerData.emgName || !workerData.emgPhone) {
-        return alert("Please complete all required fields.");
+    // Validation: Only Name and Security are strictly required to proceed locally
+    if (!workerData.name || !workerData.pin || !workerData.duress) {
+        return alert("Please complete Name and Security PINs to proceed.");
     }
     
+    // Store EVERYTHING locally for use in future site visits
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
     
-    // Initialize deviceId if not present
     if (!state.deviceId) {
         state.deviceId = getDeviceID();
     }
     
     saveState();
     
+    // UI Transitions
     const setupPage = document.getElementById('setupPage');
     if (setupPage) setupPage.classList.remove('active');
-    
     const headerName = document.getElementById('headerWorkerName');
     if (headerName) headerName.innerText = workerData.name;
     
-    announce(`Welcome ${workerData.name}. System is now active.`);
-    logSafety("Setup Complete", "Worker profile initialized.");
+    announce(`Welcome ${workerData.name}. Device registered.`);
     navigate('main');
     
-    // CRITICAL: Sync with backend after wizard completion
-    console.log('Wizard complete - syncing with backend...');
-    console.log('About to call forceSync(true)...');
-    console.log('forceSync function exists:', typeof forceSync);
-    console.log('state.worker:', state.worker);
+    // Streamlined Registration: Send only Name and ID to the backend
+    console.log('Registering Device ID with Backend...');
+    const regPayload = {
+        'action': 'registerDevice',
+        'key': CONFIG.key,
+        'Worker Name': workerData.name,
+        'deviceId': state.deviceId,
+        'Timestamp': new Date().toISOString()
+    };
     
-    try {
-        forceSync(true);
-        console.log('forceSync call completed');
-    } catch (error) {
-        console.error('ERROR calling forceSync:', error);
-        console.error('Error stack:', error.stack);
-    }
+    processUploadQueue(regPayload);
 }
 
 // ============================================================================
@@ -4306,4 +4302,5 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
+
 
