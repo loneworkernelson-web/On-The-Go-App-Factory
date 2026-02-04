@@ -364,42 +364,24 @@ function handleResolvePost(p) {
         }
     }
     if (!rowUpdated) {
-    const row = [
-        ts.toISOString(),                    // A: Timestamp
-        dateStr,                             // B: Date
-        workerName,                          // C: Worker Name
-        p['Worker Phone Number'],            // D: Worker Phone
-        p['Emergency Contact Name'],         // E: EMG Name
-        p['Emergency Contact Number'],       // F: EMG Phone
-        p['Emergency Contact Email'],        // G: EMG Email
-        p['Escalation Contact Name'],        // H: ESC Name
-        p['Escalation Contact Number'],      // I: ESC Phone
-        p['Escalation Contact Email'],       // J: ESC Email
-        p['Alarm Status'],                   // K: Status
-        polishedNotes,                       // L: Notes
-        p['Location Name'],                  // M: Site Name
-        p['Location Address'],               // N: Site Address
-        p['Last Known GPS'],                 // O: GPS Coord
-        p['Timestamp'],                      // P: GPS Timestamp (Device)
-        p['Battery Level'],                  // Q: Battery
-        p1,                                  // R: Photo 1
-        distanceValue,                       // S: Distance (km)
-        p['Visit Report Data'],              // T: JSON Data
-        p['Anticipated Departure Time'],      // U: Due Out
-        sig,                                 // V: Signature
-        p2, p3, p4                           // W, X, Y: Extra Photos
-    ];
-    sheet.appendRow(row);
+        const ts = new Date();
+        const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
+        const row = [
+            ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], 
+            p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], 
+            p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], 
+            p['Alarm Status'], p['Notes'], p['Location Name'], p['Location Address'], 
+            p['Last Known GPS'], p['Timestamp'], p['Battery Level'], "", "", "", "", "", "", "", ""
+        ];
+        sheet.appendRow(row);
+    }
 }
-
 
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
     const workerName = p['Worker Name'];
     const templateName = p['Template Name'] || "";
-    
-    // 1. Check for Private Routing
     const isNoteToSelf = (templateName.trim().toLowerCase() === 'note to self');
 
     let p1="", p2="", p3="", p4="", sig="";
@@ -411,37 +393,26 @@ function handleWorkerPost(p, e) {
 
     const ts = new Date();
     const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
-    
     let polishedNotes = p['Notes'] || "";
     const hasFormData = p['Visit Report Data'] && p['Visit Report Data'].length > 2;
 
-    // 2. Data Extraction and AI Polishing
-    let distanceValue = p['Distance'] || ""; // Initial value from the payload
+    let distanceValue = p['Distance'] || ""; 
 
     if (hasFormData) {
         try {
             const reportObj = JSON.parse(p['Visit Report Data']);
-            
-            // AI Scribe
             if (CONFIG.GEMINI_API_KEY && CONFIG.GEMINI_API_KEY.length > 10) {
                 polishedNotes = smartScribe(reportObj, templateName, p['Notes']);
             }
-
-            // NEW: Deep-scan JSON for Distance/KM values
-            // Scans form fields for keywords like "km", "dist", or "odo"
             for (let key in reportObj) {
                 if (/km|mil|dist|odo/i.test(key)) { 
                     let val = parseFloat(reportObj[key]);
-                    if (!isNaN(val)) {
-                        distanceValue = val; 
-                        break; // Stop at the first valid numeric distance found
-                    }
+                    if (!isNaN(val)) { distanceValue = val; break; }
                 }
             }
         } catch(e) { console.error("Data Parsing Error: " + e); }
     }
     
-    // 3. Persistent Storage (Skip if 'Note to Self')
     if (!isNoteToSelf) {
         if(!sheet) {
             sheet = ss.insertSheet('Visits');
@@ -451,7 +422,7 @@ function handleWorkerPost(p, e) {
         let rowUpdated = false;
         const lastRow = sheet.getLastRow();
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        const distColIdx = headers.indexOf("Distance (km)"); // Targeting Column S
+        const distColIdx = headers.indexOf("Distance (km)");
         
         if (lastRow > 1) {
             const startRow = Math.max(2, lastRow - 50); 
@@ -467,21 +438,13 @@ function handleWorkerPost(p, e) {
                         const targetRow = startRow + i;
                         sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
                         sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
-                        
-                        // Update Distance if found
-                        if (distanceValue && distColIdx > -1) {
-                            sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
-                        }
-
+                        if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
                         if (polishedNotes && polishedNotes !== rowData[11]) {
                              const oldNotes = sheet.getRange(targetRow, 12).getValue();
                              if (!oldNotes.includes(polishedNotes)) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + polishedNotes).trim());
                         }
                         if (p['Last Known GPS']) sheet.getRange(targetRow, 15).setValue(p['Last Known GPS']);
-                        if (p['Visit Report Data']) {
-                            const h = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-                            sheet.getRange(targetRow, h.indexOf("Visit Report Data") + 1).setValue(p['Visit Report Data']);
-                        }
+                        if (p['Visit Report Data']) sheet.getRange(targetRow, headers.indexOf("Visit Report Data") + 1).setValue(p['Visit Report Data']);
                         rowUpdated = true;
                         break;
                     }
@@ -489,36 +452,12 @@ function handleWorkerPost(p, e) {
             }
         }
 
-if (!rowUpdated) {
-    const row = [
-        ts.toISOString(),                    // A: Timestamp
-        dateStr,                             // B: Date
-        workerName,                          // C: Worker Name
-        p['Worker Phone Number'],            // D: Worker Phone
-        p['Emergency Contact Name'],         // E: EMG Name
-        p['Emergency Contact Number'],       // F: EMG Phone
-        p['Emergency Contact Email'],        // G: EMG Email
-        p['Escalation Contact Name'],        // H: ESC Name
-        p['Escalation Contact Number'],      // I: ESC Phone
-        p['Escalation Contact Email'],       // J: ESC Email
-        p['Alarm Status'],                   // K: Status
-        polishedNotes,                       // L: Notes
-        p['Location Name'],                  // M: Site Name
-        p['Location Address'],               // N: Site Address
-        p['Last Known GPS'],                 // O: GPS Coord
-        p['Timestamp'],                      // P: GPS Timestamp (Device)
-        p['Battery Level'],                  // Q: Battery
-        p1,                                  // R: Photo 1
-        distanceValue,                       // S: Distance (km)
-        p['Visit Report Data'],              // T: JSON Data
-        p['Anticipated Departure Time'],      // U: Due Out
-        sig,                                 // V: Signature
-        p2, p3, p4                           // W, X, Y: Extra Photos
-    ];
-    sheet.appendRow(row);
-}
+        if (!rowUpdated) {
+            const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], polishedNotes, p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, distanceValue, p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
+            sheet.appendRow(row);
+        }
+    }
 
-    // 4. Status Update and Notifications
     updateStaffStatus(p);
     if(hasFormData) {
         try {
@@ -1045,5 +984,6 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
