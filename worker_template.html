@@ -1651,43 +1651,48 @@ function tick() {
 }
 
 // ============================================================================
-// VEHICLE CHECK
-// ============================================================================
-// RENDER LOCATIONS
+// ENHANCED RENDER LOCATIONS (Layout Corrected)
 // ============================================================================
 function renderLocations() {
     const list = document.getElementById('locationList');
     const travelRow = document.getElementById('travelRow');
     
     if (!list || !travelRow) {
-        console.error('Location containers not found!');
+        console.error('UI Error: Location containers missing.');
         return;
     }
     
     list.innerHTML = '';
     travelRow.innerHTML = '';
     
-    // ALWAYS render travel tile first (hard-coded)
-    const travelTile = createTravelTile();
-    travelRow.appendChild(travelTile);
-    
-    // Render regular locations
-    if (!state || !state.locations) {
-        state = state || {};
-        state.locations = [];
+    // 1. Render Travel Tile (Only if enabled in Factory)
+    if (CONFIG.mileageEnabled) {
+        const travelTile = createTravelTile();
+        travelRow.appendChild(travelTile);
+    } else {
+        // If mileage is disabled, you might want to hide the row entirely
+        travelRow.classList.add('hidden');
     }
     
-    state.locations.forEach(loc => {
-        if (!loc || loc.id === 'travel') return; // Skip travel (already rendered)
-        
-        const tile = createLocationTile(loc);
-        list.appendChild(tile);
-    });
+    // 2. Render Regular Locations
+    const sites = state.locations.filter(loc => loc && loc.id !== 'travel');
     
-    // Update button state after rendering
+    if (sites.length === 0) {
+        // Show "Empty State" message instead of a blank screen
+        const empty = document.createElement('div');
+        empty.className = 'p-10 text-center opacity-30 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed';
+        empty.innerHTML = 'No sites found<br>Pull to sync';
+        list.appendChild(empty);
+    } else {
+        sites.forEach(loc => {
+            const tile = createLocationTile(loc);
+            list.appendChild(tile);
+        });
+    }
+    
+    // 3. Sync Button State
     updateArrivedButtonState();
 }
-
 // ============================================================================
 // WIZARD NAVIGATION
 // ============================================================================
@@ -1923,13 +1928,40 @@ function updateArrivedButtonState() {
     }
 }
 
-// Open forms library modal
+/**
+ * Renders the Forms Library from state data.
+ *
+ */
 function openFormsLibrary() {
-    showToast('📋 Forms library - Coming soon');
-    // TODO: Implement forms library modal
-    // This will show available form templates
-}
+    const list = document.getElementById('formsLibraryList');
+    if (!list) return;
 
+    list.innerHTML = '';
+
+    const allForms = state.globalForms || [];
+    
+    if (allForms.length === 0) {
+        list.innerHTML = '<div class="p-8 text-center opacity-40 text-xs font-bold">No templates available.</div>';
+    } else {
+        allForms.forEach(form => {
+            const row = document.createElement('div');
+            row.className = 'p-5 mb-3 bg-white/5 border border-white/10 rounded-2xl flex justify-between items-center active:scale-95 transition-transform';
+            row.innerHTML = `
+                <div class="flex flex-col">
+                    <span class="text-xs font-black uppercase tracking-tight">${form.name}</span>
+                    <span class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">${form.questions.length} Fields</span>
+                </div>
+                <div class="text-lg">📋</div>
+            `;
+            row.onclick = () => {
+                buildReportForm(form.name, document.getElementById('reportFields'));
+                navigate('report');
+            };
+            list.appendChild(row);
+        });
+    }
+    showModal('formsLibrary');
+}
 // Toggle high-risk/critical timing mode
 function toggleHighRiskUI() {
     const checkbox = document.getElementById('chkHighRisk');
@@ -2066,158 +2098,89 @@ async function updateSystemInfo() {
     }
 }
     
-// Setup long-press for "Hold to Start" button
+/**
+ * Modular "Hold to Start" Logic
+ * Connects the UI to the Safety Engine using the Long-Press Utility.
+ */
 function setupHoldToStart() {
-    const btn = document.getElementById('btnStart');
-    if (!btn) return;
-    
-    let pressTimer;
-    let pressStartTime;
-    
-    const startPress = (e) => {
-        if (btn.disabled) return;
+    // Uses the utility function to handle timing and CSS classes
+    setupLongPress('btnStart', 1500, () => {
+        const btn = document.getElementById('btnStart');
         
-        pressStartTime = Date.now();
-        pressTimer = setTimeout(() => {
-            // Long press completed (1.5 seconds)
+        // Safety Check: Ensure the button isn't disabled (e.g., missing location)
+        if (btn && !btn.disabled) {
             startVisit();
-        }, 1500);
-        
-        // Visual feedback
-        btn.classList.add('scale-95');
-    };
-    
-    const endPress = (e) => {
-        clearTimeout(pressTimer);
-        btn.classList.remove('scale-95');
-        
-        const pressDuration = Date.now() - pressStartTime;
-        if (pressDuration < 1500 && pressDuration > 100) {
-            // Released too early
-            showToast('Hold button for 1.5 seconds to start');
         }
-    };
-    
-    const cancelPress = (e) => {
-        clearTimeout(pressTimer);
-        btn.classList.remove('scale-95');
-    };
-    
-    // Touch events
-    btn.addEventListener('touchstart', startPress);
-    btn.addEventListener('touchend', endPress);
-    btn.addEventListener('touchcancel', cancelPress);
-    
-    // Mouse events (for desktop testing)
-    btn.addEventListener('mousedown', startPress);
-    btn.addEventListener('mouseup', endPress);
-    btn.addEventListener('mouseleave', cancelPress);
+    });
 }
 
 // Start visit (called after long-press)
-function startVisit() {
+/**
+ * Safety Engine: Initialize the Visit
+ * Consolidates safety object creation and ensures consistent logging.
+ */
+async function startVisit() {
+    // 1. Validation
     if (!state || !state.selectedLocationId) {
         showToast('⚠️ Select a location first');
         return;
     }
-    
     if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
         showToast('⚠️ Set visit duration first');
         return;
     }
-    
-    const location = state.locations ? state.locations.find(l => l.id === state.selectedLocationId) : null;
-    
-    if (!location && state.selectedLocationId !== 'travel') {
+
+    const loc = state.locations.find(l => l.id === state.selectedLocationId) || 
+                (state.selectedLocationId === 'travel' ? { id: 'travel', name: '🚗 Travelling', isTravel: true } : null);
+
+    if (!loc) {
         showToast('⚠️ Location not found');
         return;
     }
-    
-    // For travel, create temporary location object
-    const loc = location || {
-        id: 'travel',
-        name: '🚗 Travelling',
-        isTravel: true
-    };
-    
-    // Calculate anticipated departure time
-    const startTime = Date.now();
-    const durationMs = state.visitDurationMinutes * 60 * 1000;
-    const anticipatedDepartureTime = startTime + durationMs;
-    
-    // For travel locations, capture start GPS
-    if (loc.id === 'travel' || loc.isTravel) {
-        showToast('📍 Getting start location...');
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                const startGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
-                
-                state.activeVisit = {
-                    locationId: loc.id,
-                    locationName: loc.name,
-                    startTime: startTime,
-                    duration: state.visitDurationMinutes * 60,
-                    anticipatedDepartureTime: anticipatedDepartureTime,
-                    startGPS: startGPS,
-                    highRisk: state.highRiskMode || false,
-                    isPanic: false,
-                    criticalSent: false,
-                    warningSent: false,
-                    warn90Sent: false,
-                    warn2minSent: false,
-                    warn5minSent: false
-                };
-                
-                saveState();
-                enterLockedScreen(loc);
-            },
-            err => {
-                showToast('⚠️ GPS error - starting without location');
-                
-                state.activeVisit = {
-                    locationId: loc.id,
-                    locationName: loc.name,
-                    startTime: startTime,
-                    duration: state.visitDurationMinutes * 60,
-                    anticipatedDepartureTime: anticipatedDepartureTime,
-                    startGPS: null,
-                    highRisk: state.highRiskMode || false,
-                    isPanic: false,
-                    criticalSent: false,
-                    warningSent: false,
-                    warn90Sent: false,
-                    warn2minSent: false,
-                    warn5minSent: false
-                };
-                
-                saveState();
-                enterLockedScreen(loc);
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    } else {
-        // Regular location - no GPS needed
-        state.activeVisit = {
-            locationId: loc.id,
-            locationName: loc.name,
-            startTime: startTime,
-            duration: state.visitDurationMinutes * 60,
-            anticipatedDepartureTime: anticipatedDepartureTime,
-            startGPS: null,
-            highRisk: state.highRiskMode || false,
-            isPanic: false,
-            criticalSent: false,
-            warningSent: false,
-            warn90Sent: false,
-            warn2minSent: false,
-            warn5minSent: false
-        };
-        
-        saveState();
-        enterLockedScreen(loc);
-    }
-}
 
+    // 2. Prepare Safety Data
+    const startTime = Date.now();
+    const durationSec = state.visitDurationMinutes * 60;
+    const dueOut = startTime + (durationSec * 1000);
+
+    // Initialize the safety object with all necessary flags
+    const activeVisit = {
+        locationId: loc.id,
+        locationName: loc.name,
+        startTime: startTime,
+        duration: durationSec,
+        dueOut: dueOut,
+        anticipatedDepartureTime: new Date(dueOut).toISOString(),
+        startGPS: lastGPS || "0,0",
+        highRisk: state.highRiskMode || false,
+        isPanic: false,
+        criticalSent: false,
+        warningSent: false,
+        warn90Sent: false,
+        warn2minSent: false,
+        warn5minSent: false
+    };
+
+    // 3. Handle GPS for Travel
+    if (loc.id === 'travel' || loc.isTravel) {
+        showToast('📍 Updating travel coordinates...');
+        // We use the last known high-accuracy position from the watchPosition engine
+        activeVisit.startGPS = lastGPS || "0,0";
+    }
+
+    // 4. Update State and Transition
+    state.activeVisit = activeVisit;
+    saveState();
+
+    // 5. Audit Trail & Announcements
+    const activityType = loc.id === 'travel' ? "Travel" : "Visit";
+    announce(`${activityType} to ${loc.name} started.`);
+    logSafety("ARRIVED", `${activityType} started at ${loc.name}`);
+    
+    // Warm up audio and start timers
+    if (typeof initAudio === 'function') await initAudio();
+    enterLockedScreen();
+}
 
 // ============================================================================
 // CRITICAL FUNCTIONS EXTRACTED FROM WS_SAFETY (MISSING IN ORIGINAL BUILD)
@@ -4261,6 +4224,7 @@ console.log('✅ All new features and bug fixes initialized!');
 
 </body>
 </html>
+
 
 
 
