@@ -368,13 +368,19 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="reportPage" class="page">
     <div class="header-bar">
         <h1 id="reportTitle" class="text-xl font-bold">Visit Report</h1>
-        <button onclick="closeModal('report')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
+        <button onclick="navigate(state.activeVisit ? 'locked' : 'main')" class="text-3xl text-gray-400 hover:text-white px-2">×</button>
     </div>
     <div class="content-area">
         <div id="reportFields"></div>
     </div>
-    <div class="footer-bar">
-        <button id="btnSubmitRep" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg">Submit Report</button>
+    <div class="footer-bar flex gap-3">
+        <button onclick="navigate(state.activeVisit ? 'locked' : 'main')" 
+                class="flex-1 py-4 bg-gray-700 text-gray-300 rounded-xl font-bold uppercase tracking-widest">
+            Cancel
+        </button>
+        <button id="btnSubmitRep" class="flex-[2] py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg">
+            Submit Report
+        </button>
     </div>
 </div>
 
@@ -985,7 +991,7 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // FIXED: Allow target to be either an ID string OR a direct button object
+    // FIXED: Handle both ID strings AND direct button objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
@@ -1004,7 +1010,7 @@ function setupLongPress(target, duration, callback) {
     }, { passive: true });
 
     btn.addEventListener('mousedown', (e) => {
-        // FIXED: Stop the PC from selecting text or dragging the button
+        // FIXED: preventDefault stops the PC browser from dragging the button
         e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
@@ -3349,10 +3355,10 @@ function showCurrentSiteInfo() {
         btnEmail.classList.remove('hidden');
     } else if (btnEmail) btnEmail.classList.add('hidden');
     
-    // FIXED: Removed stray braces and corrected template literal syntax
+    // FIXED: Removed extra brace and corrected template literal ${encodedAddr}
     if (location.address && btnNav) {
         const encodedAddr = encodeURIComponent(location.address);
-        btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
+        btnNav.href = `https://www.google.com/maps/search/?api=1&query=$${encodedAddr}`;
         btnNav.classList.remove('hidden');
     } else if (btnNav) {
         btnNav.classList.add('hidden');
@@ -3360,7 +3366,6 @@ function showCurrentSiteInfo() {
     
     showModal('info');
 }
-
 
 // Feature 13: Location Management (Add/Edit/Delete)
 function openLocationEditor(locationId) {
@@ -4022,6 +4027,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
