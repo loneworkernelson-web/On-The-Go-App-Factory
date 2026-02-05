@@ -996,7 +996,20 @@ function setupLongPress(elementId, duration, callback) {
             showToast('⏳ Wait... screen just woke');
             return;
         }
+    btn.addEventListener('mousedown', (e) => {
+        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
+        timer = setTimeout(() => {
+            btn.classList.remove('pressing', 'holding');
+            callback();
+        }, duration);
+    });
 
+    ['mouseup', 'mouseleave'].forEach(ev => {
+        btn.addEventListener(ev, () => {
+            clearTimeout(timer);
+            btn.classList.remove('pressing', 'holding');
+        });
+    });
         // Visual progress feedback
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         
@@ -1893,20 +1906,16 @@ function updateDurationDisplay() {
     
     const display = document.getElementById('durationDisplay');
     if (display) {
-        if (minutes >= 60) {
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            display.textContent = mins > 0 ? `${hours} hr ${mins} min` : `${hours} hr`;
-        } else {
-            display.textContent = `${minutes} min`;
-        }
+        // Intelligence: Calculate Time at Location
+        const arrivalTime = new Date(Date.now() + minutes * 60000);
+        const timeStr = arrivalTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        let durStr = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
+        display.innerHTML = `<span class="text-blue-400 font-bold">${durStr}</span> <span class="mx-2 opacity-30">|</span> <span class="text-gray-400">Due: ${timeStr}</span>`;
     }
     
-    // Store selected duration
     if (!state) state = {};
     state.visitDurationMinutes = minutes;
-    
-    // Update button state
     updateArrivedButtonState();
 }
 
@@ -2457,7 +2466,25 @@ function handlePhoto(input, key) {
         if (label) label.innerText = "❌ Error";
     });
 }
-
+// HANDLE ATTACHMENTS
+function handleAttachment(input, key) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const labelId = `lbl_${input.id}`;
+    const label = document.getElementById(labelId);
+    
+    if (label) label.innerText = "Attaching...";
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (!state.photoStore) state.photoStore = {};
+        state.photoStore[key] = e.target.result; // Saves any file type as base64
+        saveState();
+        if (label) label.innerText = "📎 Attachment Saved";
+    };
+    reader.readAsDataURL(file);
+}
+    
 // 4. INIT SIGNATURE PAD - Sets up touch/mouse drawing on canvas
 function initSigPad(canvas) {
     if (!canvas) return;
@@ -3975,6 +4002,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
