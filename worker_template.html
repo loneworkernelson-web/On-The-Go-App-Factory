@@ -1178,6 +1178,11 @@ function startTravellingPulse() {
  * REWRITTEN: High-Integrity Form Builder
  * Parses [TYPE] tags, strips them from labels, and builds the correct UI.
  */
+/**
+ * HIGH-INTEGRITY FORM BUILDER
+ * Parses [TYPE] tags, strips them from labels, and builds the UI.
+ * Corrected: Removed duplications and fixed variable reference errors.
+ */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
     fieldArea.innerHTML = ''; 
@@ -1190,15 +1195,19 @@ function buildReportForm(templateName, fieldArea) {
     questions.forEach(label => {
         // 1. Parse tag and clean label
         const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/);
-        let type = tagMatch ? tagMatch[1].toUpperCase() : "TEXT";
+        let fullTag = tagMatch ? tagMatch[1].toUpperCase() : "TEXT";
         let cleanLabel = tagMatch ? tagMatch[2] : label;
+        
+        // Split tag for options (e.g., DROP|OK,Issue)
+        const tagParts = fullTag.split('|');
+        const baseType = tagParts[0];
         
         const fieldId = `field_${cleanLabel.replace(/\s/g, '_')}`;
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-6'; 
 
         // 2. Handle Heading
-        if (type === 'HEADING' || type === 'HEAD') {
+        if (baseType === 'HEADING' || baseType === 'HEAD') {
             const h = document.createElement('h3');
             h.className = 'text-blue-400 font-black text-[10px] uppercase tracking-[0.25em] mb-4 border-b border-blue-500/20 pb-2 mt-6';
             h.innerText = cleanLabel;
@@ -1215,21 +1224,21 @@ function buildReportForm(templateName, fieldArea) {
 
         let input;
 
-        // 4. Input Factory
-        switch(type) {
-            case 'PHOTO': // UPDATED: Allows Library + Camera
+        // 4. Input Factory - Switched to baseType to support tag options
+        switch(baseType) {
+            case 'PHOTO': 
                 input = document.createElement('input');
                 input.type = 'file'; input.accept = 'image/*'; 
                 input.onchange = () => handlePhoto(input, cleanLabel);
                 break;
 
-            case 'ATTACH': // NEW: Generic File Picker
+            case 'ATTACH': 
                 input = document.createElement('input');
                 input.type = 'file';
                 input.onchange = () => handleAttachment(input, cleanLabel);
                 break;
 
-            case 'YES/NO': // FIXED: Dropdown parsing
+            case 'YES/NO': 
                 input = document.createElement('select');
                 ["-- Select --", "Yes", "No"].forEach(o => {
                     const opt = document.createElement('option');
@@ -1237,9 +1246,12 @@ function buildReportForm(templateName, fieldArea) {
                     input.appendChild(opt);
                 });
                 break;
+
             case 'NUMBER':
-                input = document.createElement('input'); input.type = 'number';
+                input = document.createElement('input'); 
+                input.type = 'number';
                 break;
+
             case '$':
             case 'CURRENCY':
                 const wrap = document.createElement('div'); wrap.className = 'flex items-center';
@@ -1251,61 +1263,64 @@ function buildReportForm(templateName, fieldArea) {
                 wrap.appendChild(sym); wrap.appendChild(input);
                 wrapper.appendChild(wrap);
                 break;
+
             case 'DATE':
-                input = document.createElement('input'); input.type = 'date';
+                input = document.createElement('input'); 
+                input.type = 'date';
                 break;
+
             case 'DROP':
-    input = document.createElement('select');
-    // Intelligent Parsing: [DROP|Opt1,Opt2] Label
-    const dropParts = type.split('|');
-    const options = dropParts.length > 1 ? dropParts[1].split(',') : ["OK", "Issue", "N/A"];
-    
-    ["-- Select --", ...options].forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = (o === "-- Select --") ? "" : o;
-        opt.text = o;
-        input.appendChild(opt);
-    });
-    break;
-            case 'YES/NO':
                 input = document.createElement('select');
-                ["-- Select --", "Yes", "No"].forEach(o => {
+                // Extract options from tag: [DROP|Opt1,Opt2]
+                const options = tagParts.length > 1 ? tagParts[1].split(',') : ["OK", "Issue", "N/A"];
+                ["-- Select --", ...options].forEach(o => {
                     const opt = document.createElement('option');
-                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
+                    opt.value = (o === "-- Select --") ? "" : o;
+                    opt.text = o;
                     input.appendChild(opt);
                 });
                 break;
+
             case 'SIGNATURE':
             case 'SIGN':
                 const canvas = document.createElement('canvas');
                 canvas.id = `sig-canvas-${cleanLabel.replace(/\s/g, '_')}`;
                 canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
                 wrapper.appendChild(canvas);
+                // Initialize after render
                 setTimeout(() => { initSigPad(canvas); }, 200);
                 break;
+
             case 'GPS':
                 const btn = document.createElement('button');
                 btn.className = 'w-full py-4 bg-blue-900/30 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
                 btn.innerText = '📍 Capture GPS';
                 btn.onclick = (e) => { e.preventDefault(); captureGPS(btn); };
                 wrapper.appendChild(btn);
-                input = document.createElement('input'); input.readOnly = true; input.className = 'opacity-40';
+                input = document.createElement('input'); 
+                input.readOnly = true; 
+                input.className = 'opacity-40';
                 break;
+
             case 'TEXT':
-                input = document.createElement('textarea'); input.rows = 3;
+                input = document.createElement('textarea'); 
+                input.rows = 3;
                 break;
+
             default:
-                input = document.createElement('input'); input.type = 'text';
+                input = document.createElement('input'); 
+                input.type = 'text';
         }
 
-if (input) {
+        // 5. Final Assembly & File Status Labels
+        if (input) {
             input.id = fieldId;
             input.className = (input.className || '') + ' form-input';
             input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
 
-            // NEW: Add visual confirmation labels for files
-            if (type === 'PHOTO' || type === 'ATTACH') {
+            // Adds "📎 Attachment Saved" or "✅ Saved" status labels
+            if (baseType === 'PHOTO' || baseType === 'ATTACH') {
                 const status = document.createElement('div');
                 status.id = `lbl_${fieldId}`; 
                 status.className = 'text-[9px] text-blue-400 font-bold mt-1 uppercase';
@@ -2457,7 +2472,8 @@ function handlePhoto(input, key) {
     if (!input.files || !input.files[0]) return;
     
     const file = input.files[0];
-    const labelId = `lbl_${input.id.split('_')[1]}`;
+    // FIXED: Match the full ID created in buildReportForm
+    const labelId = `lbl_${input.id}`; 
     const label = document.getElementById(labelId);
     
     if (label) label.innerText = "Compressing...";
@@ -4011,6 +4027,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
