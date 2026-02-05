@@ -991,12 +991,13 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // FIXED: Handle both ID strings AND direct button objects
+    // FIXED: Handle both ID strings and button objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
     
+    // 1. TOUCH (Mobile)
     btn.addEventListener('touchstart', (e) => {
         if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
@@ -1009,8 +1010,8 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     }, { passive: true });
 
+    // 2. MOUSE (PC Fix): Added preventDefault to stop drag/selection
     btn.addEventListener('mousedown', (e) => {
-        // FIXED: Stop the PC from selecting text or dragging the button
         e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
@@ -1019,19 +1020,12 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     });
 
-    // FIXED: Cleanup listeners now correctly handle passive violations
-    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => {
+    ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
             btn.classList.remove('pressing', 'holding');
         });
     });
-
-    // Dedicated touchmove listener marked as passive to fix Chrome violation
-    btn.addEventListener('touchmove', () => {
-        clearTimeout(timer);
-        btn.classList.remove('pressing', 'holding');
-    }, { passive: true });
 }
 // ============================================================================
 // INACTIVITY DIM MODE
@@ -3349,7 +3343,6 @@ function showCurrentSiteInfo() {
     
     const location = state.locations.find(l => l.id === state.activeVisit.locationId);
     if (!location) {
-        showToast('No site information available');
         return;
     }
     
@@ -3866,91 +3859,50 @@ function initSlideToWake() {
     const slideTrack = document.getElementById('slideTrack');
     const slideProgress = document.getElementById('slideProgress');
     const slideText = document.getElementById('slideText');
-    
     if (!slideButton || !slideTrack) return;
-    
-    const trackRect = slideTrack.getBoundingClientRect();
-    const trackWidth = trackRect.width;
-    const buttonWidth = 56; // 14 * 4 (w-14 in Tailwind)
-    const maxSlide = trackWidth - buttonWidth - 8; // 8px padding
-    
-    let currentX = 0;
-    
-    // Quick peek - tap to show timer briefly
-    slideTrack.addEventListener('click', (e) => {
-        if (isSliding) return;
-        
-        const batterySaver = document.getElementById('batterySaver');
-        if (batterySaver) {
-            // Flash timer
-            batterySaver.style.opacity = '0.3';
-            setTimeout(() => {
-                batterySaver.style.opacity = '1';
-            }, 2000);
-        }
-    });
-    
-    // Touch start
-    slideButton.addEventListener('touchstart', (e) => {
+
+    const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+
+    const start = (e) => {
         isSliding = true;
-        slideStartX = e.touches[0].clientX;
+        slideStartX = getX(e);
         slideButton.style.transition = 'none';
         slideProgress.style.transition = 'none';
-        e.preventDefault();
-    }, { passive: false });
-    
-    // Touch move
-    document.addEventListener('touchmove', (e) => {
+        if (!e.touches) e.preventDefault();
+    };
+
+    const move = (e) => {
         if (!isSliding) return;
-        
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - slideStartX;
-        
-        // Constrain to track bounds
-        currentX = Math.max(0, Math.min(deltaX, maxSlide));
-        
-        // Update button position
+        const trackWidth = slideTrack.offsetWidth;
+        const buttonWidth = slideButton.offsetWidth;
+        const maxSlide = trackWidth - buttonWidth - 8;
+        const deltaX = getX(e) - slideStartX;
+        let currentX = Math.max(0, Math.min(deltaX, maxSlide));
+
         slideButton.style.transform = `translateX(${currentX}px)`;
-        
-        // Update progress bar
         const progress = (currentX / maxSlide) * 100;
         slideProgress.style.width = `${progress}%`;
-        
-        // Fade text as sliding
-        if (slideText) {
-            slideText.style.opacity = Math.max(0, 1 - (progress / 50));
-        }
-        
-        // Haptic feedback at milestones
-        if (navigator.vibrate) {
-            if (progress > 24 && progress < 26) navigator.vibrate(10);
-            if (progress > 49 && progress < 51) navigator.vibrate(10);
-            if (progress > 74 && progress < 76) navigator.vibrate(10);
-        }
-        
-        // Check if completed (>90% of track)
-        if (currentX > maxSlide * 0.9) {
-            completeSlide();
-        }
-        
-        e.preventDefault();
-    }, { passive: false });
-    
-    // Touch end
-    document.addEventListener('touchend', (e) => {
+        if (progress > 90) completeSlide();
+    };
+
+    const end = () => {
         if (!isSliding) return;
         isSliding = false;
-        
-        // If not completed, spring back
-        if (currentX < maxSlide * 0.9) {
-            slideButton.style.transition = 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)';
-            slideProgress.style.transition = 'width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)';
-            slideButton.style.transform = 'translateX(0)';
-            slideProgress.style.width = '0%';
-            if (slideText) slideText.style.opacity = '1';
-            currentX = 0;
-        }
-    });
+        // Spring back if not completed
+        slideButton.style.transition = 'transform 0.3s ease';
+        slideButton.style.transform = 'translateX(0)';
+        slideProgress.style.width = '0%';
+    };
+
+    // Attach both Touch AND Mouse listeners
+    slideButton.addEventListener('touchstart', start);
+    window.addEventListener('touchmove', move);
+    window.addEventListener('touchend', end);
+    
+    slideButton.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+}
     
     function completeSlide() {
         isSliding = false;
@@ -4051,6 +4003,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
