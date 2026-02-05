@@ -1010,7 +1010,7 @@ function setupLongPress(target, duration, callback) {
     }, { passive: true });
 
     btn.addEventListener('mousedown', (e) => {
-        // FIXED: preventDefault stops the PC browser from dragging the button
+        // FIXED: Stop the PC from selecting text or dragging the button
         e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
@@ -1019,12 +1019,19 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     });
 
-    ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => {
+    // FIXED: Cleanup listeners now correctly handle passive violations
+    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
             btn.classList.remove('pressing', 'holding');
         });
     });
+
+    // Dedicated touchmove listener marked as passive to fix Chrome violation
+    btn.addEventListener('touchmove', () => {
+        clearTimeout(timer);
+        btn.classList.remove('pressing', 'holding');
+    }, { passive: true });
 }
 // ============================================================================
 // INACTIVITY DIM MODE
@@ -1827,20 +1834,15 @@ function saveWizard() {
         escEmail: document.getElementById('wizEscEmail').value.trim()
     };
     
-    // Validation: Only Name and Security are strictly required to proceed locally
     if (!workerData.name || !workerData.pin || !workerData.duress) {
         return alert("Please complete Name and Security PINs to proceed.");
     }
     
-    // Store EVERYTHING locally for use in future site visits
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
     
-    if (!state.deviceId) {
-        state.deviceId = getDeviceID();
-    }
-    
+    if (!state.deviceId) state.deviceId = getDeviceID();
     saveState();
     
     // UI Transitions
@@ -1852,18 +1854,24 @@ function saveWizard() {
     announce(`Welcome ${workerData.name}. Device registered.`);
     navigate('main');
     
-    // Streamlined Registration: Send only Name and ID to the backend
-    console.log('Registering Device ID with Backend...');
+    // FIXED: Full profile registration payload
     const regPayload = {
         'action': 'registerDevice',
         'key': CONFIG.key,
         'Worker Name': workerData.name,
+        'Worker Phone Number': workerData.phone,
+        'Worker Email': workerData.email,
+        'Emergency Contact Name': workerData.emgName,
+        'Emergency Contact Phone': workerData.emgPhone,
+        'Emergency Contact Email': workerData.emgEmail,
+        'Escalation Contact Name': workerData.escName,
+        'Escalation Contact Phone': workerData.escPhone,
+        'Escalation Contact Email': workerData.escEmail,
         'deviceId': state.deviceId,
         'Timestamp': new Date().toISOString()
     };
     
     processUploadQueue(regPayload);
-// NEW: Immediately fetch sites and forms so the app is ready to use
     setTimeout(() => { forceSync(false); }, 1000);
 }
 
@@ -2219,12 +2227,19 @@ let panicTapTimer;
 // Note: currentBatteryLevel, currentActiveTemplate and isMidVisitUpdate already declared earlier in file
 
 // 1. BUILD PAYLOAD - Constructs proper data structure for backend
+/**
+ * HIGH-INTEGRITY PAYLOAD BUILDER
+ * Standardizes keys to "Phone" to match spreadsheet headers.
+ * Fixed: Mapping for Emergency and Escalation contact numbers.
+ */
 function buildPayload(d) {
     let dt = "";
     let ln = "Unknown Site";
     let la = "No Address Provided";
     
+    // 1. Contextual Location Logic
     if (state.activeVisit) {
+        // Use active visit timing and site info
         if (state.activeVisit.anticipatedDepartureTime) {
             dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
         }
@@ -2234,6 +2249,7 @@ function buildPayload(d) {
             la = l.address || "No Address";
         }
     } else if (state.selectedLocationId) {
+        // Fallback for reports sent without an active safety session (e.g. general audits)
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         if (l) {
             ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
@@ -2241,30 +2257,37 @@ function buildPayload(d) {
         }
     }
     
-    let gps = d['Last Known GPS'] || "";
+    // 2. GPS Fallback Logic
+    let gps = d['Last Known GPS'] || lastGPS || "";
     if (!gps && state.activeVisit && state.activeVisit.startGPS) {
         gps = state.activeVisit.startGPS;
     }
     
+    // 3. Construct Final Object with Spreadsheet-Matched Headers
     return {
         'key': CONFIG.key,
         'Worker Name': state.worker?.name || "",
         'Worker Phone Number': state.worker?.phone || "",
         'Worker Email': state.worker?.email || "",
+        
+        // FIXED: Changed "Number" to "Phone" to align with backend ingestion
         'Emergency Contact Name': state.worker?.emgName || "",
-        'Emergency Contact Number': state.worker?.emgPhone || "",
+        'Emergency Contact Phone': state.worker?.emgPhone || "", 
         'Emergency Contact Email': state.worker?.emgEmail || "",
+        
+        // FIXED: Changed "Number" to "Phone"
         'Escalation Contact Name': state.worker?.escName || "",
-        'Escalation Contact Number': state.worker?.escPhone || "",
+        'Escalation Contact Phone': state.worker?.escPhone || "",
         'Escalation Contact Email': state.worker?.escEmail || "",
-        'Battery Level': currentBatteryLevel,
+        
+        'Battery Level': currentBatteryLevel || "Unknown",
         'Location Name': ln,
         'Location Address': la,
         'Anticipated Departure Time': dt,
         'Timestamp': new Date().toISOString(),
         'deviceId': state.deviceId || "",
-        'Last Known GPS': gps,
-        ...d
+        'Last Known GPS': gps || "0,0",
+        ...d // Merges custom form fields
     };
 }
 
@@ -3344,6 +3367,7 @@ function showCurrentSiteInfo() {
     const btnEmail = document.getElementById('btnSiteEmail');
     const btnNav = document.getElementById('btnSiteNav');
     
+    // FIXED: Links now use backticks and ${} for dynamic values
     if (location.contactPhone && btnCall) {
         const cleanedPhone = cleanGlobalPhone(location.contactPhone);
         btnCall.href = `tel:${cleanedPhone}`;
@@ -3355,12 +3379,12 @@ function showCurrentSiteInfo() {
         btnEmail.classList.remove('hidden');
     } else if (btnEmail) btnEmail.classList.add('hidden');
     
-    // FIXED: Removed extra brace and corrected template literal ${encodedAddr}
+    // FIXED: Removed extra brace and corrected template literal syntax
     if (location.address && btnNav) {
         const encodedAddr = encodeURIComponent(location.address);
-        btnNav.href = `https://www.google.com/maps/search/?api=1&query=$${encodedAddr}`;
+        btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
         btnNav.classList.remove('hidden');
-    } else if (btnNav) {
+    } else if (btnNav) { // REMOVED THE EXTRA } HERE
         btnNav.classList.add('hidden');
     }
     
@@ -4027,6 +4051,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
