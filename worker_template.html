@@ -991,13 +991,12 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // FIXED: Handle both ID strings and button objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
     
-    // 1. TOUCH (Mobile)
+    // 1. TOUCH (Mobile) - Correctly marked as passive
     btn.addEventListener('touchstart', (e) => {
         if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
@@ -1010,7 +1009,7 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     }, { passive: true });
 
-    // 2. MOUSE (PC Fix): Added preventDefault to stop drag/selection
+    // 2. MOUSE (PC Fix) - Added e.preventDefault() to stop dragging
     btn.addEventListener('mousedown', (e) => {
         e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
@@ -1835,20 +1834,16 @@ function saveWizard() {
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
-    
     if (!state.deviceId) state.deviceId = getDeviceID();
     saveState();
     
-    // UI Transitions
-    const setupPage = document.getElementById('setupPage');
-    if (setupPage) setupPage.classList.remove('active');
     const headerName = document.getElementById('headerWorkerName');
     if (headerName) headerName.innerText = workerData.name;
     
     announce(`Welcome ${workerData.name}. Device registered.`);
     navigate('main');
     
-    // FIXED: Full profile registration payload
+    // FIXED: Sending full profile during registration
     const regPayload = {
         'action': 'registerDevice',
         'key': CONFIG.key,
@@ -1868,7 +1863,6 @@ function saveWizard() {
     processUploadQueue(regPayload);
     setTimeout(() => { forceSync(false); }, 1000);
 }
-
 // ============================================================================
 // INSTALL PROMPTS
 // ============================================================================
@@ -4003,6 +3997,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
