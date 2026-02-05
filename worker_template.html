@@ -990,12 +990,20 @@ function setupLongPress(elementId, duration, callback) {
     
     let timer;
     
+    // 1. TOUCH HANDLING
     btn.addEventListener('touchstart', (e) => {
-        // SAFETY GUARD: Prevent accidental SOS if the screen just woke up
         if (elementId === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
             return;
         }
+        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
+        timer = setTimeout(() => {
+            btn.classList.remove('pressing', 'holding');
+            callback();
+        }, duration);
+    }, { passive: true });
+
+    // 2. MOUSE HANDLING (Desktop Fix)
     btn.addEventListener('mousedown', (e) => {
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
@@ -1004,22 +1012,8 @@ function setupLongPress(elementId, duration, callback) {
         }, duration);
     });
 
-    ['mouseup', 'mouseleave'].forEach(ev => {
-        btn.addEventListener(ev, () => {
-            clearTimeout(timer);
-            btn.classList.remove('pressing', 'holding');
-        });
-    });
-        // Visual progress feedback
-        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
-        
-        timer = setTimeout(() => {
-            btn.classList.remove('pressing', 'holding');
-            callback();
-        }, duration);
-    }, { passive: true });
-
-    ['touchend', 'touchcancel', 'touchmove'].forEach(ev => {
+    // 3. CLEANUP LISTENERS
+    ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
             btn.classList.remove('pressing', 'holding');
@@ -1303,11 +1297,19 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input'); input.type = 'text';
         }
 
-        if (input) {
+if (input) {
             input.id = fieldId;
             input.className = (input.className || '') + ' form-input';
             input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
+
+            // NEW: Add visual confirmation labels for files
+            if (type === 'PHOTO' || type === 'ATTACH') {
+                const status = document.createElement('div');
+                status.id = `lbl_${fieldId}`; 
+                status.className = 'text-[9px] text-blue-400 font-bold mt-1 uppercase';
+                wrapper.appendChild(status);
+            }
         }
         fieldArea.appendChild(wrapper);
     });
@@ -1962,7 +1964,6 @@ function openFormsLibrary() {
     if (forms.length === 0) {
         list.innerHTML = '<div class="p-8 text-center opacity-40 text-xs font-bold uppercase tracking-widest">No templates available.</div>';
     } else {
-        // Apply Two-Column Grid
         list.className = "grid grid-cols-2 gap-3 overflow-y-auto pr-2";
         
         forms.forEach(form => {
@@ -1974,9 +1975,10 @@ function openFormsLibrary() {
             if (form.name.toLowerCase().includes('audit')) icon = "🔍";
             if (form.name.toLowerCase().includes('incident')) icon = "⚠️";
 
+            // Corrected HTML structure with readable titles
             row.innerHTML = `
                 <div class="text-3xl mb-2">${icon}</div>
-                div.className = text-[11px] font-extrabold tracking-tight text-white leading-tight;>${form.name}</div>
+                <div class="text-[11px] font-extrabold tracking-tight text-white leading-tight">${form.name}</div>
                 <div class="text-[8px] text-blue-400 font-bold uppercase mt-1">${form.questions.length} Checks</div>
             `;
             row.onclick = () => {
@@ -1989,7 +1991,6 @@ function openFormsLibrary() {
     }
     showModal('formsLibrary');
 }
-
 // Toggle high-risk/critical timing mode
 function toggleHighRiskUI() {
     const checkbox = document.getElementById('chkHighRisk');
@@ -4009,6 +4010,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
