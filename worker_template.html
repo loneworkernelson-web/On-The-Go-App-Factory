@@ -3855,6 +3855,10 @@ function initSlideToWake() {
     const slideText = document.getElementById('slideText');
     if (!slideButton || !slideTrack) return;
 
+    // Declare shared variables at the top of the function scope
+    let maxSlide = 0; 
+    let currentX = 0; 
+
     const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
 
     const start = (e) => {
@@ -3869,62 +3873,54 @@ function initSlideToWake() {
         if (!isSliding) return;
         const trackWidth = slideTrack.offsetWidth;
         const buttonWidth = slideButton.offsetWidth;
-        const maxSlide = trackWidth - buttonWidth - 8;
+        maxSlide = trackWidth - buttonWidth - 8; // Update shared variable
+        
         const deltaX = getX(e) - slideStartX;
-        let currentX = Math.max(0, Math.min(deltaX, maxSlide));
+        currentX = Math.max(0, Math.min(deltaX, maxSlide));
 
         slideButton.style.transform = `translateX(${currentX}px)`;
         const progress = (currentX / maxSlide) * 100;
         slideProgress.style.width = `${progress}%`;
+        
         if (progress > 90) completeSlide();
     };
 
     const end = () => {
         if (!isSliding) return;
         isSliding = false;
-        // Spring back if not completed
+        // Spring back logic
         slideButton.style.transition = 'transform 0.3s ease';
         slideButton.style.transform = 'translateX(0)';
         slideProgress.style.width = '0%';
+        if (slideText) slideText.style.opacity = '1';
     };
 
-    // Attach both Touch AND Mouse listeners
+    // Event Listeners
     slideButton.addEventListener('touchstart', start);
     window.addEventListener('touchmove', move);
     window.addEventListener('touchend', end);
-    
     slideButton.addEventListener('mousedown', start);
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
-}
-    
+
+    // NESTED FUNCTION: Stays inside initSlideToWake to access local variables
     function completeSlide() {
         isSliding = false;
-        
-        // Snap to end
         slideButton.style.transition = 'transform 0.2s ease-out';
         slideProgress.style.transition = 'width 0.2s ease-out, opacity 0.2s ease-out';
         slideButton.style.transform = `translateX(${maxSlide}px)`;
         slideProgress.style.width = '100%';
         slideProgress.style.opacity = '1';
         
-        // Success haptic
-        if (navigator.vibrate) {
-            navigator.vibrate([50, 50, 50]);
-        }
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
         
-        // Wake screen after animation
         setTimeout(() => {
             deactivateDimMode();
             resetInactivityTimer();
-            
-            // Lock SOS for 2 seconds to prevent accidental trigger
             isSosLocked = true;
-            setTimeout(() => {
-                isSosLocked = false;
-            }, 2000);
+            setTimeout(() => { isSosLocked = false; }, 2000);
             
-            // Reset slide for next time
+            // Reset for next use
             slideButton.style.transition = 'none';
             slideButton.style.transform = 'translateX(0)';
             slideProgress.style.width = '0%';
@@ -3934,7 +3930,6 @@ function initSlideToWake() {
         }, 200);
     }
 }
-
 // Update dimmed screen timer and battery
 function updateDimmedDisplay() {
     if (!isDimmed || !state || !state.activeVisit) return;
@@ -3997,6 +3992,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
