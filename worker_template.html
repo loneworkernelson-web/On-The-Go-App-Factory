@@ -985,13 +985,12 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // Corrected: Allow target to be either an ID string OR a DOM element
+    // Intelligence: Handle both element IDs (strings) and DOM Objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
     
-    // 1. TOUCH (Mobile)
     btn.addEventListener('touchstart', (e) => {
         if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
@@ -1004,9 +1003,8 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     }, { passive: true });
 
-    // 2. MOUSE (PC Fix): Added preventDefault to stop text selection during hold
     btn.addEventListener('mousedown', (e) => {
-        e.preventDefault(); 
+        e.preventDefault(); // FIXED: Prevents PC browser from dragging/highlighting
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -1021,7 +1019,6 @@ function setupLongPress(target, duration, callback) {
         });
     });
 }
-
 // ============================================================================
 // INACTIVITY DIM MODE
 // ============================================================================
@@ -3337,7 +3334,6 @@ function showCurrentSiteInfo() {
         content.innerHTML = html;
     }
     
-    // Setup action buttons
     const btnCall = document.getElementById('btnSiteCall');
     const btnEmail = document.getElementById('btnSiteEmail');
     const btnNav = document.getElementById('btnSiteNav');
@@ -3346,9 +3342,24 @@ function showCurrentSiteInfo() {
         const cleanedPhone = cleanGlobalPhone(location.contactPhone);
         btnCall.href = `tel:${cleanedPhone}`;
         btnCall.classList.remove('hidden');
-    } else if (btnCall) {
-        btnCall.classList.add('hidden');
+    } else if (btnCall) btnCall.classList.add('hidden');
+    
+    if (location.contactEmail && btnEmail) {
+        btnEmail.href = `mailto:${location.contactEmail}`;
+        btnEmail.classList.remove('hidden');
+    } else if (btnEmail) btnEmail.classList.add('hidden');
+    
+    // FIXED: Removed stray braces and corrected template literal
+    if (location.address && btnNav) {
+        const encodedAddr = encodeURIComponent(location.address);
+        btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
+        btnNav.classList.remove('hidden');
+    } else if (btnNav) {
+        btnNav.classList.add('hidden');
     }
+    
+    showModal('info');
+}
     
     if (location.contactEmail && btnEmail) {
         btnEmail.href = `mailto:${location.contactEmail}`;
@@ -4030,6 +4041,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
