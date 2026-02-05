@@ -1222,15 +1222,25 @@ function buildReportForm(templateName, fieldArea) {
 
         // 4. Input Factory
         switch(type) {
-            case 'PHOTO':
+            case 'PHOTO': // UPDATED: Allows Library + Camera
                 input = document.createElement('input');
-                input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+                input.type = 'file'; input.accept = 'image/*'; 
                 input.onchange = () => handlePhoto(input, cleanLabel);
-                // Progress Label
-                const status = document.createElement('div');
-                status.id = `lbl_${fieldId}`; status.className = 'text-[9px] text-blue-400 font-bold mt-1 uppercase';
-                wrapper.appendChild(input); wrapper.appendChild(status);
-                input = null; // Prevent double adding
+                break;
+
+            case 'ATTACH': // NEW: Generic File Picker
+                input = document.createElement('input');
+                input.type = 'file';
+                input.onchange = () => handleAttachment(input, cleanLabel);
+                break;
+
+            case 'YES/NO': // FIXED: Dropdown parsing
+                input = document.createElement('select');
+                ["-- Select --", "Yes", "No"].forEach(o => {
+                    const opt = document.createElement('option');
+                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
+                    input.appendChild(opt);
+                });
                 break;
             case 'NUMBER':
                 input = document.createElement('input'); input.type = 'number';
@@ -1901,24 +1911,21 @@ function updateDurationDisplay() {
     const slider = document.getElementById('durationSlider');
     if (!slider) return;
     
-    const sliderValue = parseInt(slider.value);
-    const minutes = DURATION_MAP[sliderValue];
-    
+    const minutes = DURATION_MAP[parseInt(slider.value)];
     const display = document.getElementById('durationDisplay');
+    
     if (display) {
-        // Intelligence: Calculate Time at Location
-        const arrivalTime = new Date(Date.now() + minutes * 60000);
-        const timeStr = arrivalTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        // Calculate dynamic arrival/due time
+        const dueTime = new Date(Date.now() + minutes * 60000);
+        const timeStr = dueTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         
         let durStr = minutes >= 60 ? `${Math.floor(minutes/60)}h ${minutes%60}m` : `${minutes}m`;
-        display.innerHTML = `<span class="text-blue-400 font-bold">${durStr}</span> <span class="mx-2 opacity-30">|</span> <span class="text-gray-400">Due: ${timeStr}</span>`;
+        display.innerHTML = `<span class="text-blue-400 font-bold">${durStr}</span> <span class="mx-2 opacity-20">|</span> <span class="text-gray-400">Due: ${timeStr}</span>`;
     }
     
-    if (!state) state = {};
     state.visitDurationMinutes = minutes;
     updateArrivedButtonState();
 }
-
 // Update "Hold to Start" button state
 // ============================================================================
 // UPDATED: BUTTON LOGIC (Restores "Hold to Start")
@@ -1969,7 +1976,7 @@ function openFormsLibrary() {
 
             row.innerHTML = `
                 <div class="text-3xl mb-2">${icon}</div>
-                <div class="text-[10px] font-black uppercase tracking-tight text-white leading-tight">${form.name}</div>
+                div.className = text-[11px] font-extrabold tracking-tight text-white leading-tight;>${form.name}</div>
                 <div class="text-[8px] text-blue-400 font-bold uppercase mt-1">${form.questions.length} Checks</div>
             `;
             row.onclick = () => {
@@ -4002,6 +4009,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
