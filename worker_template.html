@@ -984,15 +984,16 @@ function submitReport() {
  * Unified Long-Press Utility with Safety Lock
  * Handles visual progress and prevents accidental triggers on wake.
  */
-function setupLongPress(elementId, duration, callback) {
-    const btn = document.getElementById(elementId);
+function setupLongPress(target, duration, callback) {
+    // Corrected: Allow target to be either an ID string OR a DOM element
+    const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
     
-    // 1. TOUCH HANDLING
+    // 1. TOUCH (Mobile)
     btn.addEventListener('touchstart', (e) => {
-        if (elementId === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
+        if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
             return;
         }
@@ -1003,8 +1004,9 @@ function setupLongPress(elementId, duration, callback) {
         }, duration);
     }, { passive: true });
 
-    // 2. MOUSE HANDLING (Desktop/Laptop Fix)
+    // 2. MOUSE (PC Fix): Added preventDefault to stop text selection during hold
     btn.addEventListener('mousedown', (e) => {
+        e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -1012,7 +1014,6 @@ function setupLongPress(elementId, duration, callback) {
         }, duration);
     });
 
-    // 3. CLEANUP
     ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
@@ -3357,9 +3358,11 @@ function showCurrentSiteInfo() {
     }
     
     if (location.address && btnNav) {
-        const encodedAddr = encodeURIComponent(location.address);
-        btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
-        btnNav.classList.remove('hidden');
+    const encodedAddr = encodeURIComponent(location.address);
+    // FIXED: Standard Google Maps Search API using template literals
+    btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
+    btnNav.classList.remove('hidden');
+}
     } else if (btnNav) {
         btnNav.classList.add('hidden');
     }
@@ -4027,6 +4030,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
