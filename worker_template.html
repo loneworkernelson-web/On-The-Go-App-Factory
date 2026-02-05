@@ -1039,13 +1039,16 @@ function resetInactivityTimer() {
 
 function activateDimMode() {
     if (!state || !state.activeVisit) return;
+    
+    // NEW: Do not dim if the worker is overdue or in panic
+    const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
+    if (remaining <= 0 || state.activeVisit.isPanic) return;
+
     document.documentElement.classList.add('system-dim');
     document.body.classList.add('system-dim');
     isDimmed = true;
     const batterySaver = document.getElementById('batterySaver');
-    const saverProgress = document.getElementById('saverProgress');
     if (batterySaver) batterySaver.classList.remove('hidden');
-    if (saverProgress) saverProgress.style.width = '100%';
 }
 
 function deactivateDimMode() {
@@ -1615,14 +1618,12 @@ function tick() {
         const remainingMs = remaining * 1000;
         
         // PHASE 1: Multiple warning levels
-        // 5-minute warning (300 seconds)
         if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
             playWarningSound('warning');
             state.activeVisit.warn5minSent = true;
             saveState();
         }
         
-        // 2-minute warning with voice (120 seconds)
         if (remaining <= 120 && remaining > 119 && !state.activeVisit.warn2minSent) {
             playWarningSound('warning');
             speakWarning("Warning. Safety alarm will activate in two minutes.");
@@ -1630,7 +1631,6 @@ function tick() {
             saveState();
         }
         
-        // 90-second critical warning with voice
         if (remaining <= 90 && remaining > 89 && !state.activeVisit.warn90Sent) {
             playWarningSound('critical');
             speakWarning("Critical Warning. Safety alarm will activate in 90 seconds.");
@@ -1638,13 +1638,15 @@ function tick() {
             saveState();
         }
         
-        // Update timer display
         const timerEl = document.getElementById('countdownTimer');
         const overdueLabel = document.getElementById('overdueLabel');
         const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
         
         if (remaining <= 0) {
-            // OVERDUE
+            // NEW: Automatically wake screen if dimmed
+            if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
+
+            // OVERDUE UI Update
             if (overdueLabel) overdueLabel.classList.remove('hidden');
             const absRemaining = Math.abs(remaining);
             const mins = Math.floor(absRemaining / 60);
@@ -1660,7 +1662,7 @@ function tick() {
                 timerEl.classList.add('text-red-500', 'animate-pulse');
             }
             
-            // Show "I AM SAFE" button instead of depart/extend
+            // Swap controls for safety confirmation
             const btnSafe = document.getElementById('btnSafe');
             const btnDepart = document.getElementById('btnDepart');
             const btnExtend = document.getElementById('btnExtend');
@@ -1668,7 +1670,7 @@ function tick() {
             if (btnDepart) btnDepart.classList.add('hidden');
             if (btnExtend) btnExtend.classList.add('hidden');
             
-            // Trigger critical alarm if not sent
+            // Trigger critical alarm
             if (!state.activeVisit.criticalSent) {
                 triggerPanic(false);
                 state.activeVisit.criticalSent = true;
@@ -1691,7 +1693,6 @@ function tick() {
             }
         }
         
-        // Display anticipated departure time
         if (state.activeVisit.anticipatedDepartureTime && anticipatedTimeEl) {
             const antTime = new Date(state.activeVisit.anticipatedDepartureTime);
             anticipatedTimeEl.innerText = antTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: true});
@@ -3855,7 +3856,6 @@ function initSlideToWake() {
     const slideText = document.getElementById('slideText');
     if (!slideButton || !slideTrack) return;
 
-    // Declare shared variables at the top of the function scope
     let maxSlide = 0; 
     let currentX = 0; 
 
@@ -3866,14 +3866,14 @@ function initSlideToWake() {
         slideStartX = getX(e);
         slideButton.style.transition = 'none';
         slideProgress.style.transition = 'none';
-        if (!e.touches) e.preventDefault();
+        if (!e.touches) e.preventDefault(); // Fixed for PC mouse support
     };
 
     const move = (e) => {
         if (!isSliding) return;
         const trackWidth = slideTrack.offsetWidth;
         const buttonWidth = slideButton.offsetWidth;
-        maxSlide = trackWidth - buttonWidth - 8; // Update shared variable
+        maxSlide = trackWidth - buttonWidth - 8;
         
         const deltaX = getX(e) - slideStartX;
         currentX = Math.max(0, Math.min(deltaX, maxSlide));
@@ -3888,14 +3888,12 @@ function initSlideToWake() {
     const end = () => {
         if (!isSliding) return;
         isSliding = false;
-        // Spring back logic
         slideButton.style.transition = 'transform 0.3s ease';
         slideButton.style.transform = 'translateX(0)';
         slideProgress.style.width = '0%';
         if (slideText) slideText.style.opacity = '1';
     };
 
-    // Event Listeners
     slideButton.addEventListener('touchstart', start);
     window.addEventListener('touchmove', move);
     window.addEventListener('touchend', end);
@@ -3903,7 +3901,6 @@ function initSlideToWake() {
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
 
-    // NESTED FUNCTION: Stays inside initSlideToWake to access local variables
     function completeSlide() {
         isSliding = false;
         slideButton.style.transition = 'transform 0.2s ease-out';
@@ -3915,7 +3912,7 @@ function initSlideToWake() {
         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
         
         setTimeout(() => {
-            deactivateDimMode();
+            deactivateDimMode(); // Returns user to "I AM SAFE" button
             resetInactivityTimer();
             isSosLocked = true;
             setTimeout(() => { isSosLocked = false; }, 2000);
@@ -3992,6 +3989,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
