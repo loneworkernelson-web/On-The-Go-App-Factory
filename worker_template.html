@@ -985,7 +985,7 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // Intelligence: Handle both element IDs (strings) and DOM Objects
+    // FIXED: Allow target to be either an ID string OR a direct button object
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
@@ -1004,7 +1004,8 @@ function setupLongPress(target, duration, callback) {
     }, { passive: true });
 
     btn.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // FIXED: Prevents PC browser from dragging/highlighting
+        // FIXED: Stop the PC from selecting text or dragging the button
+        e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -2470,7 +2471,7 @@ function handlePhoto(input, key) {
     if (!input.files || !input.files[0]) return;
     
     const file = input.files[0];
-    // FIXED: Match the full ID created in buildReportForm
+    // FIXED: Look for the status label using the input's own ID
     const labelId = `lbl_${input.id}`; 
     const label = document.getElementById(labelId);
     
@@ -2482,7 +2483,6 @@ function handlePhoto(input, key) {
         saveState();
         
         if (label) label.innerText = "✅ Saved";
-        
         console.log(`Photo saved: ${key}`);
     }).catch(err => {
         console.error('Photo compression failed:', err);
@@ -4041,6 +4041,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
