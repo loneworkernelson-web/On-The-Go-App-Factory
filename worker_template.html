@@ -956,47 +956,30 @@ function submitReport() {
         "Notes": d.notes || ""
     }));
     
-// ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
-    // Handles cleanup for both ending visits and mid-visit updates.
-    
+    // ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
     if (!isMidVisitUpdate) {
-        // CASE A: ENDING THE SAFETY SESSION
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
-        state.photoStore = {}; // Purge local media cache for privacy
+        state.photoStore = {}; 
         
-        // 1. Reset Global Flags
         if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
-        
-        // 2. Stop Safety Heartbeats & GPS Pulses
         if (timerInt) { clearInterval(timerInt); timerInt = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
-        
-        // 3. Physical Device Cleanup: Allow the phone to sleep again
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
         saveState();
-        
-        // 4. Navigation: Return to Site List
         navigate('main'); 
-        
-        // 5. UI Refresh: Reset the Start button and Tile highlights
         renderLocations(); 
         if (typeof updateArrivedButtonState === 'function') updateArrivedButtonState();
-        
         showToast('✅ Safety Session Completed');
     } else {
-        // CASE B: MID-VISIT UPDATE (Form submitted while on-site)
-        // Return user to the active timer screen
         navigate(state.activeVisit ? 'locked' : 'main'); 
-        
         showToast('✅ Update Logged');
         isMidVisitUpdate = false; 
-        
-        // Restart the inactivity timer for battery saver
         if (typeof resetInactivityTimer === 'function') resetInactivityTimer();
     }
+} // FIXED: This closing brace was missing
 
 // ============================================================================
 // LONG-PRESS INTERACTION
@@ -3914,7 +3897,7 @@ function initSlideToWake() {
         slideStartX = getX(e);
         slideButton.style.transition = 'none';
         slideProgress.style.transition = 'none';
-        if (!e.touches) e.preventDefault(); // Fixed for PC mouse support
+        if (!e.touches) e.preventDefault();
     };
 
     const move = (e) => {
@@ -3948,8 +3931,8 @@ function initSlideToWake() {
     slideButton.addEventListener('mousedown', start);
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
-    };
 
+    // NESTED: completeSlide must be inside to access maxSlide
     function completeSlide() {
         isSliding = false;
         slideButton.style.transition = 'transform 0.2s ease-out';
@@ -3961,12 +3944,11 @@ function initSlideToWake() {
         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
         
         setTimeout(() => {
-            deactivateDimMode(); // Returns user to "I AM SAFE" button
+            deactivateDimMode();
             resetInactivityTimer();
             isSosLocked = true;
             setTimeout(() => { isSosLocked = false; }, 2000);
             
-            // Reset for next use
             slideButton.style.transition = 'none';
             slideButton.style.transform = 'translateX(0)';
             slideProgress.style.width = '0%';
@@ -3975,7 +3957,8 @@ function initSlideToWake() {
             currentX = 0;
         }, 200);
     }
-}
+} // FIXED: Removed extra orphaned brace
+    
 // Update dimmed screen timer and battery
 function updateDimmedDisplay() {
     if (!isDimmed || !state || !state.activeVisit) return;
@@ -4038,6 +4021,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
