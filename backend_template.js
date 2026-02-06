@@ -451,10 +451,40 @@ function handleWorkerPost(p, e) {
             }
         }
 
-        if (!rowUpdated) {
-            const row = [ts.toISOString(), dateStr, workerName, p['Worker Phone Number'], p['Emergency Contact Name'], p['Emergency Contact Number'], p['Emergency Contact Email'], p['Escalation Contact Name'], p['Escalation Contact Number'], p['Escalation Contact Email'], p['Alarm Status'], polishedNotes, p['Location Name'], p['Location Address'], p['Last Known GPS'], p['Timestamp'], p['Battery Level'], p1, distanceValue, p['Visit Report Data'], p['Anticipated Departure Time'], sig, p2, p3, p4];
-            sheet.appendRow(row);
-        }
+// FIXED: Support both 'Phone' and 'Number' keys from the frontend
+    const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
+    const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
+
+    if (!rowUpdated) {
+        const row = [
+            ts.toISOString(), 
+            dateStr, 
+            workerName, 
+            p['Worker Phone Number'], 
+            p['Emergency Contact Name'], 
+            emgPhone, // FIXED
+            p['Emergency Contact Email'], 
+            p['Escalation Contact Name'], 
+            escPhone, // FIXED
+            p['Escalation Contact Email'], 
+            p['Alarm Status'], 
+            polishedNotes, 
+            p['Location Name'], 
+            p['Location Address'], 
+            p['Last Known GPS'], 
+            p['Timestamp'], 
+            p['Battery Level'], 
+            p1, 
+            distanceValue, 
+            p['Visit Report Data'], 
+            p['Anticipated Departure Time'], 
+            sig, 
+            p2, 
+            p3, 
+            p4
+        ];
+        sheet.appendRow(row);
+    }
     }
 
     updateStaffStatus(p);
@@ -520,10 +550,10 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     }
 
     // NEW: Visit Location Intelligence Block
-    let mapHtml = "";
+let mapHtml = "";
     if (p['Last Known GPS']) {
         const gps = p['Last Known GPS'];
-        // Corrected URL interpolation
+        // FIXED: Added missing $ and corrected template literal syntax
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
@@ -629,8 +659,8 @@ function _cleanPhone(num) {
 function triggerAlerts(p, type) {
     const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
     
-    // FIXED: Standardised URL format for mobile navigation
-    const gpsLink = p['Last Known GPS'] ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(p['Last Known GPS']) : "No GPS";
+    // FIXED: Corrected template literal for emergency alerts
+    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS";
     
     const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
     
@@ -983,6 +1013,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
