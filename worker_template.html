@@ -1998,6 +1998,7 @@ function updateArrivedButtonState() {
  * Renders the Forms Library in a Two-Column Grid.
  */
 function openFormsLibrary() {
+    isMidVisitUpdate = state.activeVisit ? true : false; // FIXED: Resets flag based on actual visit state
     const list = document.getElementById('formsLibraryList');
     if (!list) return;
 
@@ -2161,11 +2162,19 @@ function setupHoldToStart() {
     if (!btn) return;
     
     setupLongPress('btnStart', 1500, () => {
-        // IMPROVEMENT: Added feedback for debugging
-        if (state.selectedLocationId && state.visitDurationMinutes > 0) {
+        if (!state.selectedLocationId) return showToast('📍 Select a site first');
+        
+        // AUTO-DURATION: If travelling, default to 30m if they forgot the slider
+        if (state.selectedLocationId === 'travel' && state.visitDurationMinutes === 0) {
+            state.visitDurationMinutes = 30;
+            document.getElementById('durationSlider').value = 4; // Slider position for 30m
+            updateDurationDisplay();
+        }
+
+        if (state.visitDurationMinutes > 0) {
             startVisit();
         } else {
-            showToast('⚠️ Select duration & site first');
+            showToast('⏱️ Please set a duration');
         }
     });
 }
@@ -2175,6 +2184,7 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
+    isMidVisitUpdate = false; // FIXED: Ensures the next report clears the session correctly
     // 1. SAFE AUDIO UNLOCK: Primes the speakers for future alarms
     try {
         await Promise.race([
@@ -4026,6 +4036,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
