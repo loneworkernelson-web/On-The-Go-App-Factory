@@ -2278,7 +2278,6 @@ function buildPayload(d) {
     let ln = "Unknown Site";
     let la = "No Address Provided";
     
-    // 1. IMPROVED LOGIC: Correctly identify the site context
     if (state.activeVisit) {
         if (state.activeVisit.anticipatedDepartureTime) {
             dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
@@ -2301,23 +2300,18 @@ function buildPayload(d) {
         gps = state.activeVisit.startGPS;
     }
     
-    // 2. CONSTRUCT OBJECT: Use standardized spreadsheet headers
     return {
-        'action': d.action || 'logVisit', // FIXED: Ensures the backend always sees a command
+        'action': d.action || 'logVisit', 
         'key': CONFIG.key,
         'Worker Name': state.worker?.name || "",
         'Worker Phone Number': state.worker?.phone || "",
         'Worker Email': state.worker?.email || "",
-        
-        // FIXED: Using "Phone" to match your spreadsheet columns
         'Emergency Contact Name': state.worker?.emgName || "",
         'Emergency Contact Phone': state.worker?.emgPhone || "", 
         'Emergency Contact Email': state.worker?.emgEmail || "",
-        
         'Escalation Contact Name': state.worker?.escName || "",
         'Escalation Contact Phone': state.worker?.escPhone || "",
         'Escalation Contact Email': state.worker?.escEmail || "",
-        
         'Battery Level': currentBatteryLevel || "100%",
         'Location Name': ln,
         'Location Address': la,
@@ -2740,60 +2734,61 @@ async function fetchLocationsFromBackend() {
 // HIGH-INTEGRITY INITIALIZATION (Safety-Critical Patch)
 // ============================================================================
 window.onload = () => {
-    // 1. Establish State Integrity
+    // 1. Establish State Integrity with all required sub-objects
     state = loadState() || {
         currentWizStep: 1,
         worker: {},
+        settings: { isAdvanced: false }, // Added to prevent 'isAdvanced' crashes
         pins: { std: '', duress: '' },
         activeVisit: null,
         pendingUploads: [],
         locations: [],
         photoStore: {},
+        meta: { lastVehCheck: null, wofExpiry: null }, // Added to prevent Vehicle Check crashes
         vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null }
     };
 
-    // 2. Ensure Device Identity
+    // Ensure nested objects exist in case of partial load
+    if (!state.meta) state.meta = {};
+    if (!state.settings) state.settings = {};
+    if (!state.worker) state.worker = {};
+
     if (!state.deviceId) {
         state.deviceId = getDeviceID();
         saveState();
     }
 
-    // 3. UI Primary Paint
     updateOnlineStatus();
     checkIosInstall();
     startGPSMonitoring();
     
     if (!state.worker || !state.worker.name) {
-        // Force Setup Wizard if identity is missing
-        const setupPage = document.getElementById('setupPage');
-        if (setupPage) setupPage.classList.add('active');
+        navigate('setup');
     } else {
-        // Standard worker startup
         navigate(state.activeVisit ? 'locked' : 'main');
         
-        // CRITICAL: Render UI and bind button logic
+        // Render UI and bind button logic
         renderLocations(); 
-        setupHoldToStart(); // FIX: Binds the Start button logic
-        checkVehicleStatus(); // FIX: Initialises the orange compliance bar
+        setupHoldToStart(); 
+        checkVehicleStatus(); 
         
         if (state.activeVisit) {
             enterLockedScreen();
-            timerInt = setInterval(tick, 1000);
+            if (!timerInt) timerInt = setInterval(tick, 1000);
         }
 
-        // 4. Managed Background Sync
+        // Managed Background Sync
         const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
         if (!isTemplate && navigator.onLine) {
-            forceSync(false); // Silent background sync
+            forceSync(false); 
         }
     }
 
-    // 5. Initialize Secondary Safety Controllers
     initShakeDetection();
     initVolumeDetection();
     initSlideToWake();
     
-    // Bind the standard SOS button behavior (3-tap fail-safe)
+    // Bind Panic behavior
     const btnPanic = document.getElementById('btnPanic');
     if (btnPanic) {
         btnPanic.onclick = () => {
@@ -2807,15 +2802,7 @@ window.onload = () => {
             }
         };
     }
-
-    // 6. Maintenance & Queue Management
-    window.addEventListener('online', () => {
-        if (state.pendingUploads.length > 0) setTimeout(processUploadQueue, 1000);
-    });
-    
-    document.addEventListener('touchstart', resetInactivityTimer, { passive: true });
-    
-    console.log("OTG Safety Engine: System Online.");
+    console.log("OTG Safety Engine: Robust Initialization Complete.");
 };
     
 // ============================================================================
@@ -4039,6 +4026,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
