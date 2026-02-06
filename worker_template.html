@@ -1998,7 +1998,9 @@ function updateArrivedButtonState() {
  * Renders the Forms Library in a Two-Column Grid.
  */
 function openFormsLibrary() {
-    isMidVisitUpdate = state.activeVisit ? true : false; // FIXED: Resets flag based on actual visit state
+    // 1. Correctly set the update flag based on visit state
+    isMidVisitUpdate = (state.activeVisit !== null); 
+    
     const list = document.getElementById('formsLibraryList');
     if (!list) return;
 
@@ -2009,7 +2011,6 @@ function openFormsLibrary() {
         list.innerHTML = '<div class="p-8 text-center opacity-40 text-xs font-bold uppercase tracking-widest">No templates available.</div>';
     } else {
         list.className = "grid grid-cols-2 gap-3 overflow-y-auto pr-2";
-        
         forms.forEach(form => {
             const row = document.createElement('div');
             row.className = 'p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center active:scale-95 transition-all aspect-square';
@@ -2019,16 +2020,16 @@ function openFormsLibrary() {
             if (form.name.toLowerCase().includes('audit')) icon = "🔍";
             if (form.name.toLowerCase().includes('incident')) icon = "⚠️";
 
-            // Fixed: Titles now render cleanly without logic errors
             row.innerHTML = `
                 <div class="text-3xl mb-2">${icon}</div>
                 <div class="text-[11px] font-extrabold tracking-tight text-white leading-tight">${form.name}</div>
                 <div class="text-[8px] text-blue-400 font-bold uppercase mt-1">${form.questions.length} Checks</div>
             `;
+            
+            // FIXED: Now calls loadFormAndShow to ensure the Submit button is active
             row.onclick = () => {
                 closeModal('formsLibrary');
-                buildReportForm(form.name, document.getElementById('reportFields'));
-                navigate('report');
+                loadFormAndShow(form.name);
             };
             list.appendChild(row);
         });
@@ -2164,18 +2165,14 @@ function setupHoldToStart() {
     setupLongPress('btnStart', 1500, () => {
         if (!state.selectedLocationId) return showToast('📍 Select a site first');
         
-        // AUTO-DURATION: If travelling, default to 30m if they forgot the slider
-        if (state.selectedLocationId === 'travel' && state.visitDurationMinutes === 0) {
-            state.visitDurationMinutes = 30;
-            document.getElementById('durationSlider').value = 4; // Slider position for 30m
+        // AUTO-DURATION: Ensure a value exists even if the slider wasn't touched
+        if (state.visitDurationMinutes === 0 || typeof state.visitDurationMinutes === 'undefined') {
+            state.visitDurationMinutes = 30; // Default to 30m
+            document.getElementById('durationSlider').value = 4; 
             updateDurationDisplay();
         }
 
-        if (state.visitDurationMinutes > 0) {
-            startVisit();
-        } else {
-            showToast('⏱️ Please set a duration');
-        }
+        startVisit();
     });
 }
 // Start visit (called after long-press)
@@ -2748,14 +2745,15 @@ window.onload = () => {
     state = loadState() || {
         currentWizStep: 1,
         worker: {},
-        settings: { isAdvanced: false }, // Added to prevent 'isAdvanced' crashes
+        settings: { isAdvanced: false },
         pins: { std: '', duress: '' },
         activeVisit: null,
         pendingUploads: [],
         locations: [],
         photoStore: {},
-        meta: { lastVehCheck: null, wofExpiry: null }, // Added to prevent Vehicle Check crashes
-        vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null }
+        meta: { lastVehCheck: null, wofExpiry: null },
+        vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
+        visitDurationMinutes: 0 // FIXED: This field must be present to enable buttons
     };
 
     // Ensure nested objects exist in case of partial load
@@ -4036,6 +4034,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
