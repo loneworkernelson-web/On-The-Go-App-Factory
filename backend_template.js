@@ -451,40 +451,40 @@ function handleWorkerPost(p, e) {
             }
         }
 
-// FIXED: Support both 'Phone' and 'Number' keys from the frontend
-    const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
-    const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
+// Ensure these fallbacks are in your backend script to catch the frontend keys
+const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
+const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
 
-    if (!rowUpdated) {
-        const row = [
-            ts.toISOString(), 
-            dateStr, 
-            workerName, 
-            p['Worker Phone Number'], 
-            p['Emergency Contact Name'], 
-            emgPhone, // FIXED
-            p['Emergency Contact Email'], 
-            p['Escalation Contact Name'], 
-            escPhone, // FIXED
-            p['Escalation Contact Email'], 
-            p['Alarm Status'], 
-            polishedNotes, 
-            p['Location Name'], 
-            p['Location Address'], 
-            p['Last Known GPS'], 
-            p['Timestamp'], 
-            p['Battery Level'], 
-            p1, 
-            distanceValue, 
-            p['Visit Report Data'], 
-            p['Anticipated Departure Time'], 
-            sig, 
-            p2, 
-            p3, 
-            p4
-        ];
-        sheet.appendRow(row);
-    }
+if (!rowUpdated) {
+    const row = [
+        ts.toISOString(), 
+        dateStr, 
+        workerName, 
+        p['Worker Phone Number'], 
+        p['Emergency Contact Name'], 
+        emgPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
+        p['Emergency Contact Email'], 
+        p['Escalation Contact Name'], 
+        escPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
+        p['Escalation Contact Email'], 
+        p['Alarm Status'], 
+        polishedNotes, 
+        p['Location Name'], 
+        p['Location Address'], 
+        p['Last Known GPS'], 
+        p['Timestamp'], 
+        p['Battery Level'], 
+        p1, 
+        distanceValue, 
+        p['Visit Report Data'], 
+        p['Anticipated Departure Time'], 
+        sig, 
+        p2, 
+        p3, 
+        p4
+    ];
+    sheet.appendRow(row);
+}
     }
 
     updateStaffStatus(p);
@@ -1013,6 +1013,7 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
+
 
 
 
