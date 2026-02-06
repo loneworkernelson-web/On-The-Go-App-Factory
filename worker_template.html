@@ -1646,10 +1646,12 @@ function iamSafe() {
 function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
-        const remainingMs = remaining * 1000;
-     if (remaining <= 0) {
-            // NEW: Engage GPS monitoring if overdue
-            if (gpsWatchId === null) startGPSMonitoring();       
+        
+        // NEW: Engage GPS monitoring ONLY if overdue
+        if (remaining <= 0 && gpsWatchId === null) {
+            startGPSMonitoring();
+        }
+
         // PHASE 1: Multiple warning levels
         if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
             playWarningSound('warning');
@@ -1676,7 +1678,7 @@ function tick() {
         const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
         
         if (remaining <= 0) {
-            // NEW: Automatically wake screen if dimmed
+            // Automatically wake screen if dimmed
             if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
 
             // OVERDUE UI Update
@@ -1732,7 +1734,6 @@ function tick() {
         }
     }
 }
-
 // ============================================================================
 // ENHANCED RENDER LOCATIONS (Layout Corrected)
 // ============================================================================
@@ -4064,6 +4065,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
