@@ -991,12 +991,12 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
+    // FIXED: Handle both element IDs (strings) and direct DOM objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
     
-    // 1. TOUCH (Mobile)
     btn.addEventListener('touchstart', (e) => {
         if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
@@ -1009,8 +1009,8 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     }, { passive: true });
 
-    // 2. MOUSE (PC Fix) - Added e.preventDefault() to stop dragging
     btn.addEventListener('mousedown', (e) => {
+        // FIXED: preventDefault stops the PC browser from interrupting the hold
         e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
@@ -1026,6 +1026,7 @@ function setupLongPress(target, duration, callback) {
         });
     });
 }
+    
 // ============================================================================
 // INACTIVITY DIM MODE
 // ============================================================================
@@ -1040,7 +1041,10 @@ function resetInactivityTimer() {
 function activateDimMode() {
     if (!state || !state.activeVisit) return;
     
-    // NEW: Do not dim if the worker is overdue or in panic
+    // FIXED: Do not dim if the worker is filling out a report or looking at info
+    const isModalOpen = !document.getElementById('modalBackdrop').classList.contains('hidden');
+    if (isModalOpen) return;
+
     const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
     if (remaining <= 0 || state.activeVisit.isPanic) return;
 
@@ -2152,7 +2156,7 @@ function setupHoldToStart() {
  * Consolidates safety object creation and ensures consistent logging.
  */
 async function startVisit() {
-    // 1. Safe audio unlock (doesn't block UI if audio fails)
+    // 1. SAFE AUDIO UNLOCK: Primes the speakers for future alarms
     try {
         await Promise.race([
             Tone.start(),
@@ -2161,44 +2165,63 @@ async function startVisit() {
         console.log("🔊 Audio active");
     } catch (e) { console.warn("Audio skipped"); }
 
-    if (!state.selectedLocationId || !state.visitDurationMinutes) {
-        showToast('⚠️ Select site and duration');
+    const locId = state.selectedLocationId;
+    if (!locId) {
+        showToast('⚠️ Select a site first');
         return;
     }
 
-    const loc = state.locations.find(l => l.id === state.selectedLocationId) || 
-                (state.selectedLocationId === 'travel' ? { id: 'travel', name: '🚗 Travelling', isTravel: true } : null);
+    const loc = state.locations.find(l => l.id === locId) || 
+                (locId === 'travel' ? { id: 'travel', name: '🚗 Travelling' } : null);
+    
+    // 2. GET DURATION: Pull from the slider UI
+    const slider = document.getElementById('durationSlider');
+    const durationMins = DURATION_MAP[parseInt(slider.value)];
+    const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    if (!loc) return;
+    if (!durationMins && locId !== 'travel') {
+        showToast('⚠️ Select a duration');
+        return;
+    }
 
-    // Correctly initialize the Active Visit object
+    // 3. INITIALIZE ACTIVE VISIT: Reset all safety flags
     const startTime = Date.now();
-    const durationSec = state.visitDurationMinutes * 60;
+    const durationSec = durationMins * 60;
     const dueOut = startTime + (durationSec * 1000);
 
     state.activeVisit = {
-        locationId: loc.id,
+        locationId: locId,
         locationName: loc.name,
         startTime: startTime,
         duration: durationSec,
-        dueOut: dueOut,
         anticipatedDepartureTime: dueOut,
         startGPS: lastGPS || "0,0",
-        highRisk: state.highRiskMode || false,
+        highRisk: isHighRisk,
         isPanic: false,
         criticalSent: false,
-        warningSent: false,
-        warn90Sent: false,
+        warn5minSent: false,
         warn2minSent: false,
-        warn5minSent: false
+        warn90Sent: false
     };
 
     saveState();
 
-    const activityType = loc.id === 'travel' ? "Travel" : "Visit";
-    announce(`${activityType} to ${loc.name} started.`);
-    logSafety("ARRIVED", `${activityType} started at ${loc.name}`);
+    // 4. SYNC TO SPREADSHEET: Added 'action' for backend processing
+    const activityType = locId === 'travel' ? "Travel" : "Visit";
+    processUploadQueue(buildPayload({
+        'action': 'logVisit',
+        'Alarm Status': 'ARRIVED',
+        'Location Name': loc.name,
+        'Notes': `${activityType} started. Duration: ${durationMins}m`
+    }));
+
+    // 5. UI TRANSITION
+    if (typeof speakWarning === 'function') {
+        speakWarning(`${activityType} to ${loc.name} started.`);
+    }
     
+    renderLocations();
+    updateArrivedButtonState();
     enterLockedScreen();
 }
     
@@ -3989,6 +4012,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
