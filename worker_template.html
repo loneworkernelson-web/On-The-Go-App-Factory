@@ -956,32 +956,47 @@ function submitReport() {
         "Notes": d.notes || ""
     }));
     
-    // 8. Visual and Logic Reset
+// ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
+    // Handles cleanup for both ending visits and mid-visit updates.
+    
     if (!isMidVisitUpdate) {
-        // End the Safety Session
+        // CASE A: ENDING THE SAFETY SESSION
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
         state.photoStore = {}; // Purge local media cache for privacy
         
-        // Stop the safety heartbeat
-        if (timerInt) {
-            clearInterval(timerInt);
-            timerInt = null;
-        }
+        // 1. Reset Global Flags
+        if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
+        
+        // 2. Stop Safety Heartbeats & GPS Pulses
+        if (timerInt) { clearInterval(timerInt); timerInt = null; }
+        if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
+        
+        // 3. Physical Device Cleanup: Allow the phone to sleep again
+        if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
         saveState();
-        closeModal('report');
-        navigate('main');
-        renderLocations(); // Refresh UI to clear selections
+        
+        // 4. Navigation: Return to Site List
+        navigate('main'); 
+        
+        // 5. UI Refresh: Reset the Start button and Tile highlights
+        renderLocations(); 
+        if (typeof updateArrivedButtonState === 'function') updateArrivedButtonState();
+        
         showToast('✅ Safety Session Completed');
     } else {
-        // Mid-visit update remains in the locked state
-        closeModal('report');
+        // CASE B: MID-VISIT UPDATE (Form submitted while on-site)
+        // Return user to the active timer screen
+        navigate(state.activeVisit ? 'locked' : 'main'); 
+        
         showToast('✅ Update Logged');
-        isMidVisitUpdate = false; // Reset flag
+        isMidVisitUpdate = false; 
+        
+        // Restart the inactivity timer for battery saver
+        if (typeof resetInactivityTimer === 'function') resetInactivityTimer();
     }
-}
 
 // ============================================================================
 // LONG-PRESS INTERACTION
@@ -997,10 +1012,6 @@ function setupLongPress(target, duration, callback) {
     let timer;
     
     btn.addEventListener('touchstart', (e) => {
-        if (target === 'btnPanic' && typeof isSosLocked !== 'undefined' && isSosLocked) {
-            showToast('⏳ Wait... screen just woke');
-            return;
-        }
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -1009,7 +1020,8 @@ function setupLongPress(target, duration, callback) {
     }, { passive: true });
 
     btn.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // FIXED: Prevents PC from dragging the button
+        // FIXED: This line is required to make long-press work on a PC
+        e.preventDefault(); 
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -1017,7 +1029,7 @@ function setupLongPress(target, duration, callback) {
         }, duration);
     });
 
-    ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'mouseleave'].forEach(ev => {
+    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
             clearTimeout(timer);
             btn.classList.remove('pressing', 'holding');
@@ -1369,18 +1381,26 @@ function withPinVerification(allowDuress, callback) {
 // ============================================================================
 // PRE-DEPART
 // ============================================================================
-// Load form modal and show it
+/**
+ * GOLDEN HYBRID: LOAD FORM AND SHOW
+ * Merges complex field logic with the v18 Page-based navigation.
+ * Fixes: Blank screen on form open, Battery Saver interruptions, and PC responsiveness.
+ */
 function loadFormAndShow(templateName) {
-    // Clear signature canvas
+    // 1. SAFETY: Kill the Battery Saver timer so it doesn't interrupt form filling
+    if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
+    if (typeof deactivateDimMode === 'function') deactivateDimMode();
+
+    // 2. Clear previous signature data to prevent "ghost" signatures
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) {
         clearSig(sigCanvas.id.replace('sig-canvas-', ''));
     }
     
-    // Show report modal
-    showModal('report');
+    // 3. ARCHITECTURE FIX: Navigate to the Page instead of showing a Modal
+    navigate('report'); 
     
-    // Set title
+    // 4. Set dynamic title
     const title = templateName === '(Standard)' ? 'Status Update' : templateName;
     const titleEl = document.getElementById('reportTitle');
     if (titleEl) {
@@ -1389,21 +1409,21 @@ function loadFormAndShow(templateName) {
     
     currentActiveTemplate = templateName;
     
-    // Build form fields
+    // 5. Build form fields into the v18 report container
     const fieldsContainer = document.getElementById('reportFields');
     if (fieldsContainer) {
         buildReportForm(templateName, fieldsContainer);
     }
     
-    // Initialize signature pads after form is built
+    // 6. Initialize signature pads after a short delay for CSS rendering
     setTimeout(() => {
         document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-    }, 100);
+    }, 200);
     
-    // Pre-fill distance if available
+    // 7. INTELLIGENCE: Pre-fill Distance/KM if GPS calculation is ready
     if (calculatedDist) {
         const distInput = document.querySelector('[data-key*="Distance"]') || 
                          document.querySelector('[data-key*="KM"]') ||
@@ -1415,30 +1435,30 @@ function loadFormAndShow(templateName) {
         }
     }
     
-    // Setup submit button
+    // 8. CONFIGURE SUBMIT BUTTON: Standardize for PC and Mobile
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
-        // Clone to remove old listeners
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
         if (!state.activeVisit) {
-            // Data entry only
+            // Case A: General audit/form entry
             newBtn.textContent = 'SUBMIT REPORT';
             newBtn.classList.remove('long-press-btn');
             newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
             newBtn.onclick = submitReport;
         } else if (isMidVisitUpdate) {
-            // Mid-visit update
+            // Case B: Updating status while on-site
             newBtn.textContent = 'SEND UPDATE';
             newBtn.classList.remove('long-press-btn');
             newBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
             newBtn.onclick = submitReport;
         } else {
-            // End visit
+            // Case C: Ending the safety session
             newBtn.textContent = 'HOLD TO SUBMIT & END';
             newBtn.classList.add('long-press-btn');
-            setupLongPress(newBtn, 2000, submitReport);
+            // FIXED: Uses 1.5s for faster end-of-day workflow
+            setupLongPress(newBtn, 1500, submitReport); 
         }
     }
 }
@@ -4019,6 +4039,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
