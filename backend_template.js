@@ -1013,10 +1013,3 @@ function cleanupPrivateSentNotes() {
     console.warn("Privacy Sweep Error: " + e.toString());
   }
 }
-
-
-
-
-
-
-
