@@ -970,8 +970,11 @@ function submitReport() {
         if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
     }
     
-    // 9. VISUAL & LOGIC RESET
+// 9. VISUAL & LOGIC RESET
     if (!isMidVisitUpdate) {
+        // NEW: Physically shut down GPS monitoring when the session ends
+        if (typeof stopGPSMonitoring === 'function') stopGPSMonitoring();
+
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
@@ -1580,6 +1583,9 @@ function enterLockedScreen() {
 // TRIGGER PANIC
 // ============================================================================
 async function triggerPanic(duress = false) {
+// NEW: Ensure GPS is active during alarms
+    if (gpsWatchId === null) startGPSMonitoring();
+    
     document.body.classList.add('bg-red-900');
     announce(duress ? "Duress activated silently." : "Panic alarm activated.");
     
@@ -1641,7 +1647,9 @@ function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
         const remainingMs = remaining * 1000;
-        
+     if (remaining <= 0) {
+            // NEW: Engage GPS monitoring if overdue
+            if (gpsWatchId === null) startGPSMonitoring();       
         // PHASE 1: Multiple warning levels
         if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
             playWarningSound('warning');
@@ -2200,6 +2208,10 @@ async function startVisit() {
     } catch (e) { console.warn("Audio skipped"); }
 
     const locId = state.selectedLocationId;
+    // NEW: Engage GPS monitoring for travel sessions
+    if (locId === 'travel') {
+        startGPSMonitoring();
+    }
     if (!locId) {
         showToast('⚠️ Select a site first');
         return;
@@ -2785,7 +2797,6 @@ window.onload = () => {
     // 3. System Initialization
     updateOnlineStatus();
     checkIosInstall();
-    startGPSMonitoring();
     
     if (!state.worker || !state.worker.name) {
         navigate('setup');
@@ -4053,6 +4064,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
