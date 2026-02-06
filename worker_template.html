@@ -942,7 +942,8 @@ function submitReport() {
     // 6. Determine Backend Status
     let alarmStatus;
     if (!state.activeVisit) {
-        alarmStatus = "DATA_ENTRY_ONLY";
+        // FIXED: Using "REPORT_SUBMITTED" triggers the backend log for the Visit tab
+        alarmStatus = "REPORT_SUBMITTED"; 
     } else if (isMidVisitUpdate) {
         alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
     } else {
@@ -956,30 +957,54 @@ function submitReport() {
         "Notes": d.notes || ""
     }));
     
-    // ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
+// ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
+    // Handles cleanup for both ending visits and mid-visit updates.
+    
     if (!isMidVisitUpdate) {
+        // CASE A: ENDING THE SAFETY SESSION
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
-        state.photoStore = {}; 
+        state.photoStore = {}; // Purge local media cache for privacy
         
+        // 1. Reset Global Flags
         if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
+        
+        // 2. Stop Safety Heartbeats & GPS Pulses
         if (timerInt) { clearInterval(timerInt); timerInt = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
+        
+        // 3. NEW: Clear Vehicle Nag Bar immediately if this was a vehicle check
+        if (currentActiveTemplate && currentActiveTemplate.toLowerCase().includes('vehicle')) {
+            state.meta.lastVehCheck = new Date().toISOString();
+            if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
+        }
+
+        // 4. Physical Device Cleanup: Allow the phone to sleep again
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
         saveState();
+        
+        // 5. Navigation: Return to Dashboard
         navigate('main'); 
+        
+        // 6. UI Refresh: Reset the Start button and Tile highlights
         renderLocations(); 
         if (typeof updateArrivedButtonState === 'function') updateArrivedButtonState();
+        
         showToast('✅ Safety Session Completed');
     } else {
+        // CASE B: MID-VISIT UPDATE (Form submitted while on-site)
+        // Return user to the active timer screen
         navigate(state.activeVisit ? 'locked' : 'main'); 
+        
         showToast('✅ Update Logged');
         isMidVisitUpdate = false; 
+        
+        // Restart the inactivity timer for battery saver
         if (typeof resetInactivityTimer === 'function') resetInactivityTimer();
     }
-} // FIXED: This closing brace was missing
+} // FIXED: This closing brace finishes the submitReport function
 
 // ============================================================================
 // LONG-PRESS INTERACTION
@@ -994,23 +1019,25 @@ function setupLongPress(target, duration, callback) {
     
     let timer;
     
-    btn.addEventListener('touchstart', (e) => {
+    const start = (e) => {
+        // Re-integrated Safety Lock for SOS
+        if ((target === 'btnPanic' || btn.id === 'btnPanic') && isSosLocked) {
+            showToast('⏳ Wait... screen just woke');
+            return;
+        }
+        
+        // FIXED: preventDefault allows the PC mouse to click without dragging
+        if (e.type === 'mousedown') e.preventDefault(); 
+        
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
             callback();
         }, duration);
-    }, { passive: true });
+    };
 
-    btn.addEventListener('mousedown', (e) => {
-        // FIXED: This line is required to make long-press work on a PC
-        e.preventDefault(); 
-        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
-        timer = setTimeout(() => {
-            btn.classList.remove('pressing', 'holding');
-            callback();
-        }, duration);
-    });
+    btn.addEventListener('touchstart', start, { passive: true });
+    btn.addEventListener('mousedown', start);
 
     ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => {
         btn.addEventListener(ev, () => {
@@ -4021,6 +4048,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
