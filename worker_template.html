@@ -55,6 +55,7 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
 .long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
 .long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
+.long-press-btn.holding::after { width: 100%; transition: width 2s linear; }
 
 /* 5. GPS SIGNAL BARS */
 .gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
@@ -897,37 +898,37 @@ async function getBatteryPercent() {
  * REWRITTEN: High-Integrity Report Submission
  * Correctly maps stripped form labels to the backend payload and handles UI transitions.
  */
+/**
+ * FULL MISSION-CRITICAL SUBMIT REPORT
+ * Includes: Action Routing for Notes, Vehicle Nag clearing, and Canvas Cleanup.
+ */
 function submitReport() {
     showToast('📤 Processing report...');
     
-    // 1. Gather Data from the UI
+    // 1. GATHER DATA
     const d = gatherFormData();
     let photoCount = 0;
     const photoMap = {};
     
-    // 2. Process Photos
-    // Iterates through stored base64 images and creates tokens for the spreadsheet
+    // 2. PROCESS PHOTOS
     Object.keys(state.photoStore || {}).forEach((key) => {
         photoCount++;
         const token = `{{PHOTO_${photoCount}}}`;
         photoMap[`Photo ${photoCount}`] = state.photoStore[key];
-        
-        // Map the token to the specific custom field if it exists
         if (d.custom[key] !== undefined) {
             d.custom[key] = token;
             d.jsonPayload[key] = token;
         }
     });
     
-    // 3. Build Form Data Object
+    // 3. BUILD PAYLOAD
     const fd = {
         ...d.custom,
         "Visit Report Data": JSON.stringify(d.jsonPayload),
         "Template Name": currentActiveTemplate
     };
     
-    // 4. Intelligence: Automated Distance Extraction
-    // Scans for 'Distance', 'KM', or 'Odo' in the clean labels to populate the 'Distance' column
+    // 4. EXTRACT DISTANCE (For travel logs)
     for (let key in d.custom) {
         if (/km|odo|dist/i.test(key)) {
             const val = parseFloat(d.custom[key]);
@@ -935,76 +936,68 @@ function submitReport() {
         }
     }
     
-    // 5. Attach Media
+    // 5. ATTACH MEDIA
     Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; });
     if (d.sig) fd["Signature"] = d.sig;
     
-    // 6. Determine Backend Status
+    // 6. ROUTING LOGIC: Determine Backend Action and Status
     let alarmStatus;
-    if (!state.activeVisit) {
-        // FIXED: Using "REPORT_SUBMITTED" triggers the backend log for the Visit tab
-        alarmStatus = "REPORT_SUBMITTED"; 
+    let backendAction = 'logVisit'; // Default for most forms
+
+    // NEW: Route "Note to Self" to the correct spreadsheet function
+    if (currentActiveTemplate === "Note to Self") {
+        backendAction = 'logNote'; 
+        alarmStatus = "NOTE_LOGGED";
+    } else if (!state.activeVisit) {
+        alarmStatus = "REPORT_SUBMITTED"; // Standalone (e.g. Vehicle Check)
     } else if (isMidVisitUpdate) {
         alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
     } else {
         alarmStatus = "DEPARTED";
     }
     
-    // 7. Handshake with Backend
+    // 7. HANDSHAKE: Send to spreadsheet with the correct action key
     processUploadQueue(buildPayload({
         ...fd,
+        "action": backendAction, 
         "Alarm Status": alarmStatus,
         "Notes": d.notes || ""
     }));
+
+    // 8. NAG BAR CLEANUP: Clear orange bar immediately
+    if (currentActiveTemplate && currentActiveTemplate.toLowerCase().includes('vehicle')) {
+        state.meta.lastVehCheck = new Date().toISOString();
+        if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
+    }
     
-// ====== GOLDEN HYBRID: SECTION 8: VISUAL AND LOGIC RESET ======
-    // Handles cleanup for both ending visits and mid-visit updates.
-    
+    // 9. VISUAL & LOGIC RESET
     if (!isMidVisitUpdate) {
-        // CASE A: ENDING THE SAFETY SESSION
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
-        state.photoStore = {}; // Purge local media cache for privacy
+        state.photoStore = {}; 
         
-        // 1. Reset Global Flags
         if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
-        
-        // 2. Stop Safety Heartbeats & GPS Pulses
         if (timerInt) { clearInterval(timerInt); timerInt = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
-        
-        // 3. NEW: Clear Vehicle Nag Bar immediately if this was a vehicle check
-        if (currentActiveTemplate && currentActiveTemplate.toLowerCase().includes('vehicle')) {
-            state.meta.lastVehCheck = new Date().toISOString();
-            if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
-        }
-
-        // 4. Physical Device Cleanup: Allow the phone to sleep again
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
         saveState();
-        
-        // 5. Navigation: Return to Dashboard
         navigate('main'); 
-        
-        // 6. UI Refresh: Reset the Start button and Tile highlights
         renderLocations(); 
         if (typeof updateArrivedButtonState === 'function') updateArrivedButtonState();
-        
         showToast('✅ Safety Session Completed');
     } else {
-        // CASE B: MID-VISIT UPDATE (Form submitted while on-site)
-        // Return user to the active timer screen
         navigate(state.activeVisit ? 'locked' : 'main'); 
-        
         showToast('✅ Update Logged');
         isMidVisitUpdate = false; 
-        
-        // Restart the inactivity timer for battery saver
         if (typeof resetInactivityTimer === 'function') resetInactivityTimer();
     }
-} // FIXED: This closing brace finishes the submitReport function
+
+    // 10. CANVAS PURGE: Physically clear the drawing board
+    const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
+    if (sigCanvas) clearSig(sigCanvas.id.replace('sig-canvas-', ''));
+}
 
 // ============================================================================
 // LONG-PRESS INTERACTION
@@ -2167,17 +2160,15 @@ function setupHoldToStart() {
     const btn = document.getElementById('btnStart');
     if (!btn) return;
     
-    // Use the unified long-press utility
     setupLongPress('btnStart', 1500, () => {
-        // Re-verify selection at the moment of trigger
+        // IMPROVEMENT: Added feedback for debugging
         if (state.selectedLocationId && state.visitDurationMinutes > 0) {
             startVisit();
         } else {
-            showToast('⚠️ Please select a site and duration');
+            showToast('⚠️ Select duration & site first');
         }
     });
 }
-
 // Start visit (called after long-press)
 /**
  * Safety Engine: Initialize the Visit
@@ -4048,6 +4039,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
