@@ -2165,10 +2165,11 @@ function setupHoldToStart() {
     setupLongPress('btnStart', 1500, () => {
         if (!state.selectedLocationId) return showToast('📍 Select a site first');
         
-        // AUTO-DURATION: Ensure a value exists even if the slider wasn't touched
-        if (state.visitDurationMinutes === 0 || typeof state.visitDurationMinutes === 'undefined') {
-            state.visitDurationMinutes = 30; // Default to 30m
-            document.getElementById('durationSlider').value = 4; 
+        // AUTO-DURATION: Apply a default if the worker forgot the slider (Universal Fix)
+        if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
+            state.visitDurationMinutes = 30;
+            const slider = document.getElementById('durationSlider');
+            if (slider) slider.value = 4; // Visual update for 30m
             updateDurationDisplay();
         }
 
@@ -4034,6 +4035,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
