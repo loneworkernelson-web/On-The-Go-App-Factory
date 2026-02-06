@@ -2267,18 +2267,18 @@ let panicTapTimer;
 
 // 1. BUILD PAYLOAD - Constructs proper data structure for backend
 /**
+/**
  * HIGH-INTEGRITY PAYLOAD BUILDER
- * Standardizes keys to "Phone" to match spreadsheet headers.
- * Fixed: Mapping for Emergency and Escalation contact numbers.
+ * Fixes: "Number" to "Phone" header alignment.
+ * Fixes: Missing 'action' key for spreadsheet ingestion.
  */
 function buildPayload(d) {
     let dt = "";
     let ln = "Unknown Site";
     let la = "No Address Provided";
     
-    // 1. Contextual Location Logic
+    // 1. IMPROVED LOGIC: Correctly identify the site context
     if (state.activeVisit) {
-        // Use active visit timing and site info
         if (state.activeVisit.anticipatedDepartureTime) {
             dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
         }
@@ -2288,7 +2288,6 @@ function buildPayload(d) {
             la = l.address || "No Address";
         }
     } else if (state.selectedLocationId) {
-        // Fallback for reports sent without an active safety session (e.g. general audits)
         const l = state.locations.find(x => x.id === state.selectedLocationId);
         if (l) {
             ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
@@ -2296,37 +2295,36 @@ function buildPayload(d) {
         }
     }
     
-    // 2. GPS Fallback Logic
-    let gps = d['Last Known GPS'] || lastGPS || "";
+    let gps = d['Last Known GPS'] || "";
     if (!gps && state.activeVisit && state.activeVisit.startGPS) {
         gps = state.activeVisit.startGPS;
     }
     
-    // 3. Construct Final Object with Spreadsheet-Matched Headers
+    // 2. CONSTRUCT OBJECT: Use standardized spreadsheet headers
     return {
+        'action': d.action || 'logVisit', // FIXED: Ensures the backend always sees a command
         'key': CONFIG.key,
         'Worker Name': state.worker?.name || "",
         'Worker Phone Number': state.worker?.phone || "",
         'Worker Email': state.worker?.email || "",
         
-        // FIXED: Changed "Number" to "Phone" to align with backend ingestion
+        // FIXED: Using "Phone" to match your spreadsheet columns
         'Emergency Contact Name': state.worker?.emgName || "",
         'Emergency Contact Phone': state.worker?.emgPhone || "", 
         'Emergency Contact Email': state.worker?.emgEmail || "",
         
-        // FIXED: Changed "Number" to "Phone"
         'Escalation Contact Name': state.worker?.escName || "",
         'Escalation Contact Phone': state.worker?.escPhone || "",
         'Escalation Contact Email': state.worker?.escEmail || "",
         
-        'Battery Level': currentBatteryLevel || "Unknown",
+        'Battery Level': currentBatteryLevel || "100%",
         'Location Name': ln,
         'Location Address': la,
         'Anticipated Departure Time': dt,
         'Timestamp': new Date().toISOString(),
         'deviceId': state.deviceId || "",
         'Last Known GPS': gps || "0,0",
-        ...d // Merges custom form fields
+        ...d
     };
 }
 
@@ -4039,6 +4037,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
