@@ -991,7 +991,6 @@ function submitReport() {
  * Handles visual progress and prevents accidental triggers on wake.
  */
 function setupLongPress(target, duration, callback) {
-    // FIXED: Handle both element IDs (strings) and direct DOM objects
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
@@ -1010,8 +1009,7 @@ function setupLongPress(target, duration, callback) {
     }, { passive: true });
 
     btn.addEventListener('mousedown', (e) => {
-        // FIXED: preventDefault stops the PC browser from interrupting the hold
-        e.preventDefault(); 
+        e.preventDefault(); // FIXED: Prevents PC from dragging the button
         btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
         timer = setTimeout(() => {
             btn.classList.remove('pressing', 'holding');
@@ -1041,9 +1039,10 @@ function resetInactivityTimer() {
 function activateDimMode() {
     if (!state || !state.activeVisit) return;
     
-    // FIXED: Do not dim if the worker is filling out a report or looking at info
-    const isModalOpen = !document.getElementById('modalBackdrop').classList.contains('hidden');
-    if (isModalOpen) return;
+    // FIXED: Do not dim if the user is filling out a report or reading site info
+    const isModalOpen = !document.getElementById('modalBackdrop')?.classList.contains('hidden');
+    const isReportActive = document.getElementById('reportPage')?.classList.contains('active');
+    if (isModalOpen || isReportActive) return;
 
     const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
     if (remaining <= 0 || state.activeVisit.isPanic) return;
@@ -1054,7 +1053,6 @@ function activateDimMode() {
     const batterySaver = document.getElementById('batterySaver');
     if (batterySaver) batterySaver.classList.remove('hidden');
 }
-
 function deactivateDimMode() {
     document.documentElement.classList.remove('system-dim');
     document.body.classList.remove('system-dim');
@@ -2174,7 +2172,6 @@ async function startVisit() {
     const loc = state.locations.find(l => l.id === locId) || 
                 (locId === 'travel' ? { id: 'travel', name: '🚗 Travelling' } : null);
     
-    // 2. GET DURATION: Pull from the slider UI
     const slider = document.getElementById('durationSlider');
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
@@ -2184,7 +2181,6 @@ async function startVisit() {
         return;
     }
 
-    // 3. INITIALIZE ACTIVE VISIT: Reset all safety flags
     const startTime = Date.now();
     const durationSec = durationMins * 60;
     const dueOut = startTime + (durationSec * 1000);
@@ -2206,7 +2202,6 @@ async function startVisit() {
 
     saveState();
 
-    // 4. SYNC TO SPREADSHEET: Added 'action' for backend processing
     const activityType = locId === 'travel' ? "Travel" : "Visit";
     processUploadQueue(buildPayload({
         'action': 'logVisit',
@@ -2215,11 +2210,23 @@ async function startVisit() {
         'Notes': `${activityType} started. Duration: ${durationMins}m`
     }));
 
-    // 5. UI TRANSITION
     if (typeof speakWarning === 'function') {
         speakWarning(`${activityType} to ${loc.name} started.`);
     }
     
+    // --- MISSING SAFETY GUARDS ADDED BELOW ---
+
+    // A. ACTIVATE WAKE LOCK: Stops the OS from killing the app process
+    if (typeof requestWakeLock === 'function') requestWakeLock();
+
+    // B. START TRAVELLING PULSE: Periodic GPS updates for travel sessions
+    if (locId === 'travel' && typeof startTravellingPulse === 'function') {
+        startTravellingPulse();
+    }
+
+    // C. TRIGGER AUTO-DIM: Switches to power-saving mode after 10 seconds
+    resetInactivityTimer(); 
+
     renderLocations();
     updateArrivedButtonState();
     enterLockedScreen();
@@ -4012,6 +4019,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
