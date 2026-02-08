@@ -63,18 +63,19 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 .gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
 .gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
 
-/* Ensure dropdown options are visible and readable */
+/* BEST: Combines your custom arrow with high-contrast menu items */
 select.form-input {
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 1rem center;
     background-size: 1em;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 select.form-input option {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: #ffffff !important;
+    color: #000000 !important;
 }
 /* 6. UTILITY CLASSES */
 .form-input { width: 100%; background-color: var(--primary); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 1rem; outline: none; margin-bottom: 0.75rem; display: block; }
@@ -1454,29 +1455,28 @@ function loadFormAndShow(templateName) {
         }
     }
     
-    // 8. CONFIGURE SUBMIT BUTTON: Standardize for PC and Mobile
+    // 8. CONFIGURE SUBMIT BUTTON: Added active:scale for immediate feedback
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
+        // Added 'active:scale-95 transition-all' for immediate press feedback
+        newBtn.classList.add('active:scale-95', 'transition-all');
+
         if (!state.activeVisit) {
-            // Case A: General audit/form entry
             newBtn.textContent = 'SUBMIT REPORT';
             newBtn.classList.remove('long-press-btn');
             newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
             newBtn.onclick = submitReport;
         } else if (isMidVisitUpdate) {
-            // Case B: Updating status while on-site
             newBtn.textContent = 'SEND UPDATE';
             newBtn.classList.remove('long-press-btn');
             newBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
             newBtn.onclick = submitReport;
         } else {
-            // Case C: Ending the safety session
             newBtn.textContent = 'HOLD TO SUBMIT & END';
             newBtn.classList.add('long-press-btn');
-            // FIXED: Uses 1.5s for faster end-of-day workflow
             setupLongPress(newBtn, 1500, submitReport); 
         }
     }
@@ -2008,7 +2008,8 @@ function updateArrivedButtonState() {
     const btn = document.getElementById('btnStart');
     if (!btn) return;
     
-    // REMOVED hasDuration check: Button must be enabled to allow the "Auto-Set" long-press
+    // REMOVED hasDuration: The button must be enabled to allow 
+    // the "Auto-Set" long-press logic to begin
     const hasLocation = state && state.selectedLocationId;
     
     if (hasLocation) {
@@ -3442,10 +3443,10 @@ function showCurrentSiteInfo() {
     const btnEmail = document.getElementById('btnSiteEmail');
     const btnNav = document.getElementById('btnSiteNav');
     
-    // FIXED: Links now use backticks and ${} for dynamic values
+    // FIXED: Using backticks (``) so that variables are correctly inserted
     if (location.contactPhone && btnCall) {
         const cleanedPhone = cleanGlobalPhone(location.contactPhone);
-        btnCall.href = `tel:${cleanedPhone}`;
+        btnCall.href = `tel:${cleanedPhone}`; 
         btnCall.classList.remove('hidden');
     } else if (btnCall) btnCall.classList.add('hidden');
     
@@ -3454,12 +3455,11 @@ function showCurrentSiteInfo() {
         btnEmail.classList.remove('hidden');
     } else if (btnEmail) btnEmail.classList.add('hidden');
     
-    // FIXED: Removed extra brace and corrected template literal syntax
     if (location.address && btnNav) {
         const encodedAddr = encodeURIComponent(location.address);
         btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
         btnNav.classList.remove('hidden');
-    } else if (btnNav) { // REMOVED THE EXTRA } HERE
+    } else if (btnNav) {
         btnNav.classList.add('hidden');
     }
     
@@ -4077,6 +4077,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
