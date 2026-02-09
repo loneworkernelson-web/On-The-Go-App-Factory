@@ -1630,6 +1630,9 @@ function iamSafe() {
     withPinVerification(false, () => {
         announce("Safety confirmed. Resetting alarm.");
         logSafety("USER_SAFE", "Worker entered PIN to cancel alarm state.");
+        // Add this inside your iamSafe PIN verification success block
+        state.activeVisit.isSafeConfirmed = true; 
+        saveState();
         
         // Reset panic UI
         const lockedPage = document.getElementById('lockedPage');
@@ -3157,25 +3160,40 @@ function closeWofWarn() {
 }
 
 // ============================================================================
-// PHASE 1: TIME EXTENSION
+// PHASE 1: TIME EXTENSION - PATCHED
 // ============================================================================
 function confirmExtension(minutes) {
     const updateTime = () => {
-        // Add minutes to anticipated departure time
+        // 1. Calculate new anticipated departure time
         const currentDue = state.activeVisit.anticipatedDepartureTime;
         const newDue = currentDue + (minutes * 60000);
         
         state.activeVisit.anticipatedDepartureTime = newDue;
         
-        // Reset warning flags
-        state.activeVisit.warningSent = false;
-        state.activeVisit.warn90Sent = false;
-        state.activeVisit.warn2minSent = false;
-        state.activeVisit.warn5minSent = false;
+        // 2. CRITICAL RESET: Re-enable safety triggers for the new duration
+        state.activeVisit.isSafeConfirmed = false; 
+        state.activeVisit.isPanic = false;
+        state.activeVisit.criticalSent = false;
         
+        // 3. Reset all warning flags so they can fire again
+        state.activeVisit.warn5minSent = false;
+        state.activeVisit.warn2minSent = false;
+        state.activeVisit.warn90Sent = false;
+        
+        // 4. Update UI: Clear red alerts and pulse animations
+        document.body.classList.remove('bg-red-900');
+        const lockedPage = document.getElementById('lockedPage');
+        if (lockedPage) lockedPage.classList.remove('panic-mode');
+        
+        const timerEl = document.getElementById('countdownTimer');
+        if (timerEl) timerEl.classList.remove('text-red-500', 'animate-pulse');
+        
+        const overdueLabel = document.getElementById('overdueLabel');
+        if (overdueLabel) overdueLabel.classList.add('hidden');
+
         saveState();
         
-        // Send update to backend
+        // 5. Handshake: Log extension to the backend
         processUploadQueue(buildPayload({
             'Alarm Status': 'EXTENDED',
             'Notes': `Extended ${minutes}m`
@@ -3188,7 +3206,7 @@ function confirmExtension(minutes) {
     const now = Date.now();
     const dueTime = state.activeVisit.anticipatedDepartureTime;
     
-    // If overdue or in panic, require PIN
+    // 6. Security: If already overdue or in panic, require PIN to extend
     if (dueTime < now || state.activeVisit.isPanic) {
         withPinVerification(false, updateTime);
     } else {
@@ -4080,6 +4098,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
