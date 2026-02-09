@@ -303,18 +303,20 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
     
     <div class="content-area">
-        <!-- Sync and Add buttons row with travel tile -->
-        <div class="flex gap-2 mb-4">
-            <button onclick="forceSync(true)" id="btnSync" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">
-                ↻
-            </button>
-            <button onclick="openAddLocationModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">
-                +
-            </button>
-            <!-- Travel location (flexible width) -->
-            <div id="travelRow" class="flex-1"></div>
-        </div>
-        
+<div class="flex flex-col gap-1 mb-4">
+    <div class="flex gap-2">
+        <button onclick="forceSync(true)" id="btnSync" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-blue-400 text-2xl shadow-lg active:scale-95 transition" title="Sync Database">
+            ↻
+        </button>
+        <button onclick="openAddLocationModal()" class="w-14 h-14 bg-gray-800 border border-gray-600 rounded-xl flex items-center justify-center text-green-400 text-2xl shadow-lg active:scale-95 transition" title="Add Destination">
+            +
+        </button>
+        <div id="travelRow" class="flex-1"></div>
+    </div>
+    <div id="lastSyncLabel" class="text-[8px] text-gray-500 font-bold uppercase tracking-tighter ml-1">
+        Last Sync: Never
+    </div>
+</div>
         <!-- Regular locations (grid) -->
         <div id="locationList" class="grid grid-cols-2 gap-3"></div>
     </div>
@@ -340,8 +342,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <div class="flex gap-2 mt-2">
         <button onclick="setQuickDuration(15)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">15m</button>
         <button onclick="setQuickDuration(30)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">30m</button>
-        <button onclick="setQuickDuration(1hr)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">1h</button>
-        <button onclick="setQuickDuration(2hr)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">2h</button>
+        <button onclick="setQuickDuration(60)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">1h</button>
+        <button onclick="setQuickDuration(120)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">2h</button>
         </div>
         </div>
 
@@ -1705,6 +1707,13 @@ function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
         
+        // NEW: Haptic Heartbeat (vibrate every 10 seconds when under 2 mins)
+        if (remaining <= 120 && remaining > 0 && navigator.vibrate) {
+            // Check if the current second is a multiple of 10 (120, 110, 100...)
+            if (Math.floor(remaining) % 10 === 0) {
+                navigator.vibrate([100, 50, 100]); // Double pulse
+            }
+        }
         // 1. GPS TRIGGER: Only if overdue and NOT already watching
         if (remaining <= 0 && gpsWatchId === null) {
             startGPSMonitoring();
@@ -2921,6 +2930,7 @@ window.onload = () => {
         };
     }
     console.log("OTG Safety Engine: Robust Initialization Complete.");
+    updateLastSyncUI();
 };
     
 // ============================================================================
@@ -3341,30 +3351,14 @@ function updateOnlineStatus() {
 
 // Enhanced forceSync with online check
 function forceSync(showUI) {
-    console.log('🔵 forceSync CALLED - showUI:', showUI);
-    console.log('   state exists:', !!state);
-    console.log('   state.worker exists:', !!state?.worker);
-    console.log('   state.worker.name:', state?.worker?.name);
-    console.log('   CONFIG.key:', CONFIG.key?.substring(0, 15) + '...');
-    renderLocations();
-    // Check if key has been injected by factory
+    // 1. GATEKEEPER: Prevent sync in template mode or if identity is missing
     if (!CONFIG.key || CONFIG.key.includes('%%')) {
-        console.log('❌ forceSync EXITING - Worker key not injected by factory yet');
-        if (showUI) {
-            showToast('⚠️ Template mode - awaiting deployment');
-        }
+        if (showUI) showToast('⚠️ Template mode - awaiting deployment');
         return;
     }
     
-    // Simple check - return silently if no worker
-    if (!state || !state.worker || !state.worker.name) {
-        console.log('❌ forceSync EXITING - No worker name');
-        return;
-    }
+    if (!state || !state.worker || !state.worker.name) return;
     
-    console.log('✅ forceSync PROCEEDING with worker:', state.worker.name);
-    
-    // Show banner immediately
     if (showUI) {
         const banner = document.getElementById('uploadBanner');
         if (banner) banner.classList.remove('hidden');
@@ -3373,33 +3367,19 @@ function forceSync(showUI) {
     const deviceId = getDeviceID();
     const workerName = state.worker.name;
     
-    console.log(`🔄 Syncing for worker: ${workerName}, device: ${deviceId}`);
-    
     fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(workerName)}&key=${CONFIG.key}&deviceId=${deviceId}`)
         .then(r => r.json())
         .then(data => {
-            console.log('Sync response:', data);
-            
-            // Hide banner
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
             
-            // Handle errors
             if (data.status === "error") {
-                if (showUI) {
-                    if (data.message && data.message.includes("ACCESS DENIED")) {
-                        alert("⛔ ACCESS DENIED\n\n" + data.message);
-                        // startWizard(); // Commented - we handle this differently
-                    } else {
-                        alert("❌ Sync Error: " + (data.message || 'Unknown error'));
-                    }
-                }
+                if (showUI) alert("❌ Sync Error: " + (data.message || 'Unknown error'));
                 return;
             }
             
-            // Process locations
+            // 2. DATA MERGE: Sites, Forms, and Metadata
             const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
-            
             const backendSites = (data.sites || []).map(s => ({
                 id: 'site_' + s.siteName.replace(/\s/g, ''),
                 name: s.siteName,
@@ -3414,65 +3394,49 @@ function forceSync(showUI) {
                 isCritical: s.critical || false
             }));
             
-            // Add travel tile
-            if (CONFIG.mileageEnabled) {
-                backendSites.unshift({
-                    id: 'travel',
-                    name: 'Travel',
-                    address: 'Calculates Mileage via GPS',
-                    noReport: !CONFIG.reqTravelReport,
-                    companyName: 'Internal',
-                    templateName: 'Travel Report'
-                });
-            }
-            
-            // Merge locations
             state.locations = backendSites.concat(existingManual);
-            
-            // Update forms and meta
             state.globalForms = data.forms || [];
             state.cachedForms = data.cachedTemplates || {};
             state.meta = data.meta || {};
-            
-            // Ensure standard forms exist
-            if (!state.cachedForms["Standard Visit Note"] && !state.cachedForms["(Standard)"]) {
-                state.cachedForms["Standard Visit Note"] = [{type: 'note', text: 'Standard Check-in'}];
-            }
-            
-            if (CONFIG.mileageEnabled && !state.cachedForms['Travel Report']) {
-                state.cachedForms['Travel Report'] = [
-                    {type: 'number', text: 'Distance (km)'},
-                    {type: 'text', text: 'Details'},
-                    {type: 'photo', text: 'Odometer'}
-                ];
-            }
-            
-            // Handle travel preferences
-            const travelLoc = state.locations.find(x => x.id === 'travel');
-            const userPref = localStorage.getItem('otg_user_travel_pref');
-            if (travelLoc && userPref !== null) {
-                travelLoc.noReport = (userPref === 'true');
-            }
-            
-            // Save and render
+
+            // 3. INTEGRITY: Update timestamp ONLY on verified success
+            state.lastSyncTime = new Date().toISOString();
             saveState();
             renderLocations();
             checkVehicleStatus();
+            updateLastSyncUI(); 
             
-            if (showUI) showToast('✅ Sync Complete!');
-            
-            console.log(`✅ Sync complete: ${state.locations.length} locations loaded`);
+            if (showUI) showToast('✅ Sync Complete');
         })
         .catch(e => {
-            console.error('Sync failed:', e);
-            renderLocations();
+            // Log actual network failures for troubleshooting
+            console.error('OTG Sync Failure:', e);
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
-            if (showUI) showToast('❌ Sync failed: ' + e.message);
+            if (showUI) showToast('❌ Sync failed (Offline)');
         });
 }
 
+// Add to your scripts section
+function updateLastSyncUI() {
+    const label = document.getElementById('lastSyncLabel');
+    if (!label || !state.lastSyncTime) return;
 
+    const lastSync = new Date(state.lastSyncTime);
+    const daysOld = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60 * 24);
+    
+    // Safety Alert: Turn text red if data is > 3 days old
+    if (daysOld > 3) {
+        label.classList.add('text-red-500');
+        label.classList.remove('text-gray-500');
+    } else {
+        label.classList.remove('text-red-500');
+        label.classList.add('text-gray-500');
+    }
+
+    label.innerText = `Last Sync: ${lastSync.toLocaleDateString()} ${lastSync.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+}
+    
 // ============================================================================
 // PHASE 2 & 3: ALL REMAINING FEATURES
 // ============================================================================
@@ -4158,54 +4122,3 @@ function exitLockedScreen() {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
