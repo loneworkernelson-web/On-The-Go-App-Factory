@@ -1654,36 +1654,36 @@ function iamSafe() {
 }
 
 // ============================================================================
-// SAFETY HEARTBEAT (tick)
+// SAFETY HEARTBEAT (tick) - PATCHED
 // ============================================================================
 function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
         
-        // NEW: Engage GPS monitoring ONLY if overdue
+        // 1. GPS TRIGGER: Only if overdue and NOT already watching
         if (remaining <= 0 && gpsWatchId === null) {
             startGPSMonitoring();
         }
 
-        // PHASE 1: Multiple warning levels
-        if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
-            playWarningSound('warning');
-            state.activeVisit.warn5minSent = true;
-            saveState();
-        }
-        
-        if (remaining <= 120 && remaining > 119 && !state.activeVisit.warn2minSent) {
-            playWarningSound('warning');
-            speakWarning("Warning. Safety alarm will activate in two minutes.");
-            state.activeVisit.warn2minSent = true;
-            saveState();
-        }
-        
-        if (remaining <= 90 && remaining > 89 && !state.activeVisit.warn90Sent) {
-            playWarningSound('critical');
-            speakWarning("Critical Warning. Safety alarm will activate in 90 seconds.");
-            state.activeVisit.warn90Sent = true;
-            saveState();
+        // 2. PHASE 1: Multiple warning levels (Only fire if time is still remaining)
+        if (remaining > 0) {
+            if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
+                playWarningSound('warning');
+                state.activeVisit.warn5minSent = true;
+                saveState();
+            }
+            if (remaining <= 120 && remaining > 119 && !state.activeVisit.warn2minSent) {
+                playWarningSound('warning');
+                speakWarning("Warning. Safety alarm will activate in two minutes.");
+                state.activeVisit.warn2minSent = true;
+                saveState();
+            }
+            if (remaining <= 90 && remaining > 89 && !state.activeVisit.warn90Sent) {
+                playWarningSound('critical');
+                speakWarning("Critical Warning. Safety alarm will activate in 90 seconds.");
+                state.activeVisit.warn90Sent = true;
+                saveState();
+            }
         }
         
         const timerEl = document.getElementById('countdownTimer');
@@ -1694,7 +1694,7 @@ function tick() {
             // Automatically wake screen if dimmed
             if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
 
-            // OVERDUE UI Update
+            // 3. OVERDUE UI Update (Digital Display)
             if (overdueLabel) overdueLabel.classList.remove('hidden');
             const absRemaining = Math.abs(remaining);
             const mins = Math.floor(absRemaining / 60);
@@ -1710,22 +1710,24 @@ function tick() {
                 timerEl.classList.add('text-red-500', 'animate-pulse');
             }
             
-            // Swap controls for safety confirmation
-            const btnSafe = document.getElementById('btnSafe');
-            const btnDepart = document.getElementById('btnDepart');
-            const btnExtend = document.getElementById('btnExtend');
-            if (btnSafe) btnSafe.classList.remove('hidden');
-            if (btnDepart) btnDepart.classList.add('hidden');
-            if (btnExtend) btnExtend.classList.add('hidden');
-            
-            // Trigger critical alarm
-            if (!state.activeVisit.criticalSent) {
-                triggerPanic(false);
-                state.activeVisit.criticalSent = true;
-                saveState();
+            // 4. BREAK THE LOOP: Only update buttons and trigger panic if NOT already confirmed safe
+            if (!state.activeVisit.isSafeConfirmed) {
+                const btnSafe = document.getElementById('btnSafe');
+                const btnDepart = document.getElementById('btnDepart');
+                const btnExtend = document.getElementById('btnExtend');
+                if (btnSafe) btnSafe.classList.remove('hidden');
+                if (btnDepart) btnDepart.classList.add('hidden');
+                if (btnExtend) btnExtend.classList.add('hidden');
+                
+                // Trigger critical alarm once
+                if (!state.activeVisit.criticalSent) {
+                    triggerPanic(false);
+                    state.activeVisit.criticalSent = true;
+                    saveState();
+                }
             }
         } else {
-            // COUNTDOWN
+            // COUNTDOWN (Normal countdown UI)
             if (overdueLabel) overdueLabel.classList.add('hidden');
             const mins = Math.floor(remaining / 60);
             const secs = Math.floor(remaining % 60);
@@ -1747,6 +1749,7 @@ function tick() {
         }
     }
 }
+
 // ============================================================================
 // ENHANCED RENDER LOCATIONS (Layout Corrected)
 // ============================================================================
@@ -4077,6 +4080,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
