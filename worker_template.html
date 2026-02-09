@@ -1707,11 +1707,19 @@ function tick() {
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
         
-        // NEW: Haptic Heartbeat (vibrate every 10 seconds when under 2 mins)
+        // NEW: Escalating Haptic Heartbeat (vibrate every 10s)
         if (remaining <= 120 && remaining > 0 && navigator.vibrate) {
-            // Check if the current second is a multiple of 10 (120, 110, 100...)
             if (Math.floor(remaining) % 10 === 0) {
-                navigator.vibrate([100, 50, 100]); // Double pulse
+                if (remaining <= 30) {
+                    // URGENT: Triple pulse (Final 30 seconds)
+                    navigator.vibrate([100, 50, 100, 50, 100]);
+                } else if (remaining <= 60) {
+                    // WARNING: Double pulse (Final minute)
+                    navigator.vibrate([100, 50, 100]);
+                } else {
+                    // ALERT: Single pulse (2-minute mark)
+                    navigator.vibrate([100]);
+                }
             }
         }
         // 1. GPS TRIGGER: Only if overdue and NOT already watching
@@ -3423,18 +3431,27 @@ function updateLastSyncUI() {
     if (!label || !state.lastSyncTime) return;
 
     const lastSync = new Date(state.lastSyncTime);
-    const daysOld = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60 * 24);
+    const diffMs = Date.now() - lastSync.getTime();
+    const minsOld = diffMs / (1000 * 60);
+    const hoursOld = minsOld / 60;
     
-    // Safety Alert: Turn text red if data is > 3 days old
-    if (daysOld > 3) {
-        label.classList.add('text-red-500');
-        label.classList.remove('text-gray-500');
-    } else {
-        label.classList.remove('text-red-500');
-        label.classList.add('text-gray-500');
-    }
+    // Clear old colors
+    label.classList.remove('text-green-500', 'text-gray-500', 'text-yellow-500', 'text-red-500');
 
-    label.innerText = `Last Sync: ${lastSync.toLocaleDateString()} ${lastSync.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    // Color code by age
+    if (minsOld < 1) {
+        label.classList.add('text-green-500');
+        label.innerText = 'Last Sync: Just now';
+    } else if (hoursOld < 24) {
+        label.classList.add('text-gray-500');
+        label.innerText = `Last Sync: ${Math.floor(minsOld)}m ago`;
+    } else if (hoursOld < 72) {
+        label.classList.add('text-yellow-500');
+        label.innerText = `Last Sync: > 1 day ago`;
+    } else {
+        label.classList.add('text-red-500');
+        label.innerText = `Last Sync: STALE (SYNC REQUIRED)`;
+    }
 }
     
 // ============================================================================
@@ -4122,3 +4139,4 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
