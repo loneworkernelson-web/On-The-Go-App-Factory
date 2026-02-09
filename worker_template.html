@@ -160,6 +160,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     50% { opacity: 0.4; transform: scale(0.9); }
 }
 
+/* Emergency strobe for rescue visibility */
+.strobe-active {
+    animation: strobe-anim 0.4s infinite !important;
+}
+
+@keyframes strobe-anim {
+    0%, 49% { background-color: #991b1b !important; }
+    50%, 100% { background-color: #000000 !important; }
+}
+    
 </style>
 </head>
 <body class="h-full overflow-hidden select-none">
@@ -1618,7 +1628,11 @@ async function triggerPanic(duress = false) {
     
     document.body.classList.add('bg-red-900');
     announce(duress ? "Duress activated silently." : "Panic alarm activated.");
-    
+
+        if (!duress) {
+            // Only strobe for standard panic (not silent duress)
+            document.body.classList.add('strobe-active');
+        }    
     // Play audible alarm if audio is ready
     await initAudio();
     if (audioReady && synth) {
@@ -1655,6 +1669,9 @@ function iamSafe() {
         const lockedPage = document.getElementById('lockedPage');
         if (lockedPage) lockedPage.classList.remove('panic-mode');
         document.body.classList.remove('bg-red-900');
+
+        // Update iamSafe success block to remove strobe
+        document.body.classList.remove('strobe-active');
         
         // Clear alarm state
         state.activeVisit.isPanic = false;
@@ -4141,6 +4158,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
