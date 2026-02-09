@@ -150,6 +150,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     50% { background: #dc2626; }
 }
 
+/* Animated GPS pulse for active travel tracking */
+.gps-pulse {
+    animation: gps-pulse-anim 1.5s infinite ease-in-out;
+}
+
+@keyframes gps-pulse-anim {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.9); }
+}
+
 </style>
 </head>
 <body class="h-full overflow-hidden select-none">
@@ -317,7 +327,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="durationSlider" type="range" min="0" max="31" value="0" 
                    class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" 
                    oninput="updateDurationDisplay()">
+            <div class="flex gap-2 mt-2">
+        <button onclick="setQuickDuration(15)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">15m</button>
+        <button onclick="setQuickDuration(30)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">30m</button>
+        <button onclick="setQuickDuration(1hr)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">1h</button>
+        <button onclick="setQuickDuration(2hr)" class="flex-1 py-1 bg-gray-700/50 rounded text-[10px] font-black uppercase text-blue-400 border border-blue-500/20">2h</button>
         </div>
+        </div>
+
         
         <!-- Forms Button + Hold to Start Button -->
 <div class="flex gap-4 items-stretch h-16">
@@ -1660,6 +1677,14 @@ function iamSafe() {
 // SAFETY HEARTBEAT (tick) - PATCHED
 // ============================================================================
 function tick() {
+    const gpsIndicator = document.getElementById('gpsIndicator');
+    if (gpsIndicator && state.activeVisit) {
+        if (state.activeVisit.locationId === 'travel') {
+            gpsIndicator.classList.add('gps-pulse');
+        } else {
+            gpsIndicator.classList.remove('gps-pulse');
+        }
+    }
     if (state && state.activeVisit) {
         const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
         
@@ -1667,7 +1692,7 @@ function tick() {
         if (remaining <= 0 && gpsWatchId === null) {
             startGPSMonitoring();
         }
-
+        
         // 2. PHASE 1: Multiple warning levels (Only fire if time is still remaining)
         if (remaining > 0) {
             if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
@@ -2006,6 +2031,24 @@ function updateDurationDisplay() {
     state.visitDurationMinutes = minutes;
     updateArrivedButtonState();
 }
+
+// Add this helper function to the script section
+function setQuickDuration(mins) {
+    const slider = document.getElementById('durationSlider');
+    if (!slider) return;
+
+    // Find the correct position (index) in your DURATION_MAP
+    const idx = DURATION_MAP.indexOf(mins);
+    if (idx !== -1) {
+        slider.value = idx;
+        // Physically trigger the display update so the "Due" time recalculates
+        updateDurationDisplay();
+        
+        // Haptic feedback (10ms pulse) so the worker "feels" the selection
+        if (navigator.vibrate) navigator.vibrate(10);
+    }
+}
+    
 // Update "Hold to Start" button state
 // ============================================================================
 // UPDATED: BUTTON LOGIC (Restores "Hold to Start")
@@ -4098,6 +4141,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
