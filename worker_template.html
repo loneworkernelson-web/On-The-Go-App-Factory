@@ -300,13 +300,28 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="wizEmail" type="email" placeholder="Email Address" class="form-input">
         </div>
         <div id="wizStep2" class="wizard-step">
-<form id="wizPinForm" onsubmit="return false;">
-    <input type="text" name="username" autocomplete="username" value="Worker" class="hidden" style="display:none !important;">
-    <h2 class="text-lg font-bold mb-4">Security PINs</h2>
-    <input id="wizPin" type="password" autocomplete="new-password" placeholder="Standard PIN (4-6 digits)" class="form-input" inputmode="numeric" maxlength="6">
-    <input id="wizDuress" type="password" autocomplete="new-password" placeholder="Duress PIN (silent alert)" class="form-input" inputmode="numeric" maxlength="6">
-</form>
+    <form id="wizPinForm" onsubmit="return false;">
+        <input type="text" name="username" autocomplete="username" value="Worker" class="hidden" style="display:none !important;">
+        
+        <h2 class="text-lg font-bold mb-4">Security PINs</h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="setting-label">Standard PIN</label>
+                <input id="wizPin" type="password" autocomplete="new-password" placeholder="Enter 4-6 digits" class="form-input mb-2" inputmode="numeric" maxlength="6" oninput="checkWizPinMatch()">
+                <input id="wizPinConfirm" type="password" placeholder="Confirm Standard PIN" class="form-input" inputmode="numeric" maxlength="6" oninput="checkWizPinMatch()">
+            </div>
+            
+            <div>
+                <label class="setting-label lbl-red">Duress PIN (Silent Alert)</label>
+                <input id="wizDuress" type="password" autocomplete="new-password" placeholder="Enter 4-6 digits" class="form-input mb-2" inputmode="numeric" maxlength="6" oninput="checkWizPinMatch()">
+                <input id="wizDuressConfirm" type="password" placeholder="Confirm Duress PIN" class="form-input" inputmode="numeric" maxlength="6" oninput="checkWizPinMatch()">
+            </div>
+            
+            <p id="pinMatchError" class="text-[10px] text-red-500 font-bold uppercase hidden">PINs do not match or are too short</p>
         </div>
+    </form>
+</div>
         <div id="wizStep3" class="wizard-step">
             <h2 class="text-lg font-bold mb-4">Emergency Contacts</h2>
             <label class="setting-label lbl-red">Primary Emergency Contact</label>
@@ -2098,8 +2113,9 @@ function setQuickDuration(mins) {
     const idx = DURATION_MAP.indexOf(mins);
     if (idx !== -1) {
         slider.value = idx;
-        updateDurationDisplay(); // Updates the text
-        updateArrivedButtonState(); // NEW: Forces the Start button to enable
+        updateDurationDisplay(); 
+        // Force the Start button to re-check its enabled/disabled status
+        updateArrivedButtonState(); 
         if (navigator.vibrate) navigator.vibrate(15);
     }
 }
@@ -2117,18 +2133,18 @@ function updateArrivedButtonState() {
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const hasDuration = durationMins > 0;
 
-    // Button only enables if BOTH conditions are met
+    // REMOVE physical 'disabled' so the long-press animation can actually start
+    btn.disabled = false; 
+
     if (hasLocation && hasDuration) {
-        btn.disabled = false;
         btn.classList.remove('bg-gray-700', 'text-gray-500', 'opacity-50');
         btn.classList.add('bg-blue-600', 'text-white');
         btn.innerText = state.selectedLocationId === 'travel' ? 'HOLD TO TRAVEL' : 'HOLD TO START';
     } else {
-        btn.disabled = true;
+        // Visually dim the button but keep it clickable for feedback
         btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
         btn.classList.remove('bg-blue-600', 'text-white');
         
-        // Provide contextual help on the button itself
         if (!hasLocation) btn.innerText = 'SELECT SITE';
         else if (!hasDuration) btn.innerText = 'SELECT TIME';
     }
@@ -4173,10 +4189,31 @@ function exitLockedScreen() {
     releaseWakeLock();
 }
 
+    function checkWizPinMatch() {
+    const pin = document.getElementById('wizPin').value;
+    const pinConf = document.getElementById('wizPinConfirm').value;
+    const dur = document.getElementById('wizDuress').value;
+    const durConf = document.getElementById('wizDuressConfirm').value;
+    const btnNext = document.getElementById('btnWizNext');
+    const err = document.getElementById('pinMatchError');
+
+    const pinsMatch = (pin === pinConf && pin !== '') && (dur === durConf && dur !== '');
+    
+    if (pinsMatch) {
+        btnNext.disabled = false;
+        btnNext.classList.remove('opacity-50');
+        err.classList.add('hidden');
+    } else {
+        btnNext.disabled = true;
+        btnNext.classList.add('opacity-50');
+        if (pinConf !== '' || durConf !== '') err.classList.remove('hidden');
+    }
+}
 </script>
 
 </body>
 </html>
+
 
 
 
