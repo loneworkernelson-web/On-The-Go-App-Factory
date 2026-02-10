@@ -53,10 +53,20 @@ body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparen
 
 /* 4. LONG-PRESS INTERACTION STYLES */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn::after { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: rgba(255, 255, 255, 0.3); transition: width 0.2s ease-out; }
 .long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
 .long-press-btn.holding::after { width: 100%; transition: width 2s linear; }
-
+/* 3. ANIMATION PATCH: High-visibility blue fill */
+.long-press-btn::after { 
+    content: ''; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 0; 
+    height: 100%; 
+    background: rgba(59, 130, 246, 0.5); /* Semi-transparent blue */
+    transition: width 0.2s ease-out; 
+    z-index: 0;
+}
 /* 5. GPS SIGNAL BARS */
 .gps-bar { width: 4px; height: 12px; background-color: #374151; border-radius: 1px; transition: background-color 0.3s; }
 .gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
@@ -381,15 +391,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
         
         <!-- Forms Button + Hold to Start Button -->
-<div class="flex gap-4 items-stretch h-16">
+<div class="flex gap-3 h-16 items-stretch">
     <button id="btnForms" onclick="openFormsLibrary()" 
-            class="flex-none w-24 bg-indigo-950 text-indigo-300 font-black rounded-2xl border border-indigo-700/50 shadow-lg active:scale-95 transition text-[10px] uppercase tracking-widest">
+            class="w-1/4 bg-indigo-950 text-indigo-300 font-black rounded-2xl border border-indigo-700/50 shadow-lg active:scale-95 transition text-xs uppercase tracking-tighter leading-none">
         Forms
     </button>
     <button type="button" id="btnStart" 
             class="long-press-btn flex-1 bg-gray-700 text-gray-500 font-black rounded-2xl text-xl shadow-lg transition-all uppercase tracking-tighter" 
             disabled>
-        Hold to Start
+        <span class="relative z-10">Hold to Start</span>
     </button>
 </div>
     </div>
@@ -2085,16 +2095,12 @@ function updateDurationDisplay() {
 function setQuickDuration(mins) {
     const slider = document.getElementById('durationSlider');
     if (!slider) return;
-
-    // Find the correct position (index) in your DURATION_MAP
     const idx = DURATION_MAP.indexOf(mins);
     if (idx !== -1) {
         slider.value = idx;
-        // Physically trigger the display update so the "Due" time recalculates
-        updateDurationDisplay();
-        
-        // Haptic feedback (10ms pulse) so the worker "feels" the selection
-        if (navigator.vibrate) navigator.vibrate(10);
+        updateDurationDisplay(); // Updates the text
+        updateArrivedButtonState(); // NEW: Forces the Start button to enable
+        if (navigator.vibrate) navigator.vibrate(15);
     }
 }
     
@@ -2104,23 +2110,30 @@ function setQuickDuration(mins) {
 // ============================================================================
 function updateArrivedButtonState() {
     const btn = document.getElementById('btnStart');
-    if (!btn) return;
+    const slider = document.getElementById('durationSlider');
+    if (!btn || !slider) return;
     
-    // REMOVED hasDuration: The button must be enabled to allow 
-    // the "Auto-Set" long-press logic to begin
-    const hasLocation = state && state.selectedLocationId;
-    
-    if (hasLocation) {
+    const hasLocation = !!state.selectedLocationId;
+    const durationMins = DURATION_MAP[parseInt(slider.value)];
+    const hasDuration = durationMins > 0;
+
+    // Button only enables if BOTH conditions are met
+    if (hasLocation && hasDuration) {
         btn.disabled = false;
-        btn.classList.remove('bg-gray-700', 'text-gray-500');
+        btn.classList.remove('bg-gray-700', 'text-gray-500', 'opacity-50');
         btn.classList.add('bg-blue-600', 'text-white');
         btn.innerText = state.selectedLocationId === 'travel' ? 'HOLD TO TRAVEL' : 'HOLD TO START';
     } else {
         btn.disabled = true;
-        btn.classList.add('bg-gray-700', 'text-gray-500');
-        btn.innerText = 'HOLD TO START';
+        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
+        btn.classList.remove('bg-blue-600', 'text-white');
+        
+        // Provide contextual help on the button itself
+        if (!hasLocation) btn.innerText = 'SELECT SITE';
+        else if (!hasDuration) btn.innerText = 'SELECT TIME';
     }
 }
+    
 /**
  * Renders the Forms Library in a Two-Column Grid.
  */
@@ -4164,6 +4177,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
