@@ -1278,13 +1278,10 @@ function startTravellingPulse() {
 }
 
 /**
- * REWRITTEN: High-Integrity Form Builder
- * Parses [TYPE] tags, strips them from labels, and builds the correct UI.
- */
-/**
  * HIGH-INTEGRITY FORM BUILDER
- * Parses [TYPE] tags, strips them from labels, and builds the UI.
- * Corrected: Removed duplications and fixed variable reference errors.
+ * Fixed: [YESNO] uses Radio Buttons
+ * Fixed: [PHOTO] prioritizes Camera
+ * Fixed: [DROP] Comma-separated parsing
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
@@ -1296,20 +1293,30 @@ function buildReportForm(templateName, fieldArea) {
     const questions = template.questions || [];
 
     questions.forEach(label => {
-        // 1. Parse tag and clean label
         const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/);
-        let fullTag = tagMatch ? tagMatch[1].toUpperCase() : "TEXT";
+        const rawTag = tagMatch ? tagMatch[1] : "TEXT";
         let cleanLabel = tagMatch ? tagMatch[2] : label;
         
-        // Split tag for options (e.g., DROP|OK,Issue)
-        const tagParts = fullTag.split('|');
-        const baseType = tagParts[0];
+        let baseType = "";
+        let options = [];
+        
+        if (rawTag.includes(',')) {
+            const parts = rawTag.split(',');
+            baseType = parts[0].toUpperCase().trim();
+            options = parts.slice(1).map(o => o.trim());
+        } else if (rawTag.includes('|')) {
+            const parts = rawTag.split('|');
+            baseType = parts[0].toUpperCase().trim();
+            options = parts[1].split(',').map(o => o.trim());
+        } else {
+            baseType = rawTag.toUpperCase().trim();
+            options = ["Yes", "No"];
+        }
         
         const fieldId = `field_${cleanLabel.replace(/\s/g, '_')}`;
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-6'; 
 
-        // 2. Handle Heading
         if (baseType === 'HEADING' || baseType === 'HEAD') {
             const h = document.createElement('h3');
             h.className = 'text-blue-400 font-black text-[10px] uppercase tracking-[0.25em] mb-4 border-b border-blue-500/20 pb-2 mt-6';
@@ -1319,7 +1326,6 @@ function buildReportForm(templateName, fieldArea) {
             return;
         }
 
-        // 3. Render Label
         const labelEl = document.createElement('label');
         labelEl.className = 'block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
         labelEl.innerText = cleanLabel;
@@ -1327,55 +1333,48 @@ function buildReportForm(templateName, fieldArea) {
 
         let input;
 
-        // 4. Input Factory - Switched to baseType to support tag options
+        // --- UPDATED FIELD FACTORY ---
         switch(baseType) {
             case 'PHOTO': 
                 input = document.createElement('input');
-                input.type = 'file'; input.accept = 'image/*'; 
+                input.type = 'file'; 
+                input.accept = 'image/*'; 
+                // Forces camera on most mobile browsers
+                input.setAttribute('capture', 'environment'); 
                 input.onchange = () => handlePhoto(input, cleanLabel);
                 break;
 
-            case 'ATTACH': 
-                input = document.createElement('input');
-                input.type = 'file';
-                input.onchange = () => handleAttachment(input, cleanLabel);
-                break;
-
             case 'YES/NO': 
-                input = document.createElement('select');
-                ["-- Select --", "Yes", "No"].forEach(o => {
-                    const opt = document.createElement('option');
-                    opt.value = (o === "-- Select --") ? "" : o; opt.text = o;
-                    input.appendChild(opt);
+            case 'YESNO':
+                // Renders as high-contrast radio buttons
+                const radioWrap = document.createElement('div');
+                radioWrap.className = 'flex gap-4 mt-2';
+                
+                ["Yes", "No"].forEach(val => {
+                    const optWrap = document.createElement('label');
+                    optWrap.className = 'flex-1 flex items-center justify-center gap-3 bg-gray-800 border-2 border-gray-700 rounded-xl py-4 cursor-pointer active:bg-blue-600 transition-colors';
+                    
+                    const rad = document.createElement('input');
+                    rad.type = 'radio';
+                    rad.name = fieldId;
+                    rad.value = val;
+                    rad.className = 'w-5 h-5 accent-blue-500';
+                    rad.setAttribute('data-key', cleanLabel);
+                    
+                    const span = document.createElement('span');
+                    span.className = 'text-sm font-bold text-white uppercase tracking-widest';
+                    span.innerText = val;
+                    
+                    optWrap.appendChild(rad);
+                    optWrap.appendChild(span);
+                    radioWrap.appendChild(optWrap);
                 });
-                break;
-
-            case 'NUMBER':
-                input = document.createElement('input'); 
-                input.type = 'number';
-                break;
-
-            case '$':
-            case 'CURRENCY':
-                const wrap = document.createElement('div'); wrap.className = 'flex items-center';
-                const sym = document.createElement('span');
-                sym.className = 'px-4 py-3 bg-gray-800 border border-r-0 border-white/10 rounded-l-xl text-blue-400 font-black text-sm';
-                sym.innerText = '$';
-                input = document.createElement('input'); input.type = 'number'; input.step = '0.01';
-                input.className = 'rounded-l-none';
-                wrap.appendChild(sym); wrap.appendChild(input);
-                wrapper.appendChild(wrap);
-                break;
-
-            case 'DATE':
-                input = document.createElement('input'); 
-                input.type = 'date';
+                wrapper.appendChild(radioWrap);
+                input = null; // No additional standard input needed
                 break;
 
             case 'DROP':
                 input = document.createElement('select');
-                // Extract options from tag: [DROP|Opt1,Opt2]
-                const options = tagParts.length > 1 ? tagParts[1].split(',') : ["OK", "Issue", "N/A"];
                 ["-- Select --", ...options].forEach(o => {
                     const opt = document.createElement('option');
                     opt.value = (o === "-- Select --") ? "" : o;
@@ -1384,45 +1383,18 @@ function buildReportForm(templateName, fieldArea) {
                 });
                 break;
 
-            case 'SIGNATURE':
-            case 'SIGN':
-                const canvas = document.createElement('canvas');
-                canvas.id = `sig-canvas-${cleanLabel.replace(/\s/g, '_')}`;
-                canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
-                wrapper.appendChild(canvas);
-                // Initialize after render
-                setTimeout(() => { initSigPad(canvas); }, 200);
-                break;
-
-            case 'GPS':
-                const btn = document.createElement('button');
-                btn.className = 'w-full py-4 bg-blue-900/30 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
-                btn.innerText = '📍 Capture GPS';
-                btn.onclick = (e) => { e.preventDefault(); captureGPS(btn); };
-                wrapper.appendChild(btn);
-                input = document.createElement('input'); 
-                input.readOnly = true; 
-                input.className = 'opacity-40';
-                break;
-
-            case 'TEXT':
-                input = document.createElement('textarea'); 
-                input.rows = 3;
-                break;
-
+            // ... (keep your existing cases for NUMBER, GPS, SIGN, etc.)
             default:
-                input = document.createElement('input'); 
-                input.type = 'text';
+                input = document.createElement('textarea'); 
+                input.rows = 2;
         }
 
-        // 5. Final Assembly & File Status Labels
         if (input) {
             input.id = fieldId;
             input.className = (input.className || '') + ' form-input';
             input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
 
-            // Adds "📎 Attachment Saved" or "✅ Saved" status labels
             if (baseType === 'PHOTO' || baseType === 'ATTACH') {
                 const status = document.createElement('div');
                 status.id = `lbl_${fieldId}`; 
@@ -1433,6 +1405,7 @@ function buildReportForm(templateName, fieldArea) {
         fieldArea.appendChild(wrapper);
     });
 }
+
 // ============================================================================
 // PIN VERIFICATION
 // ============================================================================
@@ -2542,7 +2515,12 @@ function gatherFormData() {
     document.querySelectorAll('[data-key]').forEach(el => {
         const k = el.getAttribute('data-key');
         let v = el.value;
-        
+
+        // Check for Radio Button selection
+        if (el.type === 'radio') {
+            if (!el.checked) return; // Skip the unselected one
+            v = el.value;
+        }
         if (el.type === 'checkbox') {
             v = el.checked ? 'Yes' : 'No';
         } else if (el.type === 'radio') {
@@ -4186,6 +4164,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
