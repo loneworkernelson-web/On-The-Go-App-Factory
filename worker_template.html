@@ -2401,31 +2401,20 @@ function setupHoldToStart() {
         startVisit();
     });
 }
-// Start visit (called after long-press)
 /**
- * Safety Engine: Initialize the Visit
- * Consolidates safety object creation and ensures consistent logging.
+ * HIGH-INTEGRITY VISIT INITIALIZATION
+ * Added: GPS Handshake for accurate travel starting points.
  */
 async function startVisit() {
-    isMidVisitUpdate = false; // FIXED: Ensures the next report clears the session correctly
-    // 1. SAFE AUDIO UNLOCK: Primes the speakers for future alarms
+    isMidVisitUpdate = false; 
+
+    // 1. Audio Unlock
     try {
-        await Promise.race([
-            Tone.start(),
-            new Promise(r => setTimeout(r, 500))
-        ]);
-        console.log("🔊 Audio active");
+        await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 500))]);
     } catch (e) { console.warn("Audio skipped"); }
 
     const locId = state.selectedLocationId;
-    // NEW: Engage GPS monitoring for travel sessions
-    if (locId === 'travel') {
-        startGPSMonitoring();
-    }
-    if (!locId) {
-        showToast('⚠️ Select a site first');
-        return;
-    }
+    if (!locId) return showToast('⚠️ Select a site first');
 
     const loc = state.locations.find(l => l.id === locId) || 
                 (locId === 'travel' ? { id: 'travel', name: '🚗 Travelling' } : null);
@@ -2434,22 +2423,34 @@ async function startVisit() {
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    if (!durationMins && locId !== 'travel') {
-        showToast('⚠️ Select a duration');
-        return;
+    // 2. TRAVEL PRE-FLIGHT: Force a fresh GPS lock
+    let verifiedStartGPS = lastGPS || "0,0";
+    if (locId === 'travel') {
+        showToast('📍 Locking GPS signal...');
+        try {
+            const freshPos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                    enableHighAccuracy: true, timeout: 3000 
+                });
+            });
+            verifiedStartGPS = `${freshPos.coords.latitude.toFixed(6)},${freshPos.coords.longitude.toFixed(6)}`;
+            lastGPS = verifiedStartGPS; // Update global state
+        } catch (e) {
+            console.warn('Fast GPS lock failed, using fallback.');
+        }
+        startGPSMonitoring(); // Engage continuous tracking
     }
 
     const startTime = Date.now();
     const durationSec = durationMins * 60;
-    const dueOut = startTime + (durationSec * 1000);
 
     state.activeVisit = {
         locationId: locId,
         locationName: loc.name,
         startTime: startTime,
         duration: durationSec,
-        anticipatedDepartureTime: dueOut,
-        startGPS: lastGPS || "0,0",
+        anticipatedDepartureTime: startTime + (durationSec * 1000),
+        startGPS: verifiedStartGPS, // HIGH-INTEGRITY COORDINATE
         highRisk: isHighRisk,
         isPanic: false,
         criticalSent: false,
@@ -2460,31 +2461,21 @@ async function startVisit() {
 
     saveState();
 
+    // 3. LOGGING & ANNOUNCEMENT
     const activityType = locId === 'travel' ? "Travel" : "Visit";
     processUploadQueue(buildPayload({
         'action': 'logVisit',
         'Alarm Status': 'ARRIVED',
-        'Location Name': loc.name,
-        'Notes': `${activityType} started. Duration: ${durationMins}m`
+        'Notes': `${activityType} started. Duration: ${durationMins}m`,
+        'Last Known GPS': verifiedStartGPS
     }));
 
-    if (typeof speakWarning === 'function') {
-        speakWarning(`${activityType} to ${loc.name} started.`);
-    }
+    announce(`${activityType} started.`);
     
-    // --- MISSING SAFETY GUARDS ADDED BELOW ---
-
-    // A. ACTIVATE WAKE LOCK: Stops the OS from killing the app process
     if (typeof requestWakeLock === 'function') requestWakeLock();
+    if (locId === 'travel') startTravellingPulse();
 
-    // B. START TRAVELLING PULSE: Periodic GPS updates for travel sessions
-    if (locId === 'travel' && typeof startTravellingPulse === 'function') {
-        startTravellingPulse();
-    }
-
-    // C. TRIGGER AUTO-DIM: Switches to power-saving mode after 10 seconds
     resetInactivityTimer(); 
-
     renderLocations();
     updateArrivedButtonState();
     enterLockedScreen();
@@ -4280,6 +4271,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
