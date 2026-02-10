@@ -1314,9 +1314,9 @@ function startTravellingPulse() {
 }
 
 /**
- * HIGH-INTEGRITY FORM BUILDER
- * Added: [1TEXT], [TEXT], [ATTACH], [NOTE]
- * Maintained: [SIGN], [DATE], [CHECK], [GPS], [PHOTO], [YESNO], [DROP]
+ * FINAL GOLDEN BUILD: FORM ENGINE
+ * Fixed: Added Camera Trigger [PHOTO]
+ * Fixed: Added logic for [1TEXT], [TEXT], [ATTACH], [NOTE]
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
@@ -1347,7 +1347,6 @@ function buildReportForm(templateName, fieldArea) {
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-6'; 
 
-        // Informational fields do not need standard labels
         const isInfoOnly = (baseType === 'HEADING' || baseType === 'HEAD' || baseType === 'NOTE');
         
         if (!isInfoOnly) {
@@ -1359,7 +1358,6 @@ function buildReportForm(templateName, fieldArea) {
 
         let input;
 
-        // --- EXTENDED FIELD FACTORY ---
         switch(baseType) {
             case 'HEADING':
             case 'HEAD':
@@ -1371,7 +1369,6 @@ function buildReportForm(templateName, fieldArea) {
                 return;
 
             case 'NOTE':
-                // Informational text block (No Input)
                 const n = document.createElement('div');
                 n.className = 'p-4 bg-blue-900/20 border-l-4 border-blue-500 rounded-r-xl text-xs text-blue-100 font-medium italic leading-relaxed';
                 n.innerText = cleanLabel;
@@ -1379,29 +1376,47 @@ function buildReportForm(templateName, fieldArea) {
                 fieldArea.appendChild(wrapper);
                 return;
 
+            case 'CHECK':
+            case 'CHECKBOX':
+                const checkWrap = document.createElement('label');
+                checkWrap.className = 'flex items-center gap-3 bg-gray-800/40 p-4 rounded-xl border border-white/5 cursor-pointer active:bg-blue-900/20 transition';
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.className = 'w-6 h-6 rounded accent-blue-500';
+                const checkText = document.createElement('span');
+                checkText.className = 'text-sm font-bold text-gray-300';
+                checkText.innerText = 'Confirm';
+                checkWrap.appendChild(input);
+                checkWrap.appendChild(checkText);
+                wrapper.appendChild(checkWrap);
+                break;
+
             case '1TEXT':
-                // Single line text input
                 input = document.createElement('input');
                 input.type = 'text';
+                input.placeholder = 'Type here...';
                 break;
 
             case 'TEXT':
-                // Multi-line extended text input
                 input = document.createElement('textarea');
                 input.rows = 4;
+                input.placeholder = 'Type extended notes...';
                 break;
 
-            case 'ATTACH':
-                // General file attachment
-                const attachBtn = document.createElement('label');
-                attachBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
-                attachBtn.innerHTML = '<span>📎 Attach File or Document</span>';
+            case '$':
+            case 'CURRENCY':
+                const moneyWrap = document.createElement('div');
+                moneyWrap.className = 'flex items-center';
+                const sym = document.createElement('div');
+                sym.className = 'bg-gray-700 px-4 py-3 rounded-l-xl border border-white/10 text-blue-400 font-bold';
+                sym.innerText = '$';
                 input = document.createElement('input');
-                input.type = 'file'; 
-                input.className = 'hidden';
-                input.onchange = () => handleAttachment(input, cleanLabel);
-                attachBtn.appendChild(input);
-                wrapper.appendChild(attachBtn);
+                input.type = 'number';
+                input.step = '0.01';
+                input.className = 'rounded-l-none';
+                moneyWrap.appendChild(sym);
+                moneyWrap.appendChild(input);
+                wrapper.appendChild(moneyWrap);
                 break;
 
             case 'PHOTO': 
@@ -1411,11 +1426,25 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input');
                 input.type = 'file'; 
                 input.accept = 'image/*'; 
+                // CRITICAL: Forces mobile camera option
+                input.setAttribute('capture', 'environment'); 
                 input.className = 'hidden';
                 input.onchange = () => handlePhoto(input, cleanLabel);
                 photoBtn.appendChild(input);
                 wrapper.appendChild(photoBtn);
-                break;;
+                break;
+
+            case 'ATTACH':
+                const attachBtn = document.createElement('label');
+                attachBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
+                attachBtn.innerHTML = '<span>📎 Attach File</span>';
+                input = document.createElement('input');
+                input.type = 'file'; 
+                input.className = 'hidden';
+                input.onchange = () => handleAttachment(input, cleanLabel);
+                attachBtn.appendChild(input);
+                wrapper.appendChild(attachBtn);
+                break;
 
             case 'DATE':
                 input = document.createElement('input'); 
@@ -1426,22 +1455,6 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input'); 
                 input.type = 'number';
                 input.inputMode = 'numeric';
-                break;
-
-            case '$':
-            case 'CURRENCY':
-                const moneyWrap = document.createElement('div');
-                moneyWrap.className = 'flex items-center';
-                const symbol = document.createElement('div');
-                symbol.className = 'bg-gray-700 px-4 py-3 rounded-l-xl border border-white/10 text-blue-400 font-bold';
-                symbol.innerText = '$';
-                input = document.createElement('input');
-                input.type = 'number';
-                input.step = '0.01';
-                input.className = 'rounded-l-none';
-                moneyWrap.appendChild(symbol);
-                moneyWrap.appendChild(input);
-                wrapper.appendChild(moneyWrap);
                 break;
 
             case 'GPS':
@@ -1461,13 +1474,11 @@ function buildReportForm(templateName, fieldArea) {
                 canvas.id = `sig-canvas-${index}`;
                 canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
                 wrapper.appendChild(canvas);
-                
                 const clearBtn = document.createElement('button');
                 clearBtn.className = 'text-[10px] text-gray-500 font-bold uppercase mt-2 ml-1';
                 clearBtn.innerText = 'Clear Signature';
                 clearBtn.onclick = (e) => { e.preventDefault(); clearSig(index); };
                 wrapper.appendChild(clearBtn);
-
                 input = document.createElement('input');
                 input.type = 'hidden';
                 input.setAttribute('data-signature-id', index);
@@ -1508,9 +1519,10 @@ function buildReportForm(templateName, fieldArea) {
                 });
                 break;
 
-           default:
+            default:
                 input = document.createElement('textarea'); 
                 input.rows = 2;
+                input.placeholder = 'Type here...';
         }
 
         if (input) {
@@ -4285,6 +4297,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
