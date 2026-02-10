@@ -1304,9 +1304,8 @@ function startTravellingPulse() {
 
 /**
  * HIGH-INTEGRITY FORM BUILDER
- * Fixed: [YESNO] uses Radio Buttons
- * Fixed: [PHOTO] prioritizes Camera
- * Fixed: [DROP] Comma-separated parsing
+ * Added: [1TEXT], [TEXT], [ATTACH], [NOTE]
+ * Maintained: [SIGN], [DATE], [CHECK], [GPS], [PHOTO], [YESNO], [DROP]
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
@@ -1317,7 +1316,7 @@ function buildReportForm(templateName, fieldArea) {
     
     const questions = template.questions || [];
 
-    questions.forEach(label => {
+    questions.forEach((label, index) => {
         const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/);
         const rawTag = tagMatch ? tagMatch[1] : "TEXT";
         let cleanLabel = tagMatch ? tagMatch[2] : label;
@@ -1329,73 +1328,163 @@ function buildReportForm(templateName, fieldArea) {
             const parts = rawTag.split(',');
             baseType = parts[0].toUpperCase().trim();
             options = parts.slice(1).map(o => o.trim());
-        } else if (rawTag.includes('|')) {
-            const parts = rawTag.split('|');
-            baseType = parts[0].toUpperCase().trim();
-            options = parts[1].split(',').map(o => o.trim());
         } else {
             baseType = rawTag.toUpperCase().trim();
-            options = ["Yes", "No"];
         }
         
-        const fieldId = `field_${cleanLabel.replace(/\s/g, '_')}`;
+        const fieldId = `field_${index}_${cleanLabel.replace(/\s/g, '_')}`;
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-6'; 
 
-        if (baseType === 'HEADING' || baseType === 'HEAD') {
-            const h = document.createElement('h3');
-            h.className = 'text-blue-400 font-black text-[10px] uppercase tracking-[0.25em] mb-4 border-b border-blue-500/20 pb-2 mt-6';
-            h.innerText = cleanLabel;
-            wrapper.appendChild(h);
-            fieldArea.appendChild(wrapper);
-            return;
+        // Informational fields do not need standard labels
+        const isInfoOnly = (baseType === 'HEADING' || baseType === 'HEAD' || baseType === 'NOTE');
+        
+        if (!isInfoOnly) {
+            const labelEl = document.createElement('label');
+            labelEl.className = 'block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
+            labelEl.innerText = cleanLabel;
+            wrapper.appendChild(labelEl);
         }
-
-        const labelEl = document.createElement('label');
-        labelEl.className = 'block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
-        labelEl.innerText = cleanLabel;
-        wrapper.appendChild(labelEl);
 
         let input;
 
-        // --- UPDATED FIELD FACTORY ---
+        // --- EXTENDED FIELD FACTORY ---
         switch(baseType) {
+            case 'HEADING':
+            case 'HEAD':
+                const h = document.createElement('h3');
+                h.className = 'text-blue-400 font-black text-[10px] uppercase tracking-[0.25em] mb-4 border-b border-blue-500/20 pb-2 mt-6';
+                h.innerText = cleanLabel;
+                wrapper.appendChild(h);
+                fieldArea.appendChild(wrapper);
+                return;
+
+            case 'NOTE':
+                // Informational text block (No Input)
+                const n = document.createElement('div');
+                n.className = 'p-4 bg-blue-900/20 border-l-4 border-blue-500 rounded-r-xl text-xs text-blue-100 font-medium italic leading-relaxed';
+                n.innerText = cleanLabel;
+                wrapper.appendChild(n);
+                fieldArea.appendChild(wrapper);
+                return;
+
+            case '1TEXT':
+                // Single line text input
+                input = document.createElement('input');
+                input.type = 'text';
+                break;
+
+            case 'TEXT':
+                // Multi-line extended text input
+                input = document.createElement('textarea');
+                input.rows = 4;
+                break;
+
+            case 'ATTACH':
+                // General file attachment
+                const attachBtn = document.createElement('label');
+                attachBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
+                attachBtn.innerHTML = '<span>📎 Attach File or Document</span>';
+                input = document.createElement('input');
+                input.type = 'file'; 
+                input.className = 'hidden';
+                input.onchange = () => handleAttachment(input, cleanLabel);
+                attachBtn.appendChild(input);
+                wrapper.appendChild(attachBtn);
+                break;
+
             case 'PHOTO': 
+                const photoBtn = document.createElement('label');
+                photoBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
+                photoBtn.innerHTML = '<span>📷 Take or Attach Photo</span>';
                 input = document.createElement('input');
                 input.type = 'file'; 
                 input.accept = 'image/*'; 
-                // Forces camera on most mobile browsers
-                input.setAttribute('capture', 'environment'); 
+                input.className = 'hidden';
                 input.onchange = () => handlePhoto(input, cleanLabel);
+                photoBtn.appendChild(input);
+                wrapper.appendChild(photoBtn);
+                break;;
+
+            case 'DATE':
+                input = document.createElement('input'); 
+                input.type = 'date';
                 break;
 
-            case 'YES/NO': 
+            case 'NUMBER':
+                input = document.createElement('input'); 
+                input.type = 'number';
+                input.inputMode = 'numeric';
+                break;
+
+            case '$':
+            case 'CURRENCY':
+                const moneyWrap = document.createElement('div');
+                moneyWrap.className = 'flex items-center';
+                const symbol = document.createElement('div');
+                symbol.className = 'bg-gray-700 px-4 py-3 rounded-l-xl border border-white/10 text-blue-400 font-bold';
+                symbol.innerText = '$';
+                input = document.createElement('input');
+                input.type = 'number';
+                input.step = '0.01';
+                input.className = 'rounded-l-none';
+                moneyWrap.appendChild(symbol);
+                moneyWrap.appendChild(input);
+                wrapper.appendChild(moneyWrap);
+                break;
+
+            case 'GPS':
+                const gpsBtn = document.createElement('button');
+                gpsBtn.className = 'w-full py-4 bg-blue-900/30 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
+                gpsBtn.innerText = '📍 Capture GPS';
+                gpsBtn.onclick = (e) => { e.preventDefault(); captureGPS(gpsBtn); };
+                wrapper.appendChild(gpsBtn);
+                input = document.createElement('input'); 
+                input.readOnly = true; 
+                input.className = 'opacity-40';
+                break;
+
+            case 'SIGN':
+            case 'SIGNATURE':
+                const canvas = document.createElement('canvas');
+                canvas.id = `sig-canvas-${index}`;
+                canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
+                wrapper.appendChild(canvas);
+                
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'text-[10px] text-gray-500 font-bold uppercase mt-2 ml-1';
+                clearBtn.innerText = 'Clear Signature';
+                clearBtn.onclick = (e) => { e.preventDefault(); clearSig(index); };
+                wrapper.appendChild(clearBtn);
+
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.setAttribute('data-signature-id', index);
+                setTimeout(() => { initSigPad(canvas); }, 200);
+                break;
+
             case 'YESNO':
-                // Renders as high-contrast radio buttons
+            case 'YES/NO':
                 const radioWrap = document.createElement('div');
                 radioWrap.className = 'flex gap-4 mt-2';
-                
                 ["Yes", "No"].forEach(val => {
                     const optWrap = document.createElement('label');
                     optWrap.className = 'flex-1 flex items-center justify-center gap-3 bg-gray-800 border-2 border-gray-700 rounded-xl py-4 cursor-pointer active:bg-blue-600 transition-colors';
-                    
                     const rad = document.createElement('input');
                     rad.type = 'radio';
                     rad.name = fieldId;
                     rad.value = val;
                     rad.className = 'w-5 h-5 accent-blue-500';
                     rad.setAttribute('data-key', cleanLabel);
-                    
+                    optWrap.appendChild(rad);
                     const span = document.createElement('span');
                     span.className = 'text-sm font-bold text-white uppercase tracking-widest';
                     span.innerText = val;
-                    
-                    optWrap.appendChild(rad);
                     optWrap.appendChild(span);
                     radioWrap.appendChild(optWrap);
                 });
                 wrapper.appendChild(radioWrap);
-                input = null; // No additional standard input needed
+                input = null; 
                 break;
 
             case 'DROP':
@@ -1408,15 +1497,16 @@ function buildReportForm(templateName, fieldArea) {
                 });
                 break;
 
-            // ... (keep your existing cases for NUMBER, GPS, SIGN, etc.)
-            default:
+           default:
                 input = document.createElement('textarea'); 
                 input.rows = 2;
         }
 
         if (input) {
             input.id = fieldId;
-            input.className = (input.className || '') + ' form-input';
+            if (input.type !== 'checkbox' && input.type !== 'hidden') {
+                input.className = (input.className || '') + ' form-input';
+            }
             input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
 
@@ -1430,33 +1520,7 @@ function buildReportForm(templateName, fieldArea) {
         fieldArea.appendChild(wrapper);
     });
 }
-
-// ============================================================================
-// PIN VERIFICATION
-// ============================================================================
-function withPinVerification(allowDuress, callback) {
-    showModal('pin');
-    const pinInput = document.getElementById('pinInput');
-    const btnConfirm = document.getElementById('btnPinConfirm');
     
-    if (!pinInput || !btnConfirm) return;
-    
-    pinInput.value = '';
-    pinInput.focus();
-    
-    btnConfirm.onclick = () => {
-        const value = pinInput.value;
-        closeModal('pin');
-        if (value === state.pins.std) {
-            callback();
-        } else if (allowDuress && value === state.pins.duress) {
-            triggerPanic(true); // Silent duress
-        } else {
-            showToast("Incorrect PIN");
-        }
-    };
-}
-
 // ============================================================================
 // PRE-DEPART
 // ============================================================================
@@ -2541,32 +2605,30 @@ function gatherFormData() {
     const sn = document.getElementById('rep_notes');
     if (sn) d.notes = sn.value;
     
+    // Gather all inputs with a data-key
     document.querySelectorAll('[data-key]').forEach(el => {
         const k = el.getAttribute('data-key');
         let v = el.value;
-
-        // Check for Radio Button selection
-        if (el.type === 'radio') {
-            if (!el.checked) return; // Skip the unselected one
-            v = el.value;
-        }
+        
         if (el.type === 'checkbox') {
             v = el.checked ? 'Yes' : 'No';
         } else if (el.type === 'radio') {
             if (!el.checked) return;
             v = el.value;
+        } else if (el.type === 'hidden' && el.hasAttribute('data-signature-id')) {
+            // High-integrity signature harvesting
+            const sigId = el.getAttribute('data-signature-id');
+            const canvas = document.getElementById(`sig-canvas-${sigId}`);
+            if (canvas) v = canvas.toDataURL('image/png');
         }
         
         d.custom[k] = v;
         d.jsonPayload[k] = v;
     });
     
-    const c = document.querySelector('canvas[id^="sig-canvas-"]');
-    if (c) d.sig = c.toDataURL('image/png');
-    
     return d;
 }
-
+    
 // 4. RENDER PANIC STATE - Changes UI to panic mode
 function renderPanicState() {
     const lockedPage = document.getElementById('lockedPage');
@@ -4213,6 +4275,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
