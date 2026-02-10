@@ -1154,23 +1154,34 @@ function resetInactivityTimer() {
     deactivateDimMode();
 }
 
+/**
+ * REWRITTEN: High-Integrity Auto-Dim
+ * Fixed: Removed non-existent modalBackdrop check.
+ */
 function activateDimMode() {
     if (!state || !state.activeVisit) return;
     
-    // FIXED: Do not dim if the user is filling out a report or reading site info
-    const isModalOpen = !document.getElementById('modalBackdrop')?.classList.contains('hidden');
+    // 1. SAFETY GATE: Do not dim if the user is filling out a report
     const isReportActive = document.getElementById('reportPage')?.classList.contains('active');
-    if (isModalOpen || isReportActive) return;
+    
+    // 2. MODAL GATE: Check if ANY modal is physically visible
+    const activeModal = document.querySelector('[id$="Modal"]:not(.hidden)');
+    
+    if (isReportActive || activeModal) return;
 
+    // 3. OVERDUE GATE: Do not dim if time has run out or in panic mode
     const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
     if (remaining <= 0 || state.activeVisit.isPanic) return;
 
+    // 4. ACTIVATE DIMMING
     document.documentElement.classList.add('system-dim');
     document.body.classList.add('system-dim');
     isDimmed = true;
+    
     const batterySaver = document.getElementById('batterySaver');
     if (batterySaver) batterySaver.classList.remove('hidden');
 }
+    
 function deactivateDimMode() {
     document.documentElement.classList.remove('system-dim');
     document.body.classList.remove('system-dim');
@@ -3046,7 +3057,10 @@ window.onload = () => {
     }
     console.log("OTG Safety Engine: Robust Initialization Complete.");
     updateLastSyncUI();
-};
+    // Add to the end of window.onload
+    ['mousedown', 'touchstart', 'mousemove', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, resetInactivityTimer, { passive: true });
+});
     
 // ============================================================================
 // PHASE 1: SETTINGS PAGE FUNCTIONS
@@ -4271,6 +4285,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
