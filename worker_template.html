@@ -2025,12 +2025,22 @@ if ('serviceWorker' in navigator) {
         });
 }
 
+// ============================================================================
+// INSTALL PROMPTS (PC & Android)
+// ============================================================================
 window.addEventListener('beforeinstallprompt', e => {
+    // 1. Prevent the default mini-infobar from appearing
     e.preventDefault();
+    
+    // 2. Stash the event so it can be triggered by your button
     deferredPrompt = e;
-    // Can show custom install button here
+    
+    // 3. Show your custom banner if the user hasn't dismissed it previously
+    if (!localStorage.getItem('install_dismissed')) {
+        const banner = document.getElementById('installBanner');
+        if (banner) banner.classList.remove('hidden');
+    }
 });
-
 // ============================================================================
 // CLEANUP ON UNLOAD
 // ============================================================================
@@ -3716,13 +3726,18 @@ function updateWizardDots() {
 // Feature 17: Android Install Banner
 function triggerInstall() {
     if (deferredPrompt) {
+        // Show the browser's native install dialog
         deferredPrompt.prompt();
+        
         deferredPrompt.userChoice.then(choiceResult => {
             if (choiceResult.outcome === 'accepted') {
-                console.log('User accepted install');
+                console.log('✅ User installed the app');
             }
+            // Clear the prompt so it can't be used again
             deferredPrompt = null;
         });
+        
+        // Hide your custom banner immediately
         const banner = document.getElementById('installBanner');
         if (banner) banner.classList.add('hidden');
     }
@@ -4139,4 +4154,5 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
