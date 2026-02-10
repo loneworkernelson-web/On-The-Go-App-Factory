@@ -1605,26 +1605,25 @@ function loadFormAndShow(templateName) {
     }
 }
 
+/**
+ * HIGH-INTEGRITY DEPARTURE GATE
+ * Fixed: 'Location not found' error during travel sessions.
+ */
 function preDepart() {
     if (!state || !state.activeVisit) return;
     
     isMidVisitUpdate = false;
-    
-    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
-    
-    if (!location) {
-        showToast('⚠️ Location not found');
-        return;
-    }
-    
-    // For travel locations - calculate distance
-    if (location.id === 'travel' || location.isTravel) {
-        // Check if report is required
-        if (location.noReport) {
-            submitReport();
+    const activeLocId = state.activeVisit.locationId;
+
+    // 1. TRAVEL BYPASS: Handle travel sessions without requiring a list lookup
+    if (activeLocId === 'travel') {
+        const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
+        
+        if (noReport) {
+            submitReport(); // End immediately if no report required
             return;
         }
-        
+
         const btnDepart = document.getElementById('btnDepart');
         if (btnDepart) btnDepart.textContent = 'Getting GPS...';
         
@@ -1636,35 +1635,41 @@ function preDepart() {
                 if (startGPS && endGPS) {
                     try {
                         calculatedDist = await getDistance(startGPS, endGPS);
-                        console.log('Distance calculated:', calculatedDist);
                     } catch (err) {
-                        console.error('Distance calc error:', err);
                         const dist = haversine(startGPS, endGPS);
                         calculatedDist = { km: dist.toFixed(2), type: 'crow', offline: true };
                     }
                 }
-                
                 if (btnDepart) btnDepart.textContent = 'HOLD TO END';
-                loadFormAndShow(location.templateName || '(Standard)');
+                loadFormAndShow('Travel Report'); // Explicitly load the travel template
             },
             (err) => {
-                console.error('GPS error:', err);
                 if (btnDepart) btnDepart.textContent = 'HOLD TO END';
                 calculatedDist = null;
-                loadFormAndShow(location.templateName || '(Standard)');
+                loadFormAndShow('Travel Report');
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-    } else if (location.noReport) {
-        // Regular location with no report required
+        return; // Exit here for travel sessions
+    }
+
+    // 2. STANDARD LOOKUP: Only for regular site visits
+    const location = state.locations.find(l => l.id === activeLocId);
+    
+    if (!location) {
+        showToast('⚠️ Location not found. Emergency end triggered.');
+        // EMERGENCY FAILSAFE: Allow user to submit a standard note if site is missing
+        loadFormAndShow('(Standard)');
+        return;
+    }
+
+    if (location.noReport) {
         submitReport();
     } else {
-        // Regular location with report required
         calculatedDist = null;
         loadFormAndShow(location.templateName || '(Standard)');
     }
 }
-
 
 // ============================================================================
 // ENTER LOCKED SCREEN
@@ -4275,6 +4280,7 @@ function exitLockedScreen() {
 
 </body>
 </html>
+
 
 
 
