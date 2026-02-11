@@ -2359,30 +2359,38 @@ function editTravelSettings() {
     }
 }
  
-/**
- * 1C. Start Button: Dynamic "Travel to Destination" Text
- */
 function updateArrivedButtonState() {
     const btn = document.getElementById('btnStart');
-    if (!btn) return;
-    
     const slider = document.getElementById('durationSlider');
-    const hasLocation = !!state.selectedLocationId;
-    const hasDuration = DURATION_MAP[parseInt(slider.value)] > 0;
+    if (!btn || !slider) return;
     
-    btn.disabled = false; // Keep enabled for feedback
+    const hasLocation = !!state.selectedLocationId;
+    const durationMins = DURATION_MAP[parseInt(slider.value)];
+    const hasDuration = durationMins > 0;
+
+    btn.disabled = false; 
+    
+    // CRITICAL: Clear all mode colors first to prevent conflicts
+    btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-700', 'text-white', 'text-gray-500', 'opacity-50');
 
     if (state.isTravelActive) {
         const loc = state.locations.find(l => l.id === state.selectedLocationId);
-        const destName = loc ? loc.name : "...";
-        btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
-        btn.classList.add('bg-purple-600', 'text-white');
+        const destName = loc ? loc.name : null;
+        
+        if (destName) {
+            btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
+            btn.classList.add('bg-purple-600', 'text-white');
+        } else {
+            // PROMPT: Guides the user to pick a site
+            btn.innerText = 'SELECT DESTINATION';
+            btn.classList.add('bg-purple-600', 'text-white', 'opacity-50');
+        }
     } else if (hasLocation && hasDuration) {
         btn.innerText = 'HOLD TO START';
         btn.classList.add('bg-blue-600', 'text-white');
     } else {
         btn.innerText = !hasLocation ? 'SELECT SITE' : 'SELECT TIME';
-        btn.classList.add('bg-gray-700', 'text-gray-500');
+        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
     }
 }
    
@@ -4323,21 +4331,38 @@ function showCurrentSiteInfo() {
         showModal('info');
     }
 }
+
+    /**
+ * MISSING SECURITY COMPONENT: PIN Verification Engine
+ */
+function withPinVerification(isDuress, successCallback) {
+    showModal('pin');
+    const input = document.getElementById('pinInput');
+    const confirmBtn = document.getElementById('btnPinConfirm');
+    input.value = '';
+    input.focus();
+
+    confirmBtn.onclick = () => {
+        const entered = input.value;
+        const correctStd = state.pins.std;
+        const correctDur = state.pins.duress;
+
+        if (entered === correctStd) {
+            closeModal('pin');
+            successCallback();
+        } else if (entered === correctDur) {
+            closeModal('pin');
+            triggerPanic(true); // Silent Duress
+            successCallback();
+        } else {
+            showToast('❌ Incorrect PIN');
+            input.value = '';
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        }
+    };
+}
+    
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
