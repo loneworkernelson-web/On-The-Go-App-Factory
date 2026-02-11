@@ -2216,27 +2216,48 @@ function setQuickDuration(mins) {
 // ============================================================================
 // UPDATED: BUTTON LOGIC (Restores "Hold to Start")
 // ============================================================================
+/**
+ * HIGH-INTEGRITY START BUTTON ENGINE
+ * Combines: Interaction Gate, Targeted Travel, and Selection Feedback.
+ */
 function updateArrivedButtonState() {
     const btn = document.getElementById('btnStart');
     const slider = document.getElementById('durationSlider');
     if (!btn || !slider) return;
     
+    // 1. DATA GATHERING
     const hasLocation = !!state.selectedLocationId;
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const hasDuration = durationMins > 0;
 
-    // REMOVE physical 'disabled' so the long-press animation can actually start
+    // 2. INTERACTION GATE: Keep enabled so animation can play
     btn.disabled = false; 
+    
+    // Reset colors before applying new ones
+    btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-700', 'text-white', 'text-gray-500', 'opacity-50');
 
-    if (hasLocation && hasDuration) {
-        btn.classList.remove('bg-gray-700', 'text-gray-500', 'opacity-50');
-        btn.classList.add('bg-blue-600', 'text-white');
-        btn.innerText = state.selectedLocationId === 'travel' ? 'HOLD TO TRAVEL' : 'HOLD TO START';
-    } else {
-        // Visually dim the button but keep it clickable for feedback
-        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
-        btn.classList.remove('bg-blue-600', 'text-white');
+    // 3. TARGETED TRAVEL LOGIC
+    if (state.isTravelActive) {
+        const loc = state.locations.find(l => l.id === state.selectedLocationId);
+        const destName = loc ? loc.name : "...";
         
+        btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
+        btn.classList.add('bg-purple-600', 'text-white');
+        
+        // If site isn't selected yet, dim the purple button
+        if (!hasLocation) {
+            btn.classList.add('opacity-50');
+            btn.innerText = 'SELECT DESTINATION';
+        }
+    } 
+    // 4. STANDARD START LOGIC
+    else if (hasLocation && hasDuration) {
+        btn.innerText = 'HOLD TO START';
+        btn.classList.add('bg-blue-600', 'text-white');
+    } 
+    // 5. FEEDBACK GATE: Prompt user for missing data
+    else {
+        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
         if (!hasLocation) btn.innerText = 'SELECT SITE';
         else if (!hasDuration) btn.innerText = 'SELECT TIME';
     }
@@ -2302,14 +2323,16 @@ function toggleHighRiskUI() {
     }
 }
 
-// Create travel tile (always present)
+/**
+ * 1A. Travel Tile: Toggles Travel Mode
+ */
 function createTravelTile() {
-    const isSel = state && state.selectedLocationId === 'travel';
+    const isActive = state && state.isTravelActive; // Changed from ID check
     const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
     
     const tile = document.createElement('div');
     tile.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${
-        isSel 
+        isActive 
             ? 'border-white scale-[1.02] ring-2 ring-purple-400' 
             : 'border-gray-700 hover:border-white/20'
     } bg-gradient-to-r from-indigo-600 to-purple-700`;
@@ -2318,29 +2341,82 @@ function createTravelTile() {
         <div class="flex items-center gap-2">
             <div class="text-xl">🚗</div>
             <div>
-                <div class="text-sm font-bold text-white tracking-tight leading-none">Travelling</div>
-                <div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">
-                    ${noReport ? 'Report optional' : 'Report required'}
-                </div>
+                <div class="text-sm font-bold text-white tracking-tight leading-none">Travel Mode</div>
+                <div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">${noReport ? 'Report optional' : 'Report required'}</div>
             </div>
         </div>
-        <button class="text-white/40 hover:text-white text-xs p-1" 
-                onclick="event.stopPropagation(); editTravelSettings();">
-            ⚙️
-        </button>
     `;
     
     tile.onclick = () => {
-        if (state.selectedLocationId === 'travel') {
-            state.selectedLocationId = null;
-        } else {
-            state.selectedLocationId = 'travel';
-        }
+        state.isTravelActive = !state.isTravelActive;
         renderLocations();
         updateArrivedButtonState();
     };
-    
     return tile;
+}
+
+/**
+ * UPDATED: Location Tile with Information Button
+ */
+function createLocationTile(loc) {
+    const isSel = state && state.selectedLocationId === loc.id;
+    const isCritical = loc.isCritical || false;
+    
+    const tile = document.createElement('div');
+    tile.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 transition-all ${
+        isSel ? 'border-blue-500 bg-blue-900/40' : (isCritical ? 'border-red-900/50 bg-red-950/20' : 'border-gray-700 bg-gray-800 hover:bg-gray-750')
+    }`;
+    
+    let icon = "🏢";
+    if (loc.name && loc.name.toLowerCase().includes("home")) icon = "🏠";
+    
+    // Check if there is any information to show
+    const hasInfo = !!(loc.address || loc.notes || loc.contactName || loc.contactPhone || loc.contactEmail);
+    
+    tile.innerHTML = `
+        <div class="flex justify-between items-start">
+            <span class="text-2xl">${icon}</span>
+            ${hasInfo ? `<button class="text-gray-500 hover:text-white p-1 -mt-1 -mr-1 z-20 text-xl" onclick="showSiteInfo('${loc.id}', event)">ℹ️</button>` : ''}
+        </div>
+        <div>
+            ${loc.companyName ? `<div class="text-[10px] font-bold text-gray-400 uppercase truncate leading-none mb-1">${loc.companyName}</div>` : ''}
+            <div class="text-[13px] font-black text-white truncate leading-tight">${loc.name}</div>
+        </div>
+    `;
+    
+    tile.onclick = () => {
+        state.selectedLocationId = (state.selectedLocationId === loc.id) ? null : loc.id;
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    return tile;
+}
+
+/**
+ * 1C. Start Button: Dynamic "Travel to Destination" Text
+ */
+function updateArrivedButtonState() {
+    const btn = document.getElementById('btnStart');
+    if (!btn) return;
+    
+    const slider = document.getElementById('durationSlider');
+    const hasLocation = !!state.selectedLocationId;
+    const hasDuration = DURATION_MAP[parseInt(slider.value)] > 0;
+    
+    btn.disabled = false; // Keep enabled for feedback
+
+    if (state.isTravelActive) {
+        const loc = state.locations.find(l => l.id === state.selectedLocationId);
+        const destName = loc ? loc.name : "...";
+        btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
+        btn.classList.add('bg-purple-600', 'text-white');
+    } else if (hasLocation && hasDuration) {
+        btn.innerText = 'HOLD TO START';
+        btn.classList.add('bg-blue-600', 'text-white');
+    } else {
+        btn.innerText = !hasLocation ? 'SELECT SITE' : 'SELECT TIME';
+        btn.classList.add('bg-gray-700', 'text-gray-500');
+    }
 }
 
 // Edit travel settings (report required toggle)
@@ -2361,45 +2437,83 @@ function editTravelSettings() {
 }
 
     
-// Create regular location tile
-function createLocationTile(loc) {
-    const isSel = state && state.selectedLocationId === loc.id;
-    const isCritical = loc.isCritical || false; // NEW check
+/**
+ * 1A. Travel Tile: Toggles Travel Mode
+ */
+function createTravelTile() {
+    const isActive = state && state.isTravelActive; // Changed from ID check
+    const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
     
     const tile = document.createElement('div');
-    tile.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 shadow-sm transition-all ${
-        isSel 
-            ? 'border-blue-500 bg-blue-900/40' 
-            : (isCritical ? 'border-red-900/50 bg-red-950/20' : 'border-gray-700 bg-gray-800 hover:bg-gray-750')
-    }`;
-    
-    let icon = "🏢";
-    if (loc.name && loc.name.toLowerCase().includes("home")) icon = "🏠";
+    tile.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${
+        isActive 
+            ? 'border-white scale-[1.02] ring-2 ring-purple-400' 
+            : 'border-gray-700 hover:border-white/20'
+    } bg-gradient-to-r from-indigo-600 to-purple-700`;
     
     tile.innerHTML = `
-        <div class="flex justify-between items-start">
-            <span class="text-2xl">${icon}</span>
-            ${(loc.notes || loc.contactName || loc.id.startsWith('loc_')) 
-                ? `<button class="text-gray-500 hover:text-white z-20" onclick="showSiteInfo('${loc.id}', event)">ℹ️</button>` 
-                : ''}
-        </div>
-        <div>
-            ${loc.companyName ? `<div class="text-xs font-bold text-gray-400 uppercase truncate leading-none">${loc.companyName}</div>` : ''}
-            <div class="text-[13px] font-black text-white truncate leading-tight mt-1">${loc.name}</div>
+        <div class="flex items-center gap-2">
+            <div class="text-xl">🚗</div>
+            <div>
+                <div class="text-sm font-bold text-white tracking-tight leading-none">Travel Mode</div>
+                <div class="text-[8px] text-indigo-200 font-medium uppercase mt-0.5">${noReport ? 'Report optional' : 'Report required'}</div>
+            </div>
         </div>
     `;
     
     tile.onclick = () => {
-        if (state.selectedLocationId === loc.id) {
-            state.selectedLocationId = null;
-        } else {
-            state.selectedLocationId = loc.id;
-        }
+        state.isTravelActive = !state.isTravelActive;
         renderLocations();
         updateArrivedButtonState();
     };
-    
     return tile;
+}
+
+/**
+ * 1B. Location Tile: Selects Destination
+ */
+function createLocationTile(loc) {
+    const isSel = state && state.selectedLocationId === loc.id;
+    const tile = document.createElement('div');
+    tile.className = `p-3 rounded-lg border-2 cursor-pointer flex flex-col justify-between h-24 transition-all ${
+        isSel ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 bg-gray-800'
+    }`;
+    
+    tile.innerHTML = `<div><span class="text-2xl">🏢</span></div><div class="text-[13px] font-black text-white truncate">${loc.name}</div>`;
+    
+    tile.onclick = () => {
+        state.selectedLocationId = (state.selectedLocationId === loc.id) ? null : loc.id;
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    return tile;
+}
+
+/**
+ * 1C. Start Button: Dynamic "Travel to Destination" Text
+ */
+function updateArrivedButtonState() {
+    const btn = document.getElementById('btnStart');
+    if (!btn) return;
+    
+    const slider = document.getElementById('durationSlider');
+    const hasLocation = !!state.selectedLocationId;
+    const hasDuration = DURATION_MAP[parseInt(slider.value)] > 0;
+    
+    btn.disabled = false; // Keep enabled for feedback
+
+    if (state.isTravelActive) {
+        const loc = state.locations.find(l => l.id === state.selectedLocationId);
+        const destName = loc ? loc.name : "...";
+        btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
+        btn.classList.add('bg-purple-600', 'text-white');
+    } else if (hasLocation && hasDuration) {
+        btn.innerText = 'HOLD TO START';
+        btn.classList.add('bg-blue-600', 'text-white');
+    } else {
+        btn.innerText = !hasLocation ? 'SELECT SITE' : 'SELECT TIME';
+        btn.classList.add('bg-gray-700', 'text-gray-500');
+    }
 }
    
 /**
@@ -2425,8 +2539,8 @@ function setupHoldToStart() {
     });
 }
 /**
- * HIGH-INTEGRITY VISIT INITIALIZATION
- * Added: GPS Handshake for accurate travel starting points.
+ * REWRITTEN: Targeted Travel & Visit Safety Engine
+ * Permits selecting a Site as a travel destination.
  */
 async function startVisit() {
     isMidVisitUpdate = false; 
@@ -2437,18 +2551,22 @@ async function startVisit() {
     } catch (e) { console.warn("Audio skipped"); }
 
     const locId = state.selectedLocationId;
-    if (!locId) return showToast('⚠️ Select a site first');
+    const isTravelMode = !!state.isTravelActive; // Toggle state from Travel Mode tile
+    
+    // Safety check: require a destination if in travel mode
+    if (!locId && !isTravelMode) return showToast('⚠️ Select a destination first');
 
+    // Identify the target location object
     const loc = state.locations.find(l => l.id === locId) || 
-                (locId === 'travel' ? { id: 'travel', name: '🚗 Travelling' } : null);
+                { id: 'travel', name: 'General Travel' };
     
     const slider = document.getElementById('durationSlider');
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    // 2. TRAVEL PRE-FLIGHT: Force a fresh GPS lock
+    // 2. GPS PRE-FLIGHT: Fresh lock for mileage accuracy
     let verifiedStartGPS = lastGPS || "0,0";
-    if (locId === 'travel') {
+    if (isTravelMode || locId === 'travel') {
         showToast('📍 Locking GPS signal...');
         try {
             const freshPos = await new Promise((resolve, reject) => {
@@ -2457,9 +2575,9 @@ async function startVisit() {
                 });
             });
             verifiedStartGPS = `${freshPos.coords.latitude.toFixed(6)},${freshPos.coords.longitude.toFixed(6)}`;
-            lastGPS = verifiedStartGPS; // Update global state
+            lastGPS = verifiedStartGPS;
         } catch (e) {
-            console.warn('Fast GPS lock failed, using fallback.');
+            console.warn('GPS signal lock deferred.');
         }
         startGPSMonitoring(); // Engage continuous tracking
     }
@@ -2467,13 +2585,15 @@ async function startVisit() {
     const startTime = Date.now();
     const durationSec = durationMins * 60;
 
+    // 3. Initialize Active Safety Session
     state.activeVisit = {
-        locationId: locId,
+        locationId: locId || 'travel',
         locationName: loc.name,
+        isTravel: isTravelMode, // Stores Targeted Travel mode for reporting logic
         startTime: startTime,
         duration: durationSec,
         anticipatedDepartureTime: startTime + (durationSec * 1000),
-        startGPS: verifiedStartGPS, // HIGH-INTEGRITY COORDINATE
+        startGPS: verifiedStartGPS,
         highRisk: isHighRisk,
         isPanic: false,
         criticalSent: false,
@@ -2482,25 +2602,30 @@ async function startVisit() {
         warn90Sent: false
     };
 
+    // Reset targeted travel toggle for next session
+    state.isTravelActive = false; 
     saveState();
 
-    // 3. LOGGING & ANNOUNCEMENT
-    const activityType = locId === 'travel' ? "Travel" : "Visit";
+    // 4. BACKEND LOGGING: Destination written to spreadsheet
+    const alarmStatus = isTravelMode ? "TRAVELLING" : "ARRIVED";
+    const logNote = isTravelMode ? `Travel to ${loc.name} started.` : `${loc.name} visit started.`;
+
     processUploadQueue(buildPayload({
         'action': 'logVisit',
-        'Alarm Status': 'ARRIVED',
-        'Notes': `${activityType} started. Duration: ${durationMins}m`,
+        'Alarm Status': alarmStatus,
+        'Location Name': loc.name, // Written as destination to the sheet
+        'Notes': `${logNote} Duration: ${durationMins}m`,
         'Last Known GPS': verifiedStartGPS
     }));
 
-    announce(`${activityType} started.`);
+    announce(isTravelMode ? `Travelling to ${loc.name}.` : `${loc.name} started.`);
     
     if (typeof requestWakeLock === 'function') requestWakeLock();
-    if (locId === 'travel') startTravellingPulse();
+    if (isTravelMode || locId === 'travel') startTravellingPulse();
 
     resetInactivityTimer(); 
     renderLocations();
-    updateArrivedButtonState();
+    updateArrivedButtonState(); // Resets button label for locked screen state
     enterLockedScreen();
 }
     
@@ -4293,10 +4418,90 @@ function exitLockedScreen() {
         if (pinConf !== '' || durConf !== '') err.classList.remove('hidden');
     }
 }
+
+    /**
+ * REWRITTEN: Site Info population with live navigation
+ */
+function populateSiteInfoModal(location) {
+    const content = document.getElementById('siteInfoContent');
+    if (!content) return;
+
+    let html = `<div class="space-y-4">
+        <div>
+            <label class="text-[10px] text-blue-400 font-black uppercase tracking-widest">Site Name</label>
+            <div class="text-lg font-bold text-white">${location.name}</div>
+        </div>`;
+
+    if (location.companyName) html += `<div><label class="text-[10px] text-gray-500 font-black uppercase">Company</label><div class="text-white">${location.companyName}</div></div>`;
+    if (location.address) html += `<div><label class="text-[10px] text-gray-500 font-black uppercase">Address</label><div class="text-white">${location.address}</div></div>`;
+    
+    if (location.contactName || location.contactPhone) {
+        html += `<div class="pt-2 border-t border-gray-700">
+            <label class="text-[10px] text-red-400 font-black uppercase tracking-widest">Contact</label>
+            <div class="text-white font-bold">${location.contactName || 'Primary Contact'}</div>
+            ${location.contactPhone ? `<div class="text-gray-400 text-xs">${location.contactPhone}</div>` : ''}
+        </div>`;
+    }
+
+    if (location.notes) {
+        html += `<div class="p-3 bg-blue-900/10 rounded-xl border border-blue-500/20 mt-2">
+            <label class="text-[10px] text-blue-400 font-black uppercase tracking-widest mb-1 block">Notes</label>
+            <div class="text-xs text-gray-300 italic">${location.notes}</div>
+        </div>`;
+    }
+
+    html += `</div>`;
+    content.innerHTML = html;
+
+    // Configure Action Buttons
+    const btnCall = document.getElementById('btnSiteCall');
+    const btnEmail = document.getElementById('btnSiteEmail');
+    const btnNav = document.getElementById('btnSiteNav');
+
+    if (location.contactPhone && btnCall) {
+        btnCall.href = `tel:${cleanGlobalPhone(location.contactPhone)}`;
+        btnCall.classList.remove('hidden');
+    } else if (btnCall) btnCall.classList.add('hidden');
+
+    if (location.contactEmail && btnEmail) {
+        btnEmail.href = `mailto:${location.contactEmail}`;
+        btnEmail.classList.remove('hidden');
+    } else if (btnEmail) btnEmail.classList.add('hidden');
+
+    if (location.address && btnNav) {
+        // FIXED: Official Google Maps Navigation API
+        const encodedAddr = encodeURIComponent(location.address);
+        btnNav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
+        btnNav.classList.remove('hidden');
+    } else if (btnNav) {
+        btnNav.classList.add('hidden');
+    }
+}
+
+// Global function to trigger info from a tile
+function showSiteInfo(locationId, event) {
+    if (event) event.stopPropagation(); // Prevents selecting the tile
+    const location = state.locations.find(l => l.id === locationId);
+    if (location) {
+        populateSiteInfoModal(location);
+        showModal('info');
+    }
+}
+
+// Fixed existing Locked Screen info trigger
+function showCurrentSiteInfo() {
+    if (!state || !state.activeVisit) return;
+    const location = state.locations.find(l => l.id === state.activeVisit.locationId);
+    if (location) {
+        populateSiteInfoModal(location);
+        showModal('info');
+    }
+}
 </script>
 
 </body>
 </html>
+
 
 
 
