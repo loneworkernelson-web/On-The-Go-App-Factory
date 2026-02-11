@@ -2212,57 +2212,6 @@ function setQuickDuration(mins) {
     }
 }
     
-// Update "Hold to Start" button state
-// ============================================================================
-// UPDATED: BUTTON LOGIC (Restores "Hold to Start")
-// ============================================================================
-/**
- * HIGH-INTEGRITY START BUTTON ENGINE
- * Combines: Interaction Gate, Targeted Travel, and Selection Feedback.
- */
-function updateArrivedButtonState() {
-    const btn = document.getElementById('btnStart');
-    const slider = document.getElementById('durationSlider');
-    if (!btn || !slider) return;
-    
-    // 1. DATA GATHERING
-    const hasLocation = !!state.selectedLocationId;
-    const durationMins = DURATION_MAP[parseInt(slider.value)];
-    const hasDuration = durationMins > 0;
-
-    // 2. INTERACTION GATE: Keep enabled so animation can play
-    btn.disabled = false; 
-    
-    // Reset colors before applying new ones
-    btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-700', 'text-white', 'text-gray-500', 'opacity-50');
-
-    // 3. TARGETED TRAVEL LOGIC
-    if (state.isTravelActive) {
-        const loc = state.locations.find(l => l.id === state.selectedLocationId);
-        const destName = loc ? loc.name : "...";
-        
-        btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
-        btn.classList.add('bg-purple-600', 'text-white');
-        
-        // If site isn't selected yet, dim the purple button
-        if (!hasLocation) {
-            btn.classList.add('opacity-50');
-            btn.innerText = 'SELECT DESTINATION';
-        }
-    } 
-    // 4. STANDARD START LOGIC
-    else if (hasLocation && hasDuration) {
-        btn.innerText = 'HOLD TO START';
-        btn.classList.add('bg-blue-600', 'text-white');
-    } 
-    // 5. FEEDBACK GATE: Prompt user for missing data
-    else {
-        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
-        if (!hasLocation) btn.innerText = 'SELECT SITE';
-        else if (!hasDuration) btn.innerText = 'SELECT TIME';
-    }
-}
-    
 /**
  * Renders the Forms Library in a Two-Column Grid.
  */
@@ -4378,6 +4327,7 @@ function showCurrentSiteInfo() {
 
 </body>
 </html>
+
 
 
 
