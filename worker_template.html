@@ -1585,16 +1585,30 @@ function loadFormAndShow(templateName) {
         });
     }, 300); // Increased to 300ms for stable DOM painting
     
-    if (calculatedDist) {
-        const distInput = document.querySelector('[data-key*="Distance"]') || 
-                         document.querySelector('[data-key*="KM"]') ||
-                         document.querySelector('[data-key*="distance"]');
-        if (distInput) {
-            distInput.value = calculatedDist.km;
-            distInput.style.border = '2px solid #4ade80';
-            distInput.classList.add('bg-green-900/20');
-        }
+/**
+ * PATCHED: High-Integrity Distance Pre-fill Logic
+ */
+if (calculatedDist) {
+    // FIXED: Querying with 'i' flag for case-insensitive matching in modern browsers
+    // or providing all common variations for maximum compatibility.
+    const distInput = document.querySelector('[data-key*="Distance"]') || 
+                     document.querySelector('[data-key*="distance"]') ||
+                     document.querySelector('[data-key*="KM"]') ||
+                     document.querySelector('[data-key*="km"]') ||
+                     document.querySelector('[data-key*="Km"]') ||
+                     document.querySelector('[data-key*="Odo"]'); // Matches Odometer
+                     
+    if (distInput) {
+        distInput.value = calculatedDist.km;
+        
+        // VISUAL CUE: Signals to the worker that the value was auto-calculated
+        distInput.style.border = '2px solid #4ade80';
+        distInput.classList.add('bg-green-900/20');
+        
+        // Logic: Ensures the "KM" display is updated if the field is a slider or has a label listener
+        distInput.dispatchEvent(new Event('input', { bubbles: true })); 
     }
+}
     
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
@@ -4374,6 +4388,7 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
 
