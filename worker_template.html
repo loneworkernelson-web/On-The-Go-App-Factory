@@ -1564,15 +1564,19 @@ function buildReportForm(templateName, fieldArea) {
 }
     
 /**
- * PATCHED: Context-Aware Form Display & Auto-Population
- * Captures site identity and injects it into form fields for seamless matching.
+ * PATCHED: Universal Context-Aware Form Display
+ * Ensures auto-population works from both Site Info AND during active visits.
  */
 function loadFormAndShow(templateName, context = null) {
     if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
     if (typeof deactivateDimMode === 'function') deactivateDimMode();
 
-    // Context Capture: Essential for matching "Update Site Procedures" to the Sites tab
-    formExecutionContext = context;
+    // 1. DYNAMIC CONTEXT CAPTURE
+    // Priority: 1. Passed context (Map) -> 2. Active Session (Visit) -> 3. Reset
+    formExecutionContext = context || (state.activeVisit ? { 
+        siteName: state.activeVisit.locationName, 
+        companyName: state.activeVisit.companyName || "" 
+    } : null);
 
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) {
@@ -1594,14 +1598,14 @@ function loadFormAndShow(templateName, context = null) {
         buildReportForm(templateName, fieldsContainer);
     }
     
-    // FIXED: Centralised signature pad initialisation with proper timing
+    // Signature Pad Initialization
     setTimeout(() => {
         const canvases = document.querySelectorAll('canvas[id^="sig-canvas-"]');
         canvases.forEach(canvas => {
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-    }, 300); // Increased to 300ms for stable DOM painting
+    }, 300); 
     
     /**
      * ROCKET-LOADER SAFE: Distance Pre-fill
@@ -1622,26 +1626,26 @@ function loadFormAndShow(templateName, context = null) {
     }
 
     /**
-     * AUTO-POPULATION: Site & Company Handshake
+     * 2. REFINED AUTO-POPULATION LOGIC
      */
-    if (context) {
+    if (formExecutionContext) {
         setTimeout(() => {
             const allFormElements = document.querySelectorAll('[data-key]');
             
             allFormElements.forEach(el => {
                 const key = el.getAttribute('data-key').toLowerCase();
                 
-                // Map context data to the correct input fields
-                if (key.includes('site') && context.siteName) {
-                    el.value = context.siteName;
-                    el.classList.add('bg-blue-900/10'); // Visual hint of auto-fill
+                // Logic: Matches "Site Name", "Site", "Company Name", etc.
+                if (key.includes('site') && formExecutionContext.siteName) {
+                    el.value = formExecutionContext.siteName;
+                    el.classList.add('bg-blue-900/10'); 
                 }
-                if (key.includes('company') && context.companyName) {
-                    el.value = context.companyName;
+                if (key.includes('company') && formExecutionContext.companyName) {
+                    el.value = formExecutionContext.companyName;
                     el.classList.add('bg-blue-900/10');
                 }
             });
-        }, 400); // Delay ensures buildReportForm is fully painted
+        }, 500); // Increased delay to 500ms for high-reliability field targeting
     }
     
     const btn = document.getElementById('btnSubmitRep');
@@ -1667,6 +1671,7 @@ function loadFormAndShow(templateName, context = null) {
         }
     }
 }
+    
 /**
  * HIGH-INTEGRITY DEPARTURE GATE
  * Fixed: 'Location not found' error during travel sessions.
@@ -4509,6 +4514,7 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
 
 
 
