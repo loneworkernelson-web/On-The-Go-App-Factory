@@ -2766,21 +2766,23 @@ function triggerAutoAlert(status) {
 }
 
 // 2. COMPRESS IMAGE - Reduces photo size before upload
+/**
+ * PATCHED: High-Integrity Photo Compression
+ * Optimised for Google Sheets 50,000 character cell limit.
+ */
 function compressImg(file) {
     return new Promise(resolve => {
         const reader = new FileReader();
-        
         reader.onload = e => {
             const img = new Image();
-            
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1200;
-                const MAX_HEIGHT = 1200;
+                // FIXED: Reduced from 1200 to 800 to fit cell character limits
+                const MAX_WIDTH = 800;
+                const MAX_HEIGHT = 800;
                 let width = img.width;
                 let height = img.height;
                 
-                // Calculate new dimensions
                 if (width > height) {
                     if (width > MAX_WIDTH) {
                         height = height * (MAX_WIDTH / width);
@@ -2795,24 +2797,21 @@ function compressImg(file) {
                 
                 canvas.width = width;
                 canvas.height = height;
-                
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // Convert to JPEG with 80% quality
-                const compressed = canvas.toDataURL('image/jpeg', 0.8);
+                // FIXED: Quality reduced to 0.6 for optimal Base64 string length
+                const compressed = canvas.toDataURL('image/jpeg', 0.6);
                 
-                console.log(`Image compressed: ${file.size} bytes -> ${compressed.length} chars`);
+                console.log(`Image optimised for Sheets: ${compressed.length} chars`);
                 resolve(compressed);
             };
-            
             img.src = e.target.result;
         };
-        
         reader.readAsDataURL(file);
     });
 }
-
+    
 // 3. HANDLE PHOTO - Processes photo uploads with compression
 function handlePhoto(input, key) {
     if (!input.files || !input.files[0]) return;
@@ -4388,6 +4387,7 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
 
