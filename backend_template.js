@@ -1098,3 +1098,51 @@ function updateSiteEmergencyProcedures(payload) {
 // case 'uploadEmergencyProcedures':
 //   return ContentService.createTextOutput(JSON.stringify(updateSiteEmergencyProcedures(payload))).setMimeType(ContentService.MimeType.JSON);
 
+/**
+ * BACKEND logic: Specifically updates the 'Sites' tab
+ */
+function updateSiteEmergencyProcedures(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const siteSheet = ss.getSheetByName("Sites");
+  if (!siteSheet) return { status: 'error', message: 'Sites tab not found' };
+
+  const data = siteSheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  // 1. Identify "Emergency Procedures" column
+  let colIdx = headers.indexOf("Emergency Procedures");
+  if (colIdx === -1) {
+    colIdx = headers.length;
+    siteSheet.getRange(1, colIdx + 1).setValue("Emergency Procedures");
+  }
+
+  // 2. Locate the specific site row
+  let targetRow = -1;
+  const siteCol = headers.indexOf("Site Name");
+  const compCol = headers.indexOf("Company Name");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][siteCol] === payload.siteName && data[i][compCol] === payload.companyName) {
+      targetRow = i + 1;
+      break;
+    }
+  }
+
+  if (targetRow === -1) return { status: 'error', message: 'Site match failed' };
+
+  // 3. Process Photos & Generate Links
+  const photoUrls = [];
+  const folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
+  
+  (payload.photos || []).forEach((base64, idx) => {
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64.split(",")[1]), "image/jpeg", `EP_${payload.siteName}_${idx}.jpg`);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    photoUrls.push(file.getUrl());
+  });
+
+  // 4. Update the Sites cell
+  siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
+  return { status: 'success', links: photoUrls };
+}
+
