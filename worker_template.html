@@ -4416,22 +4416,41 @@ function withPinVerification(isDuress, successCallback) {
     };
 }
 
+/**
+ * PATCHED: Procedure Viewer
+ * Handles multiple comma-separated Drive links with mobile-safe opening.
+ */
 function viewEmergencyProcedures(linksString) {
-    if (!linksString) return;
-    const links = linksString.split(',').map(l => l.trim());
+    if (!linksString) {
+        showToast("⚠️ No procedures linked to this site");
+        return;
+    }
+
+    // 1. Split the comma-separated string from index 9
+    const links = linksString.split(',').map(l => l.trim()).filter(l => l !== "");
     
-    // For maximum reliability on mobile, we open the Google Drive links in a sequence
-    // or trigger a custom zoomable overlay.
-    links.forEach((url, index) => {
-        setTimeout(() => {
-            window.open(url, '_blank');
-        }, index * 500); // Staggers the opening of multiple pages
-    });
+    if (links.length === 0) return;
+
+    // 2. Mobile-Safe Multi-Link Handling
+    if (links.length === 1) {
+        window.open(links[0], '_blank');
+    } else {
+        // Provide feedback if opening multiple tabs
+        showToast(`Opening ${links.length} procedure pages...`);
+        
+        links.forEach((url, index) => {
+            // Logic: Stagger the opens to prevent browser 'spam' blockers
+            setTimeout(() => {
+                window.open(url, '_blank');
+            }, index * 600); 
+        });
+    }
 }
 </script>
 
 </body>
 </html>
+
 
 
 
