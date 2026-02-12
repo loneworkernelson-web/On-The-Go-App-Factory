@@ -1014,10 +1014,14 @@ async function getBatteryPercent() {
  * FULL MISSION-CRITICAL SUBMIT REPORT
  * Fixed: Site/Company handshake and media transmission for Emergency Procedures.
  */
+/**
+ * PATCHED: High-Integrity Report Submission
+ * Ensures media, signatures, and site context are correctly transmitted.
+ */
 function submitReport() {
     showToast('📤 Processing report...');
     
-    // 1. GATHER DATA: Pulls all current field values, including auto-populated ones
+    // 1. GATHER DATA: Includes the recently patched signature and auto-filled fields
     const d = gatherFormData();
     let photoCount = 0;
     const photoMap = {};
@@ -1026,7 +1030,9 @@ function submitReport() {
     Object.keys(state.photoStore || {}).forEach((key) => {
         photoCount++;
         const token = `{{PHOTO_${photoCount}}}`;
+        // Store actual base64 data for transmission
         photoMap[`Photo ${photoCount}`] = state.photoStore[key];
+        
         if (d.custom[key] !== undefined) {
             d.custom[key] = token;
             d.jsonPayload[key] = token;
@@ -1050,7 +1056,7 @@ function submitReport() {
     
     // 5. ATTACH MEDIA: Explicitly adds photos and signature to the flat payload
     Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; });
-    if (d.sig) fd["Signature"] = d.sig;
+    if (d.sig) fd["Signature"] = d.sig; 
     
     // 6. ROUTING LOGIC: Determine Backend Action and Status
     let alarmStatus;
@@ -1060,10 +1066,11 @@ function submitReport() {
     if (currentActiveTemplate === "Update Site Procedures") {
         backendAction = 'uploadEmergencyProcedures';
         
-        // FIXED: Priority given to form values (which are auto-populated) over session state
+        // FIXED: Explicit handshake for backend row matching
         fd["siteName"] = d.custom["Site Name"] || d.custom["Site"] || (state.activeVisit ? state.activeVisit.locationName : "");
         fd["companyName"] = d.custom["Company Name"] || d.custom["Company"] || (state.activeVisit ? state.activeVisit.companyName : "");
         
+        // Pass the raw array of photos for the Google Drive handler
         fd["photos"] = Object.values(state.photoStore || {});
         alarmStatus = "PROCEDURES_UPDATED";
     } 
@@ -1103,7 +1110,7 @@ function submitReport() {
         state.activeVisit = null;
         state.selectedLocationId = null;
         state.visitDurationMinutes = 0;
-        state.photoStore = {}; 
+        state.photoStore = {}; // CRITICAL: Clear store after successful submission
         
         if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
         if (timerInt) { clearInterval(timerInt); timerInt = null; }
@@ -1113,7 +1120,7 @@ function submitReport() {
         saveState();
         navigate('main'); 
         
-        // NEW: Trigger forceSync specifically for procedure updates to refresh map UI
+        // FIXED: Trigger forceSync for procedure updates to refresh map UI markers
         if (currentActiveTemplate === "Update Site Procedures") {
             setTimeout(() => {
                 if (typeof forceSync === 'function') forceSync(false);
@@ -1135,7 +1142,7 @@ function submitReport() {
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) clearSig(sigCanvas.id.replace('sig-canvas-', ''));
     
-    // FINAL CLEANUP: Clear global context
+    // FINAL CLEANUP: Clear global context for the next session
     formExecutionContext = null;
 }
 
@@ -2668,42 +2675,49 @@ function processUploadQueue(d) {
 }
 
 /**
- * PATCHED: Data Gathering Engine
- * Ensures all field types, including signatures and auto-filled site data, are correctly captured.
+/**
+ * PATCHED: High-Integrity Data Gathering Engine
+ * Ensures signatures and auto-filled site data are correctly captured for the backend.
  */
 function gatherFormData() {
     const d = { custom: {}, notes: '', sig: null, jsonPayload: {} };
     
-    // 1. Capture global notes if present (e.g., from the Standard template)
+    // 1. Capture legacy notes (Standard template)
     const sn = document.getElementById('rep_notes');
     if (sn) d.notes = sn.value;
     
-    // 2. Iterate through all tagged form inputs
+    // 2. Iterate through all dynamic form elements
     document.querySelectorAll('[data-key]').forEach(el => {
         const k = el.getAttribute('data-key');
         let v = el.value;
+        let isMedia = false;
         
-        // Logic: Special handling for non-text inputs
+        // Logic: Handle specific input types
         if (el.type === 'checkbox') {
             v = el.checked ? 'Yes' : 'No';
         } else if (el.type === 'radio') {
-            // Only capture the value of the selected radio button
-            if (!el.checked) return;
+            if (!el.checked) return; // Skip non-selected options
             v = el.value;
         } else if (el.type === 'hidden' && el.hasAttribute('data-signature-id')) {
-            // FIXED: High-integrity signature extraction
+            // FIXED: Signature extraction
             const sigId = el.getAttribute('data-signature-id');
             const canvas = document.getElementById(`sig-canvas-${sigId}`);
             if (canvas) {
                 v = canvas.toDataURL('image/png');
-                // CRITICAL: Explicitly set d.sig so submitReport can map it to the 'Signature' column
-                d.sig = v; 
+                d.sig = v; // Assigned to dedicated property for backend
+                isMedia = true; 
             }
         }
         
-        // 3. Map values to both custom fields and the JSON backup
+        // 3. Populate Payload Objects
         d.custom[k] = v;
-        d.jsonPayload[k] = v;
+        
+        // OPTIMISATION: Replace large media with tokens in the JSON blob to prevent cell overflows
+        if (isMedia) {
+            d.jsonPayload[k] = "{{SIGNATURE}}"; 
+        } else {
+            d.jsonPayload[k] = v;
+        }
     });
     
     return d;
@@ -4495,6 +4509,7 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
 
 
 
