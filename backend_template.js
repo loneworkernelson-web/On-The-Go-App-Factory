@@ -835,7 +835,17 @@ function getSyncData(workerName, deviceId) {
             const assignedStr = (sData[i][0] || "").toString().toLowerCase();
             const allowedUsers = assignedStr.split(',').map(s => s.trim());
             if (allowedUsers.includes("all") || allowedUsers.includes(wNameSafe)) {
-                sites.push({ template: sData[i][1], company: sData[i][2], siteName: sData[i][3], address: sData[i][4], contactName: sData[i][5], contactPhone: sData[i][6], contactEmail: sData[i][7], notes: sData[i][8] });
+sites.push({ 
+    template: sData[i][1], 
+    company: sData[i][2], 
+    siteName: sData[i][3], 
+    address: sData[i][4], 
+    contactName: sData[i][5], 
+    contactPhone: sData[i][6], 
+    contactEmail: sData[i][7], 
+    notes: sData[i][8],
+    emergencyProcedures: sData[i][9] // Added index for the 10th column
+});
             }
         }
     }
@@ -1145,5 +1155,6 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
 
 
