@@ -807,6 +807,7 @@ const CONFIG = {
 // GLOBALS AND STATE INITIALIZATION
 // ============================================================================
 let state; // Declared but not initialized until onload
+let formExecutionContext = null;
 let dimTimer;
 let isDimmed = false;
 const DIM_DELAY = 10000; // 10 seconds
@@ -1538,15 +1539,16 @@ function buildReportForm(templateName, fieldArea) {
     });
 }
     
-// ============================================================================
-// PRE-DEPART
-// ============================================================================
 /**
- * PATCHED: Form Display & Signature Initialization
+ * PATCHED: Context-Aware Form Display & Signature Initialisation
+ * Captures site identity to ensure backend matching for special forms.
  */
-function loadFormAndShow(templateName) {
+function loadFormAndShow(templateName, context = null) {
     if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
     if (typeof deactivateDimMode === 'function') deactivateDimMode();
+
+    // Context Capture: Essential for matching "Update Site Procedures" to the Sites tab
+    formExecutionContext = context;
 
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) {
@@ -1568,7 +1570,7 @@ function loadFormAndShow(templateName) {
         buildReportForm(templateName, fieldsContainer);
     }
     
-    // FIXED: Centralized signature pad initialization with proper timing
+    // FIXED: Centralised signature pad initialisation with proper timing
     setTimeout(() => {
         const canvases = document.querySelectorAll('canvas[id^="sig-canvas-"]');
         canvases.forEach(canvas => {
@@ -1577,28 +1579,28 @@ function loadFormAndShow(templateName) {
         });
     }, 300); // Increased to 300ms for stable DOM painting
     
-/**
- * ROCKET-LOADER SAFE: Distance Pre-fill
- */
-if (calculatedDist) {
-    // Manually filter fields to avoid the '*' selector conflict with Cloudflare
-    const allInputs = document.querySelectorAll('input[data-key], textarea[data-key]');
-    const distInput = Array.from(allInputs).find(input => {
-        const key = (input.getAttribute('data-key') || '').toLowerCase();
-        return key.includes('distance') || key.includes('km') || key.includes('odo');
-    });
+    /**
+     * ROCKET-LOADER SAFE: Distance Pre-fill
+     */
+    if (calculatedDist) {
+        // Manually filter fields to avoid the '*' selector conflict with Cloudflare
+        const allInputs = document.querySelectorAll('input[data-key], textarea[data-key]');
+        const distInput = Array.from(allInputs).find(input => {
+            const key = (input.getAttribute('data-key') || '').toLowerCase();
+            return key.includes('distance') || key.includes('km') || key.includes('odo');
+        });
 
-    if (distInput) {
-        distInput.value = calculatedDist.km;
-        
-        // Visual indicator that the value was auto-calculated
-        distInput.style.border = '2px solid #4ade80';
-        distInput.classList.add('bg-green-900/20');
-        
-        // Ensure any listeners (like sliders or validation) are triggered
-        distInput.dispatchEvent(new Event('input', { bubbles: true })); 
+        if (distInput) {
+            distInput.value = calculatedDist.km;
+            
+            // Visual indicator that the value was auto-calculated
+            distInput.style.border = '2px solid #4ade80';
+            distInput.classList.add('bg-green-900/20');
+            
+            // Ensure any listeners (like sliders or validation) are triggered
+            distInput.dispatchEvent(new Event('input', { bubbles: true })); 
+        }
     }
-}
     
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
@@ -4423,6 +4425,7 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
 
 
 
