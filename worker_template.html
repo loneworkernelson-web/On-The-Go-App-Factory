@@ -1325,7 +1325,7 @@ function buildReportForm(templateName, fieldArea) {
     fieldArea.innerHTML = ''; 
 
     const template = state.globalForms.find(f => f.name === templateName) || 
-                     { name: templateName, questions: ["Notes", "Signature"] };
+                     { name: templateName, questions: ["[TEXT] Notes", "[SIGN] Signature"] };
     
     const questions = template.questions || [];
 
@@ -1550,25 +1550,19 @@ function buildReportForm(templateName, fieldArea) {
 // PRE-DEPART
 // ============================================================================
 /**
- * GOLDEN HYBRID: LOAD FORM AND SHOW
- * Merges complex field logic with the v18 Page-based navigation.
- * Fixes: Blank screen on form open, Battery Saver interruptions, and PC responsiveness.
+ * PATCHED: Form Display & Signature Initialization
  */
 function loadFormAndShow(templateName) {
-    // 1. SAFETY: Kill the Battery Saver timer so it doesn't interrupt form filling
     if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
     if (typeof deactivateDimMode === 'function') deactivateDimMode();
 
-    // 2. Clear previous signature data to prevent "ghost" signatures
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) {
         clearSig(sigCanvas.id.replace('sig-canvas-', ''));
     }
     
-    // 3. ARCHITECTURE FIX: Navigate to the Page instead of showing a Modal
     navigate('report'); 
     
-    // 4. Set dynamic title
     const title = templateName === '(Standard)' ? 'Status Update' : templateName;
     const titleEl = document.getElementById('reportTitle');
     if (titleEl) {
@@ -1577,21 +1571,20 @@ function loadFormAndShow(templateName) {
     
     currentActiveTemplate = templateName;
     
-    // 5. Build form fields into the v18 report container
     const fieldsContainer = document.getElementById('reportFields');
     if (fieldsContainer) {
         buildReportForm(templateName, fieldsContainer);
     }
     
-    // 6. Initialize signature pads after a short delay for CSS rendering
+    // FIXED: Centralized signature pad initialization with proper timing
     setTimeout(() => {
-        document.querySelectorAll('canvas[id^="sig-canvas-"]').forEach(canvas => {
+        const canvases = document.querySelectorAll('canvas[id^="sig-canvas-"]');
+        canvases.forEach(canvas => {
             resizeCanvas(canvas);
             initSigPad(canvas);
         });
-    }, 200);
+    }, 300); // Increased to 300ms for stable DOM painting
     
-    // 7. INTELLIGENCE: Pre-fill Distance/KM if GPS calculation is ready
     if (calculatedDist) {
         const distInput = document.querySelector('[data-key*="Distance"]') || 
                          document.querySelector('[data-key*="KM"]') ||
@@ -1603,13 +1596,10 @@ function loadFormAndShow(templateName) {
         }
     }
     
-    // 8. CONFIGURE SUBMIT BUTTON: Added active:scale for immediate feedback
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
-        
-        // Added 'active:scale-95 transition-all' for immediate press feedback
         newBtn.classList.add('active:scale-95', 'transition-all');
 
         if (!state.activeVisit) {
@@ -4384,6 +4374,7 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
 
