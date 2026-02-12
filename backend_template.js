@@ -60,6 +60,10 @@ function doGet(e) {
   } catch(err) { return sendResponse(e, {status:"error", message: err.toString()}); }
 }
 
+/**
+ * PATCHED: Master Entry Point
+ * Integrated routing for Site Emergency Procedures.
+ */
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error"});
   if(e.parameter.key !== CONFIG.MASTER_KEY && e.parameter.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
@@ -68,14 +72,36 @@ function doPost(e) {
   if (lock.tryLock(10000)) { 
       try {
           const p = e.parameter;
-          if(p.action === 'resolve') handleResolvePost(p); 
-          else if(p.action === 'registerDevice') return sendJSON(handleRegisterDevice(p)); // NEW
-          else handleWorkerPost(p);
           
+          // 1. Handle Remote Resolution (Admin/Manager)
+          if(p.action === 'resolve') {
+              handleResolvePost(p); 
+          }
+          // 2. Handle Device Onboarding
+          else if(p.action === 'registerDevice') {
+              return sendJSON(handleRegisterDevice(p));
+          }
+          // NEW 3. Handle Emergency Procedure Updates (Site-Specific)
+          else if(p.action === 'uploadEmergencyProcedures') {
+              return sendJSON(updateSiteEmergencyProcedures(p));
+          }
+          // 4. Default: Handle standard Worker Safety Reports
+          else {
+              handleWorkerPost(p);
+          }
+          
+          // Logic: Standard success response if not already returned by specific handlers
           return sendJSON({status:"success"});
-      } catch(err) { return sendJSON({status:"error", message: err.toString()}); } 
-      finally { lock.releaseLock(); }
-  } else { return sendJSON({status:"error", message:"Busy"}); }
+          
+      } catch(err) { 
+          return sendJSON({status:"error", message: err.toString()}); 
+      } 
+      finally { 
+          lock.releaseLock(); 
+      }
+  } else { 
+      return sendJSON({status:"error", message:"Busy"}); 
+  }
 }
 
 /**
@@ -1071,3 +1097,4 @@ function updateSiteEmergencyProcedures(payload) {
 // Inside doPost(e) { switch(action) { ...
 // case 'uploadEmergencyProcedures':
 //   return ContentService.createTextOutput(JSON.stringify(updateSiteEmergencyProcedures(payload))).setMimeType(ContentService.MimeType.JSON);
+
