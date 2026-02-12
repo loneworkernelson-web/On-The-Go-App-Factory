@@ -2803,27 +2803,37 @@ function compressImg(file) {
 }
     
 /**
- * CONFIRMED BEST: Photo Handler with Multi-Field UI Feedback
+ * PATCHED: Photo Handler with UI Status Feedback
  */
 function handlePhoto(input, key) {
     if (!input.files || !input.files[0]) return;
     
     const file = input.files[0];
     const labelId = `lbl_${input.id}`; 
-    const label = document.getElementById(labelId);
+    const statusLabel = document.getElementById(labelId);
     
-    if (label) label.innerText = "Compressing...";
+    if (statusLabel) {
+        statusLabel.innerText = "⏳ Compressing...";
+        statusLabel.classList.remove('text-blue-400', 'text-red-400');
+        statusLabel.classList.add('text-blue-400');
+    }
     
     compressImg(file).then(base64 => {
         if (!state.photoStore) state.photoStore = {};
         state.photoStore[key] = base64;
         saveState();
         
-        if (label) label.innerText = "✅ Saved";
-        console.log(`Photo saved: ${key}`);
+        if (statusLabel) {
+            statusLabel.innerText = "✅ Photo Saved";
+            statusLabel.classList.add('text-green-400');
+        }
+        console.log(`Photo processed: ${key}`);
     }).catch(err => {
-        console.error('Photo compression failed:', err);
-        if (label) label.innerText = "❌ Error";
+        console.error('Compression Error:', err);
+        if (statusLabel) {
+            statusLabel.innerText = "❌ Compression Failed";
+            statusLabel.classList.add('text-red-400');
+        }
     });
 }
 
@@ -4403,4 +4413,5 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
 
