@@ -2056,6 +2056,9 @@ function nextWiz() {
     }
 }
 
+/**
+ * FULL INTEGRATION: Identity Save + UI Initialization + Backend Registration
+ */
 function saveWizard() {
     const workerData = {
         name: document.getElementById('wizName').value.trim(),
@@ -2075,6 +2078,7 @@ function saveWizard() {
         return alert("Please complete Name and Security PINs to proceed.");
     }
     
+    // 1. Persist State
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
@@ -2085,9 +2089,8 @@ function saveWizard() {
     if (headerName) headerName.innerText = workerData.name;
     
     announce(`Welcome ${workerData.name}. Device registered.`);
-    navigate('main');
-    
-    // FIXED: Sending full profile during registration
+
+    // 2. RETAINED CHUNK: Construct Registration Payload
     const regPayload = {
         'action': 'registerDevice',
         'key': CONFIG.key,
@@ -2104,9 +2107,18 @@ function saveWizard() {
         'Timestamp': new Date().toISOString()
     };
     
+    // 3. CRITICAL UI INITIALIZATION: Wakes up the buttons and tiles
+    renderLocations(); 
+    setupHoldToStart(); 
+    updateArrivedButtonState();
+    
+    navigate('main');
+    
+    // 4. Trigger Backend Sync
     processUploadQueue(regPayload);
     setTimeout(() => { forceSync(false); }, 1000);
 }
+
 // ============================================================================
 // INSTALL PROMPTS
 // ============================================================================
@@ -4369,5 +4381,6 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
