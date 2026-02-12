@@ -1010,15 +1010,19 @@ async function getBatteryPercent() {
  * Includes: Action Routing for Notes, Vehicle Nag clearing, Canvas Cleanup,
  * and NEW: Site Emergency Procedures Integration.
  */
+/**
+ * FULL MISSION-CRITICAL SUBMIT REPORT
+ * Fixed: Site/Company handshake and media transmission for Emergency Procedures.
+ */
 function submitReport() {
     showToast('📤 Processing report...');
     
-    // 1. GATHER DATA
+    // 1. GATHER DATA: Pulls all current field values, including auto-populated ones
     const d = gatherFormData();
     let photoCount = 0;
     const photoMap = {};
     
-    // 2. PROCESS PHOTOS
+    // 2. PROCESS PHOTOS: Maps photoStore to indexed Photo keys for the spreadsheet
     Object.keys(state.photoStore || {}).forEach((key) => {
         photoCount++;
         const token = `{{PHOTO_${photoCount}}}`;
@@ -1044,21 +1048,22 @@ function submitReport() {
         }
     }
     
-    // 5. ATTACH MEDIA
+    // 5. ATTACH MEDIA: Explicitly adds photos and signature to the flat payload
     Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; });
     if (d.sig) fd["Signature"] = d.sig;
     
     // 6. ROUTING LOGIC: Determine Backend Action and Status
     let alarmStatus;
-    let backendAction = 'logVisit'; // Default action
+    let backendAction = 'logVisit'; 
 
     // NEW: SPECIAL ROUTING FOR EMERGENCY PROCEDURES
     if (currentActiveTemplate === "Update Site Procedures") {
         backendAction = 'uploadEmergencyProcedures';
-        // We ensure the site and company name are explicitly included for matching
-        fd["siteName"] = state.activeVisit ? state.activeVisit.locationName : "";
-        fd["companyName"] = state.activeVisit ? state.activeVisit.companyName : "";
-        // We pass the raw photo array for the Drive upload logic
+        
+        // FIXED: Priority given to form values (which are auto-populated) over session state
+        fd["siteName"] = d.custom["Site Name"] || d.custom["Site"] || (state.activeVisit ? state.activeVisit.locationName : "");
+        fd["companyName"] = d.custom["Company Name"] || d.custom["Company"] || (state.activeVisit ? state.activeVisit.companyName : "");
+        
         fd["photos"] = Object.values(state.photoStore || {});
         alarmStatus = "PROCEDURES_UPDATED";
     } 
@@ -1068,7 +1073,7 @@ function submitReport() {
         alarmStatus = "NOTE_LOGGED";
     } 
     else if (!state.activeVisit) {
-        alarmStatus = "REPORT_SUBMITTED"; // Standalone (e.g. Vehicle Check)
+        alarmStatus = "REPORT_SUBMITTED"; 
     } 
     else if (isMidVisitUpdate) {
         alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
@@ -1085,7 +1090,7 @@ function submitReport() {
         "Notes": d.notes || ""
     }));
 
-    // 8. NAG BAR CLEANUP: Clear orange bar immediately
+    // 8. NAG BAR CLEANUP
     if (currentActiveTemplate && currentActiveTemplate.toLowerCase().includes('vehicle')) {
         state.meta.lastVehCheck = new Date().toISOString();
         if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
@@ -1107,7 +1112,16 @@ function submitReport() {
         
         saveState();
         navigate('main'); 
-        renderLocations(); 
+        
+        // NEW: Trigger forceSync specifically for procedure updates to refresh map UI
+        if (currentActiveTemplate === "Update Site Procedures") {
+            setTimeout(() => {
+                if (typeof forceSync === 'function') forceSync(false);
+            }, 1500);
+        } else {
+            renderLocations(); 
+        }
+
         if (typeof updateArrivedButtonState === 'function') updateArrivedButtonState();
         showToast('✅ Safety Session Completed');
     } else {
@@ -1120,6 +1134,9 @@ function submitReport() {
     // 10. CANVAS PURGE: Physically clear the drawing board
     const sigCanvas = document.querySelector('canvas[id^="sig-canvas-"]');
     if (sigCanvas) clearSig(sigCanvas.id.replace('sig-canvas-', ''));
+    
+    // FINAL CLEANUP: Clear global context
+    formExecutionContext = null;
 }
 
 // ============================================================================
@@ -1540,8 +1557,8 @@ function buildReportForm(templateName, fieldArea) {
 }
     
 /**
- * PATCHED: Context-Aware Form Display & Signature Initialisation
- * Captures site identity to ensure backend matching for special forms.
+ * PATCHED: Context-Aware Form Display & Auto-Population
+ * Captures site identity and injects it into form fields for seamless matching.
  */
 function loadFormAndShow(templateName, context = null) {
     if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
@@ -1583,7 +1600,6 @@ function loadFormAndShow(templateName, context = null) {
      * ROCKET-LOADER SAFE: Distance Pre-fill
      */
     if (calculatedDist) {
-        // Manually filter fields to avoid the '*' selector conflict with Cloudflare
         const allInputs = document.querySelectorAll('input[data-key], textarea[data-key]');
         const distInput = Array.from(allInputs).find(input => {
             const key = (input.getAttribute('data-key') || '').toLowerCase();
@@ -1592,14 +1608,33 @@ function loadFormAndShow(templateName, context = null) {
 
         if (distInput) {
             distInput.value = calculatedDist.km;
-            
-            // Visual indicator that the value was auto-calculated
             distInput.style.border = '2px solid #4ade80';
             distInput.classList.add('bg-green-900/20');
-            
-            // Ensure any listeners (like sliders or validation) are triggered
             distInput.dispatchEvent(new Event('input', { bubbles: true })); 
         }
+    }
+
+    /**
+     * AUTO-POPULATION: Site & Company Handshake
+     */
+    if (context) {
+        setTimeout(() => {
+            const allFormElements = document.querySelectorAll('[data-key]');
+            
+            allFormElements.forEach(el => {
+                const key = el.getAttribute('data-key').toLowerCase();
+                
+                // Map context data to the correct input fields
+                if (key.includes('site') && context.siteName) {
+                    el.value = context.siteName;
+                    el.classList.add('bg-blue-900/10'); // Visual hint of auto-fill
+                }
+                if (key.includes('company') && context.companyName) {
+                    el.value = context.companyName;
+                    el.classList.add('bg-blue-900/10');
+                }
+            });
+        }, 400); // Delay ensures buildReportForm is fully painted
     }
     
     const btn = document.getElementById('btnSubmitRep');
@@ -1625,7 +1660,6 @@ function loadFormAndShow(templateName, context = null) {
         }
     }
 }
-
 /**
  * HIGH-INTEGRITY DEPARTURE GATE
  * Fixed: 'Location not found' error during travel sessions.
@@ -2633,30 +2667,41 @@ function processUploadQueue(d) {
     });
 }
 
-// 3. GATHER FORM DATA - Collects all form field values
+/**
+ * PATCHED: Data Gathering Engine
+ * Ensures all field types, including signatures and auto-filled site data, are correctly captured.
+ */
 function gatherFormData() {
     const d = { custom: {}, notes: '', sig: null, jsonPayload: {} };
     
+    // 1. Capture global notes if present (e.g., from the Standard template)
     const sn = document.getElementById('rep_notes');
     if (sn) d.notes = sn.value;
     
-    // Gather all inputs with a data-key
+    // 2. Iterate through all tagged form inputs
     document.querySelectorAll('[data-key]').forEach(el => {
         const k = el.getAttribute('data-key');
         let v = el.value;
         
+        // Logic: Special handling for non-text inputs
         if (el.type === 'checkbox') {
             v = el.checked ? 'Yes' : 'No';
         } else if (el.type === 'radio') {
+            // Only capture the value of the selected radio button
             if (!el.checked) return;
             v = el.value;
         } else if (el.type === 'hidden' && el.hasAttribute('data-signature-id')) {
-            // High-integrity signature harvesting
+            // FIXED: High-integrity signature extraction
             const sigId = el.getAttribute('data-signature-id');
             const canvas = document.getElementById(`sig-canvas-${sigId}`);
-            if (canvas) v = canvas.toDataURL('image/png');
+            if (canvas) {
+                v = canvas.toDataURL('image/png');
+                // CRITICAL: Explicitly set d.sig so submitReport can map it to the 'Signature' column
+                d.sig = v; 
+            }
         }
         
+        // 3. Map values to both custom fields and the JSON backup
         d.custom[k] = v;
         d.jsonPayload[k] = v;
     });
@@ -4450,6 +4495,7 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
 
 
 
