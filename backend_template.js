@@ -1146,3 +1146,4 @@ function updateSiteEmergencyProcedures(payload) {
   return { status: 'success', links: photoUrls };
 }
 
+
