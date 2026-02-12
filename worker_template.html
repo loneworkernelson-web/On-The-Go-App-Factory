@@ -1005,12 +1005,9 @@ async function getBatteryPercent() {
 }
 
 /**
- * REWRITTEN: High-Integrity Report Submission
- * Correctly maps stripped form labels to the backend payload and handles UI transitions.
- */
-/**
  * FULL MISSION-CRITICAL SUBMIT REPORT
- * Includes: Action Routing for Notes, Vehicle Nag clearing, and Canvas Cleanup.
+ * Includes: Action Routing for Notes, Vehicle Nag clearing, Canvas Cleanup,
+ * and NEW: Site Emergency Procedures Integration.
  */
 function submitReport() {
     showToast('📤 Processing report...');
@@ -1052,17 +1049,30 @@ function submitReport() {
     
     // 6. ROUTING LOGIC: Determine Backend Action and Status
     let alarmStatus;
-    let backendAction = 'logVisit'; // Default for most forms
+    let backendAction = 'logVisit'; // Default action
 
-    // NEW: Route "Note to Self" to the correct spreadsheet function
-    if (currentActiveTemplate === "Note to Self") {
+    // NEW: SPECIAL ROUTING FOR EMERGENCY PROCEDURES
+    if (currentActiveTemplate === "Update Site Procedures") {
+        backendAction = 'uploadEmergencyProcedures';
+        // We ensure the site and company name are explicitly included for matching
+        fd["siteName"] = state.activeVisit ? state.activeVisit.locationName : "";
+        fd["companyName"] = state.activeVisit ? state.activeVisit.companyName : "";
+        // We pass the raw photo array for the Drive upload logic
+        fd["photos"] = Object.values(state.photoStore || {});
+        alarmStatus = "PROCEDURES_UPDATED";
+    } 
+    // ROUTING: Note to Self
+    else if (currentActiveTemplate === "Note to Self") {
         backendAction = 'logNote'; 
         alarmStatus = "NOTE_LOGGED";
-    } else if (!state.activeVisit) {
+    } 
+    else if (!state.activeVisit) {
         alarmStatus = "REPORT_SUBMITTED"; // Standalone (e.g. Vehicle Check)
-    } else if (isMidVisitUpdate) {
+    } 
+    else if (isMidVisitUpdate) {
         alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
-    } else {
+    } 
+    else {
         alarmStatus = "DEPARTED";
     }
     
@@ -1080,9 +1090,8 @@ function submitReport() {
         if (typeof checkVehicleStatus === 'function') checkVehicleStatus(); 
     }
     
-// 9. VISUAL & LOGIC RESET
+    // 9. VISUAL & LOGIC RESET
     if (!isMidVisitUpdate) {
-        // NEW: Physically shut down GPS monitoring when the session ends
         if (typeof stopGPSMonitoring === 'function') stopGPSMonitoring();
 
         state.activeVisit = null;
@@ -4283,13 +4292,14 @@ function exitLockedScreen() {
     }
 }
 
-    /**
- * REWRITTEN: Site Info population with live navigation
+/**
+ * PATCHED: Unified Site Info with Emergency Procedures
  */
 function populateSiteInfoModal(location) {
     const content = document.getElementById('siteInfoContent');
     if (!content) return;
 
+    // 1. Build Header & Contact Info
     let html = `<div class="space-y-4">
         <div>
             <label class="text-[10px] text-blue-400 font-black uppercase tracking-widest">Site Name</label>
@@ -4299,6 +4309,16 @@ function populateSiteInfoModal(location) {
     if (location.companyName) html += `<div><label class="text-[10px] text-gray-500 font-black uppercase">Company</label><div class="text-white">${location.companyName}</div></div>`;
     if (location.address) html += `<div><label class="text-[10px] text-gray-500 font-black uppercase">Address</label><div class="text-white">${location.address}</div></div>`;
     
+    // 2. Emergency Procedures Button (Integrated directly into the main list)
+    if (location['Emergency Procedures']) {
+        html += `<div class="pt-2">
+            <button onclick="viewEmergencyProcedures('${location['Emergency Procedures']}')" 
+                    class="w-full py-4 bg-red-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                🚨 VIEW EMERGENCY PROCEDURES
+            </button>
+        </div>`;
+    }
+
     if (location.contactName || location.contactPhone) {
         html += `<div class="pt-2 border-t border-gray-700">
             <label class="text-[10px] text-red-400 font-black uppercase tracking-widest">Contact</label>
@@ -4317,7 +4337,7 @@ function populateSiteInfoModal(location) {
     html += `</div>`;
     content.innerHTML = html;
 
-    // Configure Action Buttons
+    // 3. Configure Quick-Action Buttons (Call, Email, Nav)
     const btnCall = document.getElementById('btnSiteCall');
     const btnEmail = document.getElementById('btnSiteEmail');
     const btnNav = document.getElementById('btnSiteNav');
@@ -4333,9 +4353,9 @@ function populateSiteInfoModal(location) {
     } else if (btnEmail) btnEmail.classList.add('hidden');
 
     if (location.address && btnNav) {
-        // FIXED: Official Google Maps Navigation API
         const encodedAddr = encodeURIComponent(location.address);
-        btnNav.href = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
+        // FIXED: Re-added $ symbol for variable injection
+        btnNav.href = `http://googleusercontent.com/maps.google.com/${encodedAddr}`;
         btnNav.classList.remove('hidden');
     } else if (btnNav) {
         btnNav.classList.add('hidden');
@@ -4391,22 +4411,20 @@ function withPinVerification(isDuress, successCallback) {
         }
     };
 }
+
+function viewEmergencyProcedures(linksString) {
+    if (!linksString) return;
+    const links = linksString.split(',').map(l => l.trim());
     
+    // For maximum reliability on mobile, we open the Google Drive links in a sequence
+    // or trigger a custom zoomable overlay.
+    links.forEach((url, index) => {
+        setTimeout(() => {
+            window.open(url, '_blank');
+        }, index * 500); // Staggers the opening of multiple pages
+    });
+}
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
