@@ -1637,6 +1637,13 @@ function loadFormAndShow(templateName) {
 function preDepart() {
     if (!state || !state.activeVisit) return;
     
+    // SAFETY GATE: Force PIN if an alarm is active
+    if (state.activeVisit.isPanic) {
+        showToast("⚠️ Clear alarm with PIN first");
+        iamSafe(); // Triggers the PIN verification
+        return;
+    }
+    
     isMidVisitUpdate = false;
     const activeLocId = state.activeVisit.locationId;
 
@@ -1749,34 +1756,30 @@ function enterLockedScreen() {
 // TRIGGER PANIC
 // ============================================================================
 async function triggerPanic(duress = false) {
-// NEW: Ensure GPS is active during alarms
     if (gpsWatchId === null) startGPSMonitoring();
     
     document.body.classList.add('bg-red-900');
     announce(duress ? "Duress activated silently." : "Panic alarm activated.");
 
-        if (!duress) {
-            // Only strobe for standard panic (not silent duress)
-            document.body.classList.add('strobe-active');
-        }    
-    // Play audible alarm if audio is ready
+    if (!duress) {
+        document.body.classList.add('strobe-active');
+    }    
+    
     await initAudio();
     if (audioReady && synth) {
-        try {
-            synth.triggerAttackRelease('C4', '8n');
-        } catch (e) {
-            console.warn('Audio playback failed:', e);
-        }
+        try { synth.triggerAttackRelease('C4', '8n'); } catch (e) {}
     }
     
     await logSafety(duress ? "DURESS" : "PANIC", "Alert triggered.");
     
-    // Mark panic in state
     if (state && state.activeVisit) {
         state.activeVisit.isPanic = true;
         if (duress) state.activeVisit.isDuress = true;
         saveState();
     }
+
+    // CRITICAL FIX: Physically switch the UI to Panic Mode
+    renderPanicState(); 
 }
 
 // PHASE 1: I AM SAFE function (after alarm triggered)
@@ -4381,6 +4384,7 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
 
