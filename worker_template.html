@@ -1333,39 +1333,40 @@ function startTravellingPulse() {
 }
 
 /**
- * FINAL GOLDEN BUILD: FORM ENGINE
- * Fixed: Added Camera Trigger [PHOTO]
- * Fixed: Added logic for [1TEXT], [TEXT], [ATTACH], [NOTE]
+ * FULL INTEGRATED PATCH: buildReportForm
+ * Resolves: [NOTE] parsing, Windows Photo Dialogue, and Signature UI alignment.
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
     fieldArea.innerHTML = ''; 
 
+    // Logic: Fallback for unsynced or standard forms
     const template = state.globalForms.find(f => f.name === templateName) || 
-                     { name: templateName, questions: ["[TEXT] Notes", "[SIGN] Signature"] };
+                     { name: templateName, questions: ["[NOTE] Site Information", "[TEXT] Notes", "[SIGN] Signature"] };
     
     const questions = template.questions || [];
 
     questions.forEach((label, index) => {
-        const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/);
-        const rawTag = tagMatch ? tagMatch[1] : "TEXT";
+        // Tag Scrutiny: Extract [TAG] and Label
+        const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/i);
+        const rawTag = tagMatch ? tagMatch[1].toUpperCase().trim() : "TEXT";
         let cleanLabel = tagMatch ? tagMatch[2] : label;
         
-        let baseType = "";
+        let baseType = rawTag;
         let options = [];
         
+        // Logic: Support comma-separated dropdown options
         if (rawTag.includes(',')) {
             const parts = rawTag.split(',');
-            baseType = parts[0].toUpperCase().trim();
+            baseType = parts[0].trim();
             options = parts.slice(1).map(o => o.trim());
-        } else {
-            baseType = rawTag.toUpperCase().trim();
         }
         
         const fieldId = `field_${index}_${cleanLabel.replace(/\s/g, '_')}`;
         const wrapper = document.createElement('div');
         wrapper.className = 'mb-6'; 
 
+        // Visibility Scrutiny: Headings/Notes don't need small labels
         const isInfoOnly = (baseType === 'HEADING' || baseType === 'HEAD' || baseType === 'NOTE');
         
         if (!isInfoOnly) {
@@ -1376,7 +1377,6 @@ function buildReportForm(templateName, fieldArea) {
         }
 
         let input;
-
         switch(baseType) {
             case 'HEADING':
             case 'HEAD':
@@ -1385,7 +1385,7 @@ function buildReportForm(templateName, fieldArea) {
                 h.innerText = cleanLabel;
                 wrapper.appendChild(h);
                 fieldArea.appendChild(wrapper);
-                return;
+                return; // FIXED: Prevents creating a default field below
 
             case 'NOTE':
                 const n = document.createElement('div');
@@ -1393,7 +1393,48 @@ function buildReportForm(templateName, fieldArea) {
                 n.innerText = cleanLabel;
                 wrapper.appendChild(n);
                 fieldArea.appendChild(wrapper);
-                return;
+                return; // FIXED: Prevents creating a default field below
+
+            case 'PHOTO': 
+                const photoBtn = document.createElement('label');
+                photoBtn.setAttribute('for', fieldId); // REQUIRED for Windows dialogue trigger
+                photoBtn.className = 'flex flex-col items-center justify-center gap-2 w-full py-6 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700 transition-colors';
+                photoBtn.innerHTML = `<span class="text-xl">📷</span><span>Take or Attach Photo</span>`;
+                
+                input = document.createElement('input');
+                input.type = 'file'; 
+                input.id = fieldId;
+                input.accept = 'image/*'; 
+                input.setAttribute('capture', 'environment'); 
+                // FIXED: Opacity-0 instead of .hidden ensures browser triggers dialogue
+                input.className = 'absolute opacity-0 w-0 h-0 pointer-events-none';
+                input.onchange = () => handlePhoto(input, cleanLabel);
+                
+                photoBtn.appendChild(input);
+                wrapper.appendChild(photoBtn);
+                
+                const status = document.createElement('div');
+                status.id = `lbl_${fieldId}`; 
+                status.className = 'text-[9px] text-blue-400 font-bold mt-2 uppercase text-center';
+                wrapper.appendChild(status);
+                fieldArea.appendChild(wrapper);
+                return; // FIXED: Photo handling is self-contained
+
+            case 'SIGN':
+            case 'SIGNATURE':
+                const canvas = document.createElement('canvas');
+                canvas.id = `sig-canvas-${index}`;
+                canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
+                wrapper.appendChild(canvas);
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'text-[10px] text-gray-500 font-bold uppercase mt-2 ml-1';
+                clearBtn.innerText = 'Clear Signature';
+                clearBtn.onclick = (e) => { e.preventDefault(); clearSig(index); };
+                wrapper.appendChild(clearBtn);
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.setAttribute('data-signature-id', index);
+                break;
 
             case 'CHECK':
             case 'CHECKBOX':
@@ -1404,7 +1445,7 @@ function buildReportForm(templateName, fieldArea) {
                 input.className = 'w-6 h-6 rounded accent-blue-500';
                 const checkText = document.createElement('span');
                 checkText.className = 'text-sm font-bold text-gray-300';
-                checkText.innerText = 'Confirm';
+                checkText.innerText = 'I confirm';
                 checkWrap.appendChild(input);
                 checkWrap.appendChild(checkText);
                 wrapper.appendChild(checkWrap);
@@ -1420,49 +1461,6 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('textarea');
                 input.rows = 4;
                 input.placeholder = 'Type extended notes...';
-                break;
-
-            case '$':
-            case 'CURRENCY':
-                const moneyWrap = document.createElement('div');
-                moneyWrap.className = 'flex items-center';
-                const sym = document.createElement('div');
-                sym.className = 'bg-gray-700 px-4 py-3 rounded-l-xl border border-white/10 text-blue-400 font-bold';
-                sym.innerText = '$';
-                input = document.createElement('input');
-                input.type = 'number';
-                input.step = '0.01';
-                input.className = 'rounded-l-none';
-                moneyWrap.appendChild(sym);
-                moneyWrap.appendChild(input);
-                wrapper.appendChild(moneyWrap);
-                break;
-
-            case 'PHOTO': 
-                const photoBtn = document.createElement('label');
-                photoBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
-                photoBtn.innerHTML = '<span>📷 Take or Attach Photo</span>';
-                input = document.createElement('input');
-                input.type = 'file'; 
-                input.accept = 'image/*'; 
-                // CRITICAL: Forces mobile camera option
-                input.setAttribute('capture', 'environment'); 
-                input.className = 'hidden';
-                input.onchange = () => handlePhoto(input, cleanLabel);
-                photoBtn.appendChild(input);
-                wrapper.appendChild(photoBtn);
-                break;
-
-            case 'ATTACH':
-                const attachBtn = document.createElement('label');
-                attachBtn.className = 'flex items-center justify-center gap-2 w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700';
-                attachBtn.innerHTML = '<span>📎 Attach File</span>';
-                input = document.createElement('input');
-                input.type = 'file'; 
-                input.className = 'hidden';
-                input.onchange = () => handleAttachment(input, cleanLabel);
-                attachBtn.appendChild(input);
-                wrapper.appendChild(attachBtn);
                 break;
 
             case 'DATE':
@@ -1485,23 +1483,6 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input'); 
                 input.readOnly = true; 
                 input.className = 'opacity-40';
-                break;
-
-            case 'SIGN':
-            case 'SIGNATURE':
-                const canvas = document.createElement('canvas');
-                canvas.id = `sig-canvas-${index}`;
-                canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
-                wrapper.appendChild(canvas);
-                const clearBtn = document.createElement('button');
-                clearBtn.className = 'text-[10px] text-gray-500 font-bold uppercase mt-2 ml-1';
-                clearBtn.innerText = 'Clear Signature';
-                clearBtn.onclick = (e) => { e.preventDefault(); clearSig(index); };
-                wrapper.appendChild(clearBtn);
-                input = document.createElement('input');
-                input.type = 'hidden';
-                input.setAttribute('data-signature-id', index);
-                setTimeout(() => { initSigPad(canvas); }, 200);
                 break;
 
             case 'YESNO':
@@ -1544,6 +1525,7 @@ function buildReportForm(templateName, fieldArea) {
                 input.placeholder = 'Type here...';
         }
 
+        // Logic: Standardize all actual input fields
         if (input) {
             input.id = fieldId;
             if (input.type !== 'checkbox' && input.type !== 'hidden') {
@@ -1551,13 +1533,6 @@ function buildReportForm(templateName, fieldArea) {
             }
             input.setAttribute('data-key', cleanLabel);
             wrapper.appendChild(input);
-
-            if (baseType === 'PHOTO' || baseType === 'ATTACH') {
-                const status = document.createElement('div');
-                status.id = `lbl_${fieldId}`; 
-                status.className = 'text-[9px] text-blue-400 font-bold mt-1 uppercase';
-                wrapper.appendChild(status);
-            }
         }
         fieldArea.appendChild(wrapper);
     });
@@ -4428,3 +4403,4 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
+
