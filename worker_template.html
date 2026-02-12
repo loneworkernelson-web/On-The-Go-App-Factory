@@ -30,20 +30,27 @@ html.system-dim, body.system-dim {
 }
 
 /* 3. SOPHISTICATED UI BASE */
-body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; overscroll-behavior-y: contain; background-color: var(--primary); color: white; height: 100%; width: 100%; overflow: hidden; }
-
-.page { 
-    display: none; 
+body { 
+    font-family: 'Inter', sans-serif; 
+    -webkit-tap-highlight-color: transparent; 
+    user-select: none; 
+    overscroll-behavior-y: contain; 
+    background-color: var(--primary); 
+    color: white; 
     height: 100%; 
     width: 100%; 
+    overflow: hidden; 
+    display: flex; /* Added flex */
+    flex-direction: column; /* Stacks banners above pages */
+    padding-top: env(safe-area-inset-top); /* Handles notch globally */
+}
+.page { 
+    display: none; 
+    flex: 1; /* Fills remaining space */
+    width: 100%; 
     flex-direction: column; 
-    position: absolute; 
-    top: 0; 
-    left: 0; 
     background-color: var(--primary);
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    /* Removed absolute/top/left/height: 100% */
 }
 .page.active { display: flex; z-index: 10; }
 
@@ -216,13 +223,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </head>
 <body class="h-full overflow-hidden select-none">
 
-<!-- Offline Banner -->
-<div id="offlineBanner" class="hidden fixed top-0 left-0 w-full">
+<div id="offlineBanner" class="hidden bg-red-600 text-white text-center text-[10px] font-bold py-1">
     📡 OFFLINE MODE - Data queued for upload
 </div>
 
-<!-- Vehicle Nag Bar -->
-<div id="vehNagBar" class="hidden fixed top-0 left-0 w-full" onclick="startVehicleCheck()">
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-[10px] font-bold py-2 cursor-pointer" onclick="startVehicleCheck()">
     ⚠️ Vehicle Check Overdue - Tap to Complete
 </div>
 
@@ -320,7 +325,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
 
-        <div id="wizStep3" class="wizard-step">
+    <div id="wizStep3" class="wizard-step">
             <h2 class="text-lg font-bold mb-4">Emergency Contacts</h2>
             <label class="setting-label lbl-red">Primary Emergency Contact</label>
             <input id="wizContactName" type="text" placeholder="Contact Name" class="form-input-card">
@@ -1580,27 +1585,25 @@ function loadFormAndShow(templateName) {
         });
     }, 300); // Increased to 300ms for stable DOM painting
     
-/**
- * PATCHED: High-Integrity Distance Pre-fill Logic
+**
+ * ROCKET-LOADER SAFE: Distance Pre-fill
  */
 if (calculatedDist) {
-    // FIXED: Querying with 'i' flag for case-insensitive matching in modern browsers
-    // or providing all common variations for maximum compatibility.
-    const distInput = document.querySelector('[data-key*="Distance"]') || 
-                     document.querySelector('[data-key*="distance"]') ||
-                     document.querySelector('[data-key*="KM"]') ||
-                     document.querySelector('[data-key*="km"]') ||
-                     document.querySelector('[data-key*="Km"]') ||
-                     document.querySelector('[data-key*="Odo"]'); // Matches Odometer
-                     
+    // Manually filter fields to avoid the '*' selector conflict with Cloudflare
+    const allInputs = document.querySelectorAll('input[data-key], textarea[data-key]');
+    const distInput = Array.from(allInputs).find(input => {
+        const key = (input.getAttribute('data-key') || '').toLowerCase();
+        return key.includes('distance') || key.includes('km') || key.includes('odo');
+    });
+
     if (distInput) {
         distInput.value = calculatedDist.km;
         
-        // VISUAL CUE: Signals to the worker that the value was auto-calculated
+        // Visual indicator that the value was auto-calculated
         distInput.style.border = '2px solid #4ade80';
         distInput.classList.add('bg-green-900/20');
         
-        // Logic: Ensures the "KM" display is updated if the field is a slider or has a label listener
+        // Ensure any listeners (like sliders or validation) are triggered
         distInput.dispatchEvent(new Event('input', { bubbles: true })); 
     }
 }
@@ -4385,6 +4388,7 @@ function withPinVerification(isDuress, successCallback) {
 
 </body>
 </html>
+
 
 
 
