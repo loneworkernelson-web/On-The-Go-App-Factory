@@ -62,7 +62,7 @@ function doGet(e) {
 
 /**
  * PATCHED: Master Entry Point
- * Integrated routing for Site Emergency Procedures.
+ * Fix: Ensures Procedure Updates are logged to BOTH the Sites and Visits tabs.
  */
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error"});
@@ -83,14 +83,16 @@ function doPost(e) {
           }
           // NEW 3. Handle Emergency Procedure Updates (Site-Specific)
           else if(p.action === 'uploadEmergencyProcedures') {
-              return sendJSON(updateSiteEmergencyProcedures(p));
+              // Logic: Execute site update, but DO NOT return yet so it can be logged as a visit
+              updateSiteEmergencyProcedures(p);
+              handleWorkerPost(p);
           }
           // 4. Default: Handle standard Worker Safety Reports
           else {
               handleWorkerPost(p);
           }
           
-          // Logic: Standard success response if not already returned by specific handlers
+          // Logic: Standard success response for all logged activities
           return sendJSON({status:"success"});
           
       } catch(err) { 
@@ -1155,6 +1157,7 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
 
 
 
