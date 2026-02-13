@@ -1139,35 +1139,24 @@ function submitReport() {
     if (d.sig) fd["Signature"] = d.sig; 
     
     // 6. ROUTING LOGIC: Determine Backend Action and Status
-    let alarmStatus;
-    let backendAction = 'logVisit'; 
+// Inside submitReport function
+let alarmStatus;
+let backendAction = 'logVisit';
 
-    // NEW: SPECIAL ROUTING FOR EMERGENCY PROCEDURES
-    if (currentActiveTemplate === "Update Site Procedures") {
-        backendAction = 'uploadEmergencyProcedures';
-        
-        // FIXED: Explicit handshake for backend row matching
-        fd["siteName"] = d.custom["Site Name"] || d.custom["Site"] || (state.activeVisit ? state.activeVisit.locationName : "");
-        fd["companyName"] = d.custom["Company Name"] || d.custom["Company"] || (state.activeVisit ? state.activeVisit.companyName : "");
-        
-        // Pass the raw array of photos for the Google Drive handler
-        fd["photos"] = Object.values(state.photoStore || {});
-        alarmStatus = "PROCEDURES_UPDATED";
-    } 
-    // ROUTING: Note to Self
-    else if (currentActiveTemplate === "Note to Self") {
-        backendAction = 'logNote'; 
-        alarmStatus = "NOTE_LOGGED";
-    } 
-    else if (!state.activeVisit) {
-        alarmStatus = "REPORT_SUBMITTED"; 
-    } 
-    else if (isMidVisitUpdate) {
-        alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
-    } 
-    else {
-        alarmStatus = "DEPARTED";
-    }
+if (currentActiveTemplate === "Update Site Procedures") {
+    backendAction = 'uploadEmergencyProcedures';
+    alarmStatus = "PROCEDURES_UPDATED";
+} else if (currentActiveTemplate === "Note to Self") {
+    backendAction = 'logNote';
+    alarmStatus = "NOTE_LOGGED";
+} else if (!state.activeVisit) {
+    alarmStatus = "REPORT_SUBMITTED";
+} else if (isMidVisitUpdate) {
+    alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
+} else {
+    // FIXED: Ensure a clean 'DEPARTED' status even if 'USER_SAFE' was logged previously
+    alarmStatus = "DEPARTED"; 
+}
     
     // 7. HANDSHAKE: Send to spreadsheet with the correct action key
     processUploadQueue(buildPayload({
@@ -4700,6 +4689,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
