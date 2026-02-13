@@ -681,6 +681,18 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
+<div id="noticeModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" role="dialog">
+    <div id="noticeCard" class="bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm p-8 text-center border-t-[12px] border-blue-600">
+        <div id="noticeIcon" class="text-6xl mb-6">📢</div>
+        <h2 id="noticeTitle" class="text-2xl font-black text-white mb-3 uppercase tracking-tight leading-tight"></h2>
+        <div id="noticeContent" class="text-gray-400 text-sm mb-10 leading-relaxed text-left max-h-56 overflow-y-auto pr-3 scrollbar-hide"></div>
+        
+        <button id="btnAckNotice" onclick="acknowledgeNotice()" class="w-full py-6 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-xl uppercase tracking-widest active:scale-95 transition-all">
+            I have read and understood
+        </button>
+    </div>
+</div>
+    
 <div id="pinModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-800 p-6 rounded-xl w-80">
         <form id="pinEntryForm" onsubmit="return false;">
@@ -4480,6 +4492,62 @@ function withPinVerification(isDuress, successCallback) {
     };
 }
 
+    /**
+ * REFINED NOTICE ENGINE
+ */
+function checkActiveNotice() {
+    if (!state.meta || !state.meta.activeNotice) return;
+    
+    const notice = state.meta.activeNotice;
+    const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
+    
+    if (ackList.includes(notice.id)) return;
+
+    const modal = document.getElementById('noticeModal');
+    const title = document.getElementById('noticeTitle');
+    const content = document.getElementById('noticeContent');
+    const card = document.getElementById('noticeCard');
+    const icon = document.getElementById('noticeIcon');
+
+    title.innerText = notice.title;
+    content.innerText = notice.content;
+
+    // Apply priority styling
+    card.classList.remove('border-blue-600', 'border-orange-500', 'border-red-600');
+    if (notice.priority === 'Critical') {
+        card.classList.add('border-red-600');
+        icon.innerText = '🚨';
+    } else if (notice.priority === 'Urgent') {
+        card.classList.add('border-orange-500');
+        icon.innerText = '⚠️';
+    } else {
+        card.classList.add('border-blue-600');
+        icon.innerText = '📢';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function acknowledgeNotice() {
+    const notice = state.meta.activeNotice;
+    if (!notice) return;
+
+    // 1. Save locally so it doesn't pop up again
+    const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
+    ackList.push(notice.id);
+    localStorage.setItem('otg_acknowledged_notices', JSON.stringify(ackList));
+
+    // 2. Log to Visits tab for compliance audit
+    processUploadQueue(buildPayload({
+        "action": "logNote",
+        "Alarm Status": "NOTICE_ACKNOWLEDGED",
+        "Notes": `Safety Notice Read: ${notice.title} (ID: ${notice.id})`
+    }));
+
+    closeModal('notice');
+    showToast('✅ Acknowledgment saved');
+}
+    
 /**
  * PATCHED: Procedure Viewer
  * Handles multiple comma-separated Drive links with mobile-safe opening.
@@ -4514,14 +4582,3 @@ function viewEmergencyProcedures(linksString) {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
