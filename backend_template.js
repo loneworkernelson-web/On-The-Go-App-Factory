@@ -1076,64 +1076,6 @@ function cleanupPrivateSentNotes() {
 }
 
 /**
- * ADDITION: Site Emergency Procedures Handler
- * Automatically links uploaded photos to the 'Sites' tab based on Site Name.
- */
-function updateSiteEmergencyProcedures(payload) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const siteSheet = ss.getSheetByName("Sites");
-  if (!siteSheet) return { status: 'error', message: 'Sites tab not found' };
-
-  const data = siteSheet.getDataRange().getValues();
-  const headers = data[0];
-  
-  // 1. Find or Create the "Emergency Procedures" column
-  let colIdx = headers.indexOf("Emergency Procedures");
-  if (colIdx === -1) {
-    colIdx = headers.length;
-    siteSheet.getRange(1, colIdx + 1).setValue("Emergency Procedures");
-  }
-
-  // 2. Find the matching row (Site Name + Company Name)
-  let targetRow = -1;
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][headers.indexOf("Site Name")] === payload.siteName && 
-        data[i][headers.indexOf("Company Name")] === payload.companyName) {
-      targetRow = i + 1;
-      break;
-    }
-  }
-
-  if (targetRow === -1) return { status: 'error', message: 'Site match not found' };
-
-  // 3. Process Photos and get Public Links
-  const photoUrls = [];
-  const folder = DriveApp.getFolderById(CONFIG.PHOTOS_FOLDER_ID);
-  
-  payload.photos.forEach((base64, idx) => {
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64.split(",")[1]), "image/jpeg", `EP_${payload.siteName}_${idx}.jpg`);
-    const file = folder.createFile(blob);
-    // CRITICAL: Set permissions so workers can view the procedures in-app
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    photoUrls.push(file.getUrl());
-  });
-
-  // 4. Update the cell (comma-separated if multiple photos)
-  const existingValue = siteSheet.getRange(targetRow, colIdx + 1).getValue();
-  const newValue = photoUrls.join(", ");
-  siteSheet.getRange(targetRow, colIdx + 1).setValue(newValue);
-
-  return { status: 'success', links: photoUrls };
-}
-
-/**
- * INTEGRATION: Add this case to your existing doPost(e) switch block
- */
-// Inside doPost(e) { switch(action) { ...
-// case 'uploadEmergencyProcedures':
-//   return ContentService.createTextOutput(JSON.stringify(updateSiteEmergencyProcedures(payload))).setMimeType(ContentService.MimeType.JSON);
-
-/**
  * BACKEND logic: Specifically updates the 'Sites' tab
  */
 function updateSiteEmergencyProcedures(payload) {
@@ -1180,3 +1122,4 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
