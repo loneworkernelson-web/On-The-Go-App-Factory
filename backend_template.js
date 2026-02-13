@@ -1180,9 +1180,3 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
-
-
-
-
-
-
