@@ -791,110 +791,6 @@ function getDashboardData() {
     return {workers: workers, escalation_limit: CONFIG.ESCALATION_MINUTES};
 }
 
-/**
- * MISSION-CRITICAL: Unified Targeting Engine
- * Logic: Filters data based on Individual Name, Group Membership, or 'ALL'.
- */
-function getSyncData(workerName, deviceId) {
-  /**
- * MISSION-CRITICAL: Targeting Engine
- * Logic: Checks if the user is authorised via individual name, group membership, or 'ALL'.
- */
-const isAuthorised = (targetStr, name, groups) => {
-    const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
-    if (allowed.includes("all")) return true;
-    if (allowed.includes(name)) return true;
-    
-    const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
-    return myGroups.some(g => allowed.includes(g));
-};
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const stSheet = ss.getSheetByName('Staff');
-    const wNameSafe = (workerName || "").toString().toLowerCase().trim();
-    
-    if (!stSheet) return {status: "error", message: "Staff sheet missing."};
-    
-    const stData = stSheet.getDataRange().getValues();
-    let workerFound = false;
-    let workerGroups = ""; 
-    let meta = {};
-
-    // 1. Identify Worker & Their Groups
-    for (let i = 1; i < stData.length; i++) {
-        if ((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
-            workerFound = true;
-            // Column D (Index 3) is now 'Group Membership'
-            workerGroups = (stData[i][3] || "").toString().toLowerCase(); 
-            meta.lastVehCheck = stData[i][5];
-            meta.wofExpiry = stData[i][6];
-            break; 
-        }
-    }
-
-    if (!workerFound) return {status: "error", message: "Access Denied."};
-
-    // 2. HELPER: The Targeting Engine
-    const isAuthorised = (targetStr, name, groups) => {
-        const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
-        if (allowed.includes("all")) return true;
-        if (allowed.includes(name)) return true;
-        
-        const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
-        return myGroups.some(g => allowed.includes(g));
-    };
-
-    // 3. Filter Sites
-    const sites = [];
-    const siteSheet = ss.getSheetByName('Sites');
-    if (siteSheet) {
-        const sData = siteSheet.getDataRange().getValues();
-        for (let i = 1; i < sData.length; i++) {
-            if (isAuthorised(sData[i][0], wNameSafe, workerGroups)) {
-                sites.push({ 
-                    template: sData[i][1], company: sData[i][2], siteName: sData[i][3], 
-                    address: sData[i][4], contactName: sData[i][5], 
-                    contactPhone: sData[i][6], contactEmail: sData[i][7], 
-                    notes: sData[i][8], emergencyProcedures: sData[i][9] 
-                });
-            }
-        }
-    }
-    
-    // 4. Filter Templates (Forms)
-    const forms = [];
-    const cachedTemplates = {};
-    const tSheet = ss.getSheetByName('Templates');
-    if (tSheet) {
-        const tData = tSheet.getDataRange().getValues();
-        for (let i = 1; i < tData.length; i++) {
-            if (isAuthorised(tData[i][2], wNameSafe, workerGroups)) {
-                const questions = [];
-                for (let q = 4; q < 34; q++) { if (tData[i][q]) questions.push(tData[i][q]); }
-                forms.push({name: tData[i][1], type: tData[i][0], questions: questions});
-                cachedTemplates[tData[i][1]] = questions;
-            }
-        }
-    }
-
-    // 5. Filter Notices
-    const noticeSheet = ss.getSheetByName('Notices');
-    if (noticeSheet) {
-        const nData = noticeSheet.getDataRange().getValues();
-        // Seek the most recent 'Active' notice targeted to this user/group
-        for (let i = nData.length - 1; i > 0; i--) {
-            if (nData[i][6] === 'Active' && isAuthorised(nData[i][7], wNameSafe, workerGroups)) {
-                meta.activeNotice = {
-                    id: nData[i][1], priority: nData[i][2], title: nData[i][3], 
-                    content: nData[i][4], action: nData[i][5]
-                };
-                break; 
-            }
-        }
-    }
-    
-    return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
-}
-
 function getGlobalForms() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const tSheet = ss.getSheetByName('Templates');
@@ -1076,6 +972,98 @@ function cleanupPrivateSentNotes() {
 }
 
 /**
+ * MISSION-CRITICAL: Unified Targeting Engine
+ * Logic: Filters data based on Individual Name, Group Membership, or 'ALL'.
+ */
+function getSyncData(workerName, deviceId) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stSheet = ss.getSheetByName('Staff');
+    const wNameSafe = (workerName || "").toString().toLowerCase().trim();
+    
+    if (!stSheet) return {status: "error", message: "Staff sheet missing."};
+    
+    const stData = stSheet.getDataRange().getValues();
+    let workerFound = false;
+    let workerGroups = ""; 
+    let meta = {};
+
+    // 1. Identify Worker & Their Groups
+    for (let i = 1; i < stData.length; i++) {
+        if ((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
+            workerFound = true;
+            // Column D (Index 3) is now 'Group Membership'
+            workerGroups = (stData[i][3] || "").toString().toLowerCase(); 
+            meta.lastVehCheck = stData[i][5];
+            meta.wofExpiry = stData[i][6];
+            break; 
+        }
+    }
+
+    if (!workerFound) return {status: "error", message: "Access Denied."};
+
+    // 2. HELPER: The Targeting Engine
+    const isAuthorised = (targetStr, name, groups) => {
+        const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
+        if (allowed.includes("all")) return true;
+        if (allowed.includes(name)) return true;
+        
+        const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
+        return myGroups.some(g => allowed.includes(g));
+    };
+
+    // 3. Filter Sites
+    const sites = [];
+    const siteSheet = ss.getSheetByName('Sites');
+    if (siteSheet) {
+        const sData = siteSheet.getDataRange().getValues();
+        for (let i = 1; i < sData.length; i++) {
+            if (isAuthorised(sData[i][0], wNameSafe, workerGroups)) {
+                sites.push({ 
+                    template: sData[i][1], company: sData[i][2], siteName: sData[i][3], 
+                    address: sData[i][4], contactName: sData[i][5], 
+                    contactPhone: sData[i][6], contactEmail: sData[i][7], 
+                    notes: sData[i][8], emergencyProcedures: sData[i][9] 
+                });
+            }
+        }
+    }
+    
+    // 4. Filter Templates (Forms)
+    const forms = [];
+    const cachedTemplates = {};
+    const tSheet = ss.getSheetByName('Templates');
+    if (tSheet) {
+        const tData = tSheet.getDataRange().getValues();
+        for (let i = 1; i < tData.length; i++) {
+            if (isAuthorised(tData[i][2], wNameSafe, workerGroups)) {
+                const questions = [];
+                for (let q = 4; q < 34; q++) { if (tData[i][q]) questions.push(tData[i][q]); }
+                forms.push({name: tData[i][1], type: tData[i][0], questions: questions});
+                cachedTemplates[tData[i][1]] = questions;
+            }
+        }
+    }
+
+    // 5. Filter Notices
+    const noticeSheet = ss.getSheetByName('Notices');
+    if (noticeSheet) {
+        const nData = noticeSheet.getDataRange().getValues();
+        // Seek the most recent 'Active' notice targeted to this user/group
+        for (let i = nData.length - 1; i > 0; i--) {
+            if (nData[i][6] === 'Active' && isAuthorised(nData[i][7], wNameSafe, workerGroups)) {
+                meta.activeNotice = {
+                    id: nData[i][1], priority: nData[i][2], title: nData[i][3], 
+                    content: nData[i][4], action: nData[i][5]
+                };
+                break; 
+            }
+        }
+    }
+    
+    return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
+}
+
+/**
  * BACKEND logic: Specifically updates the 'Sites' tab
  */
 function updateSiteEmergencyProcedures(payload) {
@@ -1122,4 +1110,5 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
 
