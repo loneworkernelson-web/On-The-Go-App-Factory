@@ -972,10 +972,20 @@ function cleanupPrivateSentNotes() {
 }
 
 /**
- * MISSION-CRITICAL: Unified Targeting Engine
- * Logic: Filters data based on Individual Name, Group Membership, or 'ALL'.
+ * REFINED: getSyncData with Unified Targeting
+ * Logic: Pulls worker groups and applies a single Targeting Engine to filter all data.
  */
 function getSyncData(workerName, deviceId) {
+    // 1. THE TARGETING ENGINE (Defined once at the top)
+    const isAuthorised = (targetStr, name, groups) => {
+        const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
+        if (allowed.includes("all")) return true;
+        if (allowed.includes(name)) return true;
+        
+        const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
+        return myGroups.some(g => allowed.includes(g));
+    };
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const stSheet = ss.getSheetByName('Staff');
     const wNameSafe = (workerName || "").toString().toLowerCase().trim();
@@ -987,11 +997,11 @@ function getSyncData(workerName, deviceId) {
     let workerGroups = ""; 
     let meta = {};
 
-    // 1. Identify Worker & Their Groups
+    // 2. Identify Worker & Their Groups
     for (let i = 1; i < stData.length; i++) {
         if ((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
             workerFound = true;
-            // Column D (Index 3) is now 'Group Membership'
+            // Column D (Index 3) is 'Group Membership'
             workerGroups = (stData[i][3] || "").toString().toLowerCase(); 
             meta.lastVehCheck = stData[i][5];
             meta.wofExpiry = stData[i][6];
@@ -1000,16 +1010,6 @@ function getSyncData(workerName, deviceId) {
     }
 
     if (!workerFound) return {status: "error", message: "Access Denied."};
-
-    // 2. HELPER: The Targeting Engine
-    const isAuthorised = (targetStr, name, groups) => {
-        const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
-        if (allowed.includes("all")) return true;
-        if (allowed.includes(name)) return true;
-        
-        const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
-        return myGroups.some(g => allowed.includes(g));
-    };
 
     // 3. Filter Sites
     const sites = [];
@@ -1110,5 +1110,6 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
 
 
