@@ -62,7 +62,7 @@ function doGet(e) {
 
 /**
  * PATCHED: Master Entry Point
- * Fix: Ensures Procedure Updates are logged to BOTH the Sites and Visits tabs.
+ * Integrated routing for Site Procedures and Notice Acknowledgments.
  */
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error"});
@@ -73,26 +73,24 @@ function doPost(e) {
       try {
           const p = e.parameter;
           
-          // 1. Handle Remote Resolution (Admin/Manager)
           if(p.action === 'resolve') {
               handleResolvePost(p); 
           }
-          // 2. Handle Device Onboarding
           else if(p.action === 'registerDevice') {
               return sendJSON(handleRegisterDevice(p));
           }
-          // NEW 3. Handle Emergency Procedure Updates (Site-Specific)
+          // NEW 3: Handle Notice Acknowledgments
+          else if(p.action === 'acknowledgeNotice') {
+              return sendJSON(handleNoticeAck(p));
+          }
           else if(p.action === 'uploadEmergencyProcedures') {
-              // Logic: Execute site update, but DO NOT return yet so it can be logged as a visit
               updateSiteEmergencyProcedures(p);
               handleWorkerPost(p);
           }
-          // 4. Default: Handle standard Worker Safety Reports
           else {
               handleWorkerPost(p);
           }
           
-          // Logic: Standard success response for all logged activities
           return sendJSON({status:"success"});
           
       } catch(err) { 
@@ -104,34 +102,6 @@ function doPost(e) {
   } else { 
       return sendJSON({status:"error", message:"Busy"}); 
   }
-}
-
-/**
- * Handles the secure registration of a new device ID.
- */
-function handleRegisterDevice(p) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const stSheet = ss.getSheetByName('Staff');
-    const workerName = (p['Worker Name'] || "").trim();
-    const deviceId = p['deviceId'];
-
-    if (!stSheet) return {status: "error", message: "Staff sheet missing"};
-
-    const data = stSheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-        if (data[i][0].toString().toLowerCase() === workerName.toLowerCase()) {
-            const registeredId = data[i][4];
-            if (!registeredId || registeredId === "") {
-                stSheet.getRange(i + 1, 5).setValue(deviceId); // Bind ID
-                return {status: "success", message: "Device bound successfully"};
-            } else if (registeredId === deviceId) {
-                return {status: "success", message: "Device already registered"};
-            } else {
-                return {status: "error", message: "DEVICE MISMATCH: Identity locked to another phone."};
-            }
-        }
-    }
-    return {status: "error", message: "Worker not found in Staff list."};
 }
 
 // ==========================================
@@ -1111,5 +1081,33 @@ function updateSiteEmergencyProcedures(payload) {
   return { status: 'success', links: photoUrls };
 }
 
+/**
+ * MISSION-CRITICAL: Notice Acknowledgment Logger
+ * Appends worker name to Column I of the Notices tab.
+ */
+function handleNoticeAck(p) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Notices');
+    const noticeId = p.noticeId;
+    const worker = p['Worker Name'];
+
+    if (!sheet) return { status: "error", message: "Notices tab missing" };
+    
+    const data = sheet.getDataRange().getValues();
+    // Logic: Find the row by ID and update the 'Acknowledged By' column (Index 8 / Column I)
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][1] === noticeId) {
+            let currentAcks = data[i][8] ? data[i][8].toString().split(',').map(s => s.trim()) : [];
+            if (!currentAcks.includes(worker)) {
+                currentAcks.push(worker);
+                sheet.getRange(i + 1, 9).setValue(currentAcks.join(', '));
+            }
+            break;
+        }
+    }
+    // Record in the Visits tab for audit history
+    handleWorkerPost(p); 
+    return { status: "success" };
+}
 
 
