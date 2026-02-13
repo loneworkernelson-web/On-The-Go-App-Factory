@@ -352,16 +352,26 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         
 <div id="mainPage" class="page">
     <div class="header-bar">
-        <h1 id="headerWorkerName" class="text-xl font-bold">Welcome</h1>
-        <div class="flex gap-2 items-center">
-            <div id="gpsIndicator" class="flex gap-1">
-                <div class="gps-bar"></div>
-                <div class="gps-bar"></div>
-                <div class="gps-bar"></div>
-            </div>
-            <button onclick="navigate('settings')" class="text-2xl text-gray-400 hover:text-white px-2" aria-label="Settings">⚙️</button>
+    <h1 id="headerWorkerName" class="text-xl font-bold">Welcome</h1>
+    <div class="flex gap-4 items-center"> <button onclick="openResourceHub()" 
+                class="text-2xl opacity-60 hover:opacity-100 transition active:scale-90" 
+                title="Resource Library" 
+                aria-label="Resource Library">
+            📖
+        </button>
+
+        <div id="gpsIndicator" class="flex gap-1 items-end h-5"> <div class="gps-bar"></div>
+            <div class="gps-bar"></div>
+            <div class="gps-bar"></div>
         </div>
+
+        <button onclick="navigate('settings')" 
+                class="text-2xl text-gray-400 hover:text-white transition active:rotate-45" 
+                aria-label="Settings">
+            ⚙️
+        </button>
     </div>
+</div>
     
     <!-- Sync Banner -->
     <div id="uploadBanner" class="hidden mb-2 bg-blue-900/50 text-blue-200 text-xs p-2 rounded flex items-center justify-center gap-2 font-bold uppercase tracking-widest mx-4 mt-4">
@@ -773,6 +783,25 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <button onclick="closeModal('formsLibrary')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase tracking-widest">Close</button>
     </div>
 </div>
+
+<div id="resourceHubModal" class="hidden fixed inset-0 z-[350] flex items-center justify-center bg-black/90 backdrop-blur-md p-4" role="dialog">
+    <div class="bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm h-[80vh] flex flex-col border border-white/10">
+        <div class="p-8 pb-4">
+            <h2 class="text-2xl font-black text-white uppercase tracking-tight">Safety Hub</h2>
+            <div class="flex gap-4 mt-4 border-b border-white/10">
+                <button onclick="switchHubTab('res')" id="tabRes" class="pb-2 text-xs font-black uppercase tracking-widest text-blue-500 border-b-2 border-blue-500">Resources</button>
+                <button onclick="switchHubTab('not')" id="tabNot" class="pb-2 text-xs font-black uppercase tracking-widest text-gray-500">Notice Archive</button>
+            </div>
+        </div>
+        
+        <div id="hubContent" class="flex-1 overflow-y-auto p-8 pt-2 space-y-4 scrollbar-hide"></div>
+        
+        <div class="p-8 pt-0">
+            <button onclick="closeModal('resourceHub')" class="w-full py-4 bg-gray-800 text-gray-400 font-black rounded-2xl uppercase tracking-widest">Close</button>
+        </div>
+    </div>
+</div>
+
 <script data-cfasync="false">
 // ============================================================================
 // CONFIGURATION SYSTEM (Phase 2, Feature 11)
@@ -4530,24 +4559,29 @@ function checkActiveNotice() {
     modal.classList.remove('hidden');
 }
 
+/**
+ * UPDATED: acknowledgeNotice
+ * Logic: Logs the ID to the backend for recording in Column I.
+ */
 function acknowledgeNotice() {
     const notice = state.meta.activeNotice;
     if (!notice) return;
 
-    // 1. Save locally so it doesn't pop up again
     const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
     ackList.push(notice.id);
     localStorage.setItem('otg_acknowledged_notices', JSON.stringify(ackList));
 
-    // 2. Log to Visits tab for compliance audit
-    processUploadQueue(buildPayload({
-        "action": "logNote",
+    // LOG TO BACKEND: Updates Column I in the Notices Tab
+    const payload = buildPayload({
+        "action": "acknowledgeNotice",
+        "noticeId": notice.id,
         "Alarm Status": "NOTICE_ACKNOWLEDGED",
-        "Notes": `Safety Notice Read: ${notice.title} (ID: ${notice.id})`
-    }));
+        "Notes": `Confirmed: ${notice.title}`
+    });
+    processUploadQueue(payload);
 
     closeModal('notice');
-    showToast('✅ Acknowledgment saved');
+    showToast('✅ Acknowledgment Saved');
 }
     
 /**
@@ -4580,8 +4614,49 @@ function viewEmergencyProcedures(linksString) {
         });
     }
 }
+
+/**
+ * HUB NAVIGATION & RENDERING
+ */
+function openResourceHub() {
+    renderResources();
+    showModal('resourceHub');
+}
+
+function switchHubTab(tab) {
+    const isRes = tab === 'res';
+    document.getElementById('tabRes').className = isRes ? 'pb-2 text-xs font-black uppercase tracking-widest text-blue-500 border-b-2 border-blue-500' : 'pb-2 text-xs font-black uppercase tracking-widest text-gray-500';
+    document.getElementById('tabNot').className = !isRes ? 'pb-2 text-xs font-black uppercase tracking-widest text-blue-500 border-b-2 border-blue-500' : 'pb-2 text-xs font-black uppercase tracking-widest text-gray-500';
+    
+    if (isRes) renderResources();
+    else renderNoticeArchive();
+}
+
+function renderResources() {
+    const container = document.getElementById('hubContent');
+    const items = state.meta.resources || [];
+    container.innerHTML = items.length ? items.map(r => `
+        <div class="p-4 bg-white/5 border border-white/5 rounded-2xl active:scale-95 transition" onclick="window.open('${r.url}', '_blank')">
+            <div class="text-[10px] text-blue-400 font-black uppercase tracking-widest mb-1">${r.category}</div>
+            <div class="text-sm font-bold text-white">${r.title}</div>
+            <div class="text-[9px] text-gray-500 mt-2 uppercase font-black">Open ${r.type} ↗</div>
+        </div>
+    `).join('') : '<p class="text-center text-xs opacity-40 py-10">No resources assigned.</p>';
+}
+
+function renderNoticeArchive() {
+    const container = document.getElementById('hubContent');
+    const items = state.meta.noticeHistory || [];
+    container.innerHTML = items.length ? items.map(n => `
+        <div class="p-4 bg-white/5 border border-white/5 rounded-2xl opacity-60">
+            <div class="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">${new Date(n.date).toLocaleDateString()}</div>
+            <div class="text-sm font-bold text-white mb-1">${n.title}</div>
+            <div class="text-xs text-gray-400 leading-snug">${n.content}</div>
+        </div>
+    `).join('') : '<p class="text-center text-xs opacity-40 py-10">Archive empty.</p>';
+}
+    
 </script>
 
 </body>
 </html>
-
