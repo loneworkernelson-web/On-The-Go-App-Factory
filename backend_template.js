@@ -796,7 +796,19 @@ function getDashboardData() {
  * Logic: Filters data based on Individual Name, Group Membership, or 'ALL'.
  */
 function getSyncData(workerName, deviceId) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+  /**
+ * MISSION-CRITICAL: Targeting Engine
+ * Logic: Checks if the user is authorised via individual name, group membership, or 'ALL'.
+ */
+const isAuthorised = (targetStr, name, groups) => {
+    const allowed = (targetStr || "").toString().toLowerCase().split(',').map(s => s.trim());
+    if (allowed.includes("all")) return true;
+    if (allowed.includes(name)) return true;
+    
+    const myGroups = groups.split(',').map(s => s.trim()).filter(g => g !== "");
+    return myGroups.some(g => allowed.includes(g));
+};
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
     const stSheet = ss.getSheetByName('Staff');
     const wNameSafe = (workerName || "").toString().toLowerCase().trim();
     
@@ -1168,6 +1180,7 @@ function updateSiteEmergencyProcedures(payload) {
   siteSheet.getRange(targetRow, colIdx + 1).setValue(photoUrls.join(", "));
   return { status: 'success', links: photoUrls };
 }
+
 
 
 
