@@ -133,7 +133,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 .lbl-red { color: #f87171; }
 .lbl-gray { color: #9ca3af; }
 
-/* NEW: Professional Form Component Styling */
+/* Professional Input Groups & Cards */
 .input-group {
     display: flex;
     align-items: center;
@@ -141,30 +141,27 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 0.75rem;
     overflow: hidden;
-    transition: border-color 0.2s;
+    height: 3.5rem;
 }
 .input-group:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
 
-.input-prefix {
+.input-addon {
     padding: 0 1rem;
     background: rgba(255, 255, 255, 0.05);
     color: #60a5fa;
     font-weight: 800;
-    font-size: 1.1rem;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    height: 3.5rem;
+    font-size: 0.9rem;
+    height: 100%;
     display: flex;
     align-items: center;
+    text-transform: uppercase;
+    flex-shrink: 0;
 }
+.addon-prefix { border-right: 1px solid rgba(255, 255, 255, 0.1); }
+.addon-suffix { border-left: 1px solid rgba(255, 255, 255, 0.1); }
 
-.input-group .form-input {
-    border: none !important;
-    margin-bottom: 0 !important;
-    background: transparent !important;
-    height: 3.5rem;
-}
+.input-group .form-input { border: none !important; margin-bottom: 0 !important; background: transparent !important; flex: 1; }
 
-/* Toggle Switch Style for Checkboxes */
 .check-card {
     display: flex;
     justify-content: space-between;
@@ -1441,29 +1438,25 @@ function startTravellingPulse() {
 }
 
 /**
- * FULL INTEGRATED PATCH: buildReportForm
- * Resolves: [NOTE] parsing, Windows Photo Dialogue, and Signature UI alignment.
+ * RE-ENGINEERED: Professional Form Builder
+ * Resolves: Inline Currency ($), Suffix Units (km/hrs/%), and Card-style Checkboxes.
  */
 function buildReportForm(templateName, fieldArea) {
     if (!fieldArea) return;
     fieldArea.innerHTML = ''; 
 
-    // Logic: Fallback for unsynced or standard forms
     const template = state.globalForms.find(f => f.name === templateName) || 
                      { name: templateName, questions: ["[NOTE] Site Information", "[TEXT] Notes", "[SIGN] Signature"] };
     
     const questions = template.questions || [];
 
     questions.forEach((label, index) => {
-        // Tag Scrutiny: Extract [TAG] and Label
         const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/i);
         const rawTag = tagMatch ? tagMatch[1].toUpperCase().trim() : "TEXT";
         let cleanLabel = tagMatch ? tagMatch[2] : label;
         
         let baseType = rawTag;
         let options = [];
-        
-        // Logic: Support comma-separated dropdown options
         if (rawTag.includes(',')) {
             const parts = rawTag.split(',');
             baseType = parts[0].trim();
@@ -1472,14 +1465,11 @@ function buildReportForm(templateName, fieldArea) {
         
         const fieldId = `field_${index}_${cleanLabel.replace(/\s/g, '_')}`;
         const wrapper = document.createElement('div');
-        wrapper.className = 'mb-6'; 
+        wrapper.className = 'mb-5'; 
 
-        // Visibility Scrutiny: Headings/Notes don't need small labels
-        const isInfoOnly = (baseType === 'HEADING' || baseType === 'HEAD' || baseType === 'NOTE');
-        
-        if (!isInfoOnly) {
+        if (!['HEADING', 'HEAD', 'NOTE'].includes(baseType)) {
             const labelEl = document.createElement('label');
-            labelEl.className = 'block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
+            labelEl.className = 'block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
             labelEl.innerText = cleanLabel;
             wrapper.appendChild(labelEl);
         }
@@ -1493,7 +1483,7 @@ function buildReportForm(templateName, fieldArea) {
                 h.innerText = cleanLabel;
                 wrapper.appendChild(h);
                 fieldArea.appendChild(wrapper);
-                return; // FIXED: Prevents creating a default field below
+                return;
 
             case 'NOTE':
                 const n = document.createElement('div');
@@ -1501,32 +1491,85 @@ function buildReportForm(templateName, fieldArea) {
                 n.innerText = cleanLabel;
                 wrapper.appendChild(n);
                 fieldArea.appendChild(wrapper);
-                return; // FIXED: Prevents creating a default field below
+                return;
+
+            case 'NUMBER':
+                const group = document.createElement('div');
+                group.className = 'input-group';
+                
+                if (cleanLabel.includes('$')) {
+                    group.innerHTML += `<div class="input-addon addon-prefix">$</div>`;
+                    cleanLabel = cleanLabel.replace('$', '').trim();
+                }
+
+                input = document.createElement('input');
+                input.type = 'number';
+                input.inputMode = 'decimal';
+                input.className = 'form-input';
+                group.appendChild(input);
+
+                const unitMatch = cleanLabel.match(/\((km|hrs|%|m|kg)\)$/i);
+                if (unitMatch) {
+                    group.innerHTML += `<div class="input-addon addon-suffix">${unitMatch[1]}</div>`;
+                    cleanLabel = cleanLabel.replace(unitMatch[0], '').trim();
+                }
+
+                wrapper.appendChild(group);
+                break;
+
+            case 'CHECK':
+            case 'CHECKBOX':
+                const card = document.createElement('div');
+                card.className = 'check-card active:bg-blue-900/20 transition-all';
+                card.innerHTML = `
+                    <span class="text-sm font-bold text-gray-300">${cleanLabel}</span>
+                    <input type="checkbox" id="${fieldId}" data-key="${cleanLabel}" class="w-7 h-7 rounded-lg accent-blue-500">
+                `;
+                wrapper.innerHTML = ''; 
+                wrapper.appendChild(card);
+                break;
+
+            case 'YESNO':
+            case 'YES/NO':
+                const grid = document.createElement('div');
+                grid.className = 'flex gap-2';
+                input = document.createElement('input');
+                input.type = 'hidden';
+                ["Yes", "No"].forEach(val => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'flex-1 py-4 bg-gray-800 border-2 border-gray-700 rounded-xl font-black text-xs uppercase tracking-widest text-gray-400';
+                    b.innerText = val;
+                    b.onclick = () => {
+                        grid.querySelectorAll('button').forEach(btn => btn.className = 'flex-1 py-4 bg-gray-800 border-2 border-gray-700 rounded-xl font-black text-xs uppercase tracking-widest text-gray-400');
+                        b.className = val === 'Yes' ? 'flex-1 py-4 bg-blue-600 border-2 border-blue-400 rounded-xl font-black text-xs uppercase tracking-widest text-white shadow-lg' : 'flex-1 py-4 bg-red-900/50 border-2 border-red-700 rounded-xl font-black text-xs uppercase tracking-widest text-red-200';
+                        input.value = val;
+                    };
+                    grid.appendChild(b);
+                });
+                wrapper.appendChild(grid);
+                break;
 
             case 'PHOTO': 
                 const photoBtn = document.createElement('label');
-                photoBtn.setAttribute('for', fieldId); // REQUIRED for Windows dialogue trigger
+                photoBtn.setAttribute('for', fieldId);
                 photoBtn.className = 'flex flex-col items-center justify-center gap-2 w-full py-6 bg-gray-800 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 font-bold text-sm cursor-pointer active:bg-gray-700 transition-colors';
                 photoBtn.innerHTML = `<span class="text-xl">📷</span><span>Take or Attach Photo</span>`;
-                
                 input = document.createElement('input');
                 input.type = 'file'; 
                 input.id = fieldId;
                 input.accept = 'image/*'; 
                 input.setAttribute('capture', 'environment'); 
-                // FIXED: Opacity-0 instead of .hidden ensures browser triggers dialogue
                 input.className = 'absolute opacity-0 w-0 h-0 pointer-events-none';
                 input.onchange = () => handlePhoto(input, cleanLabel);
-                
                 photoBtn.appendChild(input);
                 wrapper.appendChild(photoBtn);
-                
                 const status = document.createElement('div');
                 status.id = `lbl_${fieldId}`; 
                 status.className = 'text-[9px] text-blue-400 font-bold mt-2 uppercase text-center';
                 wrapper.appendChild(status);
                 fieldArea.appendChild(wrapper);
-                return; // FIXED: Photo handling is self-contained
+                return;
 
             case 'SIGN':
             case 'SIGNATURE':
@@ -1542,21 +1585,6 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input');
                 input.type = 'hidden';
                 input.setAttribute('data-signature-id', index);
-                break;
-
-            case 'CHECK':
-            case 'CHECKBOX':
-                const checkWrap = document.createElement('label');
-                checkWrap.className = 'flex items-center gap-3 bg-gray-800/40 p-4 rounded-xl border border-white/5 cursor-pointer active:bg-blue-900/20 transition';
-                input = document.createElement('input');
-                input.type = 'checkbox';
-                input.className = 'w-6 h-6 rounded accent-blue-500';
-                const checkText = document.createElement('span');
-                checkText.className = 'text-sm font-bold text-gray-300';
-                checkText.innerText = 'I confirm';
-                checkWrap.appendChild(input);
-                checkWrap.appendChild(checkText);
-                wrapper.appendChild(checkWrap);
                 break;
 
             case '1TEXT':
@@ -1576,12 +1604,6 @@ function buildReportForm(templateName, fieldArea) {
                 input.type = 'date';
                 break;
 
-            case 'NUMBER':
-                input = document.createElement('input'); 
-                input.type = 'number';
-                input.inputMode = 'numeric';
-                break;
-
             case 'GPS':
                 const gpsBtn = document.createElement('button');
                 gpsBtn.className = 'w-full py-4 bg-blue-900/30 border border-blue-500/50 rounded-2xl text-blue-400 font-black text-[10px] uppercase tracking-widest mb-2';
@@ -1591,30 +1613,6 @@ function buildReportForm(templateName, fieldArea) {
                 input = document.createElement('input'); 
                 input.readOnly = true; 
                 input.className = 'opacity-40';
-                break;
-
-            case 'YESNO':
-            case 'YES/NO':
-                const radioWrap = document.createElement('div');
-                radioWrap.className = 'flex gap-4 mt-2';
-                ["Yes", "No"].forEach(val => {
-                    const optWrap = document.createElement('label');
-                    optWrap.className = 'flex-1 flex items-center justify-center gap-3 bg-gray-800 border-2 border-gray-700 rounded-xl py-4 cursor-pointer active:bg-blue-600 transition-colors';
-                    const rad = document.createElement('input');
-                    rad.type = 'radio';
-                    rad.name = fieldId;
-                    rad.value = val;
-                    rad.className = 'w-5 h-5 accent-blue-500';
-                    rad.setAttribute('data-key', cleanLabel);
-                    optWrap.appendChild(rad);
-                    const span = document.createElement('span');
-                    span.className = 'text-sm font-bold text-white uppercase tracking-widest';
-                    span.innerText = val;
-                    optWrap.appendChild(span);
-                    radioWrap.appendChild(optWrap);
-                });
-                wrapper.appendChild(radioWrap);
-                input = null; 
                 break;
 
             case 'DROP':
@@ -1633,8 +1631,7 @@ function buildReportForm(templateName, fieldArea) {
                 input.placeholder = 'Type here...';
         }
 
-        // Logic: Standardize all actual input fields
-        if (input) {
+        if (input && !wrapper.contains(input)) {
             input.id = fieldId;
             if (input.type !== 'checkbox' && input.type !== 'hidden') {
                 input.className = (input.className || '') + ' form-input';
@@ -4703,5 +4700,6 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
