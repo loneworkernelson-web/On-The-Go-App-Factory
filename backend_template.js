@@ -1014,25 +1014,41 @@ function getSyncData(workerName, deviceId) {
         }
     }
 
-    // 5. Filter Notices
+// 5. Filter Notices (History)
+    const noticeHistory = [];
     const noticeSheet = ss.getSheetByName('Notices');
     if (noticeSheet) {
         const nData = noticeSheet.getDataRange().getValues();
-        // Seek the most recent 'Active' notice targeted to this user/group
-        for (let i = nData.length - 1; i > 0; i--) {
+        for (let i = nData.length - 1; i > 0 && noticeHistory.length < 10; i--) {
             if (nData[i][6] === 'Active' && isAuthorised(nData[i][7], wNameSafe, workerGroups)) {
-                meta.activeNotice = {
+                noticeHistory.push({
                     id: nData[i][1], priority: nData[i][2], title: nData[i][3], 
-                    content: nData[i][4], action: nData[i][5]
-                };
-                break; 
+                    content: nData[i][4], date: nData[i][0]
+                });
             }
         }
+        meta.noticeHistory = noticeHistory; 
+        if (noticeHistory.length > 0) meta.activeNotice = noticeHistory[0];
+    }
+  
+// 6. Filter Resources
+    const resources = [];
+    const resSheet = ss.getSheetByName('Resources');
+    if (resSheet) {
+        const rData = resSheet.getDataRange().getValues();
+        for (let i = 1; i < rData.length; i++) {
+            if (isAuthorised(rData[i][4], wNameSafe, workerGroups)) {
+                resources.push({
+                    category: rData[i][0], title: rData[i][1], 
+                    type: rData[i][2], url: rData[i][3]
+                });
+            }
+        }
+        meta.resources = resources;
     }
     
     return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
 }
-
 /**
  * BACKEND logic: Specifically updates the 'Sites' tab
  */
@@ -1109,5 +1125,6 @@ function handleNoticeAck(p) {
     handleWorkerPost(p); 
     return { status: "success" };
 }
+
 
 
