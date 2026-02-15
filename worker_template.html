@@ -1214,25 +1214,23 @@ function submitReport() {
     Object.entries(photoMap).forEach(([k, v]) => { fd[k] = v; });
     if (d.sig) fd["Signature"] = d.sig; 
     
-    // 6. ROUTING LOGIC: Determine Backend Action and Status
-// Inside submitReport function
-let alarmStatus;
-let backendAction = 'logVisit';
+    // 6. GOLDEN ROUTING: Determine if this submission closes the session
+    let alarmStatus;
+    let backendAction = 'logVisit';
 
-if (currentActiveTemplate === "Update Site Procedures") {
-    backendAction = 'uploadEmergencyProcedures';
-    alarmStatus = "PROCEDURES_UPDATED";
-} else if (currentActiveTemplate === "Note to Self") {
-    backendAction = 'logNote';
-    alarmStatus = "NOTE_LOGGED";
-} else if (!state.activeVisit) {
-    alarmStatus = "REPORT_SUBMITTED";
-} else if (isMidVisitUpdate) {
-    alarmStatus = state.activeVisit.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
-} else {
-    // FIXED: Ensure a clean 'DEPARTED' status even if 'USER_SAFE' was logged previously
-    alarmStatus = "DEPARTED"; 
-}
+    if (currentActiveTemplate === "Update Site Procedures") {
+        backendAction = 'uploadEmergencyProcedures';
+        alarmStatus = "PROCEDURES_UPDATED";
+    } else if (currentActiveTemplate === "Note to Self") {
+        backendAction = 'logNote';
+        alarmStatus = "NOTE_LOGGED";
+    } else if (isMidVisitUpdate) {
+        // Log movement or status without ending the session
+        alarmStatus = state.activeVisit?.locationId === 'travel' ? "TRAVELLING" : "ON SITE";
+    } else {
+        // FINAL DEPARTURE: This clears the activeVisit and records completion
+        alarmStatus = "DEPARTED"; 
+    }
     
     // 7. HANDSHAKE: Send to spreadsheet with the correct action key
     processUploadQueue(buildPayload({
@@ -2438,8 +2436,10 @@ function setQuickDuration(mins) {
  * Renders the Forms Library in a Two-Column Grid.
  */
 function openFormsLibrary() {
-    // 1. Correctly set the update flag based on visit state
-    isMidVisitUpdate = (state.activeVisit !== null); 
+    // GOLDEN FIX: Only flag as mid-visit if the user ISN'T on the Locked screen
+    // This allows workers to use the Forms button to depart if they choose.
+    const isLocked = document.getElementById('lockedPage').classList.contains('active');
+    isMidVisitUpdate = (state.activeVisit !== null && !isLocked); 
     
     const list = document.getElementById('formsLibraryList');
     if (!list) return;
@@ -2750,19 +2750,27 @@ let panicTapTimer;
  * Fixes: "Number" to "Phone" header alignment.
  * Fixes: Missing 'action' key for spreadsheet ingestion.
  */
+/**
+ * GOLDEN FIX: buildPayload
+ * Logic: Uses active session context to ensure "Travel" and site names are never lost.
+ */
 function buildPayload(d) {
     let dt = "";
     let ln = "Unknown Site";
     let la = "No Address Provided";
     
+    // 1. DYNAMIC IDENTITY CAPTURE: Prioritize the active session details
     if (state.activeVisit) {
         if (state.activeVisit.anticipatedDepartureTime) {
             dt = new Date(state.activeVisit.anticipatedDepartureTime).toISOString();
         }
-        const l = state.locations.find(x => x.id === state.activeVisit.locationId);
-        if (l) {
-            ln = l.companyName ? `${l.companyName} - ${l.name}` : l.name;
-            la = l.address || "No Address";
+        // Use the name stored at session start (handles 'General Travel' correctly)
+        ln = state.activeVisit.locationName || "Unknown Site";
+        la = state.activeVisit.locationAddress || "No Address";
+        
+        // If it's a specific site, attempt to format with Company Name
+        if (state.activeVisit.companyName) {
+            ln = `${state.activeVisit.companyName} - ${state.activeVisit.locationName}`;
         }
     } else if (state.selectedLocationId) {
         const l = state.locations.find(x => x.id === state.selectedLocationId);
@@ -2772,30 +2780,18 @@ function buildPayload(d) {
         }
     }
     
-    let gps = d['Last Known GPS'] || "";
-    if (!gps && state.activeVisit && state.activeVisit.startGPS) {
-        gps = state.activeVisit.startGPS;
-    }
-    
     return {
         'action': d.action || 'logVisit', 
         'key': CONFIG.key,
         'Worker Name': state.worker?.name || "",
         'Worker Phone Number': state.worker?.phone || "",
-        'Worker Email': state.worker?.email || "",
-        'Emergency Contact Name': state.worker?.emgName || "",
-        'Emergency Contact Phone': state.worker?.emgPhone || "", 
-        'Emergency Contact Email': state.worker?.emgEmail || "",
-        'Escalation Contact Name': state.worker?.escName || "",
-        'Escalation Contact Phone': state.worker?.escPhone || "",
-        'Escalation Contact Email': state.worker?.escEmail || "",
         'Battery Level': currentBatteryLevel || "100%",
         'Location Name': ln,
         'Location Address': la,
         'Anticipated Departure Time': dt,
         'Timestamp': new Date().toISOString(),
         'deviceId': state.deviceId || "",
-        'Last Known GPS': gps || "0,0",
+        'Last Known GPS': d['Last Known GPS'] || (state.activeVisit?.startGPS) || "0,0",
         ...d
     };
 }
@@ -4817,6 +4813,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
