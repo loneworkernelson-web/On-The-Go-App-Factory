@@ -1373,14 +1373,21 @@ function activateDimMode() {
     if (batterySaver) batterySaver.classList.remove('hidden');
 }
     
+/**
+ * HIGH-INTEGRITY WAKE LOGIC
+ * Logic: Restores full UI visibility and resets the battery saver overlays.
+ */
 function deactivateDimMode() {
     document.documentElement.classList.remove('system-dim');
     document.body.classList.remove('system-dim');
     isDimmed = false;
     const batterySaver = document.getElementById('batterySaver');
-    const saverProgress = document.getElementById('saverProgress');
+    const slideProgress = document.getElementById('slideProgress'); 
+    
     if (batterySaver) batterySaver.classList.add('hidden');
-    if (saverProgress) saverProgress.style.width = '0%';
+    if (slideProgress) slideProgress.style.width = '0%';
+    
+    console.log("Device UI Restored: Dim Mode Deactivated");
 }
 
 // Battery saver wake button
@@ -2613,6 +2620,7 @@ function updateArrivedButtonState() {
         btn.innerText = !hasLocation ? 'SELECT SITE' : 'SELECT TIME';
         btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
     }
+    setupHoldToStart();
 }
    
 /**
@@ -3806,6 +3814,8 @@ function forceSync(showUI) {
                 if (showUI) alert("❌ Sync Error: " + (data.message || 'Unknown error'));
                 return;
             }
+            updateLastSyncUI(); // Refreshes the "Just now" label
+            if (showUI) showToast('✅ Sync Complete');
             
             // 2. DATA MERGE: Sites, Forms, and Metadata
             const existingManual = state.locations.filter(x => x && x.id && x.id.startsWith('loc_'));
@@ -4824,6 +4834,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
