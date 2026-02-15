@@ -529,6 +529,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">
                 I AM SAFE
             </button>
+            <button id="btnMainClearCache" class="long-press-btn flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">
+                Hold to Clear Cache
+            </button>
+
+            <button id="btnResetData" class="long-press-btn w-full py-4 bg-red-900/50 text-red-400 font-bold rounded-xl shadow-lg uppercase">
+                Hold to Reset App Data
+            </button>
+
+<button id="btnDelLoc" class="long-press-btn hidden bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest border border-red-800/30">
+    Hold to Delete
+</button>
         </div>
     </div>
 </div>
@@ -1181,16 +1192,23 @@ if (currentActiveTemplate === "Update Site Procedures") {
     }
     
     // 9. VISUAL & LOGIC RESET
-    if (!isMidVisitUpdate) {
-        if (typeof stopGPSMonitoring === 'function') stopGPSMonitoring();
+   if (!isMidVisitUpdate) {
+    if (typeof stopGPSMonitoring === 'function') stopGPSMonitoring();
 
-        state.activeVisit = null;
-        state.selectedLocationId = null;
-        state.visitDurationMinutes = 0;
-        state.photoStore = {}; // CRITICAL: Clear store after successful submission
-        
-        if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
-        if (timerInt) { clearInterval(timerInt); timerInt = null; }
+    state.activeVisit = null;
+    state.selectedLocationId = null;
+    state.visitDurationMinutes = 0;
+    state.photoStore = {}; 
+    
+    // NEW: Reset Duration Slider to Zero
+    const slider = document.getElementById('durationSlider');
+    if (slider) {
+        slider.value = 0;
+        updateDurationDisplay(); // Refreshes the "0 mins" label
+    }
+
+    if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
+    if (timerInt) { clearInterval(timerInt); timerInt = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
@@ -3200,6 +3218,10 @@ window.onload = () => {
         meta: { lastVehCheck: null, wofExpiry: null },
         vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
         visitDurationMinutes: 0 
+        // Bind high-sensitivity actions to long-press
+        setupLongPress('btnResetData', 1800, clearData);
+        setupLongPress('btnMainClearCache', 1800, clearFormsCache);
+        setupLongPress('btnDelLoc', 1800, deleteLoc);
     };
 
     // 2. Ensure nested objects exist in case of partial load
@@ -4715,6 +4737,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
