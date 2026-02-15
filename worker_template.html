@@ -68,8 +68,11 @@ body {
 }
 /* 4. LONG-PRESS INTERACTION STYLES */
 .long-press-btn { position: relative; overflow: hidden; transition: all 0.2s; user-select: none; }
-.long-press-btn.pressing::after { width: 100%; transition: width 1.5s linear; }
-.long-press-btn.holding::after { width: 100%; transition: width 2s linear; }
+.long-press-btn.pressing::after,
+.long-press-btn.holding::after { 
+    width: 100%; 
+    transition: width 1.8s linear; 
+}
 /* 3. ANIMATION PATCH: High-visibility blue fill */
 .long-press-btn::after { 
     content: ''; 
@@ -1224,40 +1227,37 @@ if (currentActiveTemplate === "Update Site Procedures") {
 // LONG-PRESS INTERACTION
 // ============================================================================
 /**
- * Unified Long-Press Utility with Safety Lock
- * Handles visual progress and prevents accidental triggers on wake.
+ * Standardised Long-Press Utility
+ * Logic: Simple time-based trigger without movement cancellation.
  */
 function setupLongPress(target, duration, callback) {
     const btn = (typeof target === 'string') ? document.getElementById(target) : target;
     if (!btn) return;
     
     let timer;
-    
     const start = (e) => {
-        // Re-integrated Safety Lock for SOS
         if ((target === 'btnPanic' || btn.id === 'btnPanic') && isSosLocked) {
             showToast('⏳ Wait... screen just woke');
             return;
         }
-        
-        // FIXED: preventDefault allows the PC mouse to click without dragging
         if (e.type === 'mousedown') e.preventDefault(); 
         
-        btn.classList.add(duration === 1500 ? 'pressing' : 'holding');
+        btn.classList.add('holding');
         timer = setTimeout(() => {
-            btn.classList.remove('pressing', 'holding');
+            btn.classList.remove('holding');
             callback();
         }, duration);
     };
 
+    const stop = () => {
+        clearTimeout(timer);
+        btn.classList.remove('holding');
+    };
+
     btn.addEventListener('touchstart', start, { passive: true });
     btn.addEventListener('mousedown', start);
-
     ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(ev => {
-        btn.addEventListener(ev, () => {
-            clearTimeout(timer);
-            btn.classList.remove('pressing', 'holding');
-        });
+        btn.addEventListener(ev, stop);
     });
 }
     
@@ -1574,7 +1574,7 @@ function buildReportForm(templateName, fieldArea) {
                 const clearBtn = document.createElement('button');
                 clearBtn.className = 'text-[10px] text-gray-500 font-bold uppercase mt-2 ml-1';
                 clearBtn.innerText = 'Clear Signature';
-                clearBtn.onclick = (e) => { e.preventDefault(); clearSig(index); };
+                clearBtn.onclick = (e) => clearSig(index, e);
                 wrapper.appendChild(clearBtn);
                 input = document.createElement('input');
                 input.type = 'hidden';
@@ -3011,20 +3011,22 @@ function handleAttachment(input, key) {
 // 4. BEST-IN-CLASS: High-DPI Signature Engine
 // Includes edge-case safety (touchcancel/mouseenter) and coordinate precision.
 
+/**
+ * RE-ENGINEERED: High-DPI Signature Engine
+ * Logic: Includes smooth re-entry for PC mouse users and prevents broken lines.
+ */
 function initSigPad(canvas) {
     if (!canvas) return;
     resizeCanvas(canvas); 
     
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
-    // SCOPED: Prevents drawing jumps if multiple pads exist
     let lastX = 0;
     let lastY = 0;
     
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches ? e.touches[0] : e;
-        // Rely on context scaling for DPI mapping
         return {
             x: touch.clientX - rect.left,
             y: touch.clientY - rect.top
@@ -3032,6 +3034,7 @@ function initSigPad(canvas) {
     };
     
     const startDrawing = (e) => {
+        if (e.type === 'mousedown' && e.button !== 0) return; // Only allow left-click
         isDrawing = true;
         const pos = getPos(e);
         lastX = pos.x;
@@ -3041,8 +3044,8 @@ function initSigPad(canvas) {
     
     const draw = (e) => {
         if (!isDrawing) return;
-
-        // SAFETY: Stop drawing if the user released the button while outside the pad
+        
+        // Safety: Ensure user is actually still holding the button
         if (e.type === 'mousemove' && e.buttons === 0) {
             isDrawing = false;
             return;
@@ -3052,7 +3055,7 @@ function initSigPad(canvas) {
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = '#000000'; // Maintained detail: high-contrast ink
+        ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -3064,14 +3067,10 @@ function initSigPad(canvas) {
     };
     
     const stopDrawing = () => { isDrawing = false; };
-
-    /**
-     * RE-ENTRY LOGIC: Intelligently restores the drawing state
-     * If the user re-enters while holding the button, we reset the 'last' coordinate
-     * to the entry point. This prevents a straight line being drawn from the exit point.
-     */
+    
+    // RE-ENTRY LOGIC: Intelligently resumes drawing if the user leaves and returns
     const handleReEntry = (e) => {
-        if (e.buttons === 1) { // Left mouse button still held
+        if (e.buttons === 1) { 
             const pos = getPos(e);
             lastX = pos.x;
             lastY = pos.y;
@@ -3079,39 +3078,33 @@ function initSigPad(canvas) {
         }
     };
     
-    // Mobile Touch Events: Maintained touchcancel for interruptions
     canvas.addEventListener('touchstart', startDrawing, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
     canvas.addEventListener('touchcancel', stopDrawing);
     
-    // PC Mouse Events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseenter', handleReEntry); // Replaces 'mouseout'
+}
+
+/**
+ * FIXED: Clear Signature Button Logic
+ * Logic: Prevents accidental form submission/page refresh on PC browsers.
+ */
+function clearSig(id, event) {
+    // 1. MISSION CRITICAL: Block the default browser button behavior
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+    }
     
-    // PATCHED: Removed 'mouseout' and replaced with re-entry handling
-    canvas.addEventListener('mouseenter', handleReEntry); 
-}
-
-// 5. RESIZE CANVAS: Maintained Retina/High-DPI scaling logic
-function resizeCanvas(canvasEl) {
-    const ratio = window.devicePixelRatio || 1;
-    const rect = canvasEl.getBoundingClientRect();
-    // Buffer scaling for Retina/High-DPI crispness
-    canvasEl.width = rect.width * ratio;
-    canvasEl.height = rect.height * ratio;
-    const ctx = canvasEl.getContext('2d');
-    ctx.scale(ratio, ratio);
-}
-
-// 6. CLEAR SIGNATURE - Clears signature canvas
-function clearSig(id) {
     const canvasId = id ? `sig-canvas-${id}` : 'sig-canvas';
     const canvas = document.getElementById(canvasId);
     
     if (canvas) {
         const ctx = canvas.getContext('2d');
+        // Correctly resets the canvas to white for a clean re-sign
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         console.log(`Signature cleared: ${canvasId}`);
     }
@@ -4722,6 +4715,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
