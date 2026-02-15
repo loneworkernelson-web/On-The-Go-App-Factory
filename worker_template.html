@@ -273,11 +273,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </head>
 <body class="h-full overflow-hidden select-none">
 
-<div id="offlineBanner" class="hidden bg-red-600 text-white text-center text-[10px] font-bold py-1">
+<div id="offlineBanner" class="hidden bg-red-600 text-white text-center text-xs font-bold py-1">
     📡 OFFLINE MODE - Data queued for upload
 </div>
 
-<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-[10px] font-bold py-2 cursor-pointer" onclick="startVehicleCheck()">
+<div id="vehNagBar" class="hidden bg-orange-600 text-white text-center text-xs font-bold py-2 cursor-pointer" onclick="startVehicleCheck()">
     ⚠️ Vehicle Check Overdue - Tap to Complete
 </div>
 
@@ -661,7 +661,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Vehicle WOF Block Modal -->
-<div id="wofBlockModal" class="hidden fixed inset-0 z-450 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<div id="wofBlockModal" class="hidden fixed inset-0 z-[450] flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-10 text-center border-4 border-red-600">
         <div class="text-7xl mb-6">⛔</div>
         <h2 class="text-3xl font-black text-red-500 mb-4 uppercase">STOP</h2>
@@ -671,7 +671,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Vehicle WOF Warning Modal -->
-<div id="wofWarnModal" class="hidden fixed inset-0 z-450 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<div id="wofWarnModal" class="hidden fixed inset-0 z-[450] flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-orange-500">
         <div class="text-6xl mb-4">⚠️</div>
         <h2 class="text-2xl font-black text-orange-500 mb-2 uppercase">VEHICLE COMPLIANCE</h2>
@@ -753,7 +753,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     <div id="noticeCard" class="bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm p-8 text-center border-t-[12px] border-blue-600">
         <div id="noticeIcon" class="text-6xl mb-6">📢</div>
         <h2 id="noticeTitle" class="text-2xl font-black text-white mb-3 uppercase tracking-tight leading-tight"></h2>
-        <div id="noticeContent" class="text-gray-400 text-sm mb-10 leading-relaxed text-left max-h-56 overflow-y-auto pr-3 scrollbar-hide"></div>
+        <div id="noticeContent" class="text-gray-400 text-base mb-10 leading-relaxed text-left max-h-56 overflow-y-auto pr-3 scrollbar-hide"></div>
         
         <button id="btnAckNotice" onclick="acknowledgeNotice()" class="w-full py-6 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-xl uppercase tracking-widest active:scale-95 transition-all">
             I have read and understood
@@ -1578,7 +1578,7 @@ function buildReportForm(templateName, fieldArea) {
                 wrapper.appendChild(photoBtn);
                 const status = document.createElement('div');
                 status.id = `lbl_${fieldId}`; 
-                status.className = 'text-[9px] text-blue-400 font-bold mt-2 uppercase text-center';
+                status.className = 'text-[11px] text-blue-400 font-bold mt-2 uppercase text-center';
                 wrapper.appendChild(status);
                 fieldArea.appendChild(wrapper);
                 return;
@@ -4508,10 +4508,12 @@ function populateSiteInfoModal(location) {
             </button>
         </div>`;
     } else {
-        // Logic: Redirect to submission form and pass site identity as context for backend matching
-        const contextObj = JSON.stringify({ siteName: location.name, companyName: location.companyName || "" }).replace(/"/g, '&quot;');        
+        // 1. Prepare context object and escape quotes for HTML attribute safety
+        const ctx = { siteName: location.name, companyName: location.companyName || "" };
+        const ctxSafe = JSON.stringify(ctx).replace(/"/g, '&quot;');        
+        
         html += `<div class="pt-2">
-            <button onclick="closeModal('info'); loadFormAndShow('Update Site Procedures', ${contextObj})" 
+            <button onclick="closeModal('info'); loadFormAndShow('Update Site Procedures', ${ctxSafe})" 
                     class="w-full py-4 bg-gray-800 border-2 border-dashed border-gray-600 text-gray-400 font-bold rounded-2xl flex flex-col items-center justify-center gap-1 active:bg-gray-700 active:scale-95 transition-all">
                 <span class="text-xs uppercase tracking-widest opacity-60">No Emergency Info Found</span>
                 <span class="text-xs text-blue-400 font-black uppercase">Click to Submit Procedures</span>
@@ -4555,7 +4557,7 @@ function populateSiteInfoModal(location) {
     if (location.address && btnNav) {
         const encodedAddr = encodeURIComponent(location.address);
         // FIXED: Corrected template literal syntax for navigation
-        btnNav.href = "http://google.com/maps${encodedAddr}";
+        btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodedAddr}`;
         btnNav.classList.remove('hidden');
     } else if (btnNav) {
         btnNav.classList.add('hidden');
@@ -4758,3 +4760,4 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
