@@ -586,17 +586,17 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">
                 I AM SAFE
             </button>
-            <button id="btnMainClearCache" class="long-press-btn flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">
+            <button id="btnMainClearCache" class="hidden long-press-btn flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">
                 Hold to Clear Cache
             </button>
 
-            <button id="btnResetData" class="long-press-btn w-full py-4 bg-red-900/50 text-red-400 font-bold rounded-xl shadow-lg uppercase">
+            <button id="btnResetData" class="hidden long-press-btn w-full py-4 bg-red-900/50 text-red-400 font-bold rounded-xl shadow-lg uppercase">
                 Hold to Reset App Data
             </button>
 
-<button id="btnDelLoc" class="long-press-btn hidden bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest border border-red-800/30">
-    Hold to Delete
-</button>
+            <button id="btnDelLoc" class="hidden long-press-btn bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest border border-red-800/30">
+                Hold to Delete
+            </button>
         </div>
     </div>
 </div>
@@ -2086,27 +2086,26 @@ function tick() {
         const overdueLabel = document.getElementById('overdueLabel');
         const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
         
+        JavaScript
         if (remaining <= 0) {
-            // Automatically wake screen if dimmed
+            // 1. Wake screen and activate Overdue UI
             if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
-
-            // 3. OVERDUE UI Update (Digital Display)
             if (overdueLabel) overdueLabel.classList.remove('hidden');
+            
             const absRemaining = Math.abs(remaining);
             const mins = Math.floor(absRemaining / 60);
             const secs = Math.floor(absRemaining % 60);
+            
             if (timerEl) {
                 if (mins >= 60) {
-                    const hours = Math.floor(mins / 60);
-                    const remainMins = mins % 60;
-                    timerEl.innerHTML = `-${hours} hr ${remainMins} min`;
+                    timerEl.innerHTML = `-${Math.floor(mins/60)} hr ${mins%60} min`;
                 } else {
                     timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
                 }
                 timerEl.classList.add('text-red-500', 'animate-pulse');
             }
             
-            // 4. BREAK THE LOOP: Only update buttons and trigger panic if NOT already confirmed safe
+            // 2. SAFETY BUTTON TOGGLE: Only update if not already confirmed safe
             if (!state.activeVisit.isSafeConfirmed) {
                 const btnSafe = document.getElementById('btnSafe');
                 const btnDepart = document.getElementById('btnDepart');
@@ -2114,29 +2113,30 @@ function tick() {
                 if (btnSafe) btnSafe.classList.remove('hidden');
                 if (btnDepart) btnDepart.classList.add('hidden');
                 if (btnExtend) btnExtend.classList.add('hidden');
-                
-                // Trigger critical alarm once
-                if (!state.activeVisit.criticalSent) {
-                    triggerPanic(false);
-                    state.activeVisit.criticalSent = true;
-                    saveState();
-                }
+
+                // GOLDEN FIX: Automatic trigger removed. Panic now requires manual SOS or manager intervention.
             }
         } else {
-            // COUNTDOWN (Normal countdown UI)
+            // 3. NORMAL COUNTDOWN UI
             if (overdueLabel) overdueLabel.classList.add('hidden');
             const mins = Math.floor(remaining / 60);
             const secs = Math.floor(remaining % 60);
             if (timerEl) {
                 if (mins >= 60) {
-                    const hours = Math.floor(mins / 60);
-                    const remainMins = mins % 60;
-                    timerEl.innerHTML = `${hours} hr ${remainMins} min`;
+                    timerEl.innerHTML = `${Math.floor(mins/60)} hr ${mins%60} min`;
                 } else {
                     timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
                 }
                 timerEl.classList.remove('text-red-500', 'animate-pulse');
             }
+
+            // 4. RESTORE CONTROLS: Ensures standard buttons return if time is extended
+            const btnSafe = document.getElementById('btnSafe');
+            const btnDepart = document.getElementById('btnDepart');
+            const btnExtend = document.getElementById('btnExtend');
+            if (btnSafe) btnSafe.classList.add('hidden');
+            if (btnDepart) btnDepart.classList.remove('hidden');
+            if (btnExtend) btnExtend.classList.remove('hidden');
         }
         
         if (state.activeVisit.anticipatedDepartureTime && anticipatedTimeEl) {
@@ -4817,6 +4817,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
