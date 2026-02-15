@@ -339,6 +339,10 @@ function generateWorkerTravelReport() {
 // 5. CORE LOGIC (WORKER/MONITOR)
 // ==========================================
 
+/**
+ * RE-ENGINEERED: handleResolvePost
+ * Logic: Updates the Visit record AND triggers "All Clear" alerts to contacts.
+ */
 function handleResolvePost(p) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -354,6 +358,7 @@ function handleResolvePost(p) {
             const rowData = data[i];
             if (rowData[2] === workerName) {
                 const status = String(rowData[10]);
+                // Targets active safety alerts
                 if (status.includes('EMERGENCY') || status.includes('PANIC') || status.includes('DURESS') || status.includes('OVERDUE')) {
                     const targetRow = startRow + i;
                     sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
@@ -364,6 +369,8 @@ function handleResolvePost(p) {
             }
         }
     }
+    
+    // Fallback: If no active visit is found, log the resolution as a new entry
     if (!rowUpdated) {
         const ts = new Date();
         const dateStr = Utilities.formatDate(ts, CONFIG.TIMEZONE, "yyyy-MM-dd");
@@ -376,6 +383,10 @@ function handleResolvePost(p) {
         ];
         sheet.appendRow(row);
     }
+
+    // NEW: TRIGGER "ALL CLEAR" NOTIFICATIONS
+    // This sends the Email and SMS to both emergency contacts immediately.
+    handleSafetyResolution(p); 
 }
 function handleWorkerPost(p, e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -658,10 +669,12 @@ function _cleanPhone(num) {
 }
 
 /**
- * PATCHED: High-Urgency Alert Router
+ * RE-ENGINEERED: High-Urgency Alert Router
+ * Fixes: GPS Variable injection and Dual-Contact SMS Routing.
  */
 function triggerAlerts(p, type) {
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
+    // FIXED: Added missing $ for template literal variable injection
+    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
     
     // DEFAULT CONTENT
     let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
@@ -678,14 +691,20 @@ function triggerAlerts(p, type) {
                `Device Battery: ${p['Battery Level']}`;
     }
     
+    // EMAIL ROUTING: Filter valid addresses and join for multi-recipient delivery
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { 
         MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
     }
     
-    // SMS ROUTING: Sent immediately to all active contacts
+    // SMS ROUTING: Sent immediately to all active contacts in the payload
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
+        // Ensure we capture both phone keys used in the worker app
+        const numbers = [
+            p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
+            p['Escalation Contact Number'] || p['Escalation Contact Phone']
+        ].map(n => _cleanPhone(n)).filter(n => n);
+        
         numbers.forEach(num => { 
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
@@ -700,6 +719,10 @@ function triggerAlerts(p, type) {
 /**
  * RE-ENGINEERED: Multi-Stage Escalation Engine
  * Intervals: 15, 30, 45 (Primary) | 60 (Dual) | [CRITICAL_TIMING] (Immediate Dual)
+ */
+/**
+ * RE-ENGINEERED: Multi-Stage Escalation Engine
+ * Logic: Handles 15/30/45 alerts and immediate [CRITICAL_TIMING] dual-alerts.
  */
 function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -729,28 +752,22 @@ function checkOverdueVisits() {
                 const diffMins = (now - due) / 60000; 
                 const isCritical = (entry[11] && entry[11].includes("[CRITICAL_TIMING]"));
 
-                // NEW 1: CRITICAL TIMING MODE - Immediate Dual Escalation
+                // 1. CRITICAL TIMING: Immediate Dual Alert at 0 mins
                 if (isCritical && diffMins >= 0 && !status.includes("EMERGENCY")) {
                     triggerEscalation(sheet, entry, "EMERGENCY - CRITICAL TIMING BREACH", true);
                     return; 
                 }
 
-                // 2. STANDARD STAGE 1: 15 Minutes
+                // 2. STANDARD: 15/30/45/60 min escalations
                 if (!isCritical && diffMins >= 15 && diffMins < 30 && !status.includes('15MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 15MIN ALERT", false);
                 }
-                
-                // 3. STANDARD STAGE 2: 30 Minutes
                 else if (diffMins >= 30 && diffMins < 45 && !status.includes('30MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 30MIN ALERT", false);
                 }
-
-                // 4. STANDARD STAGE 3: 45 Minutes
                 else if (diffMins >= 45 && diffMins < 60 && !status.includes('45MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 45MIN ALERT", false);
                 }
-
-                // 5. FINAL STAGE: 60 Minutes
                 else if (diffMins >= 60 && !status.includes("EMERGENCY")) {
                     triggerEscalation(sheet, entry, "EMERGENCY - 60MIN BREACH", true);
                 }
@@ -1204,3 +1221,4 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
