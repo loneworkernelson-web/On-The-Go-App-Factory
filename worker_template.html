@@ -111,7 +111,7 @@ select.form-input option {
 .spinner { border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: crosshair; }
-.wizard-step { display: none; height: 100%; flex-direction: column; }
+.wizard-step { display: none; flex-direction: column; }
 .wizard-step.active { display: flex; animation: slideIn 0.3s ease-out; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
@@ -356,7 +356,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <input id="wizEmail" type="email" placeholder="Email Address" class="form-input">
         </div>
         
-        <div id="wizStep2" class="hidden space-y-6">
+<div id="wizStep2" class="wizard-step space-y-6">
             <div class="space-y-4">
                 <h2 class="text-base font-extrabold text-white uppercase tracking-widest">Safety & Duress PINs</h2>
         
@@ -364,7 +364,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                     <p>
                         <strong class="text-blue-400 uppercase">Standard Safety PIN:</strong> This code is used exclusively to declare yourself safe <span class="font-black underline text-white">AFTER</span> an alarm has been activated. Entering this PIN is the only way to confirm to the system that you are secure and to stop the alert from escalating.
                     </p>
-                    <input type="tel" maxlength="4" placeholder="Enter 4-digit Safety PIN" 
+                    <input id="wizPin" type="tel" maxlength="4" placeholder="Enter 4-digit Safety PIN" 
                            oninput="state.pins.std = this.value; saveState()"
                            class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-white tracking-[0.5em] focus:border-blue-500 outline-none transition-all">
             
@@ -372,7 +372,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                         <p>
                             <strong class="text-purple-400 uppercase">Silent Duress PIN:</strong> This is used to silently declare yourself <span class="font-black underline text-white uppercase">UNSAFE</span> when you are required to clear an alarm under threat. The app will appear to clear the alarm normally, but it will <span class="font-black uppercase text-purple-300">immediately and silently</span> notify your contacts that you require help.
                         </p>
-                        <input type="tel" maxlength="4" placeholder="Enter 4-digit Duress PIN" 
+                        <input id="wizDuress" type="tel" maxlength="4" placeholder="Enter 4-digit Duress PIN" 
                                oninput="state.pins.duress = this.value; saveState()"
                                class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-purple-400 tracking-[0.5em] focus:border-purple-500 outline-none transition-all mt-4">
                     </div>
@@ -380,74 +380,71 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
 
-<div id="wizStep3" class="hidden space-y-6">
-    <div class="space-y-4">
-        <h2 class="text-lg font-bold text-white mb-4 uppercase tracking-widest">Response Hierarchy</h2>
-        
-        <div class="space-y-5 text-sm text-gray-200 leading-relaxed">
-            <p>
-                <strong class="text-blue-400 uppercase text-xs font-black">Primary Contact:</strong> Your first line of support. They are notified if your safety timer expires or if you manually trigger an SOS.
-            </p>
-            <div class="space-y-2 mb-6">
-                <input id="wizContactName" type="text" placeholder="Primary Contact Name" 
-                       autocomplete="name"
-                       oninput="state.worker.iceName = this.value; saveState()" 
-                       class="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-blue-500 transition-all">
+<div id="wizStep3" class="wizard-step space-y-6">
+            <div class="space-y-4">
+                <h2 class="text-lg font-bold text-white mb-4 uppercase tracking-widest">Response Hierarchy</h2>
                 
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="wizContactPhone" type="tel" placeholder="Phone Number" 
-                           autocomplete="tel"
-                           oninput="state.worker.icePhone = this.value; saveState()" 
-                           class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-blue-500 transition-all">
-                    
-                    <input id="wizContactEmail" type="email" placeholder="Email Address" 
-                           autocomplete="email"
-                           oninput="state.worker.iceEmail = this.value; saveState()" 
-                           class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-blue-500 transition-all">
+                <div class="space-y-5 text-sm text-gray-200 leading-relaxed">
+                    <p>
+                        <strong class="text-blue-400 uppercase text-xs font-black">Primary Contact:</strong> Your first line of support.
+                    </p>
+                    <div class="space-y-2 mb-6">
+                        <input id="wizContactName" type="text" placeholder="Primary Contact Name" 
+                               autocomplete="name"
+                               oninput="state.worker.iceName = this.value; saveState()" 
+                               class="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-blue-500 transition-all">
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <input id="wizContactPhone" type="tel" placeholder="Phone Number" 
+                                   autocomplete="tel"
+                                   oninput="state.worker.icePhone = this.value; saveState()" 
+                                   class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-blue-500 transition-all">
+                            
+                            <input id="wizContactEmail" type="email" placeholder="Email Address" 
+                                   autocomplete="email"
+                                   oninput="state.worker.iceEmail = this.value; saveState()" 
+                                   class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-blue-500 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-900/20 border border-blue-500/20 p-4 rounded-2xl space-y-3">
+                        <p>
+                            <strong class="text-orange-400 uppercase text-xs font-black">Escalation Contact (Optional):</strong> Alerts this person if the Primary Contact doesn't acknowledge within 1 hour.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2 mt-4">
+                        <input id="wizEscName" type="text" placeholder="Escalation Name" 
+                               autocomplete="name"
+                               oninput="state.worker.ice2Name = this.value; saveState()" 
+                               class="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-orange-500 transition-all">
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <input id="wizEscPhone" type="tel" placeholder="Phone" 
+                                   autocomplete="tel"
+                                   oninput="state.worker.ice2Phone = this.value; saveState()" 
+                                   class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-orange-500 transition-all">
+                            
+                            <input id="wizEscEmail" type="email" placeholder="Email" 
+                                   autocomplete="email"
+                                   oninput="state.worker.ice2Email = this.value; saveState()" 
+                                   class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-orange-500 transition-all">
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-blue-900/20 border border-blue-500/20 p-4 rounded-2xl space-y-3">
-                <p>
-                    <strong class="text-orange-400 uppercase text-xs font-black">Escalation Contact (Optional):</strong> If your timer expires and the Primary Contact does not acknowledge the alert within <span class="font-black text-white underline">ONE HOUR</span>, the system automatically alerts this person.
-                </p>
-                <p class="text-xs font-black text-white uppercase bg-red-900/40 p-3 rounded-lg border border-red-500/30">
-                    NOTE: If you activate an emergency SOS alarm, <span class="underline">BOTH</span> contacts are notified <span class="underline">IMMEDIATELY</span>.
-                </p>
-            </div>
-
-            <div class="space-y-2 mt-4">
-                <input id="wizEscName" type="text" placeholder="Escalation Name" 
-                       autocomplete="name"
-                       oninput="state.worker.ice2Name = this.value; saveState()" 
-                       class="w-full bg-white/10 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-orange-500 transition-all">
-                
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="wizEscPhone" type="tel" placeholder="Phone" 
-                           autocomplete="tel"
-                           oninput="state.worker.ice2Phone = this.value; saveState()" 
-                           class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-orange-500 transition-all">
-                    
-                    <input id="wizEscEmail" type="email" placeholder="Email" 
-                           autocomplete="email"
-                           oninput="state.worker.ice2Email = this.value; saveState()" 
-                           class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-orange-500 transition-all">
-                </div>
+            <div class="footer-bar flex justify-between pt-6 border-t border-white/5">
+                <button id="btnWizPrev" onclick="prevWiz()" 
+                        class="px-6 py-3 bg-gray-600 rounded-xl font-bold text-white active:scale-95 transition-all">
+                    Back
+                </button>
+                <button id="btnWizNext" onclick="nextWiz()" 
+                        class="px-6 py-3 bg-blue-600 rounded-xl font-bold text-white active:scale-95 transition-all">
+                    Finish Setup
+                </button>
             </div>
         </div>
-    </div>
-
-    <div class="footer-bar flex justify-between pt-6 border-t border-white/5">
-        <button id="btnWizPrev" onclick="prevWiz()" 
-                class="hidden px-6 py-3 bg-gray-600 rounded-xl font-bold text-white active:scale-95 transition-all">
-            Back
-        </button>
-        <button id="btnWizNext" onclick="nextWiz()" 
-                class="px-6 py-3 bg-blue-600 rounded-xl font-bold text-white active:scale-95 transition-all">
-            Next Step
-        </button>
-    </div>
-</div>
         
 <div id="mainPage" class="page">
 <div class="header-bar">
@@ -1378,6 +1375,7 @@ function activateDimMode() {
  * Logic: Restores full UI visibility and resets the battery saver overlays.
  */
 function deactivateDimMode() {
+    if (!isDimmed) return; // Exit immediately if already awake
     document.documentElement.classList.remove('system-dim');
     document.body.classList.remove('system-dim');
     isDimmed = false;
@@ -4834,6 +4832,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
