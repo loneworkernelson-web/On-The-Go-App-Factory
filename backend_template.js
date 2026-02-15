@@ -443,7 +443,7 @@ function handleWorkerPost(p, e) {
                 const rowData = data[i];
                 if (rowData[2] === workerName) {
                     const status = String(rowData[10]);
-                    const isClosed = status.includes('DEPARTED') || (status.includes('SAFE') && !status.includes('MANUALLY')) || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
+                    const isClosed = status.includes('DEPARTED') || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
                     
                     if (!isClosed) {
                         const targetRow = startRow + i;
@@ -1221,4 +1221,5 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
