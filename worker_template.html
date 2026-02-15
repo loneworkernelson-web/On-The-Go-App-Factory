@@ -661,7 +661,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Vehicle WOF Block Modal -->
-<div id="wofBlockModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<div id="wofBlockModal" class="hidden fixed inset-0 z-450 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-10 text-center border-4 border-red-600">
         <div class="text-7xl mb-6">⛔</div>
         <h2 class="text-3xl font-black text-red-500 mb-4 uppercase">STOP</h2>
@@ -671,7 +671,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Vehicle WOF Warning Modal -->
-<div id="wofWarnModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<div id="wofWarnModal" class="hidden fixed inset-0 z-450 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-orange-500">
         <div class="text-6xl mb-4">⚠️</div>
         <h2 class="text-2xl font-black text-orange-500 mb-2 uppercase">VEHICLE COMPLIANCE</h2>
@@ -749,7 +749,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
-<div id="noticeModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" role="dialog">
+<div id="noticeModal" class="hidden fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" role="dialog">
     <div id="noticeCard" class="bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-sm p-8 text-center border-t-[12px] border-blue-600">
         <div id="noticeIcon" class="text-6xl mb-6">📢</div>
         <h2 id="noticeTitle" class="text-2xl font-black text-white mb-3 uppercase tracking-tight leading-tight"></h2>
@@ -810,7 +810,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Shake-to-Alert Confirmation Modal -->
-<div id="shakeConfirmModal" class="hidden fixed inset-0 z-[120] bg-red-900/90 flex items-center justify-center">
+<div id="shakeConfirmModal" class="hidden fixed inset-0 z-[500] bg-red-900/90 flex items-center justify-center">
     <div class="text-center text-white animate-pulse">
         <div class="text-8xl mb-4">⚠️</div>
         <h1 class="text-4xl font-black mb-4">SHAKE DETECTED</h1>
@@ -821,7 +821,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
 
 <!-- Volume Panic Confirmation Modal -->
-<div id="volumeConfirmModal" class="hidden fixed inset-0 z-[120] bg-orange-900/90 flex items-center justify-center">
+<div id="volumeConfirmModal" class="hidden fixed inset-0 z-[500] bg-orange-900/90 flex items-center justify-center">
     <div class="text-center text-white">
         <div class="text-8xl mb-4">🔊</div>
         <h1 class="text-4xl font-black mb-4">VOLUME PANIC</h1>
@@ -1911,7 +1911,13 @@ async function triggerPanic(duress = false) {
         if (duress) state.activeVisit.isDuress = true;
         saveState();
     }
-
+    // NEW: Close any open notices to ensure the Panic UI is visible
+    closeModal('notice'); 
+    closeModal('resourceHub');
+    
+    // Ensure Panic UI is at the absolute top
+    const panicEl = document.getElementById('fullScreenAlert');
+    if(panicEl) panicEl.style.zIndex = "500";
     // CRITICAL FIX: Physically switch the UI to Panic Mode
     renderPanicState(); 
 }
@@ -2575,27 +2581,27 @@ function setupHoldToStart() {
     });
 }
 /**
- * REWRITTEN: Targeted Travel & Visit Safety Engine
- * Permits selecting a Site as a travel destination.
+ * PATCHED: startVisit with Grounding Enforcement
  */
-async function startVisit() {
+async function startVisit(isSkipCheck = false) {
     isMidVisitUpdate = false; 
 
-    // 1. Audio Unlock
+    // 1. COMPLIANCE GATE: Check for WOF/Rego expiry unless skipped
+    if (!isSkipCheck && checkVehicleBeforeVisit()) {
+        return; // Grounding or Warning modal is now visible; stop execution.
+    }
+
+    // 2. Audio Unlock
     try {
         await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 500))]);
     } catch (e) { console.warn("Audio skipped"); }
 
     const locId = state.selectedLocationId;
-    const isTravelMode = !!state.isTravelActive; // Toggle state from Travel Mode tile
+    const isTravelMode = !!state.isTravelActive; 
     
-    // Safety check: require a destination if in travel mode
     if (!locId && !isTravelMode) return showToast('⚠️ Select a destination first');
 
-    // Identify the target location object
-    const loc = state.locations.find(l => l.id === locId) || 
-                { id: 'travel', name: 'General Travel' };
-    
+    const loc = state.locations.find(l => l.id === locId) || { id: 'travel', name: 'General Travel' };
     const slider = document.getElementById('durationSlider');
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
@@ -3202,10 +3208,10 @@ async function fetchLocationsFromBackend() {
 }
 
 // ============================================================================
-// HIGH-INTEGRITY INITIALIZATION (Safety-Critical Patch)
+// HIGH-INTEGRITY INITIALIZATION (Fixed Syntax)
 // ============================================================================
 window.onload = () => {
-    // 1. Establish State Integrity with all required sub-objects
+    // 1. Establish State Integrity
     state = loadState() || {
         currentWizStep: 1,
         worker: {},
@@ -3218,13 +3224,14 @@ window.onload = () => {
         meta: { lastVehCheck: null, wofExpiry: null },
         vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
         visitDurationMinutes: 0 
-        // Bind high-sensitivity actions to long-press
-        setupLongPress('btnResetData', 1800, clearData);
-        setupLongPress('btnMainClearCache', 1800, clearFormsCache);
-        setupLongPress('btnDelLoc', 1800, deleteLoc);
     };
 
-    // 2. Ensure nested objects exist in case of partial load
+    // 2. Bind high-sensitivity actions to long-press AFTER state load
+    setupLongPress('btnResetData', 1800, clearData);
+    setupLongPress('btnMainClearCache', 1800, clearFormsCache);
+    setupLongPress('btnDelLoc', 1800, deleteLoc);
+
+    // 3. Ensure nested objects exist
     if (!state.meta) state.meta = {};
     if (!state.settings) state.settings = {};
     if (!state.worker) state.worker = {};
@@ -3234,7 +3241,7 @@ window.onload = () => {
         saveState();
     }
 
-    // 3. System Initialization
+    // 4. System Initialization
     updateOnlineStatus();
     checkIosInstall();
     
@@ -3242,8 +3249,6 @@ window.onload = () => {
         navigate('setup');
     } else {
         navigate(state.activeVisit ? 'locked' : 'main');
-        
-        // 4. UI Readiness & Button Binding
         renderLocations(); 
         setupHoldToStart(); 
         checkVehicleStatus(); 
@@ -3254,20 +3259,17 @@ window.onload = () => {
             if (!timerInt) timerInt = setInterval(tick, 1000);
         }
 
-        // ====== THE CRITICAL SYNC BLOCK ======
-        // Ensures registered devices pull fresh sites/templates on every launch
         const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
         if (!isTemplate && navigator.onLine) {
             forceSync(false); 
         }
     }
 
-    // 5. Covert Safety & Interface Init
     initShakeDetection();
     initVolumeDetection();
     initSlideToWake();
     
-    // 6. Panic Button Triple-Tap Security
+    // 5. User Interaction Bindings
     const btnPanic = document.getElementById('btnPanic');
     if (btnPanic) {
         btnPanic.onclick = () => {
@@ -3281,12 +3283,14 @@ window.onload = () => {
             }
         };
     }
+
+    // 6. Global Inactivity Monitoring
+    ['mousedown', 'touchstart', 'mousemove', 'keydown'].forEach(evt => {
+        window.addEventListener(evt, resetInactivityTimer, { passive: true });
+    });
+
     console.log("OTG Safety Engine: Robust Initialization Complete.");
     updateLastSyncUI();
-    // Add to the end of window.onload
-    ['mousedown', 'touchstart', 'mousemove', 'keydown'].forEach(evt => {
-    window.addEventListener(evt, resetInactivityTimer, { passive: true });
-});
 };
 
 // ============================================================================
@@ -3575,11 +3579,18 @@ function toggleWofContinue() {
     }
 }
 
+/**
+ * FIXED: closeWofWarn
+ * Logic: Resumes the visit start sequence after the worker acknowledges the warning.
+ */
 function closeWofWarn() {
     const checkbox = document.getElementById('chkWofAck');
     if (checkbox) checkbox.checked = false;
+    
     closeModal('wofWarn');
-    // Continue with visit start
+    
+    // NEW: Resume starting the visit, bypassing the check
+    startVisit(true); 
 }
 
 // ============================================================================
@@ -4600,16 +4611,23 @@ function withPinVerification(isDuress, successCallback) {
     };
 }
 
-    /**
- * REFINED NOTICE ENGINE
+/**
+ * RE-ENGINEERED: Priority-Aware Notice Engine
+ * Logic: Delays notices if a mission-critical Vehicle Grounding block is active.
  */
 function checkActiveNotice() {
     if (!state.meta || !state.meta.activeNotice) return;
     
     const notice = state.meta.activeNotice;
     const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
-    
     if (ackList.includes(notice.id)) return;
+
+    // 1. SAFETY GATE: Do not hide the 'Grounded' warning with a notice
+    const isGrounded = !document.getElementById('wofBlockModal').classList.contains('hidden');
+    if (isGrounded) {
+        console.log("Notice delayed: Vehicle grounding takes priority.");
+        return;
+    }
 
     const modal = document.getElementById('noticeModal');
     const title = document.getElementById('noticeTitle');
@@ -4620,7 +4638,7 @@ function checkActiveNotice() {
     title.innerText = notice.title;
     content.innerText = notice.content;
 
-    // Apply priority styling
+    // 2. PRIORITY STYLING
     card.classList.remove('border-blue-600', 'border-orange-500', 'border-red-600');
     if (notice.priority === 'Critical') {
         card.classList.add('border-red-600');
@@ -4633,6 +4651,8 @@ function checkActiveNotice() {
         icon.innerText = '📢';
     }
 
+    // 3. FORCE Z-INDEX (Final safeguard)
+    modal.style.zIndex = "400"; 
     modal.classList.remove('hidden');
 }
 
@@ -4737,6 +4757,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
