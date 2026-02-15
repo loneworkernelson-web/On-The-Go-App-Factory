@@ -14,7 +14,6 @@
     
     <style>
         :root {
-            /* FACTORY THEME INTEGRATION */
             --brand-primary: %%PRIMARY_COLOR%%;
             --brand-accent: %%ACCENT_COLOR%%;
         }
@@ -30,7 +29,7 @@
         .blink { animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
         
-        /* Urgency Indicators */
+        /* Urgency Indicator Styles */
         .st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; } 
         .st-amber { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: blinker 2s linear infinite; } 
         .st-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 0.5s linear infinite; } 
@@ -44,14 +43,13 @@
         .bd-grey { border-color: #475569; opacity: 0.7; }
         
         .btn-brand { background-color: var(--brand-primary); }
-        .border-brand { border-color: var(--brand-primary); }
         .text-brand { color: var(--brand-accent); }
         
         #fullScreenAlert { z-index: 500; }
         .alert-red { animation: pulseRed 1s infinite; }
         .alert-purple { animation: pulsePurple 1s infinite; }
-        @keyframes pulseRed { 0% { background-color: rgba(220, 38, 38, 0.9); } 50% { background-color: rgba(153, 27, 27, 0.95); } 100% { background-color: rgba(220, 38, 38, 0.9); } }
-        @keyframes pulsePurple { 0% { background-color: rgba(147, 51, 234, 0.9); } 50% { background-color: rgba(107, 33, 168, 0.95); } 100% { background-color: rgba(147, 51, 234, 0.9); } }
+        @keyframes pulseRed { 0% { background: rgba(220, 38, 38, 0.9); } 50% { background: rgba(153, 27, 27, 0.95); } 100% { background: rgba(220, 38, 38, 0.9); } }
+        @keyframes pulsePurple { 0% { background: rgba(147, 51, 234, 0.9); } 50% { background: rgba(107, 33, 168, 0.95); } 100% { background: rgba(147, 51, 234, 0.9); } }
         
         #mapView { background: #020617; z-index: 1; width: 100%; height: 100%; }
         .custom-div-icon { background: transparent; border: none; } 
@@ -59,7 +57,6 @@
         .map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
         .map-icon.purple { background: #d946ef; animation: blinker 0.3s linear infinite; box-shadow: 0 0 25px #d946ef; }
         .map-icon.green { background: #10b981; }
-        .map-icon.grey { background: #64748b; }
         
         #audioGate { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; p-4; }
     </style>
@@ -74,14 +71,14 @@
         
         <form onsubmit="unlockMonitor(event)" class="space-y-4">
             <input type="password" id="masterKeyInput" 
-                   autocomplete="current-password"
+                   autocomplete="new-password"
                    class="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 text-center text-xl font-mono tracking-[0.4em] text-blue-400 focus:border-blue-500 outline-none transition-all"
                    placeholder="••••••••" required>
-            <button type="submit" class="w-full btn-brand text-white font-black py-5 rounded-2xl shadow-2xl text-xl transition transform active:scale-95 uppercase tracking-widest">
+            <button type="submit" class="w-full btn-brand text-white font-black py-5 rounded-2xl shadow-2xl text-xl uppercase tracking-widest">
                 Unlock Dashboard
             </button>
         </form>
-        <p id="loginError" class="text-red-500 text-xs font-bold mt-4 uppercase hidden">Access Denied: Invalid Key</p>
+        <p id="loginError" class="text-red-500 text-xs font-bold mt-4 uppercase hidden">Access Denied: Connection Failure</p>
     </div>
 </div>
 
@@ -89,15 +86,15 @@
     <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center max-w-sm">
         <div class="text-5xl mb-6 animate-pulse">📡</div>
         <h2 class="text-3xl font-bold text-white mb-2">Connection Lost</h2>
-        <p class="text-red-400 font-mono text-sm mb-4 uppercase">System Offline</p>
+        <p class="text-red-400 font-mono text-sm uppercase">System Offline</p>
     </div>
 </div>
 
-<div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm">
+<div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm z-[500]">
     <div class="text-9xl mb-4" id="alertIcon">🚨</div>
     <h1 class="text-6xl font-black text-white mb-4 drop-shadow-md" id="alertTitle">EMERGENCY ALERT</h1>
     <h2 id="alertNames" class="text-4xl font-bold text-white bg-black/30 px-6 py-2 rounded mb-8">Worker</h2>
-    <button onclick="acknowledgeAlert()" class="bg-white text-gray-900 font-black text-2xl py-6 px-12 rounded-full shadow-2xl hover:scale-105 transition border-4 border-gray-900">ACKNOWLEDGE ALARM</button>
+    <button onclick="acknowledgeAlert()" class="bg-white text-gray-900 font-black text-2xl py-6 px-12 rounded-full shadow-2xl border-4 border-gray-900">ACKNOWLEDGE ALARM</button>
 </div>
 
 <div id="resolveModal" class="hidden fixed inset-0 z-40 bg-black/90 flex items-center justify-center p-4">
@@ -108,7 +105,10 @@
             <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">1. Confirm Name</label><input type="text" id="resNameInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white"></div>
             <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">2. Resolution Log</label><textarea id="resNoteInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white h-24"></textarea></div>
         </div>
-        <div class="flex gap-3 mt-6"><button onclick="closeResolve()" class="flex-1 bg-gray-700 text-white font-bold py-3 rounded">Cancel</button><button onclick="submitResolution()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg">✅ MARK SAFE</button></div>
+        <div class="flex gap-3 mt-6">
+            <button onclick="closeResolve()" class="flex-1 bg-gray-700 text-white font-bold py-3 rounded">Cancel</button>
+            <button onclick="submitResolution()" class="flex-1 bg-green-600 text-white font-bold py-3 rounded shadow-lg">✅ MARK SAFE</button>
+        </div>
     </div>
 </div>
 
@@ -119,22 +119,22 @@
             <div>
                 <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor</span></h1>
                 <div class="flex items-center gap-2 text-xs text-gray-400">
-                    <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
-                    <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
+                    <span id="serverStatus"><span class="w-2 h-2 rounded-full bg-gray-500 inline-block"></span> Connecting...</span>
+                    <span>• Updated: <span id="lastUpdate" class="font-mono">--:--:--</span></span>
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Sign Out</button>
-            <button onclick="exportSystemLog()" class="text-xs text-blue-400 hover:text-blue-300 underline">📊 Export Log</button>
-            <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500">🔊 Sound On</button>
+            <button onclick="resetKey()" class="text-xs text-gray-600 underline">🔑 Sign Out</button>
+            <button onclick="exportSystemLog()" class="text-xs text-blue-400 underline">📊 Export Log</button>
+            <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white">🔊 Sound On</button>
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold btn-brand text-white shadow">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400">📋 All</button></div>
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"><button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 text-white shadow">⊞ Grid</button><button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-xs font-bold text-gray-400">🗺️ Map</button></div>
             <input type="text" id="searchBox" placeholder="Filter..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-2 py-2 w-32" onkeyup="renderGrid()">
         </div>
         <div class="flex gap-6 border-l border-gray-700 pl-6">
-            <div class="text-center"><div class="text-2xl font-bold text-green-400" id="activeCount">0</div><div class="text-[10px] text-gray-500 uppercase font-bold">Active</div></div>
-            <div class="text-center"><div class="text-2xl font-bold text-red-500" id="alertCount">0</div><div class="text-[10px] text-gray-500 uppercase font-bold">Alerts</div></div>
+            <div class="text-center"><div class="text-2xl font-bold text-green-400" id="activeCount">0</div><div class="text-[11px] text-gray-500 uppercase font-bold">Active</div></div>
+            <div class="text-center"><div class="text-2xl font-bold text-red-500" id="alertCount">0</div><div class="text-[11px] text-gray-500 uppercase font-bold">Alerts</div></div>
         </div>
     </div>
 </header>
@@ -143,19 +143,17 @@
     <div class="grid-area">
         <div id="workerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         <div id="mapView" class="hidden h-full w-full rounded-xl overflow-hidden shadow-inner border border-gray-700 bg-gray-900"></div>
-        <div id="emptyState" class="hidden h-full flex flex-col items-center justify-center text-gray-600"><div class="text-4xl mb-2">😴</div><p>No active workers.</p></div>
     </div>
-    <div class="log-area"><div class="p-2 bg-gray-800 border-b border-gray-700 font-bold text-[10px] text-gray-400 uppercase tracking-wider sticky top-0">Activity Log</div><div id="eventLogList" class="flex-1 overflow-y-auto px-2 py-2 space-y-1"></div></div>
+    <div class="log-area"><div class="p-2 bg-gray-800 border-b border-gray-700 font-bold text-[11px] text-gray-400 uppercase tracking-wider sticky top-0">Activity Log</div><div id="eventLogList" class="flex-1 overflow-y-auto px-2 py-2 space-y-1"></div></div>
 </div>
 
 <script>
-// FIXED: Using %%SHEET_URL%% to resolve connection
+// FIXED: Using %%SHEET_URL%% for connection logic
 const SCRIPT_URL = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
 let API_KEY = localStorage.getItem('monitor_master_key'); 
 let workerData = []; let allRows = []; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null; let lastHeartbeat = Date.now(); 
 
-// 6. INITIALIZATION & PERSISTENT LOGIN HANDSHAKE
 window.onload = () => { if (API_KEY) unlockMonitor(); };
 
 async function unlockMonitor(e) {
@@ -164,12 +162,7 @@ async function unlockMonitor(e) {
     if (!activeKey) return;
 
     try {
-        // REQUIRED: User gesture to enable audio context
-        if(typeof Tone !== 'undefined') {
-            await Tone.start();
-            synth = new Tone.Synth().toDestination();
-        }
-        
+        if(typeof Tone !== 'undefined') { await Tone.start(); synth = new Tone.Synth().toDestination(); }
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
         const data = await resp.json();
         
@@ -187,24 +180,11 @@ async function unlockMonitor(e) {
 }
 
 function startPolling() {
-    fetchData(); 
-    setInterval(fetchData, 10000); 
-    setInterval(renderGrid, 1000);
-    
-    // Audio Keep-Alive for Browser Persistence
-    setInterval(() => {
-        if (audioEnabled && synth) {
-            try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e) {}
-        }
-    }, 25000);
-
-    // Watchdog for Offline Alerts
+    fetchData(); setInterval(fetchData, 10000); setInterval(renderGrid, 1000);
+    setInterval(() => { if (audioEnabled && synth) try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e){} }, 25000);
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
-        if (Date.now() - lastHeartbeat > 60000) {
-            ol.classList.remove('hidden');
-            if(audioEnabled && synth) playSound('offline');
-        } else { ol.classList.add('hidden'); }
+        if (Date.now() - lastHeartbeat > 60000) { ol.classList.remove('hidden'); if(audioEnabled) playSound('offline'); } else { ol.classList.add('hidden'); }
     }, 10000); 
 }
 
@@ -219,31 +199,29 @@ async function fetchData() {
 }
 
 function handleData(response) { 
-    if (response.workers) { 
-        allRows = response.workers; 
-        workerData = processWorkers(response.workers); 
-        document.getElementById('serverStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';
-        document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString(); 
-        
-        const unackedDuress = workerData.filter(w => w.status.includes("DURESS") && !acknowledgedAlerts.has(w.name)); 
-        const unackedAlert = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !acknowledgedAlerts.has(w.name)); 
-        
-        const alertBox = document.getElementById('fullScreenAlert'); 
-        if(unackedDuress.length > 0) { 
-            alertBox.classList.remove('hidden', 'alert-red'); alertBox.classList.add('alert-purple'); 
-            document.getElementById('alertTitle').innerText = "DURESS ALARM (SILENT)"; 
-            document.getElementById('alertIcon').innerText = "🥷"; 
-            document.getElementById('alertNames').innerText = unackedDuress.map(w => w.name).join(", "); startAlertLoop(); 
-        } else if(unackedAlert.length > 0) { 
-            alertBox.classList.remove('hidden', 'alert-purple'); alertBox.classList.add('alert-red'); 
-            document.getElementById('alertTitle').innerText = "EMERGENCY ALERT"; 
-            document.getElementById('alertIcon').innerText = "🚨"; 
-            document.getElementById('alertNames').innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
-        } else { alertBox.classList.add('hidden'); stopAlertLoop(); } 
-        
-        if(currentView === 'MAP') { if(mapInstance) renderMap(); } else { renderGrid(); }
-        renderLog(); 
-    } 
+    allRows = response.workers; 
+    workerData = processWorkers(response.workers); 
+    document.getElementById('serverStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Online';
+    document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString(); 
+    
+    const unackedDuress = workerData.filter(w => w.status.includes("DURESS") && !acknowledgedAlerts.has(w.name)); 
+    const unackedAlert = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !acknowledgedAlerts.has(w.name)); 
+    
+    const alertBox = document.getElementById('fullScreenAlert'); 
+    if(unackedDuress.length > 0) { 
+        alertBox.classList.remove('hidden', 'alert-red'); alertBox.classList.add('alert-purple'); 
+        document.getElementById('alertTitle').innerText = "DURESS ALARM (SILENT)"; 
+        document.getElementById('alertIcon').innerText = "🥷"; 
+        document.getElementById('alertNames').innerText = unackedDuress.map(w => w.name).join(", "); startAlertLoop(); 
+    } else if(unackedAlert.length > 0) { 
+        alertBox.classList.remove('hidden', 'alert-purple'); alertBox.classList.add('alert-red'); 
+        document.getElementById('alertTitle').innerText = "EMERGENCY ALERT"; 
+        document.getElementById('alertIcon').innerText = "🚨"; 
+        document.getElementById('alertNames').innerText = unackedAlert.map(w => w.name).join(", "); startAlertLoop(); 
+    } else { alertBox.classList.add('hidden'); stopAlertLoop(); } 
+    
+    if(currentView === 'MAP' && mapInstance) renderMap(); else renderGrid();
+    renderLog(); 
 }
 
 function processWorkers(rows) { 
@@ -265,10 +243,9 @@ function processWorkers(rows) {
         if (!workers[name] || timestamp > workers[name].timestamp) { 
             workers[name] = { 
                 name, status, phone: r['Worker Phone Number'], 
-                iceName: r['Emergency Contact Name'], icePhone: r['Emergency Contact Number'], 
-                notes, location: r['Location Name'] || r['Location Address'] || "Unknown", 
+                location: r['Location Name'] || r['Location Address'] || "Unknown", 
                 travelTarget, gps: r['Last Known GPS'], battery: r['Battery Level'], 
-                dueTime: r['Anticipated Departure Time'], timestamp, wofExpiry: r['WOFExpiry'] 
+                dueTime: r['Anticipated Departure Time'], timestamp
             }; 
         } 
     }); 
@@ -276,42 +253,58 @@ function processWorkers(rows) {
     return Object.values(workers); 
 }
 
+// RESTORED: Alert Loop Logic
+function startAlertLoop() {
+    if (alertLoopInterval) return;
+    alertLoopInterval = setInterval(() => { if (audioEnabled && synth) synth.triggerAttackRelease("C5", "4n"); }, 1000);
+}
+function stopAlertLoop() { clearInterval(alertLoopInterval); alertLoopInterval = null; }
+
+function acknowledgeAlert() { 
+    const names = document.getElementById('alertNames').innerText.split(", ");
+    names.forEach(n => acknowledgedAlerts.add(n));
+    document.getElementById('fullScreenAlert').classList.add('hidden');
+    stopAlertLoop();
+}
+
 function renderGrid() { 
     const grid = document.getElementById('workerGrid'); const search = document.getElementById('searchBox').value.toLowerCase(); const now = Date.now(); grid.innerHTML = ''; let activeC = 0; let alertC = 0;
-    
-    workerData.sort((a,b) => getUrgencyScore(b, now) - getUrgencyScore(a, now));
+    workerData.sort((a,b) => (b.status.includes('DURESS') || b.status.includes('EMERGENCY') ? 2000 : 0) - (a.status.includes('DURESS') || a.status.includes('EMERGENCY') ? 2000 : 0));
     
     workerData.forEach(w => { 
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE') || w.status === 'DATA_ENTRY_ONLY'; 
-        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC'); 
-        const isDuress = w.status.includes('DURESS'); 
-        const isOverdue = w.status.includes('OVERDUE'); 
-        if(!isSafe) activeC++; if(isAlert || isOverdue || isDuress) alertC++; 
+        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE'); 
+        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('DURESS'); 
+        if(!isSafe) activeC++; if(isAlert) alertC++; 
         if (search && !w.name.toLowerCase().includes(search)) return; 
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert && !isOverdue && !isDuress) return; 
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return; 
         
-        if(currentView === 'MAP') return; 
-
-        let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status; 
-        let resolveBtn = ''; 
+        const due = new Date(w.dueTime).getTime(); 
+        const borderClass = isAlert ? (w.status.includes('DURESS') ? 'bd-purple' : 'bd-red') : (!isSafe && due < now ? 'bd-amber' : 'bd-green');
+        const dotClass = isAlert ? (w.status.includes('DURESS') ? 'st-purple' : 'st-red') : (!isSafe && due < now ? 'st-amber' : 'st-ok');
+        
         let locLabel = w.status.includes("TRAVELLING") && w.travelTarget ? "Destination" : "Location";
         let locValue = locLabel === "Destination" ? w.travelTarget : w.location;
 
-        if (isDuress) { borderClass = 'bd-purple'; dotClass = 'st-purple'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-purple-700 text-white font-bold py-2 rounded text-xs">RESOLVE DURESS</button>`; } 
-        else if (isAlert) { borderClass = 'bd-red'; dotClass = 'st-red'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-700 text-white font-bold py-2 rounded text-xs">RESOLVE ALERT</button>`; } 
-        else if (!isSafe) { 
-            const due = new Date(w.dueTime).getTime(); 
-            if (due > now || isNaN(due)) { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
-            else { borderClass = 'bd-amber'; dotClass = 'st-amber'; } 
-        } 
-        
         const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
-        card.innerHTML = `<div class=\"flex justify-between items-start mb-2\"><h3 onclick=\"focusWorker('${w.gps}')\" class=\"font-bold text-lg text-white truncate cursor-pointer hover:text-brand\">${escapeHtml(w.name)}</h3><div class=\"${dotClass} status-dot\"></div></div><div class=\"space-y-1.5 text-xs text-gray-300\"><div class=\"flex justify-between\"><span>Status</span><span class=\"font-bold\">${escapeHtml(statusText)}</span></div><div class=\"flex justify-between\"><span>${locLabel}</span><span class=\"truncate w-24 text-right\">${escapeHtml(locValue)}</span></div><div class=\"flex justify-between text-gray-500\"><span>Battery</span><span>${escapeHtml(w.battery||'--')}%</span></div></div><div class=\"mt-3 grid grid-cols-2 gap-2\"><button onclick=\"focusWorker('${w.gps}')\" class=\"text-brand bg-brand/20 py-2 rounded text-xs font-bold\">📍 Map</button><a href=\"tel:${w.phone}\" class=\"bg-gray-700 text-white text-center py-2 rounded text-xs font-bold\">📞 Call</a></div>${resolveBtn}`; grid.appendChild(card); 
+        card.innerHTML = `
+            <div class="flex justify-between mb-2"><h3 class="font-bold text-white truncate cursor-pointer hover:text-brand" onclick="focusWorker('${w.gps}')">${escapeHtml(w.name)}</h3><div class="status-dot ${dotClass}"></div></div>
+            <div class="space-y-1 text-xs text-gray-300">
+                <div class="flex justify-between"><span>Status</span><span class="font-bold">${escapeHtml(w.status)}</span></div>
+                <div class="flex justify-between"><span>${locLabel}</span><span class="truncate w-32 text-right">${escapeHtml(locValue)}</span></div>
+                <div class="flex justify-between text-gray-500"><span>Battery</span><span>${escapeHtml(w.battery||'--')}%</span></div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+                <button onclick="focusWorker('${w.gps}')" class="text-brand bg-brand/20 py-2 rounded text-xs font-bold">📍 Map</button>
+                <a href="tel:${w.phone}" class="bg-gray-700 text-white text-center py-2 rounded text-xs font-bold">📞 Call</a>
+            </div>
+            ${isAlert ? `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-600 py-2 rounded text-xs font-bold text-white">RESOLVE ALERT</button>` : ''}
+        `; 
+        grid.appendChild(card); 
     }); 
     document.getElementById('activeCount').innerText = activeC; document.getElementById('alertCount').innerText = alertC; 
 }
 
-function escapeHtml(text) { return text ? String(text).replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, "&quot;") : ""; }
+function escapeHtml(text) { return text ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : ""; }
 
 function initMap() { 
     if(mapInstance) { mapInstance.invalidateSize(); return; } 
@@ -321,46 +314,39 @@ function initMap() {
 }
 
 function renderMap() { 
-    if(!mapInstance) return; markersLayer.clearLayers(); const bounds = L.latLngBounds(); let hasMarkers = false; 
+    markersLayer.clearLayers();
     workerData.forEach(w => { 
-        if(!w.gps || w.gps.length < 5) return; 
-        const [lat, lng] = w.gps.replace(/[^0-9.,-]/g, '').split(',').map(Number);
-        if(isNaN(lat)) return;
-        const color = w.status.includes('EMERGENCY') ? 'red' : 'green';
+        if(!w.gps || !w.gps.includes(',')) return; 
+        const [lat, lng] = w.gps.split(',').map(Number);
         
-        // Render historical breadcrumbs
         if(w.history?.length > 1) {
             const path = w.history.map(h => h.split(',').map(Number));
             L.polyline(path, {color: 'var(--brand-accent)', weight: 3, opacity: 0.5}).addTo(markersLayer);
         }
 
-        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${color}"></div>`, iconSize: [24, 24] }); 
-        L.marker([lat, lng], {icon}).bindPopup(`<b>${escapeHtml(w.name)}</b>`).addTo(markersLayer); 
-        bounds.extend([lat, lng]); hasMarkers = true; 
+        const color = w.status.includes('DURESS') ? 'purple' : (w.status.includes('EMERGENCY') ? 'red' : 'green');
+        const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${color}"></div>`, iconSize: [24, 24] });
+        L.marker([lat, lng], {icon}).bindPopup(`<b>${escapeHtml(w.name)}</b><br>${escapeHtml(w.status)}`).addTo(markersLayer); 
     }); 
-    if(hasMarkers && !mapInstance._isFocused) mapInstance.fitBounds(bounds, {padding:[50,50]}); 
 }
 
 function focusWorker(gps) { if(!gps) return; document.getElementById('btnMap').click(); setTimeout(() => { const [lat, lng] = gps.split(',').map(Number); mapInstance.flyTo([lat, lng], 17); }, 200); }
 function toggleView(view) { currentView = view; document.getElementById('workerGrid').classList.toggle('hidden', view === 'MAP'); document.getElementById('mapView').classList.toggle('hidden', view === 'GRID'); if(view === 'MAP') { initMap(); renderMap(); } }
-function renderLog() { document.getElementById('eventLogList').innerHTML = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0, 100).map(r => `<div class=\"text-[10px] mb-1\"><span class=\"text-gray-500\">${new Date(r['Timestamp']).toLocaleTimeString()}</span> <span class=\"text-white italic\">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`).join(''); }
-function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000; if (w.status.includes('EMERGENCY')) return 1000; return 0; }
-function setFilter(f) { currentFilter = f; renderGrid(); }
+function renderLog() { document.getElementById('eventLogList').innerHTML = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0, 100).map(r => `<div class="text-xs mb-1"><span class="text-gray-500">${new Date(r['Timestamp']).toLocaleTimeString()}</span> <span class="text-white italic">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`).join(''); }
 function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; }
 function closeResolve() { document.getElementById('resolveModal').classList.add('hidden'); }
 function submitResolution() { 
     const target = document.getElementById('resWorkerNameDisplay').innerText; 
-    const note = document.getElementById('resNoteInput').value.trim(); 
+    const note = document.getElementById('resNoteInput').value.trim();
     if(document.getElementById('resNameInput').value !== target) return alert("Name mismatch");
-    const formData = new FormData(); 
-    formData.append('action', 'resolve'); formData.append('key', API_KEY); formData.append('Worker Name', target); formData.append('Alarm Status', 'SAFE - HQ CLEARED'); formData.append('Notes', `[HQ]: ${note}`);
+    const formData = new FormData(); formData.append('action', 'resolve'); formData.append('key', API_KEY); formData.append('Worker Name', target); formData.append('Alarm Status', 'SAFE - HQ CLEARED'); formData.append('Notes', `[HQ]: ${note}`);
     fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData }).then(() => { closeResolve(); fetchData(); });
 }
 function exportSystemLog() {
-    const csv = "Timestamp,Worker,Status,Location\n" + allRows.map(r => `"${r['Timestamp']}","${r['Worker Name']}","${r['Alarm Status']}","${r['Location Name']}"`).join("\n");
-    const link = document.createElement("a"); link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); link.download = "Safety_Log.csv"; link.click();
+    const csv = "Timestamp,Worker,Status,Location\n" + allRows.map(r => `"${r.Timestamp}","${r['Worker Name']}","${r['Alarm Status']}","${r['Location Name']}"`).join("\n");
+    const link = document.createElement("a"); link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); link.download = "Log.csv"; link.click();
 }
-function playSound(type) { if(audioEnabled && synth) { synth.triggerAttackRelease(type === 'offline' ? "A2" : "C5", "4n"); } }
+function playSound(type) { if(audioEnabled && synth) synth.triggerAttackRelease(type === 'offline' ? "A2" : "C5", "4n"); }
 function toggleAudio() { audioEnabled = !audioEnabled; document.getElementById('btnAudio').innerText = audioEnabled ? "🔊 Sound On" : "🔇 Sound Off"; }
 function resetKey() { localStorage.removeItem('monitor_master_key'); location.reload(); }
 </script>
