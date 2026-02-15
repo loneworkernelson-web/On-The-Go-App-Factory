@@ -3007,9 +3007,9 @@ function handleAttachment(input, key) {
     reader.onerror = () => { if (label) label.innerText = "❌ Error"; };
     reader.readAsDataURL(file);
 }
-    
+
 // 4. BEST-IN-CLASS: High-DPI Signature Engine
-// Includes edge-case safety (touchcancel/mouseout) and coordinate precision.
+// Includes edge-case safety (touchcancel/mouseenter) and coordinate precision.
 
 function initSigPad(canvas) {
     if (!canvas) return;
@@ -3041,35 +3041,60 @@ function initSigPad(canvas) {
     
     const draw = (e) => {
         if (!isDrawing) return;
+
+        // SAFETY: Stop drawing if the user released the button while outside the pad
+        if (e.type === 'mousemove' && e.buttons === 0) {
+            isDrawing = false;
+            return;
+        }
+
         const pos = getPos(e);
         ctx.beginPath();
         ctx.moveTo(lastX, lastY);
         ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = '#000000';
+        ctx.strokeStyle = '#000000'; // Maintained detail: high-contrast ink
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.stroke();
+        
         lastX = pos.x;
         lastY = pos.y;
         if (e.cancelable) e.preventDefault();
     };
     
     const stopDrawing = () => { isDrawing = false; };
+
+    /**
+     * RE-ENTRY LOGIC: Intelligently restores the drawing state
+     * If the user re-enters while holding the button, we reset the 'last' coordinate
+     * to the entry point. This prevents a straight line being drawn from the exit point.
+     */
+    const handleReEntry = (e) => {
+        if (e.buttons === 1) { // Left mouse button still held
+            const pos = getPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+            isDrawing = true;
+        }
+    };
     
-    // EDGE-CASE SAFETY: Stops drawing if the user leaves the canvas area
+    // Mobile Touch Events: Maintained touchcancel for interruptions
     canvas.addEventListener('touchstart', startDrawing, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
-    canvas.addEventListener('touchcancel', stopDrawing); // Handles interruptions
+    canvas.addEventListener('touchcancel', stopDrawing);
     
+    // PC Mouse Events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('mouseout', stopDrawing); // Handles mouse leaving area
+    
+    // PATCHED: Removed 'mouseout' and replaced with re-entry handling
+    canvas.addEventListener('mouseenter', handleReEntry); 
 }
 
-// 5. RESIZE CANVAS    
+// 5. RESIZE CANVAS: Maintained Retina/High-DPI scaling logic
 function resizeCanvas(canvasEl) {
     const ratio = window.devicePixelRatio || 1;
     const rect = canvasEl.getBoundingClientRect();
@@ -3079,7 +3104,6 @@ function resizeCanvas(canvasEl) {
     const ctx = canvasEl.getContext('2d');
     ctx.scale(ratio, ratio);
 }
-
 
 // 6. CLEAR SIGNATURE - Clears signature canvas
 function clearSig(id) {
@@ -4698,6 +4722,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
