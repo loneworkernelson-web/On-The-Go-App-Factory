@@ -697,49 +697,51 @@ function checkOverdueVisits() {
     const now = new Date();
     const latest = {};
     
+    // Identify most recent entry per worker
     for(let i=1; i<data.length; i++) {
         const row = data[i];
         const name = row[2]; 
-        if(!latest[name]) latest[name] = { r: i+1, time: new Date(row[0]), rowData: row };
-        else if(new Date(row[0]) > latest[name].time) latest[name] = { r: i+1, time: new Date(row[0]), rowData: row };
+        if(!latest[name] || new Date(row[0]) > latest[name].time) {
+            latest[name] = { r: i+1, time: new Date(row[0]), rowData: row };
+        }
     }
     
     Object.keys(latest).forEach(worker => {
         try {
             const entry = latest[worker].rowData;
-            const status = entry[10]; 
+            const status = String(entry[10]); 
             const dueTimeStr = entry[20]; 
-            const isClosed = status.includes("DEPARTED") || status.includes("SAFE") || status.includes("COMPLETED");
+            // PATCHED: Removed SAFE to allow departures to update the row
+            const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY");
             
             if(!isClosed && dueTimeStr) {
                 const due = new Date(dueTimeStr);
                 const diffMins = (now - due) / 60000; 
+                // MATCHED TO EXISTING: [CRITICAL_TIMING] tag
                 const isCritical = (entry[11] && entry[11].includes("[CRITICAL_TIMING]"));
-                
-                if (diffMins > 5 && diffMins < CONFIG.ESCALATION_MINUTES && !status.includes('WARNING') && !status.includes('EMERGENCY') && !isCritical) {
-                    const newStatus = "OVERDUE - WARNING SENT";
-                    const newRow = [...entry];
-                    newRow[0] = new Date().toISOString(); 
-                    newRow[10] = newStatus; 
-                    newRow[11] = entry[11] + " [AUTO-WARNING]";
-                    sheet.appendRow(newRow);
-                    triggerAlerts({ 'Worker Name': worker, 'Alarm Status': "WARNING - 5 Mins Overdue", 'Location Name': entry[12], 'Notes': "Worker is 5 minutes overdue. Please extend or check-in.", 'Last Known GPS': entry[14], 'Battery Level': entry[16], 'Emergency Contact Email': entry[6], 'Emergency Contact Number': entry[5] }, "WARNING");
+
+                // 1. STAGE 1: 15 Minutes (OR 0 Minutes if Critical Timing is active)
+                const firstAlertThreshold = isCritical ? 0 : 15;
+                if (diffMins >= firstAlertThreshold && diffMins < 30 && !status.includes('15MIN')) {
+                    triggerEscalation(sheet, entry, "OVERDUE - 15MIN ALERT", false);
                 }
                 
-                const threshold = isCritical ? 0 : CONFIG.ESCALATION_MINUTES;
-                if (diffMins > threshold && !status.includes("EMERGENCY")) {
-                    const newStatus = isCritical ? "EMERGENCY - CRITICAL TIMING OVERDUE" : "EMERGENCY - OVERDUE";
-                    const newRow = [...entry];
-                    newRow[0] = new Date().toISOString(); 
-                    newRow[10] = newStatus; 
-                    newRow[11] = entry[11] + " [AUTO-ESCALATION]";
-                    sheet.appendRow(newRow);
-                    triggerAlerts({ 'Worker Name': worker, 'Alarm Status': newStatus, 'Location Name': entry[12], 'Notes': "Worker is overdue and has breached escalation threshold.", 'Last Known GPS': entry[14], 'Battery Level': entry[16], 'Emergency Contact Email': entry[6], 'Escalation Contact Email': entry[9], 'Emergency Contact Number': entry[5], 'Escalation Contact Number': entry[8] }, "OVERDUE");
+                // 2. STAGE 2: 30 Minutes
+                else if (diffMins >= 30 && diffMins < 45 && !status.includes('30MIN')) {
+                    triggerEscalation(sheet, entry, "OVERDUE - 30MIN ALERT", false);
+                }
+
+                // 3. STAGE 3: 45 Minutes
+                else if (diffMins >= 45 && diffMins < 60 && !status.includes('45MIN')) {
+                    triggerEscalation(sheet, entry, "OVERDUE - 45MIN ALERT", false);
+                }
+
+                // 4. FINAL STAGE: 60 Minutes (Escalation to BOTH contacts)
+                else if (diffMins >= 60 && !status.includes("EMERGENCY")) {
+                    triggerEscalation(sheet, entry, "EMERGENCY - 60MIN BREACH", true);
                 }
             }
-        } catch (err) {
-            console.error(`Error checking overdue for ${worker}: ${err.toString()}`);
-        }
+        } catch (err) { console.error(`Escalation Error: ${err.toString()}`); }
     });
 }
 
@@ -1124,6 +1126,32 @@ function handleNoticeAck(p) {
     // Record in the Visits tab for audit history
     handleWorkerPost(p); 
     return { status: "success" };
+}
+
+/**
+ * HELPER: Unified Escalation Handler
+ * Logic: Appends row and routes to Primary (isDual=false) or Both (isDual=true).
+ */
+function triggerEscalation(sheet, entry, newStatus, isDual) {
+    const newRow = [...entry];
+    newRow[0] = new Date().toISOString(); 
+    newRow[10] = newStatus; 
+    newRow[11] = entry[11] + ` [AUTO-${newStatus}]`;
+    sheet.appendRow(newRow);
+
+    const payload = {
+        'Worker Name': entry[2],
+        'Alarm Status': newStatus,
+        'Location Name': entry[12],
+        'Notes': `Alert: Worker is ${newStatus}.`,
+        'Last Known GPS': entry[14],
+        'Battery Level': entry[16],
+        'Emergency Contact Email': entry[6],
+        'Emergency Contact Number': entry[5], // Map frontend 'Phone' to backend 'Number'
+        'Escalation Contact Email': isDual ? entry[9] : "",
+        'Escalation Contact Number': isDual ? entry[8] : ""
+    };
+    triggerAlerts(payload, isDual ? "CRITICAL ESCALATION" : "OVERDUE WARNING");
 }
 
 
