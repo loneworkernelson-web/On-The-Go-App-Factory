@@ -164,19 +164,27 @@ async function unlockMonitor(e) {
     if (!activeKey) return;
 
     try {
-        if(typeof Tone !== 'undefined') { await Tone.start(); synth = new Tone.Synth().toDestination(); }
+        // REQUIRED: Unlock audio context via user gesture
+        if(typeof Tone !== 'undefined') {
+            await Tone.start();
+            synth = new Tone.Synth().toDestination();
+        }
+        
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
         const data = await resp.json();
         
         if (data.status === "success") {
             API_KEY = activeKey;
-            localStorage.setItem('monitor_master_key', activeKey);
+            // FIXED: Wrap localStorage in a try/catch to prevent the app from breaking if blocked
+            try {
+                localStorage.setItem('monitor_master_key', activeKey);
+            } catch (storageErr) {
+                console.warn("Storage blocked. You will need to re-enter the key on refresh.");
+            }
             document.getElementById('audioGate').classList.add('hidden');
             startPolling();
         } else { throw new Error(); }
     } catch (err) {
-        localStorage.removeItem('monitor_master_key');
-        API_KEY = null;
         document.getElementById('loginError')?.classList.remove('hidden');
     }
 }
