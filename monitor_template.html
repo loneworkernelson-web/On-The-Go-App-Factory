@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>%%ORG_NAME%% Monitor</title>
     <link rel="icon" href="%%LOGO_URL%%">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    
     <style>
         :root {
-            /* 1. FACTORY DYNAMIC THEME */
+            /* FACTORY THEME INTEGRATION */
             --brand-primary: %%PRIMARY_COLOR%%;
             --brand-accent: %%ACCENT_COLOR%%;
         }
@@ -20,18 +22,21 @@
         .main-layout { display: flex; flex: 1; overflow: hidden; }
         .grid-area { flex: 1; overflow-y: auto; padding: 1.5rem; position: relative; }
         .log-area { flex: 0 0 320px; background-color: #1e293b; border-left: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
+        
         .card { background-color: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; transition: all 0.2s; position: relative; overflow: hidden; }
         .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+        
         .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; }
         .blink { animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
         
-        /* Dynamic Urgency Classes */
+        /* Urgency Indicators */
         .st-ok { background-color: #10b981; box-shadow: 0 0 10px #10b981; } 
         .st-amber { background-color: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: blinker 2s linear infinite; } 
         .st-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; animation: blinker 0.5s linear infinite; } 
         .st-purple { background-color: #d946ef; box-shadow: 0 0 15px #d946ef; animation: blinker 0.3s linear infinite; }
         .st-grey { background-color: #64748b; } 
+        
         .bd-green { border-color: #059669; border-width: 2px; }
         .bd-amber { border-color: #d97706; border-width: 2px; }
         .bd-red { border-color: #dc2626; border-width: 4px; }
@@ -39,25 +44,23 @@
         .bd-grey { border-color: #475569; opacity: 0.7; }
         
         .btn-brand { background-color: var(--brand-primary); }
-        .btn-brand:hover { filter: brightness(1.2); }
         .border-brand { border-color: var(--brand-primary); }
         .text-brand { color: var(--brand-accent); }
         
-        /* Map and Alert Styles */
         #fullScreenAlert { z-index: 500; }
         .alert-red { animation: pulseRed 1s infinite; }
         .alert-purple { animation: pulsePurple 1s infinite; }
         @keyframes pulseRed { 0% { background-color: rgba(220, 38, 38, 0.9); } 50% { background-color: rgba(153, 27, 27, 0.95); } 100% { background-color: rgba(220, 38, 38, 0.9); } }
         @keyframes pulsePurple { 0% { background-color: rgba(147, 51, 234, 0.9); } 50% { background-color: rgba(107, 33, 168, 0.95); } 100% { background-color: rgba(147, 51, 234, 0.9); } }
+        
         #mapView { background: #020617; z-index: 1; width: 100%; height: 100%; }
         .custom-div-icon { background: transparent; border: none; } 
         .map-icon { width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.5); display: block; }
         .map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
         .map-icon.purple { background: #d946ef; animation: blinker 0.3s linear infinite; box-shadow: 0 0 25px #d946ef; }
         .map-icon.green { background: #10b981; }
-        .map-icon.amber { background: #f59e0b; }
         .map-icon.grey { background: #64748b; }
-
+        
         #audioGate { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; p-4; }
     </style>
 </head>
@@ -71,18 +74,14 @@
         
         <form onsubmit="unlockMonitor(event)" class="space-y-4">
             <input type="password" id="masterKeyInput" 
+                   autocomplete="current-password"
                    class="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 text-center text-xl font-mono tracking-[0.4em] text-blue-400 focus:border-blue-500 outline-none transition-all"
                    placeholder="••••••••" required>
             <button type="submit" class="w-full btn-brand text-white font-black py-5 rounded-2xl shadow-2xl text-xl transition transform active:scale-95 uppercase tracking-widest">
                 Unlock Dashboard
             </button>
         </form>
-        <p id="loginError" class="text-red-500 text-xs font-bold mt-4 uppercase hidden">Invalid Security Key</p>
-        
-        <div class="mt-8 text-left border-t border-gray-700 pt-6">
-            <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">🔧 Sound Reliability</p>
-            <p class="text-[10px] text-gray-500 leading-relaxed italic">To ensure alarms sound in the background, set browser sound permissions to 'Allow' for this URL.</p>
-        </div>
+        <p id="loginError" class="text-red-500 text-xs font-bold mt-4 uppercase hidden">Access Denied: Invalid Key</p>
     </div>
 </div>
 
@@ -90,14 +89,14 @@
     <div class="bg-gray-800 border-2 border-red-600 p-8 rounded-xl shadow-2xl text-center max-w-sm">
         <div class="text-5xl mb-6 animate-pulse">📡</div>
         <h2 class="text-3xl font-bold text-white mb-2">Connection Lost</h2>
-        <p class="text-red-400 font-mono text-sm mb-4">SYSTEM OFFLINE</p>
+        <p class="text-red-400 font-mono text-sm mb-4 uppercase">System Offline</p>
     </div>
 </div>
 
 <div id="fullScreenAlert" class="hidden fixed inset-0 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm">
     <div class="text-9xl mb-4" id="alertIcon">🚨</div>
     <h1 class="text-6xl font-black text-white mb-4 drop-shadow-md" id="alertTitle">EMERGENCY ALERT</h1>
-    <h2 id="alertNames" class="text-4xl font-bold text-white bg-black/30 px-6 py-2 rounded mb-8">Worker Name</h2>
+    <h2 id="alertNames" class="text-4xl font-bold text-white bg-black/30 px-6 py-2 rounded mb-8">Worker</h2>
     <button onclick="acknowledgeAlert()" class="bg-white text-gray-900 font-black text-2xl py-6 px-12 rounded-full shadow-2xl hover:scale-105 transition border-4 border-gray-900">ACKNOWLEDGE ALARM</button>
 </div>
 
@@ -106,19 +105,19 @@
         <h2 class="text-2xl font-bold text-white mb-2">Resolve Emergency</h2>
         <p class="text-gray-400 text-sm mb-4">Manual clear for: <span id="resWorkerNameDisplay" class="font-bold text-white"></span></p>
         <div class="space-y-4">
-            <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">1. Confirm Worker Name</label><input type="text" id="resNameInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white"></div>
-            <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">2. Resolution Note</label><textarea id="resNoteInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white h-24"></textarea></div>
+            <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">1. Confirm Name</label><input type="text" id="resNameInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white"></div>
+            <div><label class="block text-xs uppercase font-bold text-gray-500 mb-1">2. Resolution Log</label><textarea id="resNoteInput" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white h-24"></textarea></div>
         </div>
         <div class="flex gap-3 mt-6"><button onclick="closeResolve()" class="flex-1 bg-gray-700 text-white font-bold py-3 rounded">Cancel</button><button onclick="submitResolution()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-lg">✅ MARK SAFE</button></div>
     </div>
 </div>
 
 <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
-    <div class="flex justify-between items-center">
+    <div class="flex justify-between items-center mb-2">
         <div class="flex items-center gap-4">
-            <img id="orgLogo" src="%%LOGO_DATA%%" class="w-10 h-10 rounded bg-white object-contain p-1">
+            <img id="orgLogo" src="%%LOGO_URL%%" class="w-10 h-10 rounded bg-white object-contain p-1">
             <div>
-                <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor Dashboard</span></h1>
+                <h1 class="text-xl font-bold tracking-tight text-white">%%ORG_NAME%% <span class="text-gray-500 font-normal text-sm ml-2">Monitor</span></h1>
                 <div class="flex items-center gap-2 text-xs text-gray-400">
                     <span id="serverStatus" class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500"></span> Connecting...</span>
                     <span>• Updated: <span id="lastUpdate" class="text-gray-300 font-mono">--:--:--</span></span>
@@ -129,7 +128,7 @@
             <button onclick="resetKey()" class="text-xs text-gray-600 hover:text-gray-400 underline">🔑 Sign Out</button>
             <button onclick="exportSystemLog()" class="text-xs text-blue-400 hover:text-blue-300 underline">📊 Export Log</button>
             <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500">🔊 Sound On</button>
-            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold btn-brand text-white shadow">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400">📋 All</button></div>
+            <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold btn-brand text-white shadow">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400">📋 All</button></div>
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600"><button onclick="toggleView('GRID')" id="btnGrid" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 text-white shadow">⊞ Grid</button><button onclick="toggleView('MAP')" id="btnMap" class="px-3 py-1 rounded text-xs font-bold text-gray-400">🗺️ Map</button></div>
             <input type="text" id="searchBox" placeholder="Filter..." class="bg-gray-800 text-white text-sm border border-gray-600 rounded-lg pl-3 pr-2 py-2 w-32" onkeyup="renderGrid()">
         </div>
@@ -150,15 +149,14 @@
 </div>
 
 <script>
+// FIXED: Using %%SHEET_URL%% to resolve connection
 const SCRIPT_URL = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
 let API_KEY = localStorage.getItem('monitor_master_key'); 
-let workerData = []; let allRows = []; let escalationLimit = 15; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null; let lastHeartbeat = Date.now(); 
+let workerData = []; let allRows = []; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null; let lastHeartbeat = Date.now(); 
 
-// 6. INITIALIZATION & SECURITY Handshake
-window.onload = () => {
-    if (API_KEY) unlockMonitor();
-};
+// 6. INITIALIZATION & PERSISTENT LOGIN HANDSHAKE
+window.onload = () => { if (API_KEY) unlockMonitor(); };
 
 async function unlockMonitor(e) {
     if (e) e.preventDefault();
@@ -166,16 +164,18 @@ async function unlockMonitor(e) {
     if (!activeKey) return;
 
     try {
+        // REQUIRED: User gesture to enable audio context
+        if(typeof Tone !== 'undefined') {
+            await Tone.start();
+            synth = new Tone.Synth().toDestination();
+        }
+        
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
         const data = await resp.json();
         
         if (data.status === "success") {
             API_KEY = activeKey;
             localStorage.setItem('monitor_master_key', activeKey);
-            if(typeof Tone !== 'undefined') {
-                await Tone.start();
-                synth = new Tone.Synth().toDestination();
-            }
             document.getElementById('audioGate').classList.add('hidden');
             startPolling();
         } else { throw new Error(); }
@@ -191,14 +191,14 @@ function startPolling() {
     setInterval(fetchData, 10000); 
     setInterval(renderGrid, 1000);
     
-    // Audio Keep-Alive for Background Operation
+    // Audio Keep-Alive for Browser Persistence
     setInterval(() => {
         if (audioEnabled && synth) {
             try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e) {}
         }
     }, 25000);
 
-    // Watchdog for Connection Resilience
+    // Watchdog for Offline Alerts
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
         if (Date.now() - lastHeartbeat > 60000) {
@@ -208,52 +208,14 @@ function startPolling() {
     }, 10000); 
 }
 
-function resetKey() { if(confirm("Sign out of the dashboard?")) { localStorage.removeItem('monitor_master_key'); location.reload(); } }
-
-async function toggleAudio() { 
-    if (Tone.context.state !== 'running') await Tone.context.resume();
-    audioEnabled = !audioEnabled; 
-    const btn = document.getElementById('btnAudio'); 
-    if(audioEnabled) { 
-        btn.innerText = "🔊 Sound On"; 
-        btn.className = "px-3 py-1 rounded text-sm font-bold bg-green-600 text-white border border-green-500"; 
-        synth.triggerAttackRelease("C5", "8n"); 
-    } else { 
-        btn.innerText = "🔇 Sound Off"; 
-        btn.className = "px-3 py-1 rounded text-sm font-bold bg-gray-700 text-gray-400 border border-gray-600"; 
-    } 
-}
-
-function startAlertLoop() { 
-    if(alertLoopInterval) return; 
-    alertLoopInterval = setInterval(() => { 
-        if(audioEnabled && synth) { 
-            const now = Tone.now(); 
-            synth.triggerAttackRelease("A5", "0.2", now); 
-            synth.triggerAttackRelease("E6", "0.2", now + 0.3); 
-        } 
-        document.title = (document.title.includes("🚨")) ? "!! EMERGENCY !!" : "🚨 ALERT";
-    }, 1000); 
-}
-
-function stopAlertLoop() { if(alertLoopInterval) { clearInterval(alertLoopInterval); alertLoopInterval = null; } }
-
-function acknowledgeAlert() { 
-    workerData.forEach(w => { if(w.status.includes("EMERGENCY") || w.status.includes("PANIC") || w.status.includes("DURESS")) { acknowledgedAlerts.add(w.name); } }); 
-    document.getElementById('fullScreenAlert').classList.add('hidden'); 
-    stopAlertLoop(); renderGrid(); 
-}
-
 async function fetchData() { 
     if(!API_KEY) return;
     try {
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
         const data = await resp.json();
         lastHeartbeat = Date.now();
-        if(data.error) { if(data.error.includes("Key")) resetKey(); return; } 
-        if(data.escalation_limit) escalationLimit = parseInt(data.escalation_limit); 
-        handleData(data); 
-    } catch (e) { console.error("Fetch Error:", e); }
+        if(data.workers) handleData(data); 
+    } catch (e) { console.error("Sync Failure"); }
 }
 
 function handleData(response) { 
@@ -261,7 +223,7 @@ function handleData(response) {
         allRows = response.workers; 
         workerData = processWorkers(response.workers); 
         document.getElementById('serverStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> Online';
-        document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:true}); 
+        document.getElementById('lastUpdate').innerText = new Date().toLocaleTimeString(); 
         
         const unackedDuress = workerData.filter(w => w.status.includes("DURESS") && !acknowledgedAlerts.has(w.name)); 
         const unackedAlert = workerData.filter(w => (w.status.includes("EMERGENCY") || w.status.includes("PANIC")) && !acknowledgedAlerts.has(w.name)); 
@@ -330,26 +292,21 @@ function renderGrid() {
         
         if(currentView === 'MAP') return; 
 
-        let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status, timeClass = 'text-gray-500'; 
+        let borderClass = 'bd-grey', dotClass = 'st-grey', statusText = w.status; 
         let resolveBtn = ''; 
         let locLabel = w.status.includes("TRAVELLING") && w.travelTarget ? "Destination" : "Location";
         let locValue = locLabel === "Destination" ? w.travelTarget : w.location;
 
-        if (isDuress) { 
-            borderClass = 'bd-purple'; dotClass = 'st-purple'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-purple-700 text-white font-bold py-2 rounded text-xs">✅ RESOLVE DURESS</button>`; 
-        } else if (isAlert) { 
-            borderClass = 'bd-red'; dotClass = 'st-red'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-700 text-white font-bold py-2 rounded text-xs">✅ RESOLVE ALERT</button>`; 
-        } else if (!isSafe) { 
+        if (isDuress) { borderClass = 'bd-purple'; dotClass = 'st-purple'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-purple-700 text-white font-bold py-2 rounded text-xs">RESOLVE DURESS</button>`; } 
+        else if (isAlert) { borderClass = 'bd-red'; dotClass = 'st-red'; resolveBtn = `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-700 text-white font-bold py-2 rounded text-xs">RESOLVE ALERT</button>`; } 
+        else if (!isSafe) { 
             const due = new Date(w.dueTime).getTime(); 
             if (due > now || isNaN(due)) { borderClass = 'bd-green'; dotClass = 'st-ok'; } 
-            else { 
-                borderClass = 'bd-amber'; dotClass = 'st-amber'; timeClass = 'text-amber-500 font-bold'; 
-                if(Math.floor((now - due)/60000) >= escalationLimit) { borderClass = 'bd-red'; dotClass = 'st-red'; } 
-            } 
+            else { borderClass = 'bd-amber'; dotClass = 'st-amber'; } 
         } 
         
         const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
-        card.innerHTML = `<div class="flex justify-between items-start mb-2"><h3 onclick="focusWorker('${w.gps}')" class="font-bold text-lg text-white truncate cursor-pointer hover:text-brand transition">${escapeHtml(w.name)}</h3><div class="${dotClass} status-dot mt-1.5 shrink-0 ml-2"></div></div><div class="space-y-1.5 text-xs text-gray-300"><div class="flex justify-between"><span>Status</span><span class="font-bold">${escapeHtml(statusText)}</span></div><div class="flex justify-between"><span>${locLabel}</span><span class="truncate w-24 text-right">${escapeHtml(locValue)}</span></div><div class="flex justify-between"><span>Due</span><span class="${timeClass}">${formatTime(w.dueTime)}</span></div></div><div class="mt-3 grid grid-cols-2 gap-2"><button onclick="focusWorker('${w.gps}')" class="text-brand bg-brand/20 py-2 rounded text-xs font-bold">📍 Map</button><a href="tel:${w.phone}" class="bg-gray-700 text-white text-center py-2 rounded text-xs font-bold">📞 Call</a></div>${resolveBtn}`; grid.appendChild(card); 
+        card.innerHTML = `<div class=\"flex justify-between items-start mb-2\"><h3 onclick=\"focusWorker('${w.gps}')\" class=\"font-bold text-lg text-white truncate cursor-pointer hover:text-brand\">${escapeHtml(w.name)}</h3><div class=\"${dotClass} status-dot\"></div></div><div class=\"space-y-1.5 text-xs text-gray-300\"><div class=\"flex justify-between\"><span>Status</span><span class=\"font-bold\">${escapeHtml(statusText)}</span></div><div class=\"flex justify-between\"><span>${locLabel}</span><span class=\"truncate w-24 text-right\">${escapeHtml(locValue)}</span></div><div class=\"flex justify-between text-gray-500\"><span>Battery</span><span>${escapeHtml(w.battery||'--')}%</span></div></div><div class=\"mt-3 grid grid-cols-2 gap-2\"><button onclick=\"focusWorker('${w.gps}')\" class=\"text-brand bg-brand/20 py-2 rounded text-xs font-bold\">📍 Map</button><a href=\"tel:${w.phone}\" class=\"bg-gray-700 text-white text-center py-2 rounded text-xs font-bold\">📞 Call</a></div>${resolveBtn}`; grid.appendChild(card); 
     }); 
     document.getElementById('activeCount').innerText = activeC; document.getElementById('alertCount').innerText = alertC; 
 }
@@ -370,6 +327,13 @@ function renderMap() {
         const [lat, lng] = w.gps.replace(/[^0-9.,-]/g, '').split(',').map(Number);
         if(isNaN(lat)) return;
         const color = w.status.includes('EMERGENCY') ? 'red' : 'green';
+        
+        // Render historical breadcrumbs
+        if(w.history?.length > 1) {
+            const path = w.history.map(h => h.split(',').map(Number));
+            L.polyline(path, {color: 'var(--brand-accent)', weight: 3, opacity: 0.5}).addTo(markersLayer);
+        }
+
         const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="map-icon ${color}"></div>`, iconSize: [24, 24] }); 
         L.marker([lat, lng], {icon}).bindPopup(`<b>${escapeHtml(w.name)}</b>`).addTo(markersLayer); 
         bounds.extend([lat, lng]); hasMarkers = true; 
@@ -379,10 +343,7 @@ function renderMap() {
 
 function focusWorker(gps) { if(!gps) return; document.getElementById('btnMap').click(); setTimeout(() => { const [lat, lng] = gps.split(',').map(Number); mapInstance.flyTo([lat, lng], 17); }, 200); }
 function toggleView(view) { currentView = view; document.getElementById('workerGrid').classList.toggle('hidden', view === 'MAP'); document.getElementById('mapView').classList.toggle('hidden', view === 'GRID'); if(view === 'MAP') { initMap(); renderMap(); } }
-function renderLog() { 
-    const list = document.getElementById('eventLogList'); 
-    list.innerHTML = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0, 100).map(r => `<div class="text-[10px] mb-1"><span class="text-gray-500">${new Date(r['Timestamp']).toLocaleTimeString()}</span> <span class="text-white">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`).join('');
-}
+function renderLog() { document.getElementById('eventLogList').innerHTML = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0, 100).map(r => `<div class=\"text-[10px] mb-1\"><span class=\"text-gray-500\">${new Date(r['Timestamp']).toLocaleTimeString()}</span> <span class=\"text-white italic\">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`).join(''); }
 function getUrgencyScore(w, now) { if (w.status.includes('DURESS')) return 2000; if (w.status.includes('EMERGENCY')) return 1000; return 0; }
 function setFilter(f) { currentFilter = f; renderGrid(); }
 function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; }
@@ -399,8 +360,9 @@ function exportSystemLog() {
     const csv = "Timestamp,Worker,Status,Location\n" + allRows.map(r => `"${r['Timestamp']}","${r['Worker Name']}","${r['Alarm Status']}","${r['Location Name']}"`).join("\n");
     const link = document.createElement("a"); link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); link.download = "Safety_Log.csv"; link.click();
 }
-function formatTime(t) { const d = new Date(t); return isNaN(d) ? "--:--" : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
 function playSound(type) { if(audioEnabled && synth) { synth.triggerAttackRelease(type === 'offline' ? "A2" : "C5", "4n"); } }
+function toggleAudio() { audioEnabled = !audioEnabled; document.getElementById('btnAudio').innerText = audioEnabled ? "🔊 Sound On" : "🔇 Sound Off"; }
+function resetKey() { localStorage.removeItem('monitor_master_key'); location.reload(); }
 </script>
 </body>
 </html>
