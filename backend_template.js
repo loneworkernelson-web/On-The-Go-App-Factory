@@ -1209,7 +1209,10 @@ function handleSafetyResolution(p) {
     
     // 4. Dual-Contact SMS
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
+        const numbers = [
+    p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
+    p['Escalation Contact Number'] || p['Escalation Contact Phone']
+].map(n => _cleanPhone(n)).filter(n => n);
         numbers.forEach(num => { 
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
@@ -1221,5 +1224,6 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
