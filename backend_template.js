@@ -87,6 +87,9 @@ function doPost(e) {
               updateSiteEmergencyProcedures(p);
               handleWorkerPost(p);
           }
+          else if (p.action === 'notifySafety') {
+            return sendJSON(handleSafetyResolution(p));
+          }
           else {
               handleWorkerPost(p);
           }
@@ -654,41 +657,50 @@ function _cleanPhone(num) {
     return n.startsWith('+') ? n : "+" + n;
 }
 
+/**
+ * PATCHED: High-Urgency Alert Router
+ */
 function triggerAlerts(p, type) {
-    const subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
+    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
     
-    // FIXED: Corrected template literal for emergency alerts
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS";
-    
-    const body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+    // DEFAULT CONTENT
+    let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
+    let body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+
+    // SPECIAL CASE: CRITICAL TIMING MODE
+    if (p['Alarm Status'].includes("CRITICAL TIMING")) {
+        subject = `🚨 URGENT: CRITICAL SAFETY BREACH - ${p['Worker Name']}`;
+        body = `⚠️ URGENT SAFETY ALERT (CRITICAL TIMING MODE)\n\n` +
+               `The worker, ${p['Worker Name']}, is now OVERDUE from a visit they self-identified as high-risk.\n\n` +
+               `In this mode, 15 minutes is considered mission-critical. Please attempt to make contact with the worker IMMEDIATELY.\n\n` +
+               `Location: ${p['Location Name']}\n` +
+               `Last Known GPS: ${gpsLink}\n` +
+               `Device Battery: ${p['Battery Level']}`;
+    }
     
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
     if(emails.length > 0) { 
         MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
     }
     
+    // SMS ROUTING: Sent immediately to all active contacts
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
-        
         numbers.forEach(num => { 
             try {
-                // FIX: Updated to standard form-encoded payload for Textbelt reliability
-                const payload = {
-                    'phone': num,
-                    'message': `${subject}\nGPS: ${gpsLink}`,
-                    'key': CONFIG.TEXTBELT_API_KEY
-                };
-                
                 UrlFetchApp.fetch('https://textbelt.com/text', {
                     'method': 'post',
-                    'payload': payload
+                    'payload': { 'phone': num, 'message': `${subject}\nGPS: ${gpsLink}`, 'key': CONFIG.TEXTBELT_API_KEY }
                 }); 
-            } catch(e) { 
-                console.error("SMS Delivery Failed: " + e.toString()); 
-            }
+            } catch(e) { console.error("SMS Failed: " + e.toString()); }
         });
     }
 }
+
+/**
+ * RE-ENGINEERED: Multi-Stage Escalation Engine
+ * Intervals: 15, 30, 45 (Primary) | 60 (Dual) | [CRITICAL_TIMING] (Immediate Dual)
+ */
 function checkOverdueVisits() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
@@ -697,7 +709,6 @@ function checkOverdueVisits() {
     const now = new Date();
     const latest = {};
     
-    // Identify most recent entry per worker
     for(let i=1; i<data.length; i++) {
         const row = data[i];
         const name = row[2]; 
@@ -711,32 +722,35 @@ function checkOverdueVisits() {
             const entry = latest[worker].rowData;
             const status = String(entry[10]); 
             const dueTimeStr = entry[20]; 
-            // PATCHED: Removed SAFE to allow departures to update the row
             const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY");
             
             if(!isClosed && dueTimeStr) {
                 const due = new Date(dueTimeStr);
                 const diffMins = (now - due) / 60000; 
-                // MATCHED TO EXISTING: [CRITICAL_TIMING] tag
                 const isCritical = (entry[11] && entry[11].includes("[CRITICAL_TIMING]"));
 
-                // 1. STAGE 1: 15 Minutes (OR 0 Minutes if Critical Timing is active)
-                const firstAlertThreshold = isCritical ? 0 : 15;
-                if (diffMins >= firstAlertThreshold && diffMins < 30 && !status.includes('15MIN')) {
+                // NEW 1: CRITICAL TIMING MODE - Immediate Dual Escalation
+                if (isCritical && diffMins >= 0 && !status.includes("EMERGENCY")) {
+                    triggerEscalation(sheet, entry, "EMERGENCY - CRITICAL TIMING BREACH", true);
+                    return; 
+                }
+
+                // 2. STANDARD STAGE 1: 15 Minutes
+                if (!isCritical && diffMins >= 15 && diffMins < 30 && !status.includes('15MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 15MIN ALERT", false);
                 }
                 
-                // 2. STAGE 2: 30 Minutes
+                // 3. STANDARD STAGE 2: 30 Minutes
                 else if (diffMins >= 30 && diffMins < 45 && !status.includes('30MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 30MIN ALERT", false);
                 }
 
-                // 3. STAGE 3: 45 Minutes
+                // 4. STANDARD STAGE 3: 45 Minutes
                 else if (diffMins >= 45 && diffMins < 60 && !status.includes('45MIN')) {
                     triggerEscalation(sheet, entry, "OVERDUE - 45MIN ALERT", false);
                 }
 
-                // 4. FINAL STAGE: 60 Minutes (Escalation to BOTH contacts)
+                // 5. FINAL STAGE: 60 Minutes
                 else if (diffMins >= 60 && !status.includes("EMERGENCY")) {
                     triggerEscalation(sheet, entry, "EMERGENCY - 60MIN BREACH", true);
                 }
@@ -1154,5 +1168,39 @@ function triggerEscalation(sheet, entry, newStatus, isDual) {
     triggerAlerts(payload, isDual ? "CRITICAL ESCALATION" : "OVERDUE WARNING");
 }
 
+/**
+ * NEW: handleSafetyResolution
+ * Logic: Notifies both contacts that the emergency has ended.
+ */
+function handleSafetyResolution(p) {
+    // 1. Update the Visit Record for the audit trail
+    handleWorkerPost(p); 
 
+    // 2. Draft the Resolution Messages
+    const subject = `✅ ALL CLEAR: ${p['Worker Name']} is Safe`;
+    const body = `SAFETY RESOLUTION\n\n` +
+                 `The worker, ${p['Worker Name']}, has checked in and confirmed they are SAFE.\n\n` +
+                 `The previous safety alert is now resolved. No further action is required.\n\n` +
+                 `Timestamp: ${new Date().toLocaleString()}\n` +
+                 `Location: ${p['Location Name']}`;
 
+    // 3. Dual-Contact Email
+    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
+    if(emails.length > 0) { 
+        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
+    }
+    
+    // 4. Dual-Contact SMS
+    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
+        const numbers = [p['Emergency Contact Number'], p['Escalation Contact Number']].map(n => _cleanPhone(n)).filter(n => n);
+        numbers.forEach(num => { 
+            try {
+                UrlFetchApp.fetch('https://textbelt.com/text', {
+                    'method': 'post',
+                    'payload': { 'phone': num, 'message': `${subject}. Alert resolved.`, 'key': CONFIG.TEXTBELT_API_KEY }
+                }); 
+            } catch(e) {}
+        });
+    }
+    return { status: "success" };
+}
