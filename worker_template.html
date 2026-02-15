@@ -1898,31 +1898,43 @@ async function triggerPanic(duress = false) {
     renderPanicState(); 
 }
 
-// PHASE 1: I AM SAFE function (after alarm triggered)
+/**
+ * RE-ENGINEERED: iamSafe with Automated Contact Notification
+ * Logic: Clears UI alarm state and notifies backend to send "All Clear" alerts.
+ */
 function iamSafe() {
     if (!state || !state.activeVisit) return;
     
-    // Require PIN to declare safe
+    // 1. PIN VERIFICATION: Required to prevent accidental or forced clearance
     withPinVerification(false, () => {
-        announce("Safety confirmed. Resetting alarm.");
+        // Voice feedback for the worker
+        announce("Safety confirmed. Notifying contacts.");
+
+        // 2. NEW: TRIGGER BACKEND RESOLUTION
+        // Sends 'action: notifySafety' to trigger Email & SMS alerts to contacts
+        const payload = buildPayload({
+            'action': 'notifySafety',
+            'Alarm Status': 'USER_SAFE_CONFIRMED',
+            'Notes': 'Worker has manually entered PIN to confirm they are safe.'
+        });
+        processUploadQueue(payload);
+
+        // 3. AUDIT TRAIL: Standard log entry for the spreadsheet
         logSafety("USER_SAFE", "Worker entered PIN to cancel alarm state.");
-        // Add this inside your iamSafe PIN verification success block
+        
+        // 4. STATE MANAGEMENT: Reset safety flags
         state.activeVisit.isSafeConfirmed = true; 
+        state.activeVisit.isPanic = false;
+        state.activeVisit.criticalSent = false;
         saveState();
         
-        // Reset panic UI
+        // 5. UI VISUAL RESET: Remove high-urgency styling
         const lockedPage = document.getElementById('lockedPage');
         if (lockedPage) lockedPage.classList.remove('panic-mode');
         document.body.classList.remove('bg-red-900');
-
-        // Update iamSafe success block to remove strobe
         document.body.classList.remove('strobe-active');
         
-        // Clear alarm state
-        state.activeVisit.isPanic = false;
-        state.activeVisit.criticalSent = false;
-        
-        // Hide "I AM SAFE" button, show normal buttons
+        // 6. BUTTON INTERFACE RESET: Restore standard visit controls
         const btnSafe = document.getElementById('btnSafe');
         const btnDepart = document.getElementById('btnDepart');
         const btnExtend = document.getElementById('btnExtend');
@@ -1930,11 +1942,9 @@ function iamSafe() {
         if (btnDepart) btnDepart.classList.remove('hidden');
         if (btnExtend) btnExtend.classList.remove('hidden');
         
-        saveState();
         showToast("✅ Safety status confirmed");
     });
 }
-
 // ============================================================================
 // SAFETY HEARTBEAT (tick) - PATCHED
 // ============================================================================
@@ -4688,6 +4698,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
