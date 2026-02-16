@@ -260,24 +260,26 @@ async function fetchData() {
         
         const data = await resp.json();
 
-        // SESSION SECURITY: Auto-lock if the key is revoked
         if (data.status === "error" && data.message.includes("Key")) {
-            console.error("Critical: Security Key Invalidated");
             return stopPollingAndLock(); 
         }
 
         if (data.status === "success" || data.workers) {
             lastHeartbeat = Date.now();
             failureCount = 0; 
-            
             if (statusLabel) {
                 statusLabel.innerText = "● LIVE";
                 statusLabel.className = "text-green-500 font-black text-[10px]";
             }
-
-            if(data.workers) handleData(data); // Integration with existing UI handler
+            if(data.workers) handleData(data);
         }
     } catch (e) {
+        // FIXED: Gracefully handle communication interruptions
+        if (e.message.includes('connection') || e.message.includes('Receiving end')) {
+            console.warn("Handshake interrupted; retrying in next cycle.");
+            return; 
+        }
+        
         failureCount++;
         if (statusLabel) {
             statusLabel.innerText = "● RECONNECTING...";
