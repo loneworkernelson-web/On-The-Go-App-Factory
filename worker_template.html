@@ -2785,11 +2785,20 @@ function buildPayload(d) {
         }
     }
     
-    return {
+return {
         'action': d.action || 'logVisit', 
         'key': CONFIG.key,
         'Worker Name': state.worker?.name || "",
         'Worker Phone Number': state.worker?.phone || "",
+        
+        // FIXED: Maps ICE details to the spreadsheet columns
+        'Emergency Contact Name': state.worker?.emgName || state.worker?.iceName || "",
+        'Emergency Contact Phone': state.worker?.emgPhone || state.worker?.icePhone || "",
+        'Emergency Contact Email': state.worker?.emgEmail || state.worker?.iceEmail || "",
+        'Escalation Contact Name': state.worker?.escName || state.worker?.ice2Name || "",
+        'Escalation Contact Phone': state.worker?.escPhone || state.worker?.ice2Phone || "",
+        'Escalation Contact Email': state.worker?.escEmail || state.worker?.ice2Email || "",
+        
         'Battery Level': currentBatteryLevel || "100%",
         'Location Name': ln,
         'Location Address': la,
@@ -2869,12 +2878,13 @@ function gatherFormData() {
             if (!el.checked) return; // Skip non-selected options
             v = el.value;
         } else if (el.type === 'hidden' && el.hasAttribute('data-signature-id')) {
-            // FIXED: Signature extraction
+            // FIXED: Switched to JPEG (0.5 quality) to ensure spreadsheet ingestion
             const sigId = el.getAttribute('data-signature-id');
             const canvas = document.getElementById(`sig-canvas-${sigId}`);
             if (canvas) {
-                v = canvas.toDataURL('image/png');
-                d.sig = v; // Assigned to dedicated property for backend
+                // JPEG is ~80% smaller than PNG for signatures
+                v = canvas.toDataURL('image/jpeg', 0.5); 
+                d.sig = v; 
                 isMedia = true; 
             }
         }
@@ -4841,6 +4851,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
