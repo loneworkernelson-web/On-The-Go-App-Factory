@@ -221,22 +221,29 @@ async function unlockMonitor(e) {
     }
 }
 
-// ============================================================================
-// 3. RESILIENT POLLING ENGINE
-// ============================================================================
+/**
+ * RESILIENT POLLING ENGINE (v83.0)
+ * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
+ */
 function startPolling() {
     fetchData(); 
-    setInterval(fetchData, 10000); // 10s Data Sync
-    setInterval(renderGrid, 1000);  // 1s UI Refresh for timers
+    setInterval(fetchData, 10000); 
+    setInterval(renderGrid, 1000);  
     
-    // AUDIO KEEP-ALIVE: Prevents browser from sleeping the audio engine
+    // FIXED: High-integrity audio keep-alive
+    // Uses a staggered start time to prevent "Start time must be strictly greater" error.
     setInterval(() => { 
-        if (audioEnabled && synth) {
-            try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e){} 
+        if (audioEnabled && synth && Tone.context.state === 'running') {
+            try { 
+                // Scheduling the release slightly after the attack to avoid overlap
+                const now = Tone.now();
+                synth.triggerAttackRelease("C1", "1n", now + 0.1, 0.001); 
+            } catch(e) {
+                console.warn("Audio scheduling skipped to prevent crash.");
+            } 
         }
     }, 25000);
 
-    // CONNECTION MONITOR: Shows overlay if sync fails for > 60s
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
         if (!ol) return;
