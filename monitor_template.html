@@ -248,14 +248,14 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
-    if (isPollingActive) return; // Exit if already running
+    if (isPollingActive) return; // Guard: Stops duplicate loops and loud audio
     isPollingActive = true;
 
     fetchData(); 
     activeIntervals.push(setInterval(fetchData, 10000)); 
     activeIntervals.push(setInterval(renderGrid, 1000));  
     
-    // GOLDEN FIX: Silent 10Hz tone at 0.0001 volume
+    // GOLDEN FIX: Silent 10Hz tone at 0.0001 volume to keep audio engine awake
     activeIntervals.push(setInterval(() => { 
         if (audioEnabled && synth && Tone.context.state === 'running') {
             try { 
@@ -275,7 +275,7 @@ function startPolling() {
         }
     }, 10000));
 }
-
+    
 async function fetchData() { 
     if(!API_KEY) return;
     const statusLabel = document.getElementById('connectionStatus');
@@ -286,7 +286,7 @@ async function fetchData() {
         
         const data = await resp.json();
 
-        // FIXED: Optional chaining (?.) prevents crashing if 'message' is missing
+        // FIXED: Optional chaining (?.) prevents the crash that kept the login screen visible
         if (data.status === "error" && data.message?.includes("Key")) {
             return stopPollingAndLock(); 
         }
@@ -301,14 +301,8 @@ async function fetchData() {
             if(data.workers) handleData(data);
         }
     } catch (e) {
-        // Silences browser extension noise
         if (e.message?.includes('connection') || e.message?.includes('Receiving end')) return;
-        
         failureCount++;
-        if (statusLabel) {
-            statusLabel.innerText = "● RECONNECTING...";
-            statusLabel.className = "text-orange-500 animate-pulse font-black text-[10px]";
-        }
     }
 }
 
