@@ -63,17 +63,19 @@
 </head>
 <body>
 
-<div id="audioGate">
-    <div class="bg-gray-800 border-2 border-brand rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
+<div id="audioGate" class="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-gray-800 border-2 border-blue-500 rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
         <div class="text-7xl mb-6">🛡️</div>
-        <h1 class="text-3xl font-black text-white mb-2 uppercase tracking-tight">%%ORG_NAME%%</h1>
-        <p class="text-gray-400 text-sm mb-8">Enter the Master Security Key to unlock the dashboard.</p>
+        <h1 class="text-3xl font-black text-white mb-2 uppercase tracking-tight">Monitor Dashboard</h1>
         
-        <form onsubmit="unlockMonitor(event)" class="space-y-4">
-            <input type="password" id="masterKeyInput" 
-                   autocomplete="current-password"
-                   class="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 text-center text-xl font-mono tracking-[0.4em] text-blue-400 focus:border-blue-500 outline-none transition-all"
-                   placeholder="••••••••" required>
+        <form onsubmit="unlockMonitor(event)" class="space-y-6">
+            <label class="block text-left">
+                <span class="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Master Security Key</span>
+                <input type="password" id="masterKeyInput" 
+                       autocomplete="current-password"
+                       class="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-4 mt-2 text-center text-xl font-mono tracking-[0.4em] text-blue-400 focus:border-blue-500 outline-none transition-all"
+                       placeholder="••••••••" required>
+            </label>
             
             <button type="submit" 
                     class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-5 rounded-2xl shadow-2xl text-xl transition transform active:scale-95 uppercase tracking-widest cursor-pointer">
@@ -160,52 +162,139 @@ window.onload = () => { if (API_KEY) unlockMonitor(); };
 
 async function unlockMonitor(e) {
     if (e) e.preventDefault();
-    const activeKey = API_KEY || document.getElementById('masterKeyInput')?.value;
+    
+    // 1. GATHER KEY: Prioritise user input
+    const inputEl = document.getElementById('masterKeyInput');
+    const activeKey = inputEl ? inputEl.value : API_KEY;
+    
     if (!activeKey) return;
 
     try {
-        // REQUIRED: Unlock audio context via user gesture
-        if(typeof Tone !== 'undefined') {
+        // 2. AUDIO UNLOCK: Required user gesture
+        if (typeof Tone !== 'undefined') {
             await Tone.start();
-            synth = new Tone.Synth().toDestination();
+            console.log("Audio Engine Active");
         }
         
+        // 3. HANDSHAKE: Your original fetch logic remains intact
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
         const data = await resp.json();
         
         if (data.status === "success") {
             API_KEY = activeKey;
-            // FIXED: Wrap localStorage in a try/catch to prevent the app from breaking if blocked
+            
+            // 4. STORAGE: Use standardised navigator.storage fallback logic
             try {
                 localStorage.setItem('monitor_master_key', activeKey);
-            } catch (storageErr) {
-                console.warn("Storage blocked. You will need to re-enter the key on refresh.");
+            } catch (err) {
+                console.warn("Standard storage blocked; using session memory only.");
             }
+
             document.getElementById('audioGate').classList.add('hidden');
             startPolling();
-        } else { throw new Error(); }
+        } else {
+            throw new Error("Invalid Key");
+        }
     } catch (err) {
-        document.getElementById('loginError')?.classList.remove('hidden');
+        console.error("Login Failure:", err);
+        const errLabel = document.getElementById('loginError');
+        if (errLabel) errLabel.classList.remove('hidden');
     }
 }
 
+/**
+ * RESILIENT MONITOR ENGINE
+ * Integration: Merges high-integrity error recovery with existing Audio & Heartbeat loops.
+ */
+let failureCount = 0;
+const MAX_FAILURES = 3;
+
 function startPolling() {
-    fetchData(); setInterval(fetchData, 10000); setInterval(renderGrid, 1000);
-    setInterval(() => { if (audioEnabled && synth) try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e){} }, 25000);
+    // 1. INITIAL FETCH: Run once immediately
+    fetchData(); 
+
+    // 2. DATA POLLING: Standard 10s sync (GAS Quota Optimized)
+    setInterval(fetchData, 10000); 
+
+    // 3. UI REFRESH: 1s loop for countdown timers and clock
+    setInterval(renderGrid, 1000); 
+
+    // 4. AUDIO KEEP-ALIVE: 25s silent trigger to prevent browser "sleep"
+    setInterval(() => { 
+        if (audioEnabled && synth) {
+            try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e){} 
+        }
+    }, 25000);
+
+    // 5. HEARTBEAT CHECKER: 10s loop for "Offline" overlay
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
-        if (Date.now() - lastHeartbeat > 60000) { ol.classList.remove('hidden'); if(audioEnabled) playSound('offline'); } else { ol.classList.add('hidden'); }
+        if (!ol) return;
+        // If no successful sync in 60s, show overlay
+        if (Date.now() - lastHeartbeat > 60000) { 
+            ol.classList.remove('hidden'); 
+            if(audioEnabled) playSound('offline'); 
+        } else { 
+            ol.classList.add('hidden'); 
+        }
     }, 10000); 
 }
 
 async function fetchData() { 
     if(!API_KEY) return;
+    
+    const statusLabel = document.getElementById('connectionStatus');
+
     try {
-        const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
+        // Includes cache-buster (_cb) and explicit monitor action
+        const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
+        
+        if (!resp.ok) throw new Error("Connection Unstable");
+        
         const data = await resp.json();
-        lastHeartbeat = Date.now();
-        if(data.workers) handleData(data); 
-    } catch (e) { console.error("Sync Failure"); }
+
+        // SESSION SECURITY: Force re-login if the key is invalidated on the backend
+        if (data.status === "error" && data.message.includes("Key")) {
+            console.error("Critical: Security Key Invalidated");
+            return stopPollingAndLock(); 
+        }
+
+        if (data.status === "success") {
+            lastHeartbeat = Date.now(); // Satisfies your heartbeat checker loop
+            failureCount = 0; 
+            
+            if (statusLabel) {
+                statusLabel.innerText = "● LIVE";
+                statusLabel.className = "text-green-500 font-black text-[10px]";
+            }
+
+            if(data.workers) handleData(data); // Matches your existing success handler
+        }
+    } catch (e) {
+        failureCount++;
+        console.warn(`Sync Failure (${failureCount}/${MAX_FAILURES})`);
+        
+        if (statusLabel) {
+            statusLabel.innerText = "● RECONNECTING...";
+            statusLabel.className = "text-orange-500 animate-pulse font-black text-[10px]";
+        }
+
+        // AUTO-LOCK: Prevents stale data from being viewed after multiple failures
+        if (failureCount >= MAX_FAILURES) {
+            console.error("Polling halted after consecutive failures.");
+        }
+    }
+}
+/**
+ * SESSION LOCKDOWN
+ * Logic: Clears sensitive keys and forces a return to the Audio Gate.
+ */
+function stopPollingAndLock() {
+    API_KEY = null;
+    localStorage.removeItem('monitor_master_key');
+    const gate = document.getElementById('audioGate');
+    if (gate) gate.classList.remove('hidden');
+    alert("🔒 Monitor Session Expired: Please re-enter the Master Security Key.");
 }
 
 function handleData(response) { 
