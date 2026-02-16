@@ -248,20 +248,24 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
-    if (isPollingActive) return; // Guard: Stops duplicate loops and loud audio
+    // 1. DUPICATE GUARD: Prevents overlapping audio loops
+    if (isPollingActive) return; 
     isPollingActive = true;
 
     fetchData(); 
     activeIntervals.push(setInterval(fetchData, 10000)); 
     activeIntervals.push(setInterval(renderGrid, 1000));  
     
-    // GOLDEN FIX: Silent 10Hz tone at 0.0001 volume to keep audio engine awake
+    // 2. COLLISION-FREE KICK: Uses +0.1s offset to prevent scheduling errors
     activeIntervals.push(setInterval(() => { 
         if (audioEnabled && synth && Tone.context.state === 'running') {
             try { 
                 const now = Tone.now();
+                // Fixed: Schedules the note strictly in the future to avoid scheduling crashes
                 synth.triggerAttackRelease(10, "1n", now + 0.1, 0.0001); 
-            } catch(e) {} 
+            } catch(e) {
+                console.warn("Audio maintenance collision avoided.");
+            } 
         }
     }, 25000));
 
@@ -571,7 +575,16 @@ function exportSystemLog() {
     const csv = "Timestamp,Worker,Status,Location\n" + allRows.map(r => `"${r.Timestamp}","${r['Worker Name']}","${r['Alarm Status']}","${r['Location Name']}"`).join("\n");
     const link = document.createElement("a"); link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); link.download = "Log.csv"; link.click();
 }
-function playSound(type) { if(audioEnabled && synth) synth.triggerAttackRelease(type === 'offline' ? "A2" : "C5", "4n"); }
+function playSound(type) { 
+    if(audioEnabled && synth) {
+        try { 
+            // FIXED: Added Tone.now() to ensure chronological scheduling
+            synth.triggerAttackRelease(type === 'offline' ? "A2" : "C5", "4n", Tone.now()); 
+        } catch(e) {
+            console.warn("Manual sound playback collision.");
+        }
+    }
+}
 function toggleAudio() { audioEnabled = !audioEnabled; document.getElementById('btnAudio').innerText = audioEnabled ? "🔊 Sound On" : "🔇 Sound Off"; }
 function resetKey() { localStorage.removeItem('monitor_master_key'); location.reload(); }
 </script>
