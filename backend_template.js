@@ -811,17 +811,20 @@ function getDashboardData() {
   const headers = data[0];
   const rows = data.slice(1);
 
-  // 1. RAW LOG: For the 'exportSystemLog' function
+  // 1. RAW LOG: Convert Date objects to ISO Strings for stable transmission
   const allRows = rows.map(row => {
     let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      let val = row[i];
+      if (val instanceof Date) val = val.toISOString(); // GOLDEN FIX: Prevents empty {} in JSON
+      obj[h] = val;
+    });
     return obj;
   });
 
-  // 2. ACTIVE WORKERS: For the 'renderGrid' and Map
-  // Filters for workers who haven't 'DEPARTED' or 'COMPLETED'
+  // 2. ACTIVE WORKERS: Map keys precisely for the Monitor App
   const activeWorkers = allRows.filter(r => 
-    r['Alarm Status'] && !['DEPARTED', 'COMPLETED'].includes(r['Alarm Status'].toUpperCase())
+    r['Alarm Status'] && !['DEPARTED', 'COMPLETED', 'DATA_ENTRY_ONLY'].includes(r['Alarm Status'].toUpperCase())
   ).map(r => {
     return {
       "Worker Name": r['Worker Name'],
@@ -830,15 +833,14 @@ function getDashboardData() {
       "Anticipated Departure Time": r['Anticipated Departure Time'],
       "Battery Level": r['Battery Level'] || '0',
       "Worker Phone Number": r['Worker Phone Number'] || '',
-      // MATCH: Use the actual header from your Visits sheet
-      "gps": r['Last Known GPS'] || '0,0' 
+      "gps": r['Last Known GPS'] || '0,0' // FIXED: Matches spreadsheet header precisely
     };
   });
 
   return {
     status: "success",
     workers: activeWorkers,
-    all: allRows.slice(-100) // Returns last 100 rows for the log
+    all: allRows.slice(-100)
   };
 }
 
@@ -1272,6 +1274,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
