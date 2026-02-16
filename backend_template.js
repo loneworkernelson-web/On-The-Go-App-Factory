@@ -449,7 +449,12 @@ function handleWorkerPost(p, e) {
                         const targetRow = startRow + i;
                         sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
                         sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
-                        if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
+                        // GOLDEN FIX: Write file links to their respective columns during an update
+                        if (p1) sheet.getRange(targetRow, headers.indexOf("Photo 1") + 1).setValue(p1);
+                        if (p2) sheet.getRange(targetRow, headers.indexOf("Photo 2") + 1).setValue(p2);
+                        if (p3) sheet.getRange(targetRow, headers.indexOf("Photo 3") + 1).setValue(p3);
+                        if (p4) sheet.getRange(targetRow, headers.indexOf("Photo 4") + 1).setValue(p4);
+                        if (sig) sheet.getRange(targetRow, headers.indexOf("Signature") + 1).setValue(sig);if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
                         if (polishedNotes && polishedNotes !== rowData[11]) {
                              const oldNotes = sheet.getRange(targetRow, 12).getValue();
                              if (!oldNotes.includes(polishedNotes)) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + polishedNotes).trim());
@@ -1224,6 +1229,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
