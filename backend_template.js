@@ -397,6 +397,7 @@ function handleWorkerPost(p, e) {
     const templateName = p['Template Name'] || "";
     const isNoteToSelf = (templateName.trim().toLowerCase() === 'note to self');
 
+    // 1. ASSET CAPTURE: Retains your existing saveImage logic
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1'], workerName);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2'], workerName);
@@ -411,6 +412,7 @@ function handleWorkerPost(p, e) {
 
     let distanceValue = p['Distance'] || ""; 
 
+    // 2. SMARTSCRIBE & DISTANCE LOGIC: Preserved exactly
     if (hasFormData) {
         try {
             const reportObj = JSON.parse(p['Visit Report Data']);
@@ -436,7 +438,9 @@ function handleWorkerPost(p, e) {
         const lastRow = sheet.getLastRow();
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const distColIdx = headers.indexOf("Distance (km)");
+        const antColIdx = headers.indexOf("Anticipated Departure Time"); // Essential for timer
         
+        // 3. UPDATE LOGIC: Now correctly updates Anticipated Departure Time
         if (lastRow > 1) {
             const startRow = Math.max(2, lastRow - 50); 
             const numRows = lastRow - startRow + 1;
@@ -451,12 +455,21 @@ function handleWorkerPost(p, e) {
                         const targetRow = startRow + i;
                         sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
                         sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
-                        // GOLDEN FIX: Write file links to their respective columns during an update
+
+                        // GOLDEN FIX: Updates the expiry timestamp so the App timer stays in sync
+                        if (p['Anticipated Departure Time'] && antColIdx > -1) {
+                            sheet.getRange(targetRow, antColIdx + 1).setValue(p['Anticipated Departure Time']);
+                        }
+
+                        // Write media links to respective columns during update
                         if (p1) sheet.getRange(targetRow, headers.indexOf("Photo 1") + 1).setValue(p1);
                         if (p2) sheet.getRange(targetRow, headers.indexOf("Photo 2") + 1).setValue(p2);
                         if (p3) sheet.getRange(targetRow, headers.indexOf("Photo 3") + 1).setValue(p3);
                         if (p4) sheet.getRange(targetRow, headers.indexOf("Photo 4") + 1).setValue(p4);
-                        if (sig) sheet.getRange(targetRow, headers.indexOf("Signature") + 1).setValue(sig);if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
+                        if (sig) sheet.getRange(targetRow, headers.indexOf("Signature") + 1).setValue(sig);
+                        
+                        if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
+                        
                         if (polishedNotes && polishedNotes !== rowData[11]) {
                              const oldNotes = sheet.getRange(targetRow, 12).getValue();
                              if (!oldNotes.includes(polishedNotes)) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + polishedNotes).trim());
@@ -470,42 +483,44 @@ function handleWorkerPost(p, e) {
             }
         }
 
-// Ensure these fallbacks are in your backend script to catch the frontend keys
-const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
-const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
+        // 4. FALLBACK LOGIC: Corrects "Unknown Site" mapping
+        const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
+        const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
+        const finalLocName = p['Location Name'] || p['siteName'] || "Unknown Site";
 
-if (!rowUpdated) {
-    const row = [
-        ts.toISOString(), 
-        dateStr, 
-        workerName, 
-        p['Worker Phone Number'], 
-        p['Emergency Contact Name'], 
-        emgPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
-        p['Emergency Contact Email'], 
-        p['Escalation Contact Name'], 
-        escPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
-        p['Escalation Contact Email'], 
-        p['Alarm Status'], 
-        polishedNotes, 
-        p['Location Name'], 
-        p['Location Address'], 
-        p['Last Known GPS'], 
-        p['Timestamp'], 
-        p['Battery Level'], 
-        p1, 
-        distanceValue, 
-        p['Visit Report Data'], 
-        p['Anticipated Departure Time'], 
-        sig, 
-        p2, 
-        p3, 
-        p4
-    ];
-    sheet.appendRow(row);
-}
+        if (!rowUpdated) {
+            const row = [
+                ts.toISOString(), 
+                dateStr, 
+                workerName, 
+                p['Worker Phone Number'], 
+                p['Emergency Contact Name'], 
+                emgPhone, 
+                p['Emergency Contact Email'], 
+                p['Escalation Contact Name'], 
+                escPhone, 
+                p['Escalation Contact Email'], 
+                p['Alarm Status'], 
+                polishedNotes, 
+                finalLocName, // FIXED: Prioritizes siteName if Location Name is missing
+                p['Location Address'], 
+                p['Last Known GPS'], 
+                p['Timestamp'], 
+                p['Battery Level'], 
+                p1, 
+                distanceValue, 
+                p['Visit Report Data'], 
+                p['Anticipated Departure Time'], 
+                sig, 
+                p2, 
+                p3, 
+                p4
+            ];
+            sheet.appendRow(row);
+        }
     }
 
+    // 5. POST-PROCESS: Retains existing staff updates and alert triggers
     updateStaffStatus(p);
     if(hasFormData) {
         try {
@@ -1256,6 +1271,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
