@@ -825,12 +825,13 @@ function getDashboardData() {
   ).map(r => {
     return {
       "Worker Name": r['Worker Name'],
-      "Status": r['Alarm Status'], // Standardised for w.Status check
+      "Status": r['Alarm Status'],
       "Location Name": r['Location Name'],
       "Anticipated Departure Time": r['Anticipated Departure Time'],
       "Battery Level": r['Battery Level'] || '0',
       "Worker Phone Number": r['Worker Phone Number'] || '',
-      "gps": r['GPS'] || '0,0'
+      // MATCH: Use the actual header from your Visits sheet
+      "gps": r['Last Known GPS'] || '0,0' 
     };
   });
 
@@ -1271,6 +1272,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
