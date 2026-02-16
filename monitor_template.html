@@ -165,31 +165,39 @@
 
 <script>
 // ============================================================================
-// 1. CONFIGURATION & GLOBAL STATE
+// ============================================================================
+// 1. CONFIGURATION & PERMANENT CONSTANTS
 // ============================================================================
 const SCRIPT_URL = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
+
+// ============================================================================
+// 2. SESSION & LIFECYCLE GUARDS
+// ============================================================================
 let API_KEY = localStorage.getItem('monitor_master_key') || null; 
+let isPollingActive = false;    // Prevents duplicate sync loops
+let activeIntervals = [];     // Tracks all timers for clean shutdown
+let failureCount = 0;         // Tracks consecutive sync errors
+const MAX_FAILURES = 3;       // Threshold before alerting operator
 
-// Dashboard State variables required by handleData and initMap
-let workerData = []; 
-let allRows = []; 
-let mapInstance = null;
-let markersLayer = null;
-let currentView = 'GRID'; 
-let currentFilter = 'ACTIVE'; 
-let audioEnabled = true;
-let synth = null; 
-let acknowledgedAlerts = new Set(); 
-let alertLoopInterval = null; 
-let lastHeartbeat = Date.now(); 
+// ============================================================================
+// 3. DASHBOARD DATA & MAP STATE
+// ============================================================================
+let workerData = [];          // Current active worker objects
+let allRows = [];             // Raw historical rows from spreadsheet
+let mapInstance = null;       // Leaflet map container
+let markersLayer = null;      // GPS marker group
+let currentView = 'GRID';      // UI toggle state (GRID vs MAP)
+let currentFilter = 'ACTIVE';  // UI filter state (ACTIVE vs ALL)
+let lastHeartbeat = Date.now(); // Used for connection overlay timing
 
-// Resilient Engine variables
-let failureCount = 0;
-const MAX_FAILURES = 3;
-
-let isPollingActive = false; // Guard against multiple login clicks
-
+// ============================================================================
+// 4. AUDIO & ALERT ENGINE
+// ============================================================================
+let synth = null;             // Tone.js audio instance
+let audioEnabled = true;      // User toggle for mute/unmute
+let alertLoopInterval = null; // High-priority SOS siren loop
+let acknowledgedAlerts = new Set(); // Prevents repeat alarms for same event
 // ============================================================================
 // 2. SECURITY GATE & AUDIO INITIALIZATION
 // ============================================================================
@@ -240,35 +248,38 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
+    // Prevent duplicate loops if already running
     if (isPollingActive) return;
     isPollingActive = true;
 
     fetchData(); 
-    setInterval(fetchData, 10000); 
-    setInterval(renderGrid, 1000);  
     
-    // GOLDEN FIX: Reduced velocity to 0.0001 (inaudible) and added guard
-    setInterval(() => { 
+    // Capture Interval IDs in the tracking array
+    activeIntervals.push(setInterval(fetchData, 10000)); 
+    activeIntervals.push(setInterval(renderGrid, 1000));  
+    
+    // Silent Audio Kick (Maintenance Loop)
+    activeIntervals.push(setInterval(() => { 
         if (audioEnabled && synth && Tone.context.state === 'running') {
             try { 
                 const now = Tone.now();
-                // Frequency shifted to 10Hz (below human hearing) at ultra-low volume
+                // Frequency 10Hz @ 0.0001 velocity for true silence
                 synth.triggerAttackRelease(10, "1n", now + 0.1, 0.0001); 
-            } catch(e) {
-                console.warn("Audio maintenance skipped.");
-            } 
+            } catch(e) {} 
         }
-    }, 25000);
+    }, 25000));
 
-    setInterval(() => {
+    // Connection Monitor Loop
+    activeIntervals.push(setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
-        if (!ol || Date.now() - lastHeartbeat < 60000) {
-            if (ol) ol.classList.add('hidden');
-            return;
+        if (!ol) return;
+        if (Date.now() - lastHeartbeat > 60000) { 
+            ol.classList.remove('hidden'); 
+            if(audioEnabled) playSound('offline'); 
+        } else { 
+            ol.classList.add('hidden'); 
         }
-        ol.classList.remove('hidden'); 
-        if(audioEnabled) playSound('offline'); 
-    }, 10000);
+    }, 10000));
 }
 
 async function fetchData() { 
@@ -310,11 +321,27 @@ async function fetchData() {
     }
 }
 
+/**
+ * SESSION LOCKDOWN & CLEANUP
+ * Logic: Clears all timers and resets the polling guard to prevent "Loud Audio" duplicates.
+ */
 function stopPollingAndLock() {
+    // 1. CLEAR TIMERS: Physically stop all background loops
+    activeIntervals.forEach(id => clearInterval(id));
+    activeIntervals = [];
+    
+    // 2. RESET GUARDS
+    isPollingActive = false;
+    failureCount = 0;
     API_KEY = null;
+    
+    // 3. SECURE STORAGE
     localStorage.removeItem('monitor_master_key');
+    
+    // 4. UI RESET
     const gate = document.getElementById('audioGate');
     if (gate) gate.classList.remove('hidden');
+    
     alert("🔒 Monitor Session Expired: Please re-enter the Master Security Key.");
 }
 
