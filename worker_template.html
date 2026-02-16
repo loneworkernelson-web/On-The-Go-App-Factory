@@ -2648,18 +2648,27 @@ function setupHoldToStart() {
         startVisit();
     });
 }
+    
 /**
- * PATCHED: startVisit with Grounding Enforcement
+ * RE-ENGINEERED: startVisit with Concurrency Protection
+ * Logic: Prevents duplicate announcements and ensures expiry times are sent as ISO strings.
  */
 async function startVisit(isSkipCheck = false) {
+    // 1. DUAL-TRIGGER GUARD: Stop execution if already active or processing
+    if (state.activeVisit) return;
+    const btn = document.getElementById('btnStart');
+    if (btn && btn.disabled) return; 
+    if (btn) btn.disabled = true;
+
     isMidVisitUpdate = false; 
 
-    // 1. COMPLIANCE GATE: Check for WOF/Rego expiry unless skipped
-    if (!isSkipCheck && checkVehicleBeforeVisit()) {
-        return; // Grounding or Warning modal is now visible; stop execution.
+    // 2. COMPLIANCE GATE: Check for WOF/Rego expiry unless skipped
+    if (!isSkipCheck && typeof checkVehicleBeforeVisit === 'function' && checkVehicleBeforeVisit()) {
+        if (btn) btn.disabled = false; // Re-enable if compliance check blocks start
+        return; 
     }
 
-    // 2. Audio Unlock
+    // 3. Audio Unlock
     try {
         await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 500))]);
     } catch (e) { console.warn("Audio skipped"); }
@@ -2667,14 +2676,17 @@ async function startVisit(isSkipCheck = false) {
     const locId = state.selectedLocationId;
     const isTravelMode = !!state.isTravelActive; 
     
-    if (!locId && !isTravelMode) return showToast('⚠️ Select a destination first');
+    if (!locId && !isTravelMode) {
+        if (btn) btn.disabled = false;
+        return showToast('⚠️ Select a destination first');
+    }
 
     const loc = state.locations.find(l => l.id === locId) || { id: 'travel', name: 'General Travel' };
     const slider = document.getElementById('durationSlider');
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    // 2. GPS PRE-FLIGHT: Fresh lock for mileage accuracy
+    // 4. GPS PRE-FLIGHT: Fresh lock for mileage accuracy
     let verifiedStartGPS = lastGPS || "0,0";
     if (isTravelMode || locId === 'travel') {
         showToast('📍 Locking GPS signal...');
@@ -2689,21 +2701,22 @@ async function startVisit(isSkipCheck = false) {
         } catch (e) {
             console.warn('GPS signal lock deferred.');
         }
-        startGPSMonitoring(); // Engage continuous tracking
+        if (typeof startGPSMonitoring === 'function') startGPSMonitoring(); 
     }
 
     const startTime = Date.now();
     const durationSec = durationMins * 60;
+    const anticipatedDeparture = startTime + (durationSec * 1000);
 
-    // 3. Initialize Active Safety Session
+    // 5. Initialise Active Safety Session
     state.activeVisit = {
         locationId: locId || 'travel',
         locationName: loc.name,
         companyName: loc.companyName || "",
-        isTravel: isTravelMode, // Stores Targeted Travel mode for reporting logic
+        isTravel: isTravelMode, 
         startTime: startTime,
         duration: durationSec,
-        anticipatedDepartureTime: startTime + (durationSec * 1000),
+        anticipatedDepartureTime: anticipatedDeparture,
         startGPS: verifiedStartGPS,
         highRisk: isHighRisk,
         isPanic: false,
@@ -2717,26 +2730,28 @@ async function startVisit(isSkipCheck = false) {
     state.isTravelActive = false; 
     saveState();
 
-    // 4. BACKEND LOGGING: Destination written to spreadsheet
+    // 6. BACKEND LOGGING: Explicitly send ISO string for Anticipated Departure Time
     const alarmStatus = isTravelMode ? "TRAVELLING" : "ARRIVED";
     const logNote = isTravelMode ? `Travel to ${loc.name} started.` : `${loc.name} visit started.`;
 
     processUploadQueue(buildPayload({
         'action': 'logVisit',
         'Alarm Status': alarmStatus,
-        'Location Name': loc.name, // Written as destination to the sheet
+        'Location Name': loc.name, 
         'Notes': `${logNote} Duration: ${durationMins}m`,
-        'Last Known GPS': verifiedStartGPS
+        'Last Known GPS': verifiedStartGPS,
+        'Anticipated Departure Time': new Date(anticipatedDeparture).toISOString()
     }));
 
+    // Trigger announcement once
     announce(isTravelMode ? `Travelling to ${loc.name}.` : `${loc.name} started.`);
     
     if (typeof requestWakeLock === 'function') requestWakeLock();
-    if (isTravelMode || locId === 'travel') startTravellingPulse();
+    if (isTravelMode || locId === 'travel') if (typeof startTravellingPulse === 'function') startTravellingPulse();
 
     resetInactivityTimer(); 
     renderLocations();
-    updateArrivedButtonState(); // Resets button label for locked screen state
+    updateArrivedButtonState(); 
     enterLockedScreen();
 }
     
@@ -4856,6 +4871,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
