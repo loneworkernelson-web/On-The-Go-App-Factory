@@ -1800,27 +1800,28 @@ function loadFormAndShow(templateName, context = null) {
         }, 500); // Increased delay to 500ms for high-reliability field targeting
     }
     
+    // GOLDEN FIX: Every form submission now requires a 1.8s long-press
     const btn = document.getElementById('btnSubmitRep');
     if (btn) {
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.classList.add('active:scale-95', 'transition-all');
+        
+        // Adds necessary classes for the long-press animation
+        newBtn.classList.add('active:scale-95', 'transition-all', 'long-press-btn');
 
-        if (!state.activeVisit) {
-            newBtn.textContent = 'SUBMIT REPORT';
-            newBtn.classList.remove('long-press-btn');
-            newBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
-            newBtn.onclick = submitReport;
+        // Logic: Determines the label based on the current safety context
+        let label = "HOLD TO SUBMIT";
+        if (state.activeVisit && !isMidVisitUpdate) {
+            label = "HOLD TO SUBMIT & END";
         } else if (isMidVisitUpdate) {
-            newBtn.textContent = 'SEND UPDATE';
-            newBtn.classList.remove('long-press-btn');
-            newBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
-            newBtn.onclick = submitReport;
-        } else {
-            newBtn.textContent = 'HOLD TO SUBMIT & END';
-            newBtn.classList.add('long-press-btn');
-            setupLongPress(newBtn, 1800, submitReport); 
+            label = "HOLD TO SEND UPDATE";
         }
+        
+        newBtn.textContent = label;
+        
+        // Standardises the hold duration to 1.8 seconds (1800ms)
+        setupLongPress(newBtn, 1800, submitReport); 
+    }
     }
 }
     
@@ -2524,11 +2525,12 @@ function createTravelTile() {
     
     tile.onclick = () => {
         state.isTravelActive = !state.isTravelActive;
+        // RESET: Force user to pick a new duration for travel
+        const slider = document.getElementById('durationSlider');
+        if (slider) { slider.value = 0; updateDurationDisplay(); }
         renderLocations();
         updateArrivedButtonState();
     };
-    return tile;
-}
 
 /**
  * UPDATED: Location Tile with Information Button
@@ -2595,27 +2597,28 @@ function updateArrivedButtonState() {
     const hasDuration = durationMins > 0;
 
     btn.disabled = false; 
-    
-    // CRITICAL: Clear all mode colors first to prevent conflicts
     btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-700', 'text-white', 'text-gray-500', 'opacity-50');
 
+    // TRAVEL LOGIC: Time is mandatory, Site is optional
     if (state.isTravelActive) {
-        const loc = state.locations.find(l => l.id === state.selectedLocationId);
-        const destName = loc ? loc.name : null;
-        
-        if (destName) {
-            btn.innerText = `HOLD TO TRAVEL TO ${destName.toUpperCase()}`;
-            btn.classList.add('bg-purple-600', 'text-white');
-        } else {
-            // PROMPT: Guides the user to pick a site
-            btn.innerText = 'SELECT DESTINATION';
+        if (!hasDuration) {
+            btn.innerText = 'SELECT TRAVEL TIME';
             btn.classList.add('bg-purple-600', 'text-white', 'opacity-50');
+        } else {
+            const loc = state.locations.find(l => l.id === state.selectedLocationId);
+            btn.innerText = loc ? `HOLD TO TRAVEL TO ${loc.name.toUpperCase()}` : 'HOLD TO START TRAVEL';
+            btn.classList.add('bg-purple-600', 'text-white');
         }
-    } else if (hasLocation && hasDuration) {
+    } 
+    // STANDARD LOGIC: Both Time and Site mandatory
+    else if (hasLocation && hasDuration) {
         btn.innerText = 'HOLD TO START';
         btn.classList.add('bg-blue-600', 'text-white');
+    } else if (!hasLocation) {
+        btn.innerText = 'SELECT SITE';
+        btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
     } else {
-        btn.innerText = !hasLocation ? 'SELECT SITE' : 'SELECT TIME';
+        btn.innerText = 'SELECT TIME';
         btn.classList.add('bg-gray-700', 'text-gray-500', 'opacity-50');
     }
     setupHoldToStart();
@@ -2627,19 +2630,18 @@ function updateArrivedButtonState() {
  */
 function setupHoldToStart() {
     const btn = document.getElementById('btnStart');
-    if (!btn) return;
+    const slider = document.getElementById('durationSlider');
+    if (!btn || !slider) return;
+    
+    const durationMins = DURATION_MAP[parseInt(slider.value)];
     
     setupLongPress('btnStart', 1800, () => {
-        if (!state.selectedLocationId) return showToast('📍 Select a site first');
+        // MANDATORY: Block start if time is zero
+        if (durationMins <= 0) return showToast('⏳ Select a duration first');
         
-        // AUTO-DURATION: Apply a default if the worker forgot the slider (Universal Fix)
-        if (!state.visitDurationMinutes || state.visitDurationMinutes === 0) {
-            state.visitDurationMinutes = 30;
-            const slider = document.getElementById('durationSlider');
-            if (slider) slider.value = 4; // Visual update for 30m
-            updateDurationDisplay();
-        }
-
+        // MANDATORY: Block if no site (unless in Travel Mode)
+        if (!state.isTravelActive && !state.selectedLocationId) return showToast('📍 Select a site first');
+        
         startVisit();
     });
 }
@@ -4851,6 +4853,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
