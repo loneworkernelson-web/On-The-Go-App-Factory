@@ -152,42 +152,61 @@
 </div>
 
 <script>
-// FIXED: Using %%SHEET_URL%% for connection logic
+// ============================================================================
+// 1. CONFIGURATION & GLOBAL STATE
+// ============================================================================
 const SCRIPT_URL = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
 let API_KEY = localStorage.getItem('monitor_master_key'); 
-let workerData = []; let allRows = []; let mapInstance = null, markersLayer = null, currentView = 'GRID'; let currentFilter = 'ACTIVE'; let audioEnabled = true, synth = null; let acknowledgedAlerts = new Set(); let alertLoopInterval = null; let lastHeartbeat = Date.now(); 
 
-window.onload = () => { if (API_KEY) unlockMonitor(); };
+// Dashboard State variables required by handleData and initMap
+let workerData = []; 
+let allRows = []; 
+let mapInstance = null;
+let markersLayer = null;
+let currentView = 'GRID'; 
+let currentFilter = 'ACTIVE'; 
+let audioEnabled = true;
+let synth = null; 
+let acknowledgedAlerts = new Set(); 
+let alertLoopInterval = null; 
+let lastHeartbeat = Date.now(); 
 
+// Resilient Engine variables
+let failureCount = 0;
+const MAX_FAILURES = 3;
+
+// ============================================================================
+// 2. SECURITY GATE & AUDIO INITIALIZATION
+// ============================================================================
 async function unlockMonitor(e) {
     if (e) e.preventDefault();
     
-    // 1. GATHER KEY: Prioritise user input
     const inputEl = document.getElementById('masterKeyInput');
     const activeKey = inputEl ? inputEl.value : API_KEY;
     
     if (!activeKey) return;
 
     try {
-        // 2. AUDIO UNLOCK: Required user gesture
+        // AUDIO UNLOCK: Required user gesture for Tone.js
         if (typeof Tone !== 'undefined') {
             await Tone.start();
+            synth = new Tone.Synth().toDestination();
             console.log("Audio Engine Active");
         }
         
-        // 3. HANDSHAKE: Your original fetch logic remains intact
+        // HANDSHAKE: Validate against the Google Sheet backend
         const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
         const data = await resp.json();
         
         if (data.status === "success") {
             API_KEY = activeKey;
             
-            // 4. STORAGE: Use standardised navigator.storage fallback logic
+            // Standardised persistence
             try {
                 localStorage.setItem('monitor_master_key', activeKey);
             } catch (err) {
-                console.warn("Standard storage blocked; using session memory only.");
+                console.warn("Storage blocked; using session memory.");
             }
 
             document.getElementById('audioGate').classList.add('hidden');
@@ -202,42 +221,32 @@ async function unlockMonitor(e) {
     }
 }
 
-/**
- * RESILIENT MONITOR ENGINE
- * Integration: Merges high-integrity error recovery with existing Audio & Heartbeat loops.
- */
-let failureCount = 0;
-const MAX_FAILURES = 3;
-
+// ============================================================================
+// 3. RESILIENT POLLING ENGINE
+// ============================================================================
 function startPolling() {
-    // 1. INITIAL FETCH: Run once immediately
     fetchData(); 
-
-    // 2. DATA POLLING: Standard 10s sync (GAS Quota Optimized)
-    setInterval(fetchData, 10000); 
-
-    // 3. UI REFRESH: 1s loop for countdown timers and clock
-    setInterval(renderGrid, 1000); 
-
-    // 4. AUDIO KEEP-ALIVE: 25s silent trigger to prevent browser "sleep"
+    setInterval(fetchData, 10000); // 10s Data Sync
+    setInterval(renderGrid, 1000);  // 1s UI Refresh for timers
+    
+    // AUDIO KEEP-ALIVE: Prevents browser from sleeping the audio engine
     setInterval(() => { 
         if (audioEnabled && synth) {
             try { synth.triggerAttackRelease("C1", "1n", Tone.now(), 0.001); } catch(e){} 
         }
     }, 25000);
 
-    // 5. HEARTBEAT CHECKER: 10s loop for "Offline" overlay
+    // CONNECTION MONITOR: Shows overlay if sync fails for > 60s
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
         if (!ol) return;
-        // If no successful sync in 60s, show overlay
         if (Date.now() - lastHeartbeat > 60000) { 
             ol.classList.remove('hidden'); 
             if(audioEnabled) playSound('offline'); 
         } else { 
             ol.classList.add('hidden'); 
         }
-    }, 10000); 
+    }, 10000);
 }
 
 async function fetchData() { 
@@ -246,21 +255,19 @@ async function fetchData() {
     const statusLabel = document.getElementById('connectionStatus');
 
     try {
-        // Includes cache-buster (_cb) and explicit monitor action
         const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
-        
         if (!resp.ok) throw new Error("Connection Unstable");
         
         const data = await resp.json();
 
-        // SESSION SECURITY: Force re-login if the key is invalidated on the backend
+        // SESSION SECURITY: Auto-lock if the key is revoked
         if (data.status === "error" && data.message.includes("Key")) {
             console.error("Critical: Security Key Invalidated");
             return stopPollingAndLock(); 
         }
 
-        if (data.status === "success") {
-            lastHeartbeat = Date.now(); // Satisfies your heartbeat checker loop
+        if (data.status === "success" || data.workers) {
+            lastHeartbeat = Date.now();
             failureCount = 0; 
             
             if (statusLabel) {
@@ -268,27 +275,17 @@ async function fetchData() {
                 statusLabel.className = "text-green-500 font-black text-[10px]";
             }
 
-            if(data.workers) handleData(data); // Matches your existing success handler
+            if(data.workers) handleData(data); // Integration with existing UI handler
         }
     } catch (e) {
         failureCount++;
-        console.warn(`Sync Failure (${failureCount}/${MAX_FAILURES})`);
-        
         if (statusLabel) {
             statusLabel.innerText = "● RECONNECTING...";
             statusLabel.className = "text-orange-500 animate-pulse font-black text-[10px]";
         }
-
-        // AUTO-LOCK: Prevents stale data from being viewed after multiple failures
-        if (failureCount >= MAX_FAILURES) {
-            console.error("Polling halted after consecutive failures.");
-        }
     }
 }
-/**
- * SESSION LOCKDOWN
- * Logic: Clears sensitive keys and forces a return to the Audio Gate.
- */
+
 function stopPollingAndLock() {
     API_KEY = null;
     localStorage.removeItem('monitor_master_key');
@@ -296,6 +293,22 @@ function stopPollingAndLock() {
     if (gate) gate.classList.remove('hidden');
     alert("🔒 Monitor Session Expired: Please re-enter the Master Security Key.");
 }
+
+// ============================================================================
+// 4. INITIALIZATION
+// ============================================================================
+window.onload = () => {
+    // Standardised storage persistence request
+    if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist();
+    }
+
+    if (API_KEY) {
+        unlockMonitor();
+    }
+    
+    initMap(); // REQUIRED: Initializes the Leaflet map instance
+};
 
 function handleData(response) { 
     allRows = response.workers; 
