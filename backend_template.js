@@ -52,11 +52,13 @@ function doGet(e) {
           const dist = getRouteDistance(p.start, p.end);
           return sendResponse(e, { status: "success", km: dist });
       } 
-      if(p.test) return (p.key === CONFIG.MASTER_KEY) ? sendResponse(e, {status:"success"}) : sendResponse(e, {status:"error"});
-      if(p.key === CONFIG.MASTER_KEY && !p.action) return sendResponse(e, getDashboardData());
+     // GOLDEN FIX: Support the explicit 'getMonitorData' action
+      if (p.key === CONFIG.MASTER_KEY && (p.action === 'getMonitorData' || !p.action)) {
+          return sendResponse(e, getDashboardData());
+      }
       if(p.action === 'sync') return (p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) ? sendResponse(e, getSyncData(p.worker, p.deviceId)) : sendResponse(e, {status:"error"});
       if(p.action === 'getGlobalForms') return sendResponse(e, getGlobalForms());
-      return sendResponse(e, {status:"error"});
+      return sendResponse(e, {status:"error", message: "Invalid Key or Action"}); 
   } catch(err) { return sendResponse(e, {status:"error", message: err.toString()}); }
 }
 
@@ -781,22 +783,47 @@ function checkOverdueVisits() {
     });
 }
 
+/**
+ * RE-ENGINEERED: Monitor Data Aggregator
+ * Logic: Maps spreadsheet columns to exact JSON keys expected by Monitor App.
+ */
 function getDashboardData() {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Visits');
-    const staffSheet = ss.getSheetByName('Staff');
-    if(!sheet) return {workers: []};
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return {workers: []}; 
-    const startRow = Math.max(2, lastRow - 500); 
-    const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 25).getValues();
-    const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
-    const workers = data.map(r => { let obj = {}; headers.forEach((h, i) => obj[h] = r[i]); return obj; });
-    if(staffSheet) {
-        const sData = staffSheet.getDataRange().getValues();
-        workers.forEach(w => { for(let i=1; i<sData.length; i++) { if(sData[i][0] === w['Worker Name']) { w['WOFExpiry'] = sData[i][6]; } } });
-    }
-    return {workers: workers, escalation_limit: CONFIG.ESCALATION_MINUTES};
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Visits");
+  if (!sheet) return { status: "error", message: "Visits sheet not found" };
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  // 1. RAW LOG: For the 'exportSystemLog' function
+  const allRows = rows.map(row => {
+    let obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+
+  // 2. ACTIVE WORKERS: For the 'renderGrid' and Map
+  // Filters for workers who haven't 'DEPARTED' or 'COMPLETED'
+  const activeWorkers = allRows.filter(r => 
+    r['Alarm Status'] && !['DEPARTED', 'COMPLETED'].includes(r['Alarm Status'].toUpperCase())
+  ).map(r => {
+    return {
+      "Worker Name": r['Worker Name'],
+      "Status": r['Alarm Status'], // Standardised for w.Status check
+      "Location Name": r['Location Name'],
+      "Anticipated Departure Time": r['Anticipated Departure Time'],
+      "Battery Level": r['Battery Level'] || '0',
+      "Worker Phone Number": r['Worker Phone Number'] || '',
+      "gps": r['GPS'] || '0,0'
+    };
+  });
+
+  return {
+    status: "success",
+    workers: activeWorkers,
+    all: allRows.slice(-100) // Returns last 100 rows for the log
+  };
 }
 
 function getGlobalForms() {
@@ -1229,6 +1256,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
