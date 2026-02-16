@@ -368,6 +368,50 @@ window.onload = () => {
     initMap(); // REQUIRED: Initializes the Leaflet map instance
 };
 
+/**
+ * RE-ENGINEERED: Dashboard Infrastructure
+ * Logic: Restores missing helpers required for Map Markers, Log Classes, and Card Dots.
+ */
+let markers = []; // Global marker registry
+
+function getIcon(status) {
+    let color = 'blue';
+    const s = String(status || "").toUpperCase();
+    if (s.includes('SOS') || s.includes('DURESS') || s.includes('PANIC')) color = 'red';
+    else if (s === 'ARRIVED') color = 'green';
+    
+    return new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+}
+
+function getStatusClass(status) {
+    const s = String(status || "").toUpperCase();
+    if (s.includes('SOS') || s.includes('DURESS') || s.includes('PANIC')) return 'bg-red-500/20 text-red-400 border border-red-500/50';
+    if (s === 'ARRIVED') return 'bg-green-500/20 text-green-400 border border-green-500/50';
+    if (s === 'TRAVELLING') return 'bg-blue-500/20 text-blue-400 border border-blue-500/50';
+    return 'bg-slate-500/20 text-slate-400 border border-slate-500/50';
+}
+
+function getStatusDot(status, isOverdue) {
+    if (status === 'DURESS' || status === 'SOS') return 'bg-purple-500 shadow-[0_0_10px_#d946ef]';
+    if (isOverdue) return 'bg-red-500 animate-ping';
+    if (status === 'ARRIVED') return 'bg-green-500';
+    if (status === 'TRAVELLING') return 'bg-blue-500';
+    return 'bg-slate-600';
+}
+
+function zoomToWorker(gps) {
+    if (!gps || gps === '0,0' || !map) return;
+    const coords = gps.split(',').map(Number);
+    map.setView(coords, 16);
+}
+    
 function handleData(response) { 
     allRows = response.workers; 
     workerData = processWorkers(response.workers); 
