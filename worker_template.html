@@ -3703,9 +3703,10 @@ function closeWofWarn() {
     startVisit(true); 
 }
 
-// ============================================================================
-// PHASE 1: TIME EXTENSION - PATCHED
-// ============================================================================
+/**
+ * RE-ENGINEERED: Time Extension with Timer Synchronization
+ * Logic: Updates local expiry, increments total duration, and syncs with backend.
+ */
 function confirmExtension(minutes) {
     const updateTime = () => {
         // 1. Calculate new anticipated departure time
@@ -3713,6 +3714,9 @@ function confirmExtension(minutes) {
         const newDue = currentDue + (minutes * 60000);
         
         state.activeVisit.anticipatedDepartureTime = newDue;
+        
+        // GOLDEN FIX: Increase the total duration budget so the visual timer can recalculate % remaining
+        state.activeVisit.duration += (minutes * 60);
         
         // 2. CRITICAL RESET: Re-enable safety triggers for the new duration
         state.activeVisit.isSafeConfirmed = false; 
@@ -3738,9 +3742,11 @@ function confirmExtension(minutes) {
         saveState();
         
         // 5. Handshake: Log extension to the backend
+        // GOLDEN FIX: Include the ISO timestamp so the Monitor App and Spreadsheet see the new deadline immediately
         processUploadQueue(buildPayload({
             'Alarm Status': 'EXTENDED',
-            'Notes': `Extended ${minutes}m`
+            'Notes': `Extended ${minutes}m`,
+            'Anticipated Departure Time': new Date(newDue).toISOString()
         }));
         
         showToast(`✅ Visit extended by ${minutes} minutes`);
@@ -3757,7 +3763,6 @@ function confirmExtension(minutes) {
         updateTime();
     }
 }
-
 // ============================================================================
 // PHASE 1: MID-VISIT UPDATES
 // ============================================================================
@@ -4871,6 +4876,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
