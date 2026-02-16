@@ -415,41 +415,95 @@ function acknowledgeAlert() {
     stopAlertLoop();
 }
 
-function renderGrid() { 
-    const grid = document.getElementById('workerGrid'); const search = document.getElementById('searchBox').value.toLowerCase(); const now = Date.now(); grid.innerHTML = ''; let activeC = 0; let alertC = 0;
-    workerData.sort((a,b) => (b.status.includes('DURESS') || b.status.includes('EMERGENCY') ? 2000 : 0) - (a.status.includes('DURESS') || a.status.includes('EMERGENCY') ? 2000 : 0));
+/**
+ * UNIFIED RENDER ENGINE
+ * Restores: Search, Counters, Battery, and Resolve buttons.
+ */
+function renderGrid() {
+    const grid = document.getElementById('workerGrid');
+    const search = document.getElementById('searchBox')?.value.toLowerCase() || "";
+    const now = Date.now();
     
-    workerData.forEach(w => { 
-        const isSafe = w.status === 'DEPARTED' || w.status === 'COMPLETED' || w.status.includes('SAFE'); 
-        const isAlert = w.status.includes('EMERGENCY') || w.status.includes('PANIC') || w.status.includes('DURESS'); 
-        if(!isSafe) activeC++; if(isAlert) alertC++; 
-        if (search && !w.name.toLowerCase().includes(search)) return; 
-        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return; 
-        
-        const due = new Date(w.dueTime).getTime(); 
-        const borderClass = isAlert ? (w.status.includes('DURESS') ? 'bd-purple' : 'bd-red') : (!isSafe && due < now ? 'bd-amber' : 'bd-green');
-        const dotClass = isAlert ? (w.status.includes('DURESS') ? 'st-purple' : 'st-red') : (!isSafe && due < now ? 'st-amber' : 'st-ok');
-        
-        let locLabel = w.status.includes("TRAVELLING") && w.travelTarget ? "Destination" : "Location";
-        let locValue = locLabel === "Destination" ? w.travelTarget : w.location;
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    let activeC = 0;
+    let alertC = 0;
 
-        const card = document.createElement('div'); card.className = `card p-4 ${borderClass}`; 
-        card.innerHTML = `
-            <div class="flex justify-between mb-2"><h3 class="font-bold text-white truncate cursor-pointer hover:text-brand" onclick="focusWorker('${w.gps}')">${escapeHtml(w.name)}</h3><div class="status-dot ${dotClass}"></div></div>
-            <div class="space-y-1 text-xs text-gray-300">
-                <div class="flex justify-between"><span>Status</span><span class="font-bold">${escapeHtml(w.status)}</span></div>
-                <div class="flex justify-between"><span>${locLabel}</span><span class="truncate w-32 text-right">${escapeHtml(locValue)}</span></div>
-                <div class="flex justify-between text-gray-500"><span>Battery</span><span>${escapeHtml(w.battery||'--')}%</span></div>
+    // 1. FILTER & COUNTERS
+    let filtered = workerData.filter(w => {
+        const isSafe = ['DEPARTED', 'COMPLETED'].includes(w.Status) || w.Status.includes('SAFE');
+        const isAlert = w.Status.includes('SOS') || w.Status.includes('DURESS') || w.Status.includes('PANIC');
+        
+        if (!isSafe) activeC++;
+        if (isAlert) alertC++;
+
+        // Filter by Search Box
+        if (search && !w['Worker Name'].toLowerCase().includes(search)) return false;
+        
+        // Filter by Active/All Toggle
+        if (currentFilter === 'ACTIVE' && isSafe && !isAlert) return false;
+        
+        return true;
+    });
+
+    // 2. HIGH-PRIORITY SORT
+    filtered.sort((a, b) => {
+        const priority = { 'DURESS': 1, 'SOS': 1, 'PANIC': 1, 'OVERDUE': 2, 'ARRIVED': 3, 'TRAVELLING': 3 };
+        const scoreA = priority[a.Status] || 99;
+        const scoreB = priority[b.Status] || 99;
+        return scoreA - scoreB;
+    });
+
+    // 3. RENDER CARDS
+    grid.innerHTML = filtered.map(w => {
+        const dueTime = new Date(w['Anticipated Departure Time']);
+        const isOverdue = (dueTime < now) && !['DEPARTED', 'DURESS', 'SOS'].includes(w.Status);
+        const isAlert = w.Status.includes('SOS') || w.Status.includes('DURESS');
+        
+        const statusClass = isOverdue ? 'text-red-500 animate-pulse font-black' : 
+                           (isAlert ? 'text-purple-400 font-black' : 'text-blue-400');
+
+        return `
+            <div class="p-4 bg-slate-800/50 border ${isAlert ? 'border-purple-500 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'border-slate-700'} rounded-xl transition-all">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full ${getStatusDot(w.Status, isOverdue)}"></span>
+                        <h3 class="font-bold text-white truncate max-w-[150px]">${w['Worker Name']}</h3>
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-bold">🔋 ${w['Battery Level'] || '--'}</div>
+                </div>
+
+                <div class="space-y-1 mb-4">
+                    <div class="flex justify-between text-[11px] uppercase tracking-tighter">
+                        <span class="text-slate-500">Status</span>
+                        <span class="${statusClass}">${isOverdue ? '⚠️ OVERDUE' : w.Status}</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] uppercase tracking-tighter">
+                        <span class="text-slate-500">Location</span>
+                        <span class="text-slate-300 truncate w-32 text-right">${w['Location Name'] || 'Unknown'}</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="zoomToWorker('${w['Worker Name']}')" class="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-xs font-bold">📍 MAP</button>
+                    <a href="tel:${w['Worker Phone Number']}" class="bg-blue-600/20 text-blue-400 text-center py-2 rounded text-xs font-bold border border-blue-500/30">📞 CALL</a>
+                </div>
+
+                ${isAlert ? `
+                    <button onclick="openResolve('${w['Worker Name']}')" class="mt-2 w-full bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold text-white shadow-lg">
+                        RESOLVE ALERT
+                    </button>
+                ` : ''}
             </div>
-            <div class="mt-3 grid grid-cols-2 gap-2">
-                <button onclick="focusWorker('${w.gps}')" class="text-brand bg-brand/20 py-2 rounded text-xs font-bold">📍 Map</button>
-                <a href="tel:${w.phone}" class="bg-gray-700 text-white text-center py-2 rounded text-xs font-bold">📞 Call</a>
-            </div>
-            ${isAlert ? `<button onclick="openResolve('${escapeHtml(w.name)}')" class="mt-2 w-full bg-green-600 py-2 rounded text-xs font-bold text-white">RESOLVE ALERT</button>` : ''}
-        `; 
-        grid.appendChild(card); 
-    }); 
-    document.getElementById('activeCount').innerText = activeC; document.getElementById('alertCount').innerText = alertC; 
+        `;
+    }).join('');
+
+    // 4. UPDATE DOM COUNTERS
+    const activeEl = document.getElementById('activeCount');
+    const alertEl = document.getElementById('alertCount');
+    if (activeEl) activeEl.innerText = activeC;
+    if (alertEl) alertEl.innerText = alertC;
 }
 
 function escapeHtml(text) { return text ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : ""; }
