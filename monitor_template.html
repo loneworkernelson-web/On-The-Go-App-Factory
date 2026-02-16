@@ -288,18 +288,24 @@ async function fetchData() {
     const statusLabel = document.getElementById('connectionStatus');
 
     try {
+        console.log("🔄 Attempting to sync with Backend..."); // Diagnostic
         const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
-        if (!resp.ok) throw new Error("Offline");
+        
+        if (!resp.ok) {
+            console.error(`❌ HTTP Error: ${resp.status} ${resp.statusText}`);
+            throw new Error("Offline");
+        }
         
         const data = await resp.json();
+        console.log("✅ Data Received:", data); // Diagnostic
 
-        // FIXED: Optional chaining (?.) prevents the crash that kept the login screen visible
         if (data.status === "error" && data.message?.includes("Key")) {
+            console.warn("⚠️ Invalid Security Key - Locking Session");
             return stopPollingAndLock(); 
         }
 
         if (data.status === "success" || data.workers) {
-            lastHeartbeat = Date.now();
+            lastHeartbeat = Date.now(); // This stops the "Lost Connection" alarm
             failureCount = 0; 
             if (statusLabel) {
                 statusLabel.innerText = "● LIVE";
@@ -308,11 +314,15 @@ async function fetchData() {
             if(data.workers) handleData(data);
         }
     } catch (e) {
-        // GOLDEN FIX: Log the actual error to the console for debugging
-        console.error("Dashboard Fetch Failure:", e);
+        console.error("🚨 Fetch Execution Error:", e); // Diagnostic
         
         if (e.message?.includes('connection') || e.message?.includes('Receiving end')) return;
+        
         failureCount++;
+        if (statusLabel) {
+            statusLabel.innerText = "● RECONNECTING...";
+            statusLabel.className = "text-orange-500 animate-pulse font-black text-[10px]";
+        }
     }
 }
 
