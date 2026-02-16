@@ -248,9 +248,12 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
-    // 1. DUPICATE GUARD: Prevents overlapping audio loops
+    // 1. DUPICATE GUARD & HEARTBEAT RESET
     if (isPollingActive) return; 
     isPollingActive = true;
+    
+    // GOLDEN FIX: Reset heartbeat to 'now' so the alarm doesn't trip immediately
+    lastHeartbeat = Date.now(); 
 
     fetchData(); 
     activeIntervals.push(setInterval(fetchData, 10000)); 
@@ -305,6 +308,9 @@ async function fetchData() {
             if(data.workers) handleData(data);
         }
     } catch (e) {
+        // GOLDEN FIX: Log the actual error to the console for debugging
+        console.error("Dashboard Fetch Failure:", e);
+        
         if (e.message?.includes('connection') || e.message?.includes('Receiving end')) return;
         failureCount++;
     }
