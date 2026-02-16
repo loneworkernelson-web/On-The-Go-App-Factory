@@ -57,13 +57,25 @@
         .map-icon.red { background: #ef4444; animation: blinker 0.8s linear infinite; box-shadow: 0 0 20px #ef4444; }
         .map-icon.purple { background: #d946ef; animation: blinker 0.3s linear infinite; box-shadow: 0 0 25px #d946ef; }
         .map-icon.green { background: #10b981; }
-        
-        #audioGate { position: fixed; inset: 0; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; p-4; }
+
+        /* 2. GOLDEN FIX: Use a CLASS for the layout to ensure .hidden works */
+        .audio-gate-layout { 
+            position: fixed; 
+            inset: 0; 
+            background: #0f172a; 
+            z-index: 9999; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 1rem; 
+        }
+
+        @keyframes blinker { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
-<div id="audioGate" class="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+<div id="audioGate" class="audio-gate-layout bg-black/90 backdrop-blur-md">
     <div class="bg-gray-800 border-2 border-blue-500 rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 text-center">
         <div class="text-7xl mb-6">🛡️</div>
         <h1 class="text-3xl font-black text-white mb-2 uppercase tracking-tight">Monitor Dashboard</h1>
@@ -157,7 +169,7 @@
 // ============================================================================
 const SCRIPT_URL = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%"; 
-let API_KEY = localStorage.getItem('monitor_master_key'); 
+let API_KEY = localStorage.getItem('monitor_master_key') || null; 
 
 // Dashboard State variables required by handleData and initMap
 let workerData = []; 
@@ -175,6 +187,8 @@ let lastHeartbeat = Date.now();
 // Resilient Engine variables
 let failureCount = 0;
 const MAX_FAILURES = 3;
+
+let isPollingActive = false; // Guard against multiple login clicks
 
 // ============================================================================
 // 2. SECURITY GATE & AUDIO INITIALIZATION
@@ -226,33 +240,34 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
+    if (isPollingActive) return;
+    isPollingActive = true;
+
     fetchData(); 
     setInterval(fetchData, 10000); 
     setInterval(renderGrid, 1000);  
     
-    // FIXED: High-integrity audio keep-alive
-    // Uses a staggered start time to prevent "Start time must be strictly greater" error.
+    // GOLDEN FIX: Reduced velocity to 0.0001 (inaudible) and added guard
     setInterval(() => { 
         if (audioEnabled && synth && Tone.context.state === 'running') {
             try { 
-                // Scheduling the release slightly after the attack to avoid overlap
                 const now = Tone.now();
-                synth.triggerAttackRelease("C1", "1n", now + 0.1, 0.001); 
+                // Frequency shifted to 10Hz (below human hearing) at ultra-low volume
+                synth.triggerAttackRelease(10, "1n", now + 0.1, 0.0001); 
             } catch(e) {
-                console.warn("Audio scheduling skipped to prevent crash.");
+                console.warn("Audio maintenance skipped.");
             } 
         }
     }, 25000);
 
     setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
-        if (!ol) return;
-        if (Date.now() - lastHeartbeat > 60000) { 
-            ol.classList.remove('hidden'); 
-            if(audioEnabled) playSound('offline'); 
-        } else { 
-            ol.classList.add('hidden'); 
+        if (!ol || Date.now() - lastHeartbeat < 60000) {
+            if (ol) ol.classList.add('hidden');
+            return;
         }
+        ol.classList.remove('hidden'); 
+        if(audioEnabled) playSound('offline'); 
     }, 10000);
 }
 
