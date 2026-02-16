@@ -248,35 +248,29 @@ async function unlockMonitor(e) {
  * Fixed: Resolved Tone.js scheduling conflict causing dashboard hang.
  */
 function startPolling() {
-    // Prevent duplicate loops if already running
-    if (isPollingActive) return;
+    if (isPollingActive) return; // Exit if already running
     isPollingActive = true;
 
     fetchData(); 
-    
-    // Capture Interval IDs in the tracking array
     activeIntervals.push(setInterval(fetchData, 10000)); 
     activeIntervals.push(setInterval(renderGrid, 1000));  
     
-    // Silent Audio Kick (Maintenance Loop)
+    // GOLDEN FIX: Silent 10Hz tone at 0.0001 volume
     activeIntervals.push(setInterval(() => { 
         if (audioEnabled && synth && Tone.context.state === 'running') {
             try { 
                 const now = Tone.now();
-                // Frequency 10Hz @ 0.0001 velocity for true silence
                 synth.triggerAttackRelease(10, "1n", now + 0.1, 0.0001); 
             } catch(e) {} 
         }
     }, 25000));
 
-    // Connection Monitor Loop
     activeIntervals.push(setInterval(() => {
         const ol = document.getElementById('connectionOverlay');
-        if (!ol) return;
-        if (Date.now() - lastHeartbeat > 60000) { 
+        if (ol && Date.now() - lastHeartbeat > 60000) { 
             ol.classList.remove('hidden'); 
             if(audioEnabled) playSound('offline'); 
-        } else { 
+        } else if (ol) { 
             ol.classList.add('hidden'); 
         }
     }, 10000));
@@ -284,16 +278,16 @@ function startPolling() {
 
 async function fetchData() { 
     if(!API_KEY) return;
-    
     const statusLabel = document.getElementById('connectionStatus');
 
     try {
         const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
-        if (!resp.ok) throw new Error("Connection Unstable");
+        if (!resp.ok) throw new Error("Offline");
         
         const data = await resp.json();
 
-        if (data.status === "error" && data.message.includes("Key")) {
+        // FIXED: Optional chaining (?.) prevents crashing if 'message' is missing
+        if (data.status === "error" && data.message?.includes("Key")) {
             return stopPollingAndLock(); 
         }
 
@@ -307,11 +301,8 @@ async function fetchData() {
             if(data.workers) handleData(data);
         }
     } catch (e) {
-        // FIXED: Gracefully handle communication interruptions
-        if (e.message.includes('connection') || e.message.includes('Receiving end')) {
-            console.warn("Handshake interrupted; retrying in next cycle.");
-            return; 
-        }
+        // Silences browser extension noise
+        if (e.message?.includes('connection') || e.message?.includes('Receiving end')) return;
         
         failureCount++;
         if (statusLabel) {
