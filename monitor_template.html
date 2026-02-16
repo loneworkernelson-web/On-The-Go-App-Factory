@@ -535,7 +535,30 @@ function renderMap() {
 function focusWorker(gps) { if(!gps) return; document.getElementById('btnMap').click(); setTimeout(() => { const [lat, lng] = gps.split(',').map(Number); mapInstance.flyTo([lat, lng], 17); }, 200); }
 function toggleView(view) { currentView = view; document.getElementById('workerGrid').classList.toggle('hidden', view === 'MAP'); document.getElementById('mapView').classList.toggle('hidden', view === 'GRID'); if(view === 'MAP') { initMap(); renderMap(); } }
 function renderLog() { document.getElementById('eventLogList').innerHTML = [...allRows].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0, 100).map(r => `<div class="text-xs mb-1"><span class="text-gray-500">${new Date(r['Timestamp']).toLocaleTimeString()}</span> <span class="text-white italic">${escapeHtml(r['Worker Name'])}: ${escapeHtml(r['Alarm Status'])}</span></div>`).join(''); }
-function openResolve(name) { document.getElementById('resolveModal').classList.remove('hidden'); document.getElementById('resWorkerNameDisplay').innerText = name; }
+/**
+ * HIGH-INTEGRITY ALERT RESOLUTION
+ * Logic: Pre-fills and locks the worker's name to prevent identity mismatch.
+ */
+function openResolve(name) {
+    const modal = document.getElementById('resolveModal');
+    const displayEl = document.getElementById('resWorkerNameDisplay');
+    const inputEl = document.getElementById('resNameInput');
+    const noteEl = document.getElementById('resNoteInput');
+
+    if (!modal || !displayEl || !inputEl) return;
+
+    // 1. IDENTITY LOCK: Set the name for visual confirmation and backend validation
+    displayEl.innerText = name; 
+    inputEl.value = name; 
+    
+    // 2. UI RESET: Clear previous notes for the new resolution
+    if (noteEl) noteEl.value = '';
+    
+    // 3. SHOW MODAL
+    modal.classList.remove('hidden');
+    
+    console.log(`Resolution interface opened for: ${name}`);
+}
 function closeResolve() { document.getElementById('resolveModal').classList.add('hidden'); }
 function submitResolution() { 
     const target = document.getElementById('resWorkerNameDisplay').innerText; 
