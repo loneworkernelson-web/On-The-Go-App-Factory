@@ -1719,6 +1719,10 @@ function buildReportForm(templateName, fieldArea) {
  * PATCHED: Universal Context-Aware Form Display
  * Ensures auto-population works from both Site Info AND during active visits.
  */
+/**
+ * RE-ENGINEERED: Universal Context-Aware Form Display
+ * Resolves: Extra syntax braces, 1.8s hold integration, and context-aware population.
+ */
 function loadFormAndShow(templateName, context = null) {
     if (typeof dimTimer !== 'undefined') clearTimeout(dimTimer);
     if (typeof deactivateDimMode === 'function') deactivateDimMode();
@@ -1750,7 +1754,7 @@ function loadFormAndShow(templateName, context = null) {
         buildReportForm(templateName, fieldsContainer);
     }
     
-    // Signature Pad Initialization
+    // Signature Pad Initialisation
     setTimeout(() => {
         const canvases = document.querySelectorAll('canvas[id^="sig-canvas-"]');
         canvases.forEach(canvas => {
@@ -1797,7 +1801,7 @@ function loadFormAndShow(templateName, context = null) {
                     el.classList.add('bg-blue-900/10');
                 }
             });
-        }, 500); // Increased delay to 500ms for high-reliability field targeting
+        }, 500); 
     }
     
     // GOLDEN FIX: Every form submission now requires a 1.8s long-press
@@ -1821,7 +1825,6 @@ function loadFormAndShow(templateName, context = null) {
         
         // Standardises the hold duration to 1.8 seconds (1800ms)
         setupLongPress(newBtn, 1800, submitReport); 
-    }
     }
 }
     
@@ -2503,14 +2506,12 @@ function toggleHighRiskUI() {
  * 1A. Travel Tile: Toggles Travel Mode
  */
 function createTravelTile() {
-    const isActive = state && state.isTravelActive; // Changed from ID check
+    const isActive = state && state.isTravelActive;
     const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
     
     const tile = document.createElement('div');
     tile.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${
-        isActive 
-            ? 'border-white scale-[1.02] ring-2 ring-purple-400' 
-            : 'border-gray-700 hover:border-white/20'
+        isActive ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-gray-700 hover:border-white/20'
     } bg-gradient-to-r from-indigo-600 to-purple-700`;
     
     tile.innerHTML = `
@@ -2525,13 +2526,15 @@ function createTravelTile() {
     
     tile.onclick = () => {
         state.isTravelActive = !state.isTravelActive;
-        // RESET: Force user to pick a new duration for travel
         const slider = document.getElementById('durationSlider');
         if (slider) { slider.value = 0; updateDurationDisplay(); }
         renderLocations();
         updateArrivedButtonState();
     };
+    return tile; // FIXED: Added return
+} // FIXED: Added closing brace
 
+    
 /**
  * UPDATED: Location Tile with Information Button
  */
@@ -4853,6 +4856,7 @@ function renderNoticeArchive() {
 
 </body>
 </html>
+
 
 
 
