@@ -439,8 +439,8 @@ function handleData(response) {
 }
 
 /**
- * RE-ENGINEERED: Worker Data Processor
- * Alignment: Matches keys exactly to renderGrid() requirements.
+ * RE-ENGINEERED: Worker Data Processor with Alias Support
+ * Logic: Provides full keys for UI rendering and shorthand aliases for system logic.
  */
 function processWorkers(rows) { 
     const workers = {}; 
@@ -457,9 +457,9 @@ function processWorkers(rows) {
         if(!history[name]) history[name] = [];
         if(r['Last Known GPS']?.includes(',')) history[name].push(r['Last Known GPS']);
 
-        // Maintain original spreadsheet keys for renderGrid consistency
         if (!workers[name] || timestamp > workers[name].timestamp) { 
             workers[name] = { 
+                // Full Descriptive Keys for renderGrid()
                 "Worker Name": name,
                 "Status": r['Alarm Status'] || "Unknown",
                 "Worker Phone Number": r['Worker Phone Number'], 
@@ -467,7 +467,16 @@ function processWorkers(rows) {
                 "Last Known GPS": r['Last Known GPS'], 
                 "Battery Level": r['Battery Level'], 
                 "Anticipated Departure Time": r['Anticipated Departure Time'],
-                "timestamp": timestamp
+                "timestamp": timestamp,
+
+                // Shorthand Aliases for handleData, renderMap, and map buttons
+                name: name,
+                status: r['Alarm Status'] || "Unknown",
+                gps: r['Last Known GPS'],
+                phone: r['Worker Phone Number'],
+                battery: r['Battery Level'],
+                location: r['Location Name'] || r['Location Address'] || "Unknown",
+                dueTime: r['Anticipated Departure Time']
             }; 
         } 
     }); 
@@ -478,6 +487,7 @@ function processWorkers(rows) {
     
     return Object.values(workers); 
 }
+    
 // RESTORED: Alert Loop Logic
 function startAlertLoop() {
     if (alertLoopInterval) return;
