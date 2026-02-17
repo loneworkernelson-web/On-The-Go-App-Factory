@@ -512,23 +512,36 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </label>
         </div>
         
-        <!-- Duration Slider -->
-        <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
-            <div class="flex justify-between mb-2 font-black tracking-tighter">
-                <span class="text-gray-400 text-xs uppercase font-black">TIME</span>
-                <span id="durationDisplay" class="text-sm text-blue-400">0 mins</span>
-            </div>
-            <input id="durationSlider" type="range" min="0" max="31" value="0" 
-                   class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" 
-                   oninput="updateDurationDisplay()">
-        <div class="flex gap-2 mt-2">
-            <button onclick="setQuickDuration(15)" class="flex-1 py-1 bg-gray-700/50 rounded text-xs font-black uppercase text-blue-400 border border-blue-500/20">15 min</button>
-            <button onclick="setQuickDuration(30)" class="flex-1 py-1 bg-gray-700/50 rounded text-xs font-black uppercase text-blue-400 border border-blue-500/20">30 min</button>
-            <button onclick="setQuickDuration(60)" class="flex-1 py-1 bg-gray-700/50 rounded text-xs font-black uppercase text-blue-400 border border-blue-500/20">1 hr</button>
-            <button onclick="setQuickDuration(120)" class="flex-1 py-1 bg-gray-700/50 rounded text-xs font-black uppercase text-blue-400 border border-blue-500/20">2 hr</button>
+<!-- Duration Selector -->
+<div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
+    <div class="flex justify-between items-center mb-3">
+        <span class="text-gray-400 text-xs font-black">Expected Duration</span>
+        <div id="durationDisplay" class="text-right">
+            <span class="text-blue-400 font-black text-sm">0 min</span>
         </div>
-        </div>
+    </div>
 
+    <!-- Quick presets ABOVE slider -->
+    <div class="grid grid-cols-4 gap-1.5 mb-3">
+        <button onclick="setQuickDuration(15)"  class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">15m</button>
+        <button onclick="setQuickDuration(30)"  class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">30m</button>
+        <button onclick="setQuickDuration(45)"  class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">45m</button>
+        <button onclick="setQuickDuration(60)"  class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">1 hr</button>
+        <button onclick="setQuickDuration(90)"  class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">1½ hr</button>
+        <button onclick="setQuickDuration(120)" class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">2 hr</button>
+        <button onclick="setQuickDuration(180)" class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">3 hr</button>
+        <button onclick="setQuickDuration(240)" class="dur-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">4 hr</button>
+    </div>
+
+    <!-- Fine-tune slider -->
+    <input id="durationSlider" type="range" min="0" max="31" value="0" 
+           class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider-thumb" 
+           oninput="updateDurationDisplay()">
+    <div class="flex justify-between mt-1">
+        <span class="text-[9px] text-gray-600">10 min</span>
+        <span class="text-[9px] text-gray-600">8 hr</span>
+    </div>
+</div>
         
         <!-- Forms Button + Hold to Start Button -->
 <div class="flex gap-3 h-16 items-stretch">
@@ -2414,6 +2427,11 @@ window.addEventListener('beforeunload', () => {
 
 // Update duration display when slider moves
 function updateDurationDisplay() {
+    // Clear preset highlights when manually sliding
+    document.querySelectorAll('.dur-btn').forEach(b => {
+        b.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+        b.classList.add('bg-gray-700/50', 'text-gray-400', 'border-gray-600');
+    });
     const slider = document.getElementById('durationSlider');
     if (!slider) return;
     
@@ -2442,9 +2460,19 @@ function setQuickDuration(mins) {
     if (idx !== -1) {
         slider.value = idx;
         updateDurationDisplay(); 
-        // Force the Start button to re-check its enabled/disabled status
         updateArrivedButtonState(); 
         if (navigator.vibrate) navigator.vibrate(15);
+    }
+    // Highlight active preset
+    document.querySelectorAll('.dur-btn').forEach(b => {
+        b.classList.remove('bg-blue-600', 'text-white', 'border-blue-500');
+        b.classList.add('bg-gray-700/50', 'text-gray-400', 'border-gray-600');
+    });
+    const match = [...document.querySelectorAll('.dur-btn')].find(b => 
+        b.getAttribute('onclick')?.includes(`(${mins})`));
+    if (match) {
+        match.classList.remove('bg-gray-700/50', 'text-gray-400', 'border-gray-600');
+        match.classList.add('bg-blue-600', 'text-white', 'border-blue-500');
     }
 }
     
@@ -4931,6 +4959,7 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
 
 
 
