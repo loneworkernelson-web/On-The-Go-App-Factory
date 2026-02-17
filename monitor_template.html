@@ -291,6 +291,7 @@ async function fetchData() {
 
     try {
         console.log("🔄 Attempting to sync with Backend..."); // Diagnostic
+        // Added explicit action and cache-busting callback
         const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
         
         if (!resp.ok) {
@@ -313,7 +314,18 @@ async function fetchData() {
                 statusLabel.innerText = "● LIVE";
                 statusLabel.className = "text-green-500 font-black text-[10px]";
             }
-            if(data.workers) handleData(data);
+
+            // ISSUE 2 FIX: Correctly populate active workers and history archives
+            if (data.workers) {
+                // 1. Process active workers using the 'Belt and Braces' alias logic
+                workerData = typeof processWorkers === 'function' ? processWorkers(data.workers) : data.workers;
+                
+                // 2. GOLDEN FIX: allRows must pull from 'data.all' to support the Activity Log and CSV
+                allRows = data.all || data.workers; 
+
+                // 3. Trigger alert processing and UI updates
+                handleData(data); 
+            }
         }
     } catch (e) {
         console.error("🚨 Fetch Execution Error:", e); // Diagnostic
@@ -373,22 +385,6 @@ window.onload = () => {
  * Logic: Restores missing helpers required for Map Markers, Log Classes, and Card Dots.
  */
 let markers = []; // Global marker registry
-
-function getIcon(status) {
-    let color = 'blue';
-    const s = String(status || "").toUpperCase();
-    if (s.includes('SOS') || s.includes('DURESS') || s.includes('PANIC')) color = 'red';
-    else if (s === 'ARRIVED') color = 'green';
-    
-    return new L.Icon({
-        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
-    });
-}
 
 function getStatusClass(status) {
     const s = String(status || "").toUpperCase();
@@ -732,6 +728,14 @@ async function secureStoreKey(key) {
         iv: Array.from(iv),
         data: Array.from(new Uint8Array(cipher))
     }));
+}
+function setFilter(f) {
+    currentFilter = f;
+    // Update UI button states
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('onclick').includes(f));
+    });
+    renderGrid();
 }
     
 </script>
