@@ -72,7 +72,7 @@ function doPost(e) {
   const p = e.parameter;
   const key = p.key;
   // Identify sensitive actions that require admin-level clearance
-  const isAdminAction = ['resolve', 'acknowledgeNotice', 'uploadEmergencyProcedures', 'notifySafety'].includes(p.action);
+  const isAdminAction = ['resolve'].includes(p.action)
 
   // 1. SECURITY: Enforce Master Key for admin-only actions
   if (isAdminAction && key !== CONFIG.MASTER_KEY) {
@@ -81,9 +81,6 @@ function doPost(e) {
 
   // 2. SECURITY: Validate key access and enforce 32-character entropy standard
   if (key !== CONFIG.MASTER_KEY && key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
-  if (key === CONFIG.MASTER_KEY && key.length !== 32) {
-      return sendJSON({status:"error", message: "Security standard violation: Key must be 32 characters"});
-  }
 
   const lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) { 
@@ -1298,6 +1295,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
