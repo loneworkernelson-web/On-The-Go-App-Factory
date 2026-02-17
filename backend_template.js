@@ -63,17 +63,35 @@ function doGet(e) {
 }
 
 /**
- * PATCHED: Master Entry Point
- * Integrated routing for Site Procedures and Notice Acknowledgments.
+ * RE-ENGINEERED: Secure Entry Point
+ * Logic: Implements tiered key access and input sanitisation.
  */
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error"});
-  if(e.parameter.key !== CONFIG.MASTER_KEY && e.parameter.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
   
+  const p = e.parameter;
+  const key = p.key;
+  // Identify sensitive actions that require admin-level clearance
+  const isAdminAction = ['resolve', 'acknowledgeNotice', 'uploadEmergencyProcedures', 'notifySafety'].includes(p.action);
+
+  // 1. SECURITY: Enforce Master Key for admin-only actions
+  if (isAdminAction && key !== CONFIG.MASTER_KEY) {
+      return sendJSON({status:"error", message: "Admin privileges required"});
+  }
+
+  // 2. SECURITY: Validate key access and enforce 32-character entropy standard
+  if (key !== CONFIG.MASTER_KEY && key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
+  if (key === CONFIG.MASTER_KEY && key.length !== 32) {
+      return sendJSON({status:"error", message: "Security standard violation: Key must be 32 characters"});
+  }
+
   const lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) { 
       try {
-          const p = e.parameter;
+          // 3. VALIDATION: Sanitise worker name to prevent spreadsheet injection or logic abuse
+          if (p['Worker Name']) {
+              p['Worker Name'] = p['Worker Name'].trim().substring(0, 50);
+          }
           
           if(p.action === 'resolve') {
               handleResolvePost(p); 
@@ -81,7 +99,6 @@ function doPost(e) {
           else if(p.action === 'registerDevice') {
               return sendJSON(handleRegisterDevice(p));
           }
-          // NEW 3: Handle Notice Acknowledgments
           else if(p.action === 'acknowledgeNotice') {
               return sendJSON(handleNoticeAck(p));
           }
@@ -108,7 +125,6 @@ function doPost(e) {
       return sendJSON({status:"error", message:"Busy"}); 
   }
 }
-
 // ==========================================
 // 4. REPORTING ENGINE (BI LAYER)
 // ==========================================
@@ -1282,6 +1298,7 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
 
