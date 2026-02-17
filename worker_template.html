@@ -289,10 +289,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white">
     
     <div class="text-center space-y-4">
-        <div class="space-y-1">
+        <div class="space-y-1 cursor-pointer active:opacity-50 transition-opacity" onclick="triggerPeek()">
             <p class="text-[10px] font-black tracking-[0.4em] text-gray-600 uppercase">Shake Vigorously for SOS</p>
             <p id="saverTimerHUD" class="text-4xl font-mono font-bold text-gray-300">--:--</p>
-            <p class="text-[9px] text-gray-700 font-bold uppercase tracking-widest">(Syncing every 30s)</p>
+            <p class="text-[9px] text-gray-700 font-bold uppercase tracking-widest">Tap Numbers to Peek</p>
         </div>
         
         <div class="flex items-center justify-center gap-2 text-gray-500">
@@ -318,13 +318,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <div class="w-full flex justify-center">
                 <span class="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em] transition-opacity duration-200" id="slideLabel">Slide to Wake</span>
             </div>
-        </div> <div class="text-center">
+        </div>
+
+        <div class="text-center">
             <div class="inline-flex items-center gap-2 bg-red-900/10 border border-red-900/30 rounded-full px-5 py-2">
                 <span class="text-red-600 text-lg">🆘</span>
                 <span class="text-red-700 text-[10px] font-black uppercase tracking-widest">SOS accessible anytime</span>
             </div>
         </div>
-    </div> </div>
+    </div>
+</div>
 
 <div id="setupPage" class="page">
     <div class="header-bar">
@@ -5010,9 +5013,45 @@ function updateBatterySaverHUD() {
         if (battBarHUD) battBarHUD.style.width = `${state.battery}%`;
     }
 }
+
+function checkWakeSlider(el) {
+    const val = parseInt(el.value);
+    const thumb = document.getElementById('sliderThumb');
+    const label = document.getElementById('slideLabel'); 
+    
+    if (thumb) {
+        // Calculate the physical movement of the white button
+        const offset = (val / 100) * (el.offsetWidth - 56); 
+        thumb.style.transform = `translateX(${offset}px)`;
+    }
+    
+    // Smoothly fades the 'Slide to Wake' text as the thumb moves
+    if (label) label.style.opacity = (100 - val) / 100;
+
+    // Trigger the wake-up once the slide reaches 90% completion
+    if (val >= 90) {
+        el.value = 0; // Reset the range input
+        if (thumb) thumb.style.transform = `translateX(0px)`;
+        if (label) label.style.opacity = 1;
+        toggleBatterySaver(); // Restore the full visit screen
+    }
+}
+
+/**
+ * UI LOGIC: Safe Peek
+ * Logic: Forces a single update of the HUD timer when the timer area is tapped.
+ */
+function triggerPeek() {
+    console.log("Peek triggered: Syncing HUD timer...");
+    if (typeof updateBatterySaverHUD === 'function') {
+        updateBatterySaverHUD(); // Force an immediate refresh of the dark-mode stats
+        if (navigator.vibrate) navigator.vibrate(10); // Subtle haptic confirmation
+    }
+}
 </script>
 
 </body>
 </html>
+
 
 
