@@ -2033,9 +2033,10 @@ function iamSafe() {
         showToast("✅ Safety status confirmed");
     });
 }
-// ============================================================================
-// SAFETY HEARTBEAT (tick) - PATCHED
-// ============================================================================
+/**
+ * RE-ENGINEERED: High-Integrity Safety Heartbeat
+ * Logic: 5m Vibration, 2m Verbal Alarm, Negative Counter, and 15m Grace Period.
+ */
 function tick() {
     const gpsIndicator = document.getElementById('gpsIndicator');
     if (gpsIndicator && state.activeVisit) {
@@ -2045,56 +2046,49 @@ function tick() {
             gpsIndicator.classList.remove('gps-pulse');
         }
     }
+
     if (state && state.activeVisit) {
-        const remaining = state.activeVisit.duration - (Date.now() - state.activeVisit.startTime) / 1000;
-        
-        // NEW: Escalating Haptic Heartbeat (vibrate every 10s)
-        if (remaining <= 120 && remaining > 0 && navigator.vibrate) {
-            if (Math.floor(remaining) % 10 === 0) {
-                if (remaining <= 30) {
-                    // URGENT: Triple pulse (Final 30 seconds)
-                    navigator.vibrate([100, 50, 100, 50, 100]);
-                } else if (remaining <= 60) {
-                    // WARNING: Double pulse (Final minute)
-                    navigator.vibrate([100, 50, 100]);
-                } else {
-                    // ALERT: Single pulse (2-minute mark)
-                    navigator.vibrate([100]);
-                }
-            }
-        }
-        // 1. GPS TRIGGER: Only if overdue and NOT already watching
-        if (remaining <= 0 && gpsWatchId === null) {
-            startGPSMonitoring();
-        }
-        
-        // 2. PHASE 1: Multiple warning levels (Only fire if time is still remaining)
+        const now = Date.now();
+        const remaining = state.activeVisit.duration - (now - state.activeVisit.startTime) / 1000;
+        const diffMins = (state.activeVisit.anticipatedDepartureTime - now) / 60000;
+
+        // 1. WARNING ESCALATION (PRE-EXPIRY)
         if (remaining > 0) {
-            if (remaining <= 300 && remaining > 299 && !state.activeVisit.warn5minSent) {
-                playWarningSound('warning');
+            // 5-Minute Warning: STRONG VIBRATIONS ONLY
+            if (diffMins <= 5 && diffMins > 4.9 && !state.activeVisit.warn5minSent) {
+                if (navigator.vibrate) navigator.vibrate([800, 200, 800, 200, 800]);
                 state.activeVisit.warn5minSent = true;
                 saveState();
             }
-            if (remaining <= 120 && remaining > 119 && !state.activeVisit.warn2minSent) {
-                playWarningSound('warning');
-                speakWarning("Warning. Safety alarm will activate in two minutes.");
+            // 2-Minute Warning: LOUD VERBAL ALARM + VIBRATION
+            if (diffMins <= 2 && diffMins > 1.9 && !state.activeVisit.warn2minSent) {
+                if (navigator.vibrate) navigator.vibrate([1000, 500, 1000]);
+                speakWarning("Warning. Safety alarm will activate in two minutes. Please extend visit time, or end visit.");
                 state.activeVisit.warn2minSent = true;
                 saveState();
             }
-            if (remaining <= 90 && remaining > 89 && !state.activeVisit.warn90Sent) {
-                playWarningSound('critical');
-                speakWarning("Critical Warning. Safety alarm will activate in 90 seconds.");
-                state.activeVisit.warn90Sent = true;
-                saveState();
-            }
         }
-        
+
         const timerEl = document.getElementById('countdownTimer');
         const overdueLabel = document.getElementById('overdueLabel');
         const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
         
+        // 2. OVERDUE & GRACE PERIOD LOGIC
         if (remaining <= 0) {
-            // 1. Wake screen and activate Overdue UI
+            const isAlarmed = state.activeVisit.criticalSent; // Flag for 15m grace expiry
+
+            // GPS PUSH: Send location immediately upon becoming overdue
+            if (!state.activeVisit.overdueGpsSent) {
+                if (typeof startGPSMonitoring === 'function') startGPSMonitoring();
+                processUploadQueue(buildPayload({
+                    'Alarm Status': 'OVERDUE',
+                    'Notes': 'Worker is overdue. GPS tracking active.',
+                    'Last Known GPS': lastGPS || "0,0"
+                }));
+                state.activeVisit.overdueGpsSent = true;
+                saveState();
+            }
+
             if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
             if (overdueLabel) overdueLabel.classList.remove('hidden');
             
@@ -2103,40 +2097,40 @@ function tick() {
             const secs = Math.floor(absRemaining % 60);
             
             if (timerEl) {
-                if (mins >= 60) {
-                    timerEl.innerHTML = `-${Math.floor(mins/60)} hr ${mins%60} min`;
-                } else {
-                    timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
-                }
+                timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
                 timerEl.classList.add('text-red-500', 'animate-pulse');
             }
             
-            // 2. SAFETY BUTTON TOGGLE: Only update if not already confirmed safe
-            if (!state.activeVisit.isSafeConfirmed) {
-                const btnSafe = document.getElementById('btnSafe');
-                const btnDepart = document.getElementById('btnDepart');
-                const btnExtend = document.getElementById('btnExtend');
+            // 3. 15-MINUTE GRACE EXPIRY CHECK
+            if (Math.abs(diffMins) >= 15 && !isAlarmed) {
+                triggerGraceExpiryAlarm();
+            }
+
+            // 4. BUTTON VISIBILITY: Show 'I Am Safe' ONLY if Alarm is active
+            const btnSafe = document.getElementById('btnSafe');
+            const btnDepart = document.getElementById('btnDepart');
+            const btnExtend = document.getElementById('btnExtend');
+
+            if (isAlarmed) {
                 if (btnSafe) btnSafe.classList.remove('hidden');
                 if (btnDepart) btnDepart.classList.add('hidden');
-                if (btnExtend) btnExtend.classList.add('hidden');
-
-                // GOLDEN FIX: Automatic trigger removed. Panic now requires manual SOS or manager intervention.
+                if (btnExtend) btnExtend.classList.remove('hidden'); // Extend stays available
+            } else {
+                // In 0-15m Grace Period: Keep Depart and Extend, Hide Safe
+                if (btnSafe) btnSafe.classList.add('hidden');
+                if (btnDepart) btnDepart.classList.remove('hidden');
+                if (btnExtend) btnExtend.classList.remove('hidden');
             }
         } else {
-            // 3. NORMAL COUNTDOWN UI
+            // NORMAL UI STATE
             if (overdueLabel) overdueLabel.classList.add('hidden');
             const mins = Math.floor(remaining / 60);
             const secs = Math.floor(remaining % 60);
             if (timerEl) {
-                if (mins >= 60) {
-                    timerEl.innerHTML = `${Math.floor(mins/60)} hr ${mins%60} min`;
-                } else {
-                    timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
-                }
+                timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
                 timerEl.classList.remove('text-red-500', 'animate-pulse');
             }
-
-            // 4. RESTORE CONTROLS: Ensures standard buttons return if time is extended
+            // Standard button state
             const btnSafe = document.getElementById('btnSafe');
             const btnDepart = document.getElementById('btnDepart');
             const btnExtend = document.getElementById('btnExtend');
@@ -3704,45 +3698,43 @@ function closeWofWarn() {
 }
 
 /**
- * RE-ENGINEERED: Time Extension with Timer Synchronization
- * Logic: Updates local expiry, increments total duration, and syncs with backend.
+ * RE-ENGINEERED: confirmExtension
+ * Logic: Increments duration and resets all safety flags.
  */
 function confirmExtension(minutes) {
     const updateTime = () => {
-        // 1. Calculate new anticipated departure time
         const currentDue = state.activeVisit.anticipatedDepartureTime;
         const newDue = currentDue + (minutes * 60000);
         
         state.activeVisit.anticipatedDepartureTime = newDue;
         
-        // GOLDEN FIX: Increase the total duration budget so the visual timer can recalculate % remaining
+        // GOLDEN FIX: Increase the total duration budget so timer % stays correct
         state.activeVisit.duration += (minutes * 60);
         
-        // 2. CRITICAL RESET: Re-enable safety triggers for the new duration
+        // Reset Safety Flags
         state.activeVisit.isSafeConfirmed = false; 
         state.activeVisit.isPanic = false;
         state.activeVisit.criticalSent = false;
+        state.activeVisit.overdueGpsSent = false;
         
-        // 3. Reset all warning flags so they can fire again
+        // Reset warnings so they fire again
         state.activeVisit.warn5minSent = false;
         state.activeVisit.warn2minSent = false;
         state.activeVisit.warn90Sent = false;
         
-        // 4. Update UI: Clear red alerts and pulse animations
-        document.body.classList.remove('bg-red-900');
-        const lockedPage = document.getElementById('lockedPage');
-        if (lockedPage) lockedPage.classList.remove('panic-mode');
-        
+        // UI Clean-up
+        document.body.classList.remove('bg-red-900', 'panic-mode');
         const timerEl = document.getElementById('countdownTimer');
         if (timerEl) timerEl.classList.remove('text-red-500', 'animate-pulse');
-        
         const overdueLabel = document.getElementById('overdueLabel');
-        if (overdueLabel) overdueLabel.classList.add('hidden');
+        if (overdueLabel) {
+            overdueLabel.classList.add('hidden');
+            overdueLabel.innerText = "OVERDUE"; // Reset label text
+        }
 
         saveState();
         
-        // 5. Handshake: Log extension to the backend
-        // GOLDEN FIX: Include the ISO timestamp so the Monitor App and Spreadsheet see the new deadline immediately
+        // Sync with Backend
         processUploadQueue(buildPayload({
             'Alarm Status': 'EXTENDED',
             'Notes': `Extended ${minutes}m`,
@@ -3756,13 +3748,15 @@ function confirmExtension(minutes) {
     const now = Date.now();
     const dueTime = state.activeVisit.anticipatedDepartureTime;
     
-    // 6. Security: If already overdue or in panic, require PIN to extend
-    if (dueTime < now || state.activeVisit.isPanic) {
+    // Require PIN if already in Alarmed mode
+    if (state.activeVisit.criticalSent || state.activeVisit.isPanic) {
         withPinVerification(false, updateTime);
     } else {
         updateTime();
     }
 }
+
+    
 // ============================================================================
 // PHASE 1: MID-VISIT UPDATES
 // ============================================================================
@@ -4871,8 +4865,36 @@ function renderNoticeArchive() {
         </div>
     `).join('') : '<p class="text-center text-xs opacity-40 py-10">Archive empty.</p>';
 }
+
+/**
+ * GRACE EXPIRY: Critical Alarm Activation
+ * Logic: Locks UI to Alarm mode and notifies contacts via backend.
+ */
+function triggerGraceExpiryAlarm() {
+    state.activeVisit.criticalSent = true;
+    state.activeVisit.isPanic = true; // Required for PIN resolution
+    saveState();
+
+    // 1. Notify Backend
+    processUploadQueue(buildPayload({
+        'Alarm Status': 'OVERDUE ALARM',
+        'Notes': '15-minute grace period expired. Emergency contacts notified.',
+        'Last Known GPS': lastGPS || "0,0"
+    }));
+
+    // 2. UI Lock & Audio
+    document.body.classList.add('bg-red-900', 'panic-mode');
+    announce("Safety Alarm Activated. Your emergency contacts have been notified.");
+    
+    const overdueLabel = document.getElementById('overdueLabel');
+    if (overdueLabel) {
+        overdueLabel.innerText = "ALARM ACTIVATED";
+        overdueLabel.classList.add('border-white', 'text-white');
+    }
+}
     
 </script>
 
 </body>
 </html>
+
