@@ -1033,7 +1033,13 @@ async function initAudio() {
 // Initialize audio on first user interaction
 document.addEventListener('click', initAudio, { once: true });
 document.addEventListener('touchstart', initAudio, { once: true });
-
+['mousedown', 'touchstart', 'scroll', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, () => {
+        if (state && state.activeVisit) {
+            state.idleSeconds = 0; // Activity detected, reset the clock
+        }
+    }, { passive: true });
+});
 // ============================================================================
 // STATE PERSISTENCE
 // ============================================================================
@@ -4617,22 +4623,29 @@ setInterval(updateDimmedDisplay, 1000);
 
 // ====== FEATURE 4: WAKE LOCK API ======
 
+let wakeLock = null; // Global variable
+
+/**
+ * MISSION-CRITICAL: Screen Wake Lock
+ * Logic: Prevents the device from dimming or locking the screen physically.
+ */
 async function requestWakeLock() {
     if ('wakeLock' in navigator) {
         try {
-            wakeLock = await navigator.wakeLock.request('screen');
-            
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock released');
-                wakeLock = null;
-            });
-            
-            console.log('✅ Wake Lock active - phone will not auto-lock');
+            // Only request if we don't already have an active lock
+            if (!wakeLock) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock released');
+                    wakeLock = null;
+                });
+                
+                console.log('✅ Wake Lock active - screen will not auto-lock');
+            }
         } catch (err) {
-            console.error('Wake Lock error:', err);
+            console.error(`${err.name}, ${err.message}`);
         }
-    } else {
-        console.warn('Wake Lock API not supported');
     }
 }
 
@@ -5113,6 +5126,7 @@ document.addEventListener("visibilitychange", () => {
 
 </body>
 </html>
+
 
 
 
