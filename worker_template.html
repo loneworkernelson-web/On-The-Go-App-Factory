@@ -286,55 +286,45 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
   <p id="toastText"></p>
 </div>
 
-<div id="batterySaver" class="hidden fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center transition-opacity duration-500">
-    <!-- Timer at top -->
-    <div class="absolute top-8 left-0 right-0 text-center">
-        <div class="text-4xl font-mono text-white/50" id="dimmedTimer">--:--</div>
-        <p class="text-gray-600 text-xs mt-1">Visit in progress</p>
-    </div>
+<div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white">
     
-    <!-- Status display -->
-    <div class="flex flex-col items-center gap-6 mb-16">
-        <div class="relative">
-            <div class="w-24 h-24 rounded-full border-2 border-white/10 flex items-center justify-center">
-                <div class="w-16 h-16 rounded-full bg-white/5 animate-pulse"></div>
-            </div>
-            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-gray-900 px-3 py-1 rounded-full border border-gray-700">
-                <span class="text-green-400 text-xs font-bold">🔋 <span id="dimmedBattery">--</span>%</span>
-            </div>
+    <div class="text-center space-y-4">
+        <div class="space-y-1">
+            <p class="text-[10px] font-black tracking-[0.4em] text-gray-600 uppercase">Shake Vigorously for SOS</p>
+            <p id="saverTimerHUD" class="text-4xl font-mono font-bold text-gray-300">--:--</p>
+            <p class="text-[9px] text-gray-700 font-bold uppercase tracking-widest">(Syncing every 30s)</p>
         </div>
         
-        <div class="text-center">
-            <h3 class="text-white font-bold text-2xl mb-1">Battery Saver</h3>
-            <p class="text-gray-400 text-sm">Slide to wake screen</p>
+        <div class="flex items-center justify-center gap-2 text-gray-500">
+            <span id="saverBatteryHUD" class="text-xs font-black">--%</span>
+            <div class="w-8 h-4 border border-gray-800 rounded-sm relative">
+                <div id="saverBatteryBarHUD" class="absolute inset-y-0 left-0 bg-gray-700" style="width: 0%"></div>
+            </div>
         </div>
     </div>
-    
-    <!-- Slide to unlock -->
-    <div class="w-80 mx-auto px-6">
-        <div id="slideTrack" class="relative h-16 bg-gray-800/50 rounded-full border-2 border-gray-700/50 backdrop-blur-sm overflow-hidden shadow-2xl touch-none">
-            <div class="absolute inset-0 bg-blue-500/5 animate-pulse"></div>
-            <div id="slideProgress" class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-100 pointer-events-none" style="width: 0%; opacity: 0.4;"></div>
+
+    <div class="w-full max-w-xs space-y-8">
+        <div class="relative bg-gray-900/40 h-16 rounded-full p-1 border border-gray-800 flex items-center overflow-hidden shadow-inner">
+            <input type="range" id="wakeSlider" min="0" max="100" value="0" 
+                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                   oninput="checkWakeSlider(this)">
             
-            <div id="slideButton" class="absolute left-1 top-1 bottom-1 w-14 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl transition-transform touch-none">
-                <svg class="w-6 h-6 text-white animate-pulse pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div id="sliderThumb" class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl transition-all duration-75 pointer-events-none z-20">
+                 <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/>
                 </svg>
             </div>
             
-            <div id="slideText" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span class="text-gray-500 font-bold text-sm tracking-widest transition-opacity duration-200">SLIDE TO WAKE →</span>
+            <div class="w-full flex justify-center">
+                <span class="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em] transition-opacity duration-200" id="slideLabel">Slide to Wake</span>
             </div>
         </div>
-        
-        <p class="text-gray-600 text-xs text-center mt-3">Tap screen to peek at timer</p>
-    </div>
-    
-    <!-- Emergency access reminder -->
-    <div class="absolute bottom-8 left-0 right-0 text-center">
-        <div class="inline-flex items-center gap-2 bg-red-900/20 border border-red-800/30 rounded-full px-4 py-2">
-            <span class="text-red-400 text-2xl">🆘</span>
-            <span class="text-red-400 text-xs font-bold">SOS accessible anytime</span>
+
+        <div class="text-center">
+            <div class="inline-flex items-center gap-2 bg-red-900/10 border border-red-900/30 rounded-full px-5 py-2">
+                <span class="text-red-600 text-lg">🆘</span>
+                <span class="text-red-700 text-[10px] font-black uppercase tracking-widest">SOS accessible anytime</span>
+            </div>
         </div>
     </div>
 </div>
@@ -1004,6 +994,9 @@ let isSliding = false;
 let slideStartX = 0;
 let isSosLocked = false; // Prevent SOS immediately after wake
 
+let tickIntervalId = null; // To manage the heartbeat
+const TICK_NORMAL = 1000;  // 1 second
+const TICK_SAVER = 30000;  // 30 seconds
 // ============================================================================
 // AUDIO INITIALIZATION (Must be after user interaction)
 // ============================================================================
@@ -1979,7 +1972,7 @@ function enterLockedScreen() {
     
     // Start the countdown timer
     if (!timerInt) {
-        timerInt = setInterval(tick, 1000);
+        tickIntervalId = setInterval(tick, TICK_NORMAL);
     }
     
     startCheckinTimer();
@@ -2072,113 +2065,114 @@ function iamSafe() {
  * RE-ENGINEERED: High-Integrity Safety Heartbeat
  * Logic: 5m Vibration, 2m Verbal Alarm, Negative Counter, and 15m Grace Period.
  */
+/**
+ * THE MASTER HEARTBEAT: Unified Safety Engine
+ * Logic: Manages UI Throttling, Battery Safety, Warning Escalations, and Grace Periods.
+ */
 function tick() {
+    if (!state || !state.activeVisit) return;
+
+    // 1. CORE SAFETY TASKS (Always run regardless of UI state)
+    checkBatterySafety(); 
+    const now = Date.now();
+    const remaining = state.activeVisit.duration - (now - state.activeVisit.startTime) / 1000;
+    const diffMins = (state.activeVisit.anticipatedDepartureTime - now) / 60000;
+    
+    // Capture state for the HUD
+    const mins = Math.floor(Math.abs(remaining) / 60);
+    const secs = Math.floor(Math.abs(remaining) % 60);
+    state.timerDisplay = (remaining <= 0 ? "-" : "") + `${mins}:${secs.toString().padStart(2, '0')}`;
+
+    // 2. UI THROTTLE BRANCH
+    // If Battery Saver is active, update the HUD and EXIT early to save GPU/CPU.
+    if (document.getElementById('mainContent').style.display === 'none') {
+        updateBatterySaverHUD();
+        // Still check for 15m expiry in background
+        if (remaining <= 0 && Math.abs(diffMins) >= 15 && !state.activeVisit.criticalSent) {
+            triggerGraceExpiryAlarm();
+        }
+        return; 
+    }
+
+    // 3. FULL UI REFRESH (Standard Mode)
     const gpsIndicator = document.getElementById('gpsIndicator');
-    if (gpsIndicator && state.activeVisit) {
-        if (state.activeVisit.locationId === 'travel') {
-            gpsIndicator.classList.add('gps-pulse');
-        } else {
-            gpsIndicator.classList.remove('gps-pulse');
+    if (gpsIndicator) {
+        gpsIndicator.classList.toggle('gps-pulse', state.activeVisit.locationId === 'travel');
+    }
+
+    // WARNING ESCALATION (Pre-Expiry)
+    if (remaining > 0) {
+        if (diffMins <= 5 && diffMins > 4.9 && !state.activeVisit.warn5minSent) {
+            if (navigator.vibrate) navigator.vibrate([800, 200, 800, 200, 800]);
+            state.activeVisit.warn5minSent = true;
+            saveState();
+        }
+        if (diffMins <= 2 && diffMins > 1.9 && !state.activeVisit.warn2minSent) {
+            if (navigator.vibrate) navigator.vibrate([1000, 500, 1000]);
+            speakWarning("Warning. Safety alarm will activate in two minutes.");
+            state.activeVisit.warn2minSent = true;
+            saveState();
         }
     }
-    
-    if (state && state.activeVisit) {
-        // GOLDEN FIX: Call the battery check here
-        checkBatterySafety();const now = Date.now();
-        const remaining = state.activeVisit.duration - (now - state.activeVisit.startTime) / 1000;
-        const diffMins = (state.activeVisit.anticipatedDepartureTime - now) / 60000;
 
-        // 1. WARNING ESCALATION (PRE-EXPIRY)
-        if (remaining > 0) {
-            // 5-Minute Warning: STRONG VIBRATIONS ONLY
-            if (diffMins <= 5 && diffMins > 4.9 && !state.activeVisit.warn5minSent) {
-                if (navigator.vibrate) navigator.vibrate([800, 200, 800, 200, 800]);
-                state.activeVisit.warn5minSent = true;
-                saveState();
-            }
-            // 2-Minute Warning: LOUD VERBAL ALARM + VIBRATION
-            if (diffMins <= 2 && diffMins > 1.9 && !state.activeVisit.warn2minSent) {
-                if (navigator.vibrate) navigator.vibrate([1000, 500, 1000]);
-                speakWarning("Warning. Safety alarm will activate in two minutes. Please extend visit time, or end visit.");
-                state.activeVisit.warn2minSent = true;
-                saveState();
-            }
+    // OVERDUE & GRACE PERIOD UI
+    const timerEl = document.getElementById('countdownTimer');
+    const overdueLabel = document.getElementById('overdueLabel');
+    const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
+
+    if (remaining <= 0) {
+        const isAlarmed = state.activeVisit.criticalSent;
+
+        // GPS PUSH: Overdue trigger
+        if (!state.activeVisit.overdueGpsSent) {
+            if (typeof startGPSMonitoring === 'function') startGPSMonitoring();
+            processUploadQueue(buildPayload({
+                'Alarm Status': 'OVERDUE',
+                'Notes': 'Worker is overdue. GPS tracking active.',
+                'Last Known GPS': typeof lastGPS !== 'undefined' ? lastGPS : "0,0"
+            }));
+            state.activeVisit.overdueGpsSent = true;
+            saveState();
         }
 
-        const timerEl = document.getElementById('countdownTimer');
-        const overdueLabel = document.getElementById('overdueLabel');
-        const anticipatedTimeEl = document.getElementById('lockedAnticipatedTime');
+        if (overdueLabel) overdueLabel.classList.remove('hidden');
+        if (timerEl) {
+            timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+            timerEl.classList.add('text-red-500', 'animate-pulse');
+        }
         
-        // 2. OVERDUE & GRACE PERIOD LOGIC
-        if (remaining <= 0) {
-            const isAlarmed = state.activeVisit.criticalSent; // Flag for 15m grace expiry
+        // 15-MINUTE GRACE EXPIRY CHECK
+        if (Math.abs(diffMins) >= 15 && !isAlarmed) {
+            triggerGraceExpiryAlarm();
+        }
 
-            // GPS PUSH: Send location immediately upon becoming overdue
-            if (!state.activeVisit.overdueGpsSent) {
-                if (typeof startGPSMonitoring === 'function') startGPSMonitoring();
-                processUploadQueue(buildPayload({
-                    'Alarm Status': 'OVERDUE',
-                    'Notes': 'Worker is overdue. GPS tracking active.',
-                    'Last Known GPS': lastGPS || "0,0"
-                }));
-                state.activeVisit.overdueGpsSent = true;
-                saveState();
-            }
+        // BUTTON VISIBILITY
+        const btnSafe = document.getElementById('btnSafe');
+        const btnDepart = document.getElementById('btnDepart');
+        const btnExtend = document.getElementById('btnExtend');
 
-            if (typeof isDimmed !== 'undefined' && isDimmed) deactivateDimMode(); 
-            if (overdueLabel) overdueLabel.classList.remove('hidden');
-            
-            const absRemaining = Math.abs(remaining);
-            const mins = Math.floor(absRemaining / 60);
-            const secs = Math.floor(absRemaining % 60);
-            
-            if (timerEl) {
-                timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
-                timerEl.classList.add('text-red-500', 'animate-pulse');
-            }
-            
-            // 3. 15-MINUTE GRACE EXPIRY CHECK
-            if (Math.abs(diffMins) >= 15 && !isAlarmed) {
-                triggerGraceExpiryAlarm();
-            }
-
-            // 4. BUTTON VISIBILITY: Show 'I Am Safe' ONLY if Alarm is active
-            const btnSafe = document.getElementById('btnSafe');
-            const btnDepart = document.getElementById('btnDepart');
-            const btnExtend = document.getElementById('btnExtend');
-
-            if (isAlarmed) {
-                if (btnSafe) btnSafe.classList.remove('hidden');
-                if (btnDepart) btnDepart.classList.add('hidden');
-                if (btnExtend) btnExtend.classList.remove('hidden'); // Extend stays available
-            } else {
-                // In 0-15m Grace Period: Keep Depart and Extend, Hide Safe
-                if (btnSafe) btnSafe.classList.add('hidden');
-                if (btnDepart) btnDepart.classList.remove('hidden');
-                if (btnExtend) btnExtend.classList.remove('hidden');
-            }
+        if (isAlarmed) {
+            if (btnSafe) btnSafe.classList.remove('hidden');
+            if (btnDepart) btnDepart.classList.add('hidden');
         } else {
-            // NORMAL UI STATE
-            if (overdueLabel) overdueLabel.classList.add('hidden');
-            const mins = Math.floor(remaining / 60);
-            const secs = Math.floor(remaining % 60);
-            if (timerEl) {
-                timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
-                timerEl.classList.remove('text-red-500', 'animate-pulse');
-            }
-            // Standard button state
-            const btnSafe = document.getElementById('btnSafe');
-            const btnDepart = document.getElementById('btnDepart');
-            const btnExtend = document.getElementById('btnExtend');
             if (btnSafe) btnSafe.classList.add('hidden');
             if (btnDepart) btnDepart.classList.remove('hidden');
-            if (btnExtend) btnExtend.classList.remove('hidden');
         }
-        
-        if (state.activeVisit.anticipatedDepartureTime && anticipatedTimeEl) {
-            const antTime = new Date(state.activeVisit.anticipatedDepartureTime);
-            anticipatedTimeEl.innerText = antTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: true});
+    } else {
+        // NORMAL UI STATE
+        if (overdueLabel) overdueLabel.classList.add('hidden');
+        if (timerEl) {
+            timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+            timerEl.classList.remove('text-red-500', 'animate-pulse');
         }
+        if (document.getElementById('btnSafe')) document.getElementById('btnSafe').classList.add('hidden');
+        if (document.getElementById('btnDepart')) document.getElementById('btnDepart').classList.remove('hidden');
+    }
+
+    // UPDATE ANTICIPATED TIME
+    if (state.activeVisit.anticipatedDepartureTime && anticipatedTimeEl) {
+        const antTime = new Date(state.activeVisit.anticipatedDepartureTime);
+        anticipatedTimeEl.innerText = antTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: true});
     }
 }
 
@@ -3973,14 +3967,41 @@ function updateLastSyncUI() {
 // PHASE 2 & 3: ALL REMAINING FEATURES
 // ============================================================================
 
-// Feature 15: Battery Saver Manual Toggle
+/**
+ * RE-ENGINEERED: Adaptive Battery Saver
+ * Logic: Throttles the CPU heartbeat and stops DOM rendering during power-save.
+ */
 function toggleBatterySaver() {
-    if (isDimmed) {
-        deactivateDimMode();
-        showToast('💡 Battery saver off');
+    const saver = document.getElementById('batterySaver');
+    const main = document.getElementById('mainContent');
+    const isActivating = saver.classList.contains('hidden');
+
+    if (isActivating) {
+        // 1. UI: Show black screen
+        saver.classList.remove('hidden');
+        
+        // 2. RENDERING: Stop GPU/Layout calculations
+        // This is the "Deep DOM Hiding" fix for battery life.
+        main.style.display = 'none'; 
+
+        // 3. CPU: Throttle the heartbeat
+        clearInterval(tickIntervalId);
+        tickIntervalId = setInterval(tick, TICK_SAVER);
+        console.log("🔋 Battery Saver Active: Heartbeat throttled to 30s.");
     } else {
-        activateDimMode();
-        showToast('🌙 Battery saver on');
+        // 1. UI: Hide black screen
+        saver.classList.add('hidden');
+        
+        // 2. RENDERING: Resume UI
+        main.style.display = 'block';
+
+        // 3. CPU: Restore normal heartbeat
+        clearInterval(tickIntervalId);
+        tickIntervalId = setInterval(tick, TICK_NORMAL);
+        
+        // Immediate sync to ensure the timer is up-to-date
+        tick(); 
+        console.log("⚡ Normal Mode: Heartbeat restored to 1s.");
     }
 }
 
@@ -4815,28 +4836,38 @@ function checkActiveNotice() {
 }
 
 /**
- * UPDATED: acknowledgeNotice
- * Logic: Logs the ID to the backend for recording in Column I.
+ * MISSION-CRITICAL: Notice Acknowledgment
+ * Logic: Logs the ID to the backend and dismisses the UI.
  */
-function acknowledgeNotice() {
+async function acknowledgeNotice() {
+    if (!state.meta || !state.meta.activeNotice) return;
     const notice = state.meta.activeNotice;
-    if (!notice) return;
 
+    // 1. UPDATE UI IMMEDIATELY
+    closeModal('notice'); 
+
+    // 2. PERSIST LOCALLY
     const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
-    ackList.push(notice.id);
-    localStorage.setItem('otg_acknowledged_notices', JSON.stringify(ackList));
+    if (!ackList.includes(notice.id)) {
+        ackList.push(notice.id);
+        localStorage.setItem('otg_acknowledged_notices', JSON.stringify(ackList));
+    }
 
-    // LOG TO BACKEND: Updates Column I in the Notices Tab
+    // 3. LOG TO BACKEND: Targets Column I in the Notices Tab
     const payload = buildPayload({
         "action": "acknowledgeNotice",
         "noticeId": notice.id,
-        "Alarm Status": "NOTICE_ACKNOWLEDGED",
+        "Alarm Status": "NOTICE_ACK", // Matches Monitor App filters
         "Notes": `Confirmed: ${notice.title}`
     });
-    processUploadQueue(payload);
 
-    closeModal('notice');
-    showToast('✅ Acknowledgment Saved');
+    try {
+        // Use await to ensure the queue processes correctly
+        await processUploadQueue(payload); 
+        showToast('✅ Acknowledgment Saved');
+    } catch (e) {
+        console.error("Notice sync failed:", e);
+    }
 }
     
 /**
@@ -4964,7 +4995,26 @@ async function checkBatterySafety() {
         saveState();
     }
 }
+/**
+ * NEW: Battery Saver HUD Updater
+ * Logic: Updates visible HUD elements using minimal DOM operations.
+ */
+function updateBatterySaverHUD() {
+    const timeHUD = document.getElementById('saverTimerHUD');
+    const battTextHUD = document.getElementById('saverBatteryHUD');
+    const battBarHUD = document.getElementById('saverBatteryBarHUD');
+
+    // Display the current formatted time remaining
+    if (timeHUD) timeHUD.innerText = state.timerDisplay || "--:--";
+    
+    // Display battery info
+    if (battTextHUD && state.battery) {
+        battTextHUD.innerText = `${state.battery}%`;
+        if (battBarHUD) battBarHUD.style.width = `${state.battery}%`;
+    }
+}
 </script>
 
 </body>
 </html>
+
