@@ -2867,9 +2867,10 @@ return {
  */
 let retryDelay = 2000; // Start with 2s backoff
 
+let _isProcessing = false;
+
 function processUploadQueue(d) {
     if (d) {
-        // LIMIT QUEUE: Keep the 100 most recent items to prevent memory exhaustion
         if (state.pendingUploads.length > 100) {
             state.pendingUploads.shift(); 
         }
@@ -2877,7 +2878,9 @@ function processUploadQueue(d) {
         saveState();
     }
     
-    if (!navigator.onLine || state.pendingUploads.length === 0) return;
+    // LOCK: Prevent concurrent fetches from sending the same item twice
+    if (_isProcessing || !navigator.onLine || state.pendingUploads.length === 0) return;
+    _isProcessing = true;
 
     const currentUpload = state.pendingUploads[0];
     const fd = new FormData();
@@ -2888,17 +2891,17 @@ function processUploadQueue(d) {
         body: fd, 
         mode: 'no-cors' 
     }).then(() => {
-        // SUCCESS: Reset backoff and clear queue item
         state.pendingUploads.shift();
         saveState();
-        retryDelay = 2000; 
+        retryDelay = 2000;
+        _isProcessing = false;  // UNLOCK
         
         if (state.pendingUploads.length > 0) {
             setTimeout(processUploadQueue, 500);
         }
     }).catch(e => {
-        // FAILURE: Exponential Backoff (Retries: 2s, 4s, 8s... up to 1m)
         console.warn(`Sync deferred. Retrying in ${retryDelay/1000}s...`);
+        _isProcessing = false;  // UNLOCK on failure too
         setTimeout(processUploadQueue, retryDelay);
         retryDelay = Math.min(retryDelay * 2, 60000); 
     });
@@ -4959,6 +4962,7 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
 
 
 
