@@ -690,6 +690,40 @@ function getIcon(status) {
         shadowSize: [41, 41]
     });
 }
+
+/**
+ * CORRECT VERSION: PBKDF2-Hardened Encryption
+ * Logic: Allows the key to be re-derived on refresh so the dashboard stays logged in.
+ */
+async function secureStoreKey(key) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(key);
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    
+    // 1. Create a base key for derivation
+    const baseKey = await window.crypto.subtle.importKey(
+        "raw", encoder.encode("OTG_STATION_IV"), "PBKDF2", false, ["deriveKey"]
+    );
+
+    // 2. Derive the actual AES-GCM key using a salt
+    const aesKey = await window.crypto.subtle.deriveKey(
+        { 
+            name: "PBKDF2", 
+            salt: encoder.encode("NelsonDioceseSafety"), // Fixed salt for recovery
+            iterations: 100000, 
+            hash: "SHA-256" 
+        },
+        baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+    );
+
+    // 3. Encrypt and save to session memory
+    const cipher = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, data);
+    sessionStorage.setItem('monitor_payload', JSON.stringify({
+        iv: Array.from(iv),
+        data: Array.from(new Uint8Array(cipher))
+    }));
+}
+    
 </script>
 </body>
 </html>
