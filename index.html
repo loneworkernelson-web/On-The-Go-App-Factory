@@ -113,12 +113,12 @@
 <div class="mb-4">
     <div class="flex justify-between items-end mb-1">
         <label class="block text-blue-300 font-extrabold text-xs">Secret Key (Admin Only)</label>
-        <span id="keyLenCounter" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">0 / 32</span>
+        <span id="keyLenCounter" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">0 / 32–64</span>
     </div>
     <div class="flex gap-2">
         <input type="text" id="secretKey" 
                class="input-field text-yellow-400 font-mono text-sm py-2" 
-               placeholder="Exactly 32 characters"
+               placeholder="e.g. kauri-harbour-ember-summit-47-rimu"
                oninput="updateKeyCounter(); saveInput(this); validateKey();">
         <button onclick="generateSecureKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2">🔄</button>
     </div>
@@ -443,8 +443,8 @@
   window.onload = async () => {
         document.getElementById('mainContent').classList.remove('blur-sm');
         loadPersistedData();
-        if(!document.getElementById('secretKey').value) generateMemorableKey('secretKey');
-        if(!document.getElementById('workerKey').value) generateMemorableKey('workerKey');
+        if(!document.getElementById('secretKey').value) generateSecureKey('secretKey');
+        if(!document.getElementById('workerKey').value) generateSecureKey('workerKey');
         updateRegionInfo();
         setupDragDrop();
         for (const [k, f] of Object.entries(FILES)) { 
@@ -541,19 +541,8 @@ function applyPreset(p, a, el) {
     document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
     if(el) el.classList.add('selected');
 }
-    function generateMemorableKey(id) {
-    const arr = crypto.getRandomValues(new Uint8Array(24));
-    if (id === 'workerKey') {
-        document.getElementById(id).value = "wk_" + Array.from(arr).map(b => b.toString(36)).join('').slice(0, 9);
-    } else {
-        document.getElementById(id).value = Array.from(arr).map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 32).toUpperCase();
-    }
-    saveInput(document.getElementById(id));
-    if (id === 'secretKey') validateKey();
-}
-    function saveInput(el) { localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value); }
+
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
-    function validateKey() { }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
     function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
@@ -668,10 +657,10 @@ function testConnection() {
         const mKey = document.getElementById('secretKey').value.trim();
     
         // GOLDEN FIX: Physical security gate
-        if (mKey.length !== 32) {
-            alert("🚨 SECURITY REQUIREMENT: The Secret Key must be exactly 32 characters to protect the organisation against brute-force attacks.\n\n" +
+        if (mKey.length < 32 || mKey.length > 64) {
+            alert("🚨 SECURITY REQUIREMENT: The Secret Key must be between 32 and 64 characters.\n\n" +
                   "Current Length: " + mKey.length + " characters.\n\n" +
-                  "Please use the 🔄 button to generate a secure key or manually adjust your entry.");
+                  "Please use the 🔄 button to generate a secure passphrase.");
             document.getElementById('secretKey').focus();
             return;
     }
@@ -837,55 +826,73 @@ const emailBody = 'Hello Team,\n\n' +
         }
     }
 /**
- * SECURITY COMPONENT: High-Entropy Key Generator
- * Logic: Generates a 32-character alphanumeric string using Crypto API.
+ * KEY GENERATION: Unified generator for both key types.
+ * - secretKey → memorable NZ passphrase (32–64 chars), e.g. kauri-harbour-ember-summit-47-rimu
+ * - workerKey → short prefixed token, e.g. wk_a3x9mzk2p
  */
-/**
- * REPLACEMENT: High-Entropy Generator
- * Logic: Replaces 'Memorable' (weak) keys with 32-character random alphanumeric strings.
- */
+const NZ_WORDS = [
+    // NZ flora
+    'kauri','rimu','totara','pohutukawa','kowhai','manuka','kanuka','kahikatea',
+    'puriri','tawa','rewarewa','horoeka','harakeke','muehlenbeckia','cabbagetree',
+    // NZ fauna
+    'tui','kereru','fantail','pukeko','takahe','kiwi','morepork','kokako',
+    'weka','kea','kakapo','kotare','matuku','tuatara','weta','gecko',
+    // NZ landscapes / geography
+    'harbour','glacier','fiordland','plateau','estuary','summit','crater',
+    'lagoon','headland','peninsula','rangitoto','aoraki','tongariro','ruapehu',
+    // General strong / memorable words (NZ spelling)
+    'anchor','beacon','compass','ember','flint','granite','haven','iron',
+    'jasper','kindling','larch','marble','nautical','obsidian','pewter',
+    'quarry','ravine','silver','timber','uplift','willow','yarrow','zenith',
+    'armour','colour','honour','labour','valour','favour','ardour','vapour',
+    'centre','theatre','fibre','sabre','spectre','lustre','calibre','sombre',
+];
+
 function generateSecureKey(id) {
-    const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    let key = "";
-    const values = new Uint32Array(32);
-    window.crypto.getRandomValues(values);
-    for (let i = 0; i < 32; i++) {
-        key += charset[values[i] % charset.length];
-    }
     const input = document.getElementById(id);
-    input.value = key;
+    if (id === 'workerKey') {
+        // Short token: wk_ + 9 URL-safe random chars
+        const charset = "abcdefghjkmnpqrstuvwxyz23456789";
+        const vals = crypto.getRandomValues(new Uint32Array(9));
+        input.value = "wk_" + Array.from(vals).map(v => charset[v % charset.length]).join('');
+    } else {
+        // Passphrase: word-word-word-word-NN-word  (≈ 35–45 chars, always within 32–64)
+        const pick = () => NZ_WORDS[crypto.getRandomValues(new Uint32Array(1))[0] % NZ_WORDS.length];
+        const num  = String(10 + (crypto.getRandomValues(new Uint32Array(1))[0] % 90)); // 10–99
+        input.value = [pick(), pick(), pick(), pick(), num, pick()].join('-');
+    }
     saveInput(input);
-    validateKey(); // Trigger the green/red visual cue
+    if (id === 'secretKey') validateKey();
 }
 
 /**
- * REPLACEMENT: Visual Key Validator
+ * VISUAL VALIDATOR: Green for 32–64 chars, red for anything else.
  */
 function validateKey() {
     updateKeyCounter();
     const input = document.getElementById('secretKey');
-    const length = input.value.trim().length;
-    
-    if (length === 32) {
-        input.style.borderColor = "#22c55e"; // Success Green
-    } else if (length > 0) {
-        input.style.borderColor = "#ef4444"; // Error Red
+    const len = input.value.trim().length;
+    if (len >= 32 && len <= 64) {
+        input.style.borderColor = "#22c55e";   // success green
+    } else if (len > 0) {
+        input.style.borderColor = "#ef4444";   // error red
     } else {
-        input.style.borderColor = "#475569"; // Default Slate
+        input.style.borderColor = "#475569";   // default slate
     }
 }
+
 /**
- * UI HELPER: Real-time Secret Key Counter
- * Updates the counter color based on security compliance.
+ * UI HELPER: Real-time counter, validates against 32–64 range.
  */
 function updateKeyCounter() {
-    const el = document.getElementById('secretKey');
+    const el     = document.getElementById('secretKey');
     const countEl = document.getElementById('keyLenCounter');
-    const len = el.value.trim().length;
-    
-    countEl.innerText = `${len} / 32`;
-    
-    if (len === 32) {
+    const len    = el.value.trim().length;
+    const valid  = len >= 32 && len <= 64;
+
+    countEl.innerText = `${len} / 32–64`;
+
+    if (valid) {
         countEl.classList.remove('text-slate-500', 'text-red-400');
         countEl.classList.add('text-green-500');
     } else if (len > 0) {
@@ -900,7 +907,3 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
-
-
-
-
