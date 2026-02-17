@@ -588,7 +588,7 @@ let mapHtml = "";
     if (p['Last Known GPS']) {
         const gps = p['Last Known GPS'];
         // FIXED: Added missing $ and corrected template literal syntax
-        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
+        const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(gps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
             <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location Intelligence</p>
@@ -696,7 +696,7 @@ function _cleanPhone(num) {
  */
 function triggerAlerts(p, type) {
     // FIXED: Added missing $ for template literal variable injection
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
+    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps?q=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
     
     // DEFAULT CONTENT
     let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
@@ -1240,7 +1240,15 @@ function triggerEscalation(sheet, entry, newStatus, isDual) {
  * Logic: Notifies both contacts that the emergency has ended.
  */
 function handleSafetyResolution(p) {
-    // 1. Update the Visit Record for the audit trail
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const staffSheet = ss.getSheetByName('Staff');
+    const staffData = staffSheet.getDataRange().getValues();
+    
+    // 1. DEVICE VERIFICATION: Check if the sending device matches the registered one
+    const worker = staffData.find(r => r[0] === p['Worker Name']);
+    if (worker && worker[4] !== p.deviceId) {
+        return { status: "error", message: "Unauthorized device for this worker" };
+    }
     handleWorkerPost(p); 
 
     // 2. Draft the Resolution Messages
@@ -1274,11 +1282,3 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
-
-
-
-
-
-
-
-
