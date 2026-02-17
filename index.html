@@ -751,8 +751,14 @@ self.addEventListener('activate', event => {
         workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
         workerFolder.file("icon.png", logoData.split(',')[1], {base64:true});
         workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
-        
-        zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor.replace(/%%ORG_NAME%%/g, org).replace(/%%SHEET_URL%%/g, url).replace(/%%LOGO_URL%%/g, logoData).replace(/%%VEHICLE_TERM%%/g, selectedConfig.term));
+        zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor
+        .replace(/%%ORG_NAME%%/g, org)
+        .replace(/%%SHEET_URL%%/g, url)
+        .replace(/%%LOGO_URL%%/g, logoData)
+        .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
+        .replace(/%%PRIMARY_COLOR%%/g, primary) // ADDED
+        .replace(/%%ACCENT_COLOR%%/g, accent)   // ADDED
+          );        
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value));
         
@@ -835,3 +841,4 @@ function validateKey() {
 </script>
 </body>
 </html>
+
