@@ -167,8 +167,8 @@ function runMonthlyStats() {
   const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
 
   const stats = {}; 
-
-  data.forEach(row => {
+  const clientList = indexSheet.getDataRange().getValues().map(r => r[0]); // MOVE OUTSIDE THE LOOP
+    data.forEach(row => {
       const d = new Date(row[dateIdx]);
       if (d >= start && d <= end) {
           let client = "Unknown";
@@ -533,7 +533,9 @@ function handleWorkerPost(p, e) {
         triggerAlerts(p, "IMMEDIATE");
     }
 }
+
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
+    const fileUrls = [p1, p2, p3, p4, sig];
     const templateName = p['Template Name'] || "";
     if (!templateName) return;
     
@@ -1282,3 +1284,4 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
