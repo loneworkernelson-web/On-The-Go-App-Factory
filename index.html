@@ -539,7 +539,16 @@ function applyPreset(p, a, el) {
     document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
     if(el) el.classList.add('selected');
 }
-    function generateMemorableKey(id) { document.getElementById(id).value = id === 'workerKey' ? "wk_" + Math.random().toString(36).substr(2, 9) : "ADM-" + Math.floor(1000 + Math.random() * 9000); saveInput(document.getElementById(id)); if(id==='secretKey') validateKey(); }
+    function generateMemorableKey(id) {
+    const arr = crypto.getRandomValues(new Uint8Array(24));
+    if (id === 'workerKey') {
+        document.getElementById(id).value = "wk_" + Array.from(arr).map(b => b.toString(36)).join('').slice(0, 9);
+    } else {
+        document.getElementById(id).value = Array.from(arr).map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 32).toUpperCase();
+    }
+    saveInput(document.getElementById(id));
+    if (id === 'secretKey') validateKey();
+}
     function saveInput(el) { localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value); }
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function validateKey() { }
@@ -826,6 +835,7 @@ function validateKey() {
 </script>
 </body>
 </html>
+
 
 
 
