@@ -1170,6 +1170,15 @@ async function getBatteryPercent() {
 }
 
 /**
+ * Keeps currentBatteryLevel fresh so all buildPayload calls
+ * report accurate battery rather than the initialised "100%".
+ */
+async function refreshBatteryLevel() {
+    const level = await getBatteryPercent();
+    if (level !== 'Unknown') currentBatteryLevel = level;
+}
+
+/**
  * FULL MISSION-CRITICAL SUBMIT REPORT
  * Includes: Action Routing for Notes, Vehicle Nag clearing, Canvas Cleanup,
  * and NEW: Site Emergency Procedures Integration.
@@ -2799,16 +2808,10 @@ let panicTapTimer;
 
 // Note: currentBatteryLevel, currentActiveTemplate and isMidVisitUpdate already declared earlier in file
 
-// 1. BUILD PAYLOAD - Constructs proper data structure for backend
-/**
 /**
  * HIGH-INTEGRITY PAYLOAD BUILDER
- * Fixes: "Number" to "Phone" header alignment.
- * Fixes: Missing 'action' key for spreadsheet ingestion.
- */
-/**
- * GOLDEN FIX: buildPayload
- * Logic: Uses active session context to ensure "Travel" and site names are never lost.
+ * Uses active session context to ensure Travel and site names are never lost.
+ * Maps ICE details to correct spreadsheet column headers.
  */
 function buildPayload(d) {
     let dt = "";
@@ -3434,6 +3437,10 @@ window.onload = () => {
 
     console.log("OTG Safety Engine: Robust Initialization Complete.");
     updateLastSyncUI();
+
+    // Keep currentBatteryLevel accurate for all buildPayload calls
+    refreshBatteryLevel();
+    setInterval(refreshBatteryLevel, 60000);
 };
 
 // ============================================================================
@@ -4961,9 +4968,3 @@ async function checkBatterySafety() {
 
 </body>
 </html>
-
-
-
-
-
-
