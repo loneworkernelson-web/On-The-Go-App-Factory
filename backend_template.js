@@ -844,7 +844,11 @@ function getDashboardData() {
       "Status": r['Alarm Status'],
       "Location Name": r['Location Name'],
       "Anticipated Departure Time": r['Anticipated Departure Time'],
-      "Battery Level": r['Battery Level'] || '0',
+      "Battery Level": (() => {
+    let b = r['Battery Level'];
+    if (typeof b === 'number' && b >= 0 && b <= 1) b = Math.round(b * 100);
+    return b || '0';
+})(),
       "Worker Phone Number": r['Worker Phone Number'] || '',
       "gps": r['Last Known GPS'] || '0,0' // FIXED: Matches spreadsheet header precisely
     };
@@ -1317,3 +1321,4 @@ function handleRegisterDevice(p) {
   }
   return { status: "error", message: "Worker not found in Staff registry" };
 }
+
