@@ -2060,9 +2060,10 @@ function tick() {
             gpsIndicator.classList.remove('gps-pulse');
         }
     }
-
+    
     if (state && state.activeVisit) {
-        const now = Date.now();
+        // GOLDEN FIX: Call the battery check here
+        checkBatterySafety();const now = Date.now();
         const remaining = state.activeVisit.duration - (now - state.activeVisit.startTime) / 1000;
         const diffMins = (state.activeVisit.anticipatedDepartureTime - now) / 60000;
 
@@ -4906,10 +4907,34 @@ function triggerGraceExpiryAlarm() {
         overdueLabel.classList.add('border-white', 'text-white');
     }
 }
-    
+
+    /**
+ * NEW: Low Battery Safety Check
+ * Logic: Alerts the worker and the Monitor App if the device is at risk of shutting down.
+ */
+async function checkBatterySafety() {
+    // Only check if we haven't already sent an alert this visit
+    if (!state.activeVisit || state.activeVisit.lowBatterySent) return;
+
+    const levelStr = await getBatteryPercent(); // Existing function in v167
+    const level = parseInt(levelStr);
+
+    if (level <= 15) {
+        // 1. Notify the Worker
+        announce("Warning. Low battery detected. Please connect to a power source to maintain safety monitoring.");
+        if (navigator.vibrate) navigator.vibrate([800, 200, 800]);
+
+        // 2. Notify the Monitor App
+        processUploadQueue(buildPayload({
+            'Alarm Status': 'LOW BATTERY',
+            'Notes': `Device battery is critical at ${levelStr}. Safety monitoring may be interrupted soon.`
+        }));
+
+        state.activeVisit.lowBatterySent = true;
+        saveState();
+    }
+}
 </script>
 
 </body>
 </html>
-
-
