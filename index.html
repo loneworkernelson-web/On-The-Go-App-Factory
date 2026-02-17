@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .uppercase { text-transform: none !important; }
     .step-section { display: none; }
     .step-section.active { display: block; animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -558,7 +559,17 @@ function applyPreset(p, a, el) {
     function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
-    function toggleEnterBtn() { document.getElementById('btnEnter').disabled = !document.getElementById('chkAccept').checked; }
+    function toggleEnterBtn() {
+    const btn = document.getElementById('btnEnter');
+    const on = document.getElementById('chkAccept').checked;
+    btn.disabled = !on;
+    btn.classList.toggle('bg-gray-700', !on);
+    btn.classList.toggle('text-gray-500', !on);
+    btn.classList.toggle('bg-green-600', on);
+    btn.classList.toggle('text-white', on);
+    btn.classList.toggle('hover:bg-green-500', on);
+    btn.classList.toggle('shadow-2xl', on);
+}
     function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
     function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++) document.getElementById('tab'+i).classList.toggle('active', i===n); if(n===3) generateScript(); }
     function toggleCheckin() { document.getElementById('checkinOptions').classList.toggle('hidden', !document.getElementById('chkCheckin').checked); }
@@ -889,6 +900,7 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
 
 
 
