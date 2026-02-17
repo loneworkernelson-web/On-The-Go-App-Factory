@@ -2659,11 +2659,10 @@ function setupHoldToStart() {
 }
     
 /**
- * RE-ENGINEERED: startVisit with Concurrency Protection
- * Logic: Prevents duplicate announcements and ensures expiry times are sent as ISO strings.
+ * RE-ENGINEERED: startVisit with Data Integrity
+ * Logic: Ensures site address is captured for the spreadsheet.
  */
 async function startVisit(isSkipCheck = false) {
-    // 1. DUAL-TRIGGER GUARD: Stop execution if already active or processing
     if (state.activeVisit) return;
     const btn = document.getElementById('btnStart');
     if (btn && btn.disabled) return; 
@@ -2671,13 +2670,11 @@ async function startVisit(isSkipCheck = false) {
 
     isMidVisitUpdate = false; 
 
-    // 2. COMPLIANCE GATE: Check for WOF/Rego expiry unless skipped
     if (!isSkipCheck && typeof checkVehicleBeforeVisit === 'function' && checkVehicleBeforeVisit()) {
-        if (btn) btn.disabled = false; // Re-enable if compliance check blocks start
+        if (btn) btn.disabled = false;
         return; 
     }
 
-    // 3. Audio Unlock
     try {
         await Promise.race([Tone.start(), new Promise(r => setTimeout(r, 500))]);
     } catch (e) { console.warn("Audio skipped"); }
@@ -2690,12 +2687,11 @@ async function startVisit(isSkipCheck = false) {
         return showToast('⚠️ Select a destination first');
     }
 
-    const loc = state.locations.find(l => l.id === locId) || { id: 'travel', name: 'General Travel' };
+    const loc = state.locations.find(l => l.id === locId) || { id: 'travel', name: 'General Travel', address: 'Field Work' };
     const slider = document.getElementById('durationSlider');
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    // 4. GPS PRE-FLIGHT: Fresh lock for mileage accuracy
     let verifiedStartGPS = lastGPS || "0,0";
     if (isTravelMode || locId === 'travel') {
         showToast('📍 Locking GPS signal...');
@@ -2717,11 +2713,12 @@ async function startVisit(isSkipCheck = false) {
     const durationSec = durationMins * 60;
     const anticipatedDeparture = startTime + (durationSec * 1000);
 
-    // 5. Initialise Active Safety Session
+    // GOLDEN FIX: Storing the address in the session state
     state.activeVisit = {
         locationId: locId || 'travel',
         locationName: loc.name,
         companyName: loc.companyName || "",
+        locationAddress: loc.address || "", // ADDED: Critical for spreadsheet recording
         isTravel: isTravelMode, 
         startTime: startTime,
         duration: durationSec,
@@ -2735,11 +2732,9 @@ async function startVisit(isSkipCheck = false) {
         warn90Sent: false
     };
 
-    // Reset targeted travel toggle for next session
     state.isTravelActive = false; 
     saveState();
 
-    // 6. BACKEND LOGGING: Explicitly send ISO string for Anticipated Departure Time
     const alarmStatus = isTravelMode ? "TRAVELLING" : "ARRIVED";
     const logNote = isTravelMode ? `Travel to ${loc.name} started.` : `${loc.name} visit started.`;
 
@@ -2747,12 +2742,12 @@ async function startVisit(isSkipCheck = false) {
         'action': 'logVisit',
         'Alarm Status': alarmStatus,
         'Location Name': loc.name, 
+        'Location Address': loc.address || "", // ADDED: Immediate sync for initial row
         'Notes': `${logNote} Duration: ${durationMins}m`,
         'Last Known GPS': verifiedStartGPS,
         'Anticipated Departure Time': new Date(anticipatedDeparture).toISOString()
     }));
 
-    // Trigger announcement once
     announce(isTravelMode ? `Travelling to ${loc.name}.` : `${loc.name} started.`);
     
     if (typeof requestWakeLock === 'function') requestWakeLock();
@@ -4938,3 +4933,4 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
