@@ -1870,7 +1870,7 @@ function loadFormAndShow(templateName, context = null) {
     
 /**
  * HIGH-INTEGRITY DEPARTURE GATE
- * Fixed: 'Location not found' error during travel sessions.
+ * Logic: Checks both ID and isTravel flag to ensure correct form routing.
  */
 function preDepart() {
     if (!state || !state.activeVisit) return;
@@ -1878,19 +1878,20 @@ function preDepart() {
     // SAFETY GATE: Force PIN if an alarm is active
     if (state.activeVisit.isPanic) {
         showToast("⚠️ Clear alarm with PIN first");
-        iamSafe(); // Triggers the PIN verification
+        iamSafe(); 
         return;
     }
     
     isMidVisitUpdate = false;
     const activeLocId = state.activeVisit.locationId;
+    const isTravelSession = state.activeVisit.isTravel || activeLocId === 'travel'; // FIXED: Added isTravel flag check
 
-    // 1. TRAVEL BYPASS: Handle travel sessions without requiring a list lookup
-    if (activeLocId === 'travel') {
+    // 1. TRAVEL ROUTING: Handle travel sessions regardless of specific site selection
+    if (isTravelSession) {
         const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
         
         if (noReport) {
-            submitReport(); // End immediately if no report required
+            submitReport(); 
             return;
         }
 
@@ -1911,7 +1912,7 @@ function preDepart() {
                     }
                 }
                 if (btnDepart) btnDepart.textContent = 'HOLD TO END';
-                loadFormAndShow('Travel Report'); // Explicitly load the travel template
+                loadFormAndShow('Travel Report'); // Correctly loads Travel template
             },
             (err) => {
                 if (btnDepart) btnDepart.textContent = 'HOLD TO END';
@@ -1920,7 +1921,7 @@ function preDepart() {
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-        return; // Exit here for travel sessions
+        return; 
     }
 
     // 2. STANDARD LOOKUP: Only for regular site visits
@@ -1928,7 +1929,6 @@ function preDepart() {
     
     if (!location) {
         showToast('⚠️ Location not found. Emergency end triggered.');
-        // EMERGENCY FAILSAFE: Allow user to submit a standard note if site is missing
         loadFormAndShow('(Standard)');
         return;
     }
@@ -5129,3 +5129,4 @@ document.addEventListener("visibilitychange", async () => {
 
 </body>
 </html>
+
