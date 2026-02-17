@@ -5107,17 +5107,20 @@ function triggerPeek() {
 
 /**
  * SAFETY COMPONENT: App Visibility Observer
- * Logic: Alerts the worker when they return from a call/other app.
+ * Logic: Re-engages safety systems and wake locks when the app is focused.
  */
-document.addEventListener("visibilitychange", () => {
+document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === 'visible') {
         console.log("App returned to foreground. Monitoring resumed.");
         
-        // Brief haptic and visual confirmation that protection is live
+        // 1. Re-acquire the Wake Lock
+        await requestWakeLock(); 
+        
+        // 2. Visual and haptic confirmation
         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         showToast("✅ Safety Monitoring Active");
         
-        // Force an immediate tick to catch up on any missed time
+        // 3. Force immediate logic sync
         if (typeof tick === 'function') tick(); 
     }
 });
@@ -5126,11 +5129,3 @@ document.addEventListener("visibilitychange", () => {
 
 </body>
 </html>
-
-
-
-
-
-
-
-
