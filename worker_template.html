@@ -3884,7 +3884,6 @@ function forceSync(showUI) {
         });
 }
 
-// Add to your scripts section
 function updateLastSyncUI() {
     const label = document.getElementById('lastSyncLabel');
     if (!label || !state.lastSyncTime) return;
@@ -3893,24 +3892,25 @@ function updateLastSyncUI() {
     const diffMs = Date.now() - lastSync.getTime();
     const minsOld = diffMs / (1000 * 60);
     const hoursOld = minsOld / 60;
-    
-    // Clear old colors
-    label.classList.remove('text-green-500', 'text-gray-500', 'text-yellow-500', 'text-red-500');
 
-    // Color code by age
+    let text, classes;
+
     if (minsOld < 1) {
-        label.classList.add('text-green-500');
-        label.innerText = 'Last Sync: Just now';
+        text = '● Synced just now';
+        classes = 'bg-green-900/60 text-green-300 border-green-700/50';
     } else if (hoursOld < 24) {
-        label.classList.add('text-gray-500');
-        label.innerText = `Last Sync: ${Math.floor(minsOld)}m ago`;
+        text = `● Synced ${Math.floor(minsOld)}m ago`;
+        classes = 'bg-gray-800/80 text-gray-300 border-gray-600/50';
     } else if (hoursOld < 72) {
-        label.classList.add('text-yellow-500');
-        label.innerText = `Last Sync: > 1 day ago`;
+        text = `⚠ Sync: > 1 day ago`;
+        classes = 'bg-yellow-900/60 text-yellow-200 border-yellow-700/50';
     } else {
-        label.classList.add('text-red-500');
-        label.innerText = `Last Sync: STALE (SYNC REQUIRED)`;
+        text = `◉ SYNC REQUIRED`;
+        classes = 'bg-red-900/60 text-red-200 border-red-600/50 animate-pulse';
     }
+
+    label.className = 'text-[11px] font-bold tracking-tighter ml-1 px-2 py-0.5 rounded-full border inline-block ' + classes;
+    label.innerText = text;
 }
     
 // ============================================================================
@@ -4912,4 +4912,5 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
 
