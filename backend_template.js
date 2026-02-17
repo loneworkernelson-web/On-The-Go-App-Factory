@@ -1295,8 +1295,25 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+/**
+ * SECURITY COMPONENT: Device Identity Binding
+ * Logic: Links a worker's name to a specific hardware ID to prevent spoofing.
+ */
+function handleRegisterDevice(p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { status: "error", message: "Staff sheet missing" };
 
+  const data = sheet.getDataRange().getValues();
+  const workerName = p['Worker Name'];
+  const deviceId = p.deviceId;
 
-
-
-
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === workerName) {
+      // Logic: Update Column E (Index 4) with the unique Device ID
+      sheet.getRange(i + 1, 5).setValue(deviceId);
+      return { status: "success", message: "Device successfully bound to " + workerName };
+    }
+  }
+  return { status: "error", message: "Worker not found in Staff registry" };
+}
