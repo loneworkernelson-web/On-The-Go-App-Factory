@@ -286,12 +286,18 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
   <p id="toastText" class="font-bold text-sm"></p>
 </div>
 
-<div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white">
+<div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white select-none">
     
     <div class="text-center space-y-4">
-        <div class="space-y-1 cursor-pointer active:opacity-50 transition-opacity" onclick="triggerPeek()">
+        <div class="bg-blue-900/30 border border-blue-500/30 rounded-full py-1.5 px-5 mb-2 animate-pulse">
+            <p class="text-[9px] font-black text-blue-400 uppercase tracking-[0.25em]">
+                ⚠️ System Active: Keep App Open
+            </p>
+        </div>
+
+        <div class="space-y-1 cursor-pointer active:opacity-40 transition-opacity" onclick="triggerPeek()">
             <p class="text-[10px] font-black tracking-[0.4em] text-gray-600 uppercase">Shake Vigorously for SOS</p>
-            <p id="saverTimerHUD" class="text-4xl font-mono font-bold text-gray-300">--:--</p>
+            <p id="saverTimerHUD" class="text-5xl font-mono font-bold text-gray-300">--:--</p>
             <p class="text-[9px] text-gray-700 font-bold uppercase tracking-widest">Tap Numbers to Peek</p>
         </div>
         
@@ -328,7 +334,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
     </div>
 </div>
-
+    
 <div id="setupPage" class="page">
     <div class="header-bar">
         <h1 class="text-xl font-bold text-blue-400">Setup Wizard</h1>
@@ -5048,10 +5054,29 @@ function triggerPeek() {
         if (navigator.vibrate) navigator.vibrate(10); // Subtle haptic confirmation
     }
 }
+
+/**
+ * SAFETY COMPONENT: App Visibility Observer
+ * Logic: Alerts the worker when they return from a call/other app.
+ */
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible') {
+        console.log("App returned to foreground. Monitoring resumed.");
+        
+        // Brief haptic and visual confirmation that protection is live
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        showToast("✅ Safety Monitoring Active");
+        
+        // Force an immediate tick to catch up on any missed time
+        if (typeof tick === 'function') tick(); 
+    }
+});
+    
 </script>
 
 </body>
 </html>
+
 
 
 
