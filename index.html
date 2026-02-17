@@ -438,15 +438,24 @@
     const REGION_DATA = { "+64": { term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" }, "+61": { term: "Rego", locale: "en-AU", tz: "Australia/Sydney" }, "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London" }, "+1": { term: "Inspection", locale: "en-US", tz: "America/New_York" } };
     let selectedConfig = REGION_DATA["+64"];
 
-    window.onload = async () => {
+  window.onload = async () => {
         document.getElementById('mainContent').classList.remove('blur-sm');
         loadPersistedData();
         if(!document.getElementById('secretKey').value) generateMemorableKey('secretKey');
         if(!document.getElementById('workerKey').value) generateMemorableKey('workerKey');
         updateRegionInfo();
         setupDragDrop();
-        for (const [k, f] of Object.entries(FILES)) { try { const r = await fetch(f + "?v=" + Date.now()); if (r.ok) TEMPLATES[k] = await r.text(); } catch(e){} }
-    };
+        for (const [k, f] of Object.entries(FILES)) { 
+        try { 
+            const r = await fetch(f + "?v=" + Date.now()); 
+            if (r.ok) TEMPLATES[k] = await r.text(); 
+            else throw new Error();
+        } catch(e){
+            console.error(`Failed to load ${f}. System build may be incomplete.`);
+            alert(`⚠️ Warning: Could not load the ${k} template. Please refresh.`);
+        } 
+    }
+};
 
     function updateCharCount(el) { document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`; }
 
@@ -633,6 +642,8 @@ function saveInput(el) {
         
         // FIX: Re-added all 18 missing injection handlers
         let wHtml = TEMPLATES.worker
+            .replace(/--primary:\s*#[a-fA-F0-9]{6}/g, `--primary: ${primary}`) // FIXED: Corrected regex & removed extra semicolon
+            .replace(/--accent:\s*#[a-fA-F0-9]{6}/g, `--accent: ${accent}`)
             .replace(/%%ORG_NAME%%/g, org)
             .replace(/%%ORGANISATION_NAME%%/g, org)
             .replace(/%%APP_NAME%%/g, appShort)
@@ -651,8 +662,7 @@ function saveInput(el) {
             .replace(/%%VOICE_LOCALE%%/g, document.getElementById('voiceLocaleDisplay').innerText)
             .replace(/%%LOGO_DATA%%/g, logoData)
             .replace(/--primary:\s*#[a-fA-F0-9]{6}/, `--primary: ${primary}`);
-            .replace(/#1e40af/g, primary) 
-            .replace(/#3b82f6/g, accent);
+
         
 
 const swCode = `
@@ -816,5 +826,6 @@ function validateKey() {
 </script>
 </body>
 </html>
+
 
 
