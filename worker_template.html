@@ -1984,40 +1984,51 @@ function enterLockedScreen() {
     startCheckinTimer();
 }
 
-// ============================================================================
-// TRIGGER PANIC
-// ============================================================================
+/**
+ * MISSION-CRITICAL: Safety Trigger Engine
+ * Logic: Distinguishes between audible SOS and stealth Duress.
+ */
 async function triggerPanic(duress = false) {
-    if (gpsWatchId === null) startGPSMonitoring();
+    if (gpsWatchId === null && typeof startGPSMonitoring === 'function') startGPSMonitoring();
     
-    document.body.classList.add('bg-red-900');
-    announce(duress ? "Duress activated silently." : "Panic alarm activated.");
-
-    if (!duress) {
-        document.body.classList.add('strobe-active');
-    }    
-    
-    await initAudio();
-    if (audioReady && synth) {
-        try { synth.triggerAttackRelease('C4', '8n'); } catch (e) {}
+    // 1. DURESS (SILENT) LOGIC
+    if (duress) {
+        // KILL LOUD ALARMS: Physically stop red flash, strobes, and speech
+        document.body.classList.remove('bg-red-900', 'panic-mode', 'strobe-active');
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        
+        // DECEPTION: Show a standard 'Reset' toast for 10 seconds
+        showToast("✅ System Reset Successful", 10000); 
+        console.log("SILENT DURESS: UI remains normal but backend alerted.");
+    } 
+    // 2. PANIC (LOUD) LOGIC
+    else {
+        document.body.classList.add('bg-red-900', 'panic-mode', 'strobe-active');
+        announce("Panic alarm activated.");
+        
+        // Audio escalation
+        await initAudio();
+        if (audioReady && synth) {
+            try { synth.triggerAttackRelease('C4', '8n'); } catch (e) {}
+        }
     }
     
-    await logSafety(duress ? "DURESS" : "PANIC", "Alert triggered.");
+    // 3. BACKEND LOGGING
+    await logSafety(duress ? "DURESS" : "PANIC", duress ? "Silent trigger" : "Manual SOS");
     
     if (state && state.activeVisit) {
         state.activeVisit.isPanic = true;
         if (duress) state.activeVisit.isDuress = true;
         saveState();
     }
-    // NEW: Close any open notices to ensure the Panic UI is visible
+
+    // 4. UI STACK CLEANUP
+    closeModal('pin'); // Ensure the PIN pad is gone
     closeModal('notice'); 
     closeModal('resourceHub');
     
-    // Ensure Panic UI is at the absolute top
-    const panicEl = document.getElementById('fullScreenAlert');
-    if(panicEl) panicEl.style.zIndex = "500";
-    // CRITICAL FIX: Physically switch the UI to Panic Mode
-    renderPanicState(); 
+    // Switch to the Panic UI only for loud mode
+    if (!duress) renderPanicState(); 
 }
 
 /**
@@ -4767,7 +4778,8 @@ function showCurrentSiteInfo() {
 }
 
 /**
- * MISSING SECURITY COMPONENT: PIN Verification Engine
+ * MISSION-CRITICAL: PIN Verification & Visual Deception Engine
+ * Logic: Distinguishes between standard resets and silent duress transitions.
  */
 function withPinVerification(isDuress, successCallback) {
     showModal('pin');
@@ -4780,15 +4792,40 @@ function withPinVerification(isDuress, successCallback) {
         const entered = input.value;
         const correctStd = state.pins.std;
         const correctDur = state.pins.duress;
+        const isCurrentlyAlarmed = document.body.classList.contains('panic-mode');
 
+        // 1. STANDARD PIN: Normal System Reset
         if (entered === correctStd) {
             closeModal('pin');
             successCallback();
-        } else if (entered === correctDur) {
+        } 
+        
+        // 2. DURESS PIN: Visual Deception & Silent Alert
+        else if (entered === correctDur) {
             closeModal('pin');
-            triggerPanic(true); // Silent Duress
+
+            // DECEPTION LOGIC: If the alarm is screaming, make it look like a standard clear
+            if (isCurrentlyAlarmed) {
+                // Instantly kill visual/audible SOS indicators
+                document.body.classList.remove('bg-red-900', 'panic-mode', 'strobe-active');
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                
+                // Show 'Cleared' message for 10 seconds as requested
+                showToast("✅ Alarm Successfully Cleared", 10000);
+            } else {
+                // If triggered from a normal state, show 'Reset' success
+                showToast("✅ System Reset Successful", 10000);
+            }
+
+            // Execute Silent Duress (No speech, no vibration)
+            triggerPanic(true); 
+            
+            // Return to standard UI to complete the deception
             successCallback();
-        } else {
+        } 
+        
+        // 3. INCORRECT ENTRY
+        else {
             showToast('❌ Incorrect PIN');
             input.value = '';
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -5076,6 +5113,7 @@ document.addEventListener("visibilitychange", () => {
 
 </body>
 </html>
+
 
 
 
