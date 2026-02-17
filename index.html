@@ -697,19 +697,19 @@ self.addEventListener('install', event => {
   );
 });
 
-//2. Robust Fetch: Handles Opaque Responses (Tailwind/ToneJS) and Offline Fallbacks
+// Issue 14: Safety fix for opaque response caching
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) return response;
       return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || (networkResponse.status !== 200 && networkResponse.status !== 0)) return networkResponse;
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => { cache.put(event.request, responseToCache); });
+        // FIXED: Only cache valid internal responses (status 200) or valid opaque CDNs (status 0)
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => { cache.put(event.request, responseToCache); });
+        }
         return networkResponse;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') return caches.match('./index.html');
       });
     })
   );
@@ -826,6 +826,7 @@ function validateKey() {
 </script>
 </body>
 </html>
+
 
 
 
