@@ -90,6 +90,7 @@ body {
 .gps-bar.active-red { background-color: #ef4444; box-shadow: 0 0 5px #ef4444; }
 .gps-bar.active-amber { background-color: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
 .gps-bar.active-green { background-color: #22c55e; box-shadow: 0 0 5px #22c55e; }
+.gps-bar.active-blue { background-color: #3b82f6; box-shadow: 0 0 5px #3b82f6; }
 
 /* BEST: Combines your custom arrow with high-contrast menu items */
 select.form-input {
@@ -461,11 +462,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 aria-label="Resource Library">
             📖
         </button>
-        <div id="gpsIndicator" class="flex gap-1 items-end h-5"> 
-            <div class="gps-bar"></div>
-            <div class="gps-bar"></div>
-            <div class="gps-bar"></div>
-        </div>
+     <div class="flex flex-col items-center">
+            <div id="gpsIndicator" class="flex gap-1 items-end h-5"> 
+                <div class="gps-bar" style="height:6px"></div>
+                <div class="gps-bar" style="height:9px"></div>
+                <div class="gps-bar" style="height:12px"></div>
+      </div>
+    <span id="gpsLabel" class="text-[8px] text-gray-500 font-bold mt-0.5">--</span>
+</div>
         <button onclick="navigate('settings')" 
                 class="text-2xl text-gray-400 hover:text-white transition active:rotate-45" 
                 aria-label="Settings">
@@ -1441,13 +1445,28 @@ function stopGPSMonitoring() {
 function updateGPSBars(pos) {
     const accuracy = pos.coords.accuracy;
     const bars = document.querySelectorAll('.gps-bar');
-    bars.forEach(b => b.classList.remove('active-red', 'active-amber', 'active-green'));
-    if (accuracy > 50) {
-        bars.forEach(b => b.classList.add('active-red'));
+    const label = document.getElementById('gpsLabel');
+    bars.forEach(b => b.classList.remove('active-red', 'active-amber', 'active-green', 'active-blue'));
+
+    if (accuracy > 200) {
+        // IP-level only — very rough
+        bars[0]?.classList.add('active-red');
+        if (label) label.textContent = 'IP';
+    } else if (accuracy > 50) {
+        // WiFi triangulation — usable
+        bars[0]?.classList.add('active-blue');
+        bars[1]?.classList.add('active-blue');
+        if (label) label.textContent = 'WiFi';
     } else if (accuracy > 20) {
-        bars.forEach(b => b.classList.add('active-amber'));
+        // GPS coarse lock
+        bars[0]?.classList.add('active-amber');
+        bars[1]?.classList.add('active-amber');
+        bars[2]?.classList.add('active-amber');
+        if (label) label.textContent = 'GPS';
     } else {
+        // GPS fine lock
         bars.forEach(b => b.classList.add('active-green'));
+        if (label) label.textContent = 'GPS';
     }
 }
 
@@ -4912,5 +4931,6 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
 
 
