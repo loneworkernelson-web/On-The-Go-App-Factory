@@ -172,7 +172,6 @@ function runMonthlyStats() {
       const d = new Date(row[dateIdx]);
       if (d >= start && d <= end) {
           let client = "Unknown";
-          const clientList = indexSheet.getDataRange().getValues().map(r => r[0]);
           const locName = row[compIdx].toString();
           
           const matchedClient = clientList.find(c => locName.includes(c));
@@ -1283,5 +1282,6 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
 
