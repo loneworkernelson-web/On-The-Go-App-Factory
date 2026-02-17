@@ -616,17 +616,40 @@ function saveInput(el) {
     localStorage.setItem('otg_' + el.id, el.type === 'checkbox' ? el.checked : el.value);
     if(el.id === 'orgName' || el.id === 'logoUrl') updateMockupUI();
 }
-    function testConnection() {
-        const url = document.getElementById('webAppUrl').value;
-        const resBox = document.getElementById('testResult');
-        resBox.classList.remove('hidden'); resBox.textContent = "Testing..."; resBox.className = "mt-4 p-4 rounded-xl text-center bg-gray-900 text-yellow-400 font-black uppercase";
-        fetch(url + '?test=1&key=' + encodeURIComponent(document.getElementById('secretKey').value)).then(r => r.json()).then(d => {
-            if(d.status === "success") {
-                resBox.textContent = "✅ Success!"; resBox.className = "mt-4 p-4 rounded-xl text-center bg-green-900 text-white font-black block shadow-2xl uppercase";
-                document.getElementById('btnNextDownload').disabled = false; document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed');
-            } else throw new Error();
-        }).catch(() => { resBox.textContent = "❌ Connection Failed. Check your URL."; resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-black block uppercase"; });
+function testConnection() {
+    const url = document.getElementById('webAppUrl').value.trim();
+    const key = document.getElementById('secretKey').value.trim();
+    const resBox = document.getElementById('testResult');
+    
+    if (!url.startsWith('https://script.google.com')) {
+        resBox.classList.remove('hidden');
+        resBox.textContent = "❌ INVALID URL: MUST START WITH HTTPS://SCRIPT.GOOGLE.COM";
+        resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-black uppercase";
+        return;
     }
+
+    resBox.classList.remove('hidden');
+    resBox.textContent = "📡 ATTEMPTING HANDSHAKE...";
+    resBox.className = "mt-4 p-4 rounded-xl text-center bg-gray-900 text-yellow-400 font-black animate-pulse uppercase";
+
+    fetch(url + '?test=1&key=' + encodeURIComponent(key))
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === "success") {
+                resBox.textContent = "✅ SYSTEM LINK ESTABLISHED";
+                resBox.className = "mt-4 p-4 rounded-xl text-center bg-green-900 text-white font-black block shadow-2xl uppercase";
+                document.getElementById('btnNextDownload').disabled = false;
+                document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                throw new Error(d.message || "Key Mismatch");
+            }
+        })
+        .catch((err) => {
+            resBox.textContent = "❌ LINK FAILED: CHECK YOUR WEB APP URL & SECRET KEY";
+            resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-black block uppercase";
+            console.error(err);
+        });
+}
 
     function downloadZip() {
         const mKey = document.getElementById('secretKey').value.trim();
@@ -858,6 +881,7 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
 
 
 
