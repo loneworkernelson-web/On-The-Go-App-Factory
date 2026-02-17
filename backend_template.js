@@ -535,7 +535,6 @@ function handleWorkerPost(p, e) {
 }
 
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
-    const fileUrls = [p1, p2, p3, p4, sig];
     const templateName = p['Template Name'] || "";
     if (!templateName) return;
     
@@ -1284,4 +1283,5 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
 
