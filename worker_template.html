@@ -4745,6 +4745,7 @@ function checkActiveNotice() {
     const ackList = JSON.parse(localStorage.getItem('otg_acknowledged_notices') || '[]');
     if (ackList.includes(notice.id)) return;
 
+    const modal = document.getElementById('noticeModal');
     // 1. SAFETY GATE: Do not hide the 'Grounded' warning with a notice
     const isGrounded = !document.getElementById('wofBlockModal').classList.contains('hidden');
     if (isGrounded) {
@@ -4774,9 +4775,10 @@ function checkActiveNotice() {
         icon.innerText = '📢';
     }
 
-    // 3. FORCE Z-INDEX (Final safeguard)
-    modal.style.zIndex = "400"; 
+    // GOLDEN FIX: Remove 'hidden' and force z-index to ensure it is not covered by the main layout
     modal.classList.remove('hidden');
+    modal.style.display = 'flex'; 
+    modal.style.zIndex = "400"; 
 }
 
 /**
@@ -4933,4 +4935,5 @@ async function checkBatterySafety() {
 
 </body>
 </html>
+
 
