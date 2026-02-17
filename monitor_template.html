@@ -438,35 +438,46 @@ function handleData(response) {
     renderLog(); 
 }
 
+/**
+ * RE-ENGINEERED: Worker Data Processor
+ * Alignment: Matches keys exactly to renderGrid() requirements.
+ */
 function processWorkers(rows) { 
-    const workers = {}; const history = {};
+    const workers = {}; 
+    const history = {};
+    
+    // Sort chronologically to ensure latest status prevails
     rows.sort((a,b) => new Date(a.Timestamp) - new Date(b.Timestamp));
+
     rows.forEach(r => { 
-        const name = r['Worker Name']; if (!name) return; 
+        const name = r['Worker Name']; 
+        if (!name) return; 
+        
         const timestamp = new Date(r['Timestamp']).getTime(); 
         if(!history[name]) history[name] = [];
         if(r['Last Known GPS']?.includes(',')) history[name].push(r['Last Known GPS']);
-        
-        let travelTarget = "";
-        const status = r['Alarm Status'] || "";
-        const notes = r['Notes'] || "";
-        if (status.includes("TRAVELLING") && notes.toLowerCase().includes("travelling to:")) {
-            travelTarget = notes.split(/travelling to:/i)[1]?.trim() || "unknown";
-        }
 
+        // Maintain original spreadsheet keys for renderGrid consistency
         if (!workers[name] || timestamp > workers[name].timestamp) { 
             workers[name] = { 
-                name, status, phone: r['Worker Phone Number'], 
-                location: r['Location Name'] || r['Location Address'] || "Unknown", 
-                travelTarget, gps: r['Last Known GPS'], battery: r['Battery Level'], 
-                dueTime: r['Anticipated Departure Time'], timestamp
+                "Worker Name": name,
+                "Status": r['Alarm Status'] || "Unknown",
+                "Worker Phone Number": r['Worker Phone Number'], 
+                "Location Name": r['Location Name'] || r['Location Address'] || "Unknown", 
+                "Last Known GPS": r['Last Known GPS'], 
+                "Battery Level": r['Battery Level'], 
+                "Anticipated Departure Time": r['Anticipated Departure Time'],
+                "timestamp": timestamp
             }; 
         } 
     }); 
-    Object.values(workers).forEach(w => { w.history = history[w.name] ? history[w.name].slice(-10) : []; });
+
+    Object.values(workers).forEach(w => { 
+        w.history = history[w["Worker Name"]] ? history[w["Worker Name"]].slice(-10) : []; 
+    });
+    
     return Object.values(workers); 
 }
-
 // RESTORED: Alert Loop Logic
 function startAlertLoop() {
     if (alertLoopInterval) return;
