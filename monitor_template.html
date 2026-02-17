@@ -130,6 +130,24 @@
     </div>
 </div>
 
+<div id="signOutModal" class="hidden fixed inset-0 z-[500] flex items-center justify-center bg-black/90 backdrop-blur-sm">
+    <div class="bg-gray-900 rounded-2xl border-2 border-red-600 p-8 max-w-sm w-[90%] text-center shadow-2xl">
+        <div class="text-5xl mb-4">⚠️</div>
+        <h2 class="text-xl font-black text-white mb-3">Sign Out of Monitor?</h2>
+        <p class="text-gray-300 text-sm font-bold mb-2">You will need the <span class="text-yellow-400">Master Key</span> to log back in.</p>
+        <p class="text-red-400 text-xs font-black uppercase tracking-wider mb-8">Do not proceed unless you have access to this key.</p>
+        <div class="flex gap-3">
+            <button onclick="document.getElementById('signOutModal').classList.add('hidden')" 
+                    class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white font-black rounded-xl transition">
+                Cancel
+            </button>
+            <button onclick="resetKey()" 
+                    class="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl transition">
+                Sign Out
+            </button>
+        </div>
+    </div>
+</div>
 <header class="bg-gray-900 border-b border-gray-800 p-4 shrink-0 z-20 shadow-lg">
     <div class="flex justify-between items-center mb-2">
         <div class="flex items-center gap-4">
@@ -143,7 +161,7 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button onclick="resetKey()" class="text-xs text-gray-600 underline">🔑 Sign Out</button>
+            <button onclick="confirmSignOut()" class="text-xs text-gray-600 underline">🔑 Sign Out</button>
             <button onclick="exportSystemLog()" class="text-xs text-blue-400 underline">📊 Export Log</button>
             <button id="btnAudio" onclick="toggleAudio()" class="px-3 py-1 rounded text-sm font-bold bg-green-600 text-white">🔊 Sound On</button>
             <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-600 ml-4"><button onclick="setFilter('ACTIVE')" id="btnFilterActive" class="px-3 py-1 rounded text-xs font-bold btn-brand text-white shadow">🟢 Active</button><button onclick="setFilter('ALL')" id="btnFilterAll" class="px-3 py-1 rounded text-xs font-bold text-gray-400">📋 All</button></div>
@@ -673,7 +691,13 @@ function playSound(type) {
     }
 }
 function toggleAudio() { audioEnabled = !audioEnabled; document.getElementById('btnAudio').innerText = audioEnabled ? "🔊 Sound On" : "🔇 Sound Off"; }
-function resetKey() { localStorage.removeItem('monitor_master_key'); location.reload(); }
+function confirmSignOut() { 
+    document.getElementById('signOutModal').classList.remove('hidden'); 
+}
+function resetKey() { 
+    localStorage.removeItem('monitor_master_key'); 
+    location.reload(); 
+}
 /**
  * Helper: Generates markers for the map. 
  * Prevents handleData from crashing when processing worker status.
