@@ -2381,7 +2381,7 @@ function nextWiz() {
 /**
  * FULL INTEGRATION: Identity Save + UI Initialization + Backend Registration
  */
-function saveWizard() {
+async function saveWizard() {
     const workerData = {
         name: document.getElementById('wizName').value.trim(),
         phone: document.getElementById('wizPhone').value.trim(),
@@ -2399,43 +2399,85 @@ function saveWizard() {
     if (!workerData.name || !workerData.pin || !workerData.duress) {
         return alert("Please complete Name and Security PINs to proceed.");
     }
-    
-    // 1. Persist State
+
+    // 1. Persist identity locally
     state.worker = workerData;
     state.pins.std = workerData.pin;
     state.pins.duress = workerData.duress;
     if (!state.deviceId) state.deviceId = getDeviceID();
     saveState();
-    
+
+    // 2. REGISTRATION: Must succeed before the wizard completes.
+    //    Uses a direct fetch (not the upload queue) so we can read the response.
+    //    Template mode (%%WORKER_KEY%% not injected) skips this check.
+    if (CONFIG.key && !CONFIG.key.includes('%%') && CONFIG.url && !CONFIG.url.includes('%%')) {
+        const btnNext = document.getElementById('btnWizNext');
+        if (btnNext) { btnNext.disabled = true; btnNext.textContent = 'Registering…'; }
+
+        const regPayload = {
+            'action':                    'registerDevice',
+            'key':                       CONFIG.key,
+            'Worker Name':               workerData.name,
+            'Worker Phone Number':       workerData.phone,
+            'Worker Email':              workerData.email,
+            'Emergency Contact Name':    workerData.emgName,
+            'Emergency Contact Phone':   workerData.emgPhone,
+            'Emergency Contact Email':   workerData.emgEmail,
+            'Escalation Contact Name':   workerData.escName,
+            'Escalation Contact Phone':  workerData.escPhone,
+            'Escalation Contact Email':  workerData.escEmail,
+            'deviceId':                  state.deviceId,
+            'Timestamp':                 new Date().toISOString()
+        };
+
+        try {
+            const response = await fetch(CONFIG.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(regPayload).toString()
+            });
+            const data = await response.json();
+
+            if (data.status === 'device_denied') {
+                // Hard block: this worker name is bound to a different physical device.
+                if (btnNext) { btnNext.disabled = false; btnNext.textContent = 'Finish Setup'; }
+                alert(
+                    '🔒 Device Not Authorised\n\n' +
+                    (data.message || 'This worker account is already registered on a different device.') +
+                    '\n\nContact your administrator to release the device binding.'
+                );
+                return; // Do NOT navigate away — wizard stays open
+            }
+
+            if (data.status === 'error') {
+                // Worker name not in Staff list, or sheet missing
+                if (btnNext) { btnNext.disabled = false; btnNext.textContent = 'Finish Setup'; }
+                alert('❌ Registration Failed\n\n' + (data.message || 'Unknown error. Check your name matches the staff list exactly.'));
+                return;
+            }
+
+            // status === 'success' — device is now registered
+            if (btnNext) { btnNext.disabled = false; btnNext.textContent = 'Finish Setup'; }
+
+        } catch (err) {
+            // Network failure — warn but allow offline first-time setup
+            console.warn('Registration request failed (offline?):', err);
+            if (btnNext) { btnNext.disabled = false; btnNext.textContent = 'Finish Setup'; }
+            showToast('⚠️ Could not reach server — registration will retry on next sync.');
+        }
+    }
+
     announce(`Welcome ${workerData.name}. Device registered.`);
 
-    // 2. RETAINED CHUNK: Construct Registration Payload
-    const regPayload = {
-        'action': 'registerDevice',
-        'key': CONFIG.key,
-        'Worker Name': workerData.name,
-        'Worker Phone Number': workerData.phone,
-        'Worker Email': workerData.email,
-        'Emergency Contact Name': workerData.emgName,
-        'Emergency Contact Phone': workerData.emgPhone,
-        'Emergency Contact Email': workerData.emgEmail,
-        'Escalation Contact Name': workerData.escName,
-        'Escalation Contact Phone': workerData.escPhone,
-        'Escalation Contact Email': workerData.escEmail,
-        'deviceId': state.deviceId,
-        'Timestamp': new Date().toISOString()
-    };
-    
-    // 3. CRITICAL UI INITIALIZATION: Wakes up the buttons and tiles
-    renderLocations(); 
-    setupHoldToStart(); 
+    // 3. UI Initialisation
+    renderLocations();
+    setupHoldToStart();
     updateArrivedButtonState();
-    
+
     navigate('main');
-    
-    // 4. Trigger Backend Sync
-    processUploadQueue(regPayload);
-    setTimeout(() => { forceSync(false); }, 1000);
+
+    // 4. Sync metadata now that we're registered
+    setTimeout(() => { forceSync(false); }, 500);
 }
 
 // ============================================================================
@@ -3967,6 +4009,22 @@ function forceSync(showUI) {
             const banner = document.getElementById('uploadBanner');
             if (banner) banner.classList.add('hidden');
             
+            if (data.status === "device_denied") {
+                // This device is not authorised for this worker — lock out the app visibly.
+                const banner = document.getElementById('uploadBanner');
+                if (banner) banner.classList.add('hidden');
+                // Show a persistent full-screen warning rather than a dismissable toast
+                const offlineBanner = document.getElementById('offlineBanner');
+                if (offlineBanner) {
+                    offlineBanner.textContent = '🔒 DEVICE NOT AUTHORISED — Contact your administrator';
+                    offlineBanner.classList.remove('hidden');
+                    offlineBanner.style.backgroundColor = '#7f1d1d';
+                }
+                console.error('Device denied by server:', data.message);
+                if (showUI) alert('🔒 Device Not Authorised\n\n' + (data.message || 'This device is not registered for your worker account.'));
+                return;
+            }
+
             if (data.status === "error") {
                 if (showUI) alert("❌ Sync Error: " + (data.message || 'Unknown error'));
                 return;
@@ -5204,6 +5262,3 @@ document.addEventListener("visibilitychange", async () => {
 
 </body>
 </html>
-
-
-
