@@ -2591,15 +2591,16 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')
         .then(registration => {
             console.log('Service Worker registered:', registration.scope);
-            
-            // Handle updates
+
+            // Poll for updates every 60s (browser default is 24h — far too slow)
+            setInterval(() => registration.update(), 60000);
+
             registration.addEventListener('updatefound', () => {
                 const newWorker = registration.installing;
                 newWorker.addEventListener('statechange', () => {
+                    // New SW installed and waiting — tell it to activate immediately
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        if (confirm('New version available. Update now?')) {
-                            window.location.reload();
-                        }
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
                     }
                 });
             });
@@ -2607,8 +2608,16 @@ if ('serviceWorker' in navigator) {
         .catch(err => {
             console.error('Service Worker registration failed:', err);
         });
-}
 
+    // When the new SW takes control, reload once to serve the fresh index.html
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            refreshing = true;   // guard against double-reload loop
+            window.location.reload();
+        }
+    });
+}
 // ============================================================================
 // INSTALL PROMPTS (PC & Android)
 // ============================================================================
@@ -5437,3 +5446,4 @@ document.addEventListener("visibilitychange", async () => {
 
 </body>
 </html>
+
