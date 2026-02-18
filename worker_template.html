@@ -309,10 +309,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 
     <div class="w-full max-w-xs space-y-8">
-        <div class="relative bg-gray-900/40 h-16 rounded-full p-1 border border-gray-800 flex items-center overflow-hidden shadow-inner">
+        <div id="wakeSlidePill" class="relative bg-gray-900/40 h-16 rounded-full p-1 border border-gray-800 flex items-center overflow-hidden shadow-inner">
             <input type="range" id="wakeSlider" min="0" max="100" value="0" 
-                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-                   oninput="checkWakeSlider(this)">
+                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
             
             <div id="sliderThumb" class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl transition-all duration-75 pointer-events-none z-20">
                  <svg class="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2240,8 +2239,10 @@ function tick() {
     const saverEl = document.getElementById('batterySaver');
     if (saverEl && !saverEl.classList.contains('hidden')) {
         updateBatterySaverHUD();
-        // Still check for 15m expiry in background
-        if (remaining <= 0 && Math.abs(diffMins) >= 15 && !state.activeVisit.criticalSent) {
+        // Still check for 15m expiry in background.
+        // isSafeConfirmed guard prevents re-triggering after worker clears the alarm.
+        if (remaining <= 0 && Math.abs(diffMins) >= 15 &&
+            !state.activeVisit.criticalSent && !state.activeVisit.isSafeConfirmed) {
             triggerGraceExpiryAlarm();
         }
         return; 
@@ -2295,7 +2296,10 @@ function tick() {
         }
         
         // 15-MINUTE GRACE EXPIRY CHECK
-        if (Math.abs(diffMins) >= 15 && !isAlarmed) {
+        // isSafeConfirmed prevents re-triggering on every tick after the worker
+        // clears the alarm — without it, resetting criticalSent in iamSafe()
+        // causes an immediate re-fire, creating an infinite alarm loop.
+        if (Math.abs(diffMins) >= 15 && !isAlarmed && !state.activeVisit.isSafeConfirmed) {
             triggerGraceExpiryAlarm();
         }
 
@@ -4819,83 +4823,93 @@ function cancelVolumeConfirmation() {
 // ====== FEATURE 3: SLIDE-TO-WAKE (Hold-to-Slide) ======
 
 function initSlideToWake() {
-    const slideButton = document.getElementById('slideButton');
-    const slideTrack = document.getElementById('slideTrack');
-    const slideProgress = document.getElementById('slideProgress');
-    const slideText = document.getElementById('slideText');
-    if (!slideButton || !slideTrack) return;
+    // Wire to the ACTUAL battery-saver elements: wakeSlider (touch target),
+    // sliderThumb (visual knob), slideLabel (text).
+    // The range input is kept purely as a visual container — its value is ignored.
+    // We use pointer/touch events so the gesture must be a deliberate LEFT-TO-RIGHT
+    // drag that starts near the thumb. Any tap, or a drag starting mid-track, is ignored.
 
-    let maxSlide = 0; 
-    let currentX = 0; 
+    const container = document.getElementById('wakeSlidePill');
+    const thumb     = document.getElementById('sliderThumb');
+    const label     = document.getElementById('slideLabel');
+    if (!container || !thumb) return;
 
-    const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+    const THUMB_W   = 56;   // px — matches w-14 (3.5rem at 16px base)
+    const START_ZONE = 0.25; // gesture must begin within first 25% of track
 
-    const start = (e) => {
-        isSliding = true;
-        slideStartX = getX(e);
-        slideButton.style.transition = 'none';
-        slideProgress.style.transition = 'none';
-        if (!e.touches) e.preventDefault();
-    };
+    let isSliding   = false;
+    let gestureValid = false; // true only when drag started in the left zone
+    let startClientX = 0;
+    let maxSlide    = 0;
+    let currentOffset = 0;
 
-    const move = (e) => {
+    function getClientX(e) {
+        return e.touches ? e.touches[0].clientX : e.clientX;
+    }
+
+    function onStart(e) {
+        const rect = container.getBoundingClientRect();
+        const relX = getClientX(e) - rect.left;
+        maxSlide = rect.width - THUMB_W - 8;
+
+        // Only begin tracking if the touch starts in the left START_ZONE
+        if (relX / rect.width > START_ZONE) return;
+
+        isSliding    = true;
+        gestureValid = true;
+        startClientX = getClientX(e);
+        currentOffset = 0;
+        thumb.style.transition = 'none';
+        e.preventDefault(); // prevent scroll while sliding
+    }
+
+    function onMove(e) {
+        if (!isSliding || !gestureValid) return;
+        const delta = Math.max(0, Math.min(getClientX(e) - startClientX, maxSlide));
+        currentOffset = delta;
+        thumb.style.transform = `translateX(${delta}px)`;
+        const progress = delta / maxSlide;
+        if (label) label.style.opacity = 1 - progress;
+        if (progress >= 0.85) completeSlide();
+    }
+
+    function onEnd() {
         if (!isSliding) return;
-        const trackWidth = slideTrack.offsetWidth;
-        const buttonWidth = slideButton.offsetWidth;
-        maxSlide = trackWidth - buttonWidth - 8;
-        
-        const deltaX = getX(e) - slideStartX;
-        currentX = Math.max(0, Math.min(deltaX, maxSlide));
+        isSliding    = false;
+        gestureValid = false;
+        // Snap thumb back
+        thumb.style.transition = 'transform 0.3s ease';
+        thumb.style.transform  = 'translateX(0)';
+        if (label) { label.style.opacity = 1; label.style.transition = 'opacity 0.2s'; }
+        currentOffset = 0;
+    }
 
-        slideButton.style.transform = `translateX(${currentX}px)`;
-        const progress = (currentX / maxSlide) * 100;
-        slideProgress.style.width = `${progress}%`;
-        
-        if (progress > 90) completeSlide();
-    };
-
-    const end = () => {
-        if (!isSliding) return;
-        isSliding = false;
-        slideButton.style.transition = 'transform 0.3s ease';
-        slideButton.style.transform = 'translateX(0)';
-        slideProgress.style.width = '0%';
-        if (slideText) slideText.style.opacity = '1';
-    };
-
-    slideButton.addEventListener('touchstart', start, { passive: false });
-    window.addEventListener('touchmove', move);
-    window.addEventListener('touchend', end);
-    slideButton.addEventListener('mousedown', start);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
-
-    // NESTED: completeSlide must be inside to access maxSlide
     function completeSlide() {
-        isSliding = false;
-        slideButton.style.transition = 'transform 0.2s ease-out';
-        slideProgress.style.transition = 'width 0.2s ease-out, opacity 0.2s ease-out';
-        slideButton.style.transform = `translateX(${maxSlide}px)`;
-        slideProgress.style.width = '100%';
-        slideProgress.style.opacity = '1';
-        
+        isSliding    = false;
+        gestureValid = false;
+        thumb.style.transition = 'transform 0.15s ease-out';
+        thumb.style.transform  = `translateX(${maxSlide}px)`;
         if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-        
         setTimeout(() => {
-            deactivateDimMode();
-            resetInactivityTimer();
+            toggleBatterySaver();
             isSosLocked = true;
             setTimeout(() => { isSosLocked = false; }, 2000);
-            
-            slideButton.style.transition = 'none';
-            slideButton.style.transform = 'translateX(0)';
-            slideProgress.style.width = '0%';
-            slideProgress.style.opacity = '0.4';
-            if (slideText) slideText.style.opacity = '1';
-            currentX = 0;
-        }, 200);
+            // Reset visual state for next time saver is activated
+            thumb.style.transition = 'none';
+            thumb.style.transform  = 'translateX(0)';
+            if (label) { label.style.opacity = 1; }
+            currentOffset = 0;
+        }, 150);
     }
-} // FIXED: Removed extra orphaned brace
+
+    // Attach to the slider container (covers the full pill area)
+    container.addEventListener('touchstart', onStart, { passive: false });
+    container.addEventListener('mousedown',  onStart);
+    window.addEventListener('touchmove',  onMove, { passive: false });
+    window.addEventListener('mousemove',  onMove);
+    window.addEventListener('touchend',   onEnd);
+    window.addEventListener('mouseup',    onEnd);
+}
     
 // Update dimmed screen timer and battery
 function updateDimmedDisplay() {
@@ -5384,28 +5398,9 @@ function updateBatterySaverHUD() {
     }
 }
 
-function checkWakeSlider(el) {
-    const val = parseInt(el.value);
-    const thumb = document.getElementById('sliderThumb');
-    const label = document.getElementById('slideLabel'); 
-    
-    if (thumb) {
-        // Calculate the physical movement of the white button
-        const offset = (val / 100) * (el.offsetWidth - 56); 
-        thumb.style.transform = `translateX(${offset}px)`;
-    }
-    
-    // Smoothly fades the 'Slide to Wake' text as the thumb moves
-    if (label) label.style.opacity = (100 - val) / 100;
-
-    // Trigger the wake-up once the slide reaches 90% completion
-    if (val >= 90) {
-        el.value = 0; // Reset the range input
-        if (thumb) thumb.style.transform = `translateX(0px)`;
-        if (label) label.style.opacity = 1;
-        toggleBatterySaver(); // Restore the full visit screen
-    }
-}
+// checkWakeSlider removed — slide-to-wake is now handled entirely by
+// initSlideToWake() using touch/pointer events on the pill container.
+// The wakeSlider range input is a visual-only element; its value is not read.
 
 /**
  * UI LOGIC: Safe Peek
