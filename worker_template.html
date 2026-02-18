@@ -4121,13 +4121,19 @@ function toggleBatterySaver() {
         saver.classList.remove('hidden');
         
         // 2. RENDERING: Stop GPU/Layout calculations
-        // This is the "Deep DOM Hiding" fix for battery life.
-        main.style.display = 'none'; 
+        main.style.display = 'none';
 
-        // 3. CPU: Throttle the heartbeat
+        // 3. CPU: Throttle the heartbeat - clear BOTH interval handles so timerInt
+        //    (running at 1s on the restore path) does not defeat the battery saver.
         clearInterval(tickIntervalId);
+        clearInterval(timerInt);
+        timerInt = null;
         tickIntervalId = setInterval(tick, TICK_SAVER);
-        console.log("🔋 Battery Saver Active: Heartbeat throttled to 30s.");
+
+        // 4. Populate the HUD immediately so values show straight away
+        //    rather than waiting up to 30s for the first throttled tick.
+        updateBatterySaverHUD();
+        console.log('Battery Saver Active: throttled to 30s.');
     } else {
         // 1. UI: Hide black screen
         saver.classList.add('hidden');
@@ -4135,13 +4141,15 @@ function toggleBatterySaver() {
         // 2. RENDERING: Resume UI
         main.style.display = 'block';
 
-        // 3. CPU: Restore normal heartbeat
+        // 3. CPU: Restore normal heartbeat on both interval handles
         clearInterval(tickIntervalId);
+        clearInterval(timerInt);
         tickIntervalId = setInterval(tick, TICK_NORMAL);
-        
-        // Immediate sync to ensure the timer is up-to-date
-        tick(); 
-        console.log("⚡ Normal Mode: Heartbeat restored to 1s.");
+        timerInt = setInterval(tick, TICK_NORMAL);
+
+        // 4. Immediate tick so the main UI is up-to-date right away
+        tick();
+        console.log('Normal Mode: Heartbeat restored to 1s.');
     }
 }
 
@@ -5196,10 +5204,11 @@ function updateBatterySaverHUD() {
     // Display the current formatted time remaining
     if (timeHUD) timeHUD.innerText = state.timerDisplay || "--:--";
     
-    // Display battery info
-    if (battTextHUD && state.battery) {
-        battTextHUD.innerText = `${state.battery}%`;
-        if (battBarHUD) battBarHUD.style.width = `${state.battery}%`;
+    // Display battery info from currentBatteryLevel (state.battery is never populated)
+    const battLevel = parseInt(currentBatteryLevel) || 0;
+    if (battTextHUD) {
+        battTextHUD.innerText = battLevel + '%';
+        if (battBarHUD) battBarHUD.style.width = battLevel + '%';
     }
 }
 
