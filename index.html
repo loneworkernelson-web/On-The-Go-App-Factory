@@ -440,6 +440,10 @@
     const REGION_DATA = { "+64": { term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" }, "+61": { term: "Rego", locale: "en-AU", tz: "Australia/Sydney" }, "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London" }, "+1": { term: "Inspection", locale: "en-US", tz: "America/New_York" } };
     let selectedConfig = REGION_DATA["+64"];
 
+    // Computed once at load time so every build from this session shares the same stamp.
+    // Used by both generateScript() and downloadZip() for consistent version labelling.
+    const buildTimestamp = new Date().toISOString().slice(0, 10) + '-' + Date.now().toString(36);
+
   window.onload = async () => {
         document.getElementById('mainContent').classList.remove('blur-sm');
         loadPersistedData();
@@ -574,7 +578,8 @@ function applyPreset(p, a, el) {
             .replace(/%%ORGANISATION_NAME%%/g, document.getElementById('orgName').value).replace(/%%TIMEZONE%%/g, document.getElementById('timezoneVal').value)
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%ENABLE_REDACTION%%/g, document.getElementById('chkRedaction').checked)
             .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
-            .replace(/%%LOCALE%%/g, selectedConfig.locale);
+            .replace(/%%LOCALE%%/g, selectedConfig.locale)
+            .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
     }
 
    // NEW: Logic to sync the UI Mockup with user inputs
@@ -693,13 +698,10 @@ function testConnection() {
             .replace(/%%REQ_TRAVEL_REPORT%%/g, "true")
             .replace(/%%VEHICLE_TERM%%/g, document.getElementById('vehTermDisplay').innerText)
             .replace(/%%VOICE_LOCALE%%/g, document.getElementById('voiceLocaleDisplay').innerText)
-            .replace(/%%LOGO_DATA%%/g, logoData);
+            .replace(/%%LOGO_DATA%%/g, logoData)
+                        .replace(/%%BUILD_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
 
         
-
-// Generate a unique build ID on every download so the service worker cache name
-// changes with each release, forcing installed apps to update automatically.
-const buildTimestamp = new Date().toISOString().slice(0, 10) + '-' + Date.now().toString(36);
 
 const swCode = `
 const CACHE_NAME = 'otg-safety-v81.36-${buildTimestamp}';
