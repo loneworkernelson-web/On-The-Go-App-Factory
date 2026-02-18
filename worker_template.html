@@ -295,10 +295,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </p>
     </div>
 
-    <div class="space-y-1 cursor-pointer active:opacity-40 transition-opacity" onclick="triggerPeek()">
-        <p class="text-[10px] font-black tracking-[0.4em] text-gray-600 uppercase">Shake Vigorously for SOS</p>
+    <!-- Timer display - tap-to-wake removed (8d); timer was never clickable anyway -->
+    <div class="space-y-1">
         <p id="saverTimerHUD" class="text-5xl font-mono font-bold text-gray-300">--:--</p>
-        <p class="text-[9px] text-gray-700 font-bold uppercase tracking-widest">Tap Numbers to Peek</p>
     </div>
         
         <div class="flex items-center justify-center gap-2 text-gray-500">
@@ -326,10 +325,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
 
+        <!-- 8c: Shake message replaces old SOS pill, keeping the red pill styling -->
         <div class="text-center">
             <div class="inline-flex items-center gap-2 bg-red-900/10 border border-red-900/30 rounded-full px-5 py-2">
                 <span class="text-red-600 text-lg">🆘</span>
-                <span class="text-red-700 text-[10px] font-black uppercase tracking-widest">SOS accessible anytime</span>
+                <span class="text-red-700 text-[10px] font-black uppercase tracking-widest">Shake vigorously for SOS</span>
             </div>
         </div>
     </div>
@@ -576,7 +576,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         Forms
     </button>
     <button type="button" id="btnStart" 
-            class="long-press-btn flex-1 bg-gray-700 text-gray-500 font-black rounded-2xl text-xl shadow-lg transition-all uppercase tracking-tighter" 
+            class="long-press-btn flex-1 bg-gray-700 text-gray-500 font-black rounded-2xl text-xl shadow-lg transition-all" 
             disabled>
         <span class="relative z-10">Hold to Start</span>
     </button>
@@ -615,7 +615,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 
         <div class="flex flex-col gap-3">
             <div class="flex gap-3 h-16">
-                <button id="btnExtend" onclick="showModal('extend')" class="flex-1 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-lg uppercase tracking-widest">
+                <button id="btnExtend" onclick="showModal('extend')" class="flex-1 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-lg">
                     Extend
                 </button>
                 <button onclick="openFormsLibrary()" class="w-24 bg-violet-950 text-violet-300 font-black rounded-2xl border border-violet-800/50 flex flex-col items-center justify-center">
@@ -624,12 +624,12 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 </button>
             </div>
 
-            <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl uppercase tracking-[0.2em]">
-                Hold to END
+            <button id="btnDepart" class="long-press-btn w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl text-xl shadow-2xl">
+                Hold to End
             </button>
             
-            <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse uppercase tracking-[0.2em]">
-                I AM SAFE
+            <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse">
+                I Am Safe
             </button>
         </div>
     </div>
@@ -731,7 +731,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="saveSettings()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg">
                 💾 Save Settings
             </button>
-            <button onclick="clearData()" class="w-full py-4 bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold rounded-xl shadow-lg uppercase">
+            <button onclick="clearData()" class="w-full py-4 bg-red-900/50 text-red-400 hover:bg-red-900/70 font-bold rounded-xl shadow-lg">
                 Reset App Data
             </button>
         </div>
@@ -747,7 +747,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="confirmExtension(15)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+15</button>
             <button onclick="confirmExtension(30)" class="py-5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-white shadow-lg">+30</button>
         </div>
-        <button onclick="closeModal('extend')" class="w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase">Cancel</button>
+        <button onclick="closeModal('extend')" class="w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400">Cancel</button>
     </div>
 </div>
 
@@ -755,25 +755,32 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="wofBlockModal" class="hidden fixed inset-0 z-[450] flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-10 text-center border-4 border-red-600">
         <div class="text-7xl mb-6">⛔</div>
-        <h2 class="text-3xl font-black text-red-500 mb-4 uppercase">STOP</h2>
-        <p class="text-lg text-white font-bold mb-6">This vehicle has an EXPIRED WOF or Registration. It is prohibited for work use.</p>
-        <button onclick="closeWofBlocker()" class="w-full py-5 bg-red-600 text-white font-black rounded-2xl text-xl shadow-2xl">I Understand</button>
+        <h2 class="text-3xl font-black text-red-500 mb-4 uppercase">Vehicle Grounded</h2>
+        <p class="text-lg text-white font-bold mb-4">Your WOF has expired. You must not use your vehicle for work travel until it is renewed.</p>
+        <p class="text-sm text-gray-400 font-bold mb-8">Once renewed, submit a <span class="text-orange-400">Vehicle Safety Check</span> form to update your records and restore travel access.</p>
+        <button onclick="closeWofBlocker()" class="w-full py-5 bg-red-600 text-white font-black rounded-2xl text-xl shadow-2xl">Understood</button>
     </div>
 </div>
 
 <!-- Vehicle WOF Warning Modal -->
-<div id="wofWarnModal" class="hidden fixed inset-0 z-[450] flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
+<!-- data-mode="load" = on-open reminder (dismiss only) -->
+<!-- data-mode="visit" = pre-travel gate (checkbox + Continue resumes startVisit) -->
+<div id="wofWarnModal" data-mode="load" class="hidden fixed inset-0 z-[450] flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
     <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center border-4 border-orange-500">
         <div class="text-6xl mb-4">⚠️</div>
-        <h2 class="text-2xl font-black text-orange-500 mb-2 uppercase">VEHICLE COMPLIANCE</h2>
-        <p class="text-white font-bold mb-6">Vehicle WOF or Rego is expiring soon:<br><span id="wofWarnText" class="text-2xl text-orange-400 font-black"></span></p>
-        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 text-left mb-6">
+        <h2 class="text-2xl font-black text-orange-500 mb-3">WOF Expiry Reminder</h2>
+        <p class="text-white font-bold mb-2">Your vehicle WOF expires in:</p>
+        <p id="wofWarnText" class="text-3xl text-orange-400 font-black mb-4"></p>
+        <p class="text-sm text-gray-400 font-bold mb-6">Please book a WOF renewal. Once done, submit a <span class="text-orange-400">Vehicle Safety Check</span> form to update your records.</p>
+        <!-- Visit-gate section: shown only when opening from pre-travel check -->
+        <div id="wofWarnVisitSection" class="hidden bg-gray-800 p-4 rounded-2xl border border-gray-700 text-left mb-4">
             <label class="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" id="chkWofAck" class="mt-1 w-6 h-6 rounded text-blue-600" onchange="toggleWofContinue()">
-                <span class="text-sm text-gray-300 font-bold">I acknowledge the vehicle is legal and safe to operate.</span>
+                <span class="text-sm text-gray-300 font-bold">I confirm the WOF is still valid for this trip and the vehicle is safe to operate.</span>
             </label>
         </div>
-        <button id="btnWofContinue" disabled onclick="closeWofWarn()" class="w-full py-4 bg-gray-700 text-gray-500 font-black rounded-2xl text-lg transition-all">Continue</button>
+        <button id="btnWofContinue" disabled onclick="closeWofWarn()" class="hidden w-full py-4 bg-gray-700 text-gray-500 font-black rounded-2xl text-lg transition-all mb-3">Continue to Travel</button>
+        <button id="btnWofDismiss" onclick="closeWofWarn()" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-2xl text-lg">Got it</button>
     </div>
 </div>
 
@@ -783,11 +790,42 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <h2 class="text-2xl font-black text-white mb-4">Site Info</h2>
         <div id="siteInfoContent" class="text-gray-300 text-sm space-y-3 mb-6"></div>
         <div class="flex gap-3 mb-4">
-            <a id="btnSiteCall" href="#" class="hidden flex-1 bg-green-600 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest">📞 Call</a>
-            <a id="btnSiteEmail" href="#" class="hidden flex-1 bg-blue-600 text-white py-4 rounded-xl text-center font-black uppercase tracking-widest">✉️ Email</a>
+            <a id="btnSiteCall" href="#" class="hidden flex-1 bg-green-600 text-white py-4 rounded-xl text-center font-black">📞 Call</a>
+            <a id="btnSiteEmail" href="#" class="hidden flex-1 bg-blue-600 text-white py-4 rounded-xl text-center font-black">✉️ Email</a>
         </div>
-        <a id="btnSiteNav" href="#" target="_blank" class="hidden block w-full py-4 bg-purple-600 text-white font-black rounded-xl text-center mb-4 uppercase tracking-widest">🗺️ Navigate</a>
-        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-xl uppercase tracking-widest">Close</button>
+        <a id="btnSiteNav" href="#" target="_blank" class="hidden block w-full py-4 bg-purple-600 text-white font-black rounded-xl text-center mb-4">🗺️ Navigate</a>
+        <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-xl">Close</button>
+    </div>
+</div>
+
+<!-- Travel Settings Modal -->
+<div id="travelSettingsModal" class="hidden fixed inset-0 z-[460] flex items-center justify-center bg-black/80 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 border-t-[8px] border-purple-600 mx-4">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="text-3xl">🚗</span>
+            <div>
+                <h2 class="text-xl font-black text-white">Travel Settings</h2>
+                <p class="text-xs text-gray-500 font-bold">This trip only &mdash; resets after each journey</p>
+            </div>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4 mb-6 border border-gray-700">
+            <label class="flex items-center justify-between cursor-pointer gap-4">
+                <div>
+                    <div class="text-sm font-black text-white">Personal Travel &ndash; No Report</div>
+                    <div class="text-xs text-gray-400 font-bold mt-0.5">No travel report will be submitted at the end of this trip.</div>
+                </div>
+                <!-- Toggle switch -->
+                <div class="relative shrink-0">
+                    <input type="checkbox" id="travelNoReportToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-600 peer-checked:bg-purple-600 rounded-full transition-colors"></div>
+                    <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+                </div>
+            </label>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="closeModal('travelSettings')" class="flex-1 py-4 bg-gray-800 text-gray-400 font-black rounded-2xl">Cancel</button>
+            <button onclick="saveTravelSettings()" class="flex-1 py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg">Save</button>
+        </div>
     </div>
 </div>
 
@@ -830,12 +868,31 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                     <span class="text-sm text-white font-bold">⚡ Critical Timing Mode (High-Risk Site)</span>
                 </label>
             </div>
+            <!-- Report Required toggle -->
+            <div class="bg-gray-900 p-3 rounded-xl">
+                <label class="flex items-center justify-between cursor-pointer gap-3">
+                    <div>
+                        <div class="text-sm text-white font-bold">📄 Report Required</div>
+                        <div class="text-xs text-gray-500 font-bold mt-0.5">Default for this site. Can be overridden per visit.</div>
+                    </div>
+                    <div class="relative shrink-0">
+                        <input type="checkbox" id="locRequiresReport" class="sr-only peer" checked>
+                        <div class="w-10 h-5 bg-gray-600 peer-checked:bg-blue-600 rounded-full transition-colors"></div>
+                        <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+                    </div>
+                </label>
+            </div>
+            <!-- Custom Template Name -->
+            <div>
+                <label class="text-xs text-gray-400 uppercase font-black tracking-widest ml-1">Custom Template Name</label>
+                <input type="text" id="locTemplate" class="form-input" placeholder="Leave blank to use standard template">
+            </div>
         </div>
         <div class="mt-8 flex gap-3">
-            <button onclick="deleteLoc()" id="btnDelLoc" class="hidden bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest border border-red-800/30">Delete</button>
+            <button onclick="deleteLoc()" id="btnDelLoc" class="hidden bg-red-900/50 text-red-400 font-black py-3 px-6 rounded-xl text-sm border border-red-800/30">Delete</button>
             <div class="flex-1"></div>
-            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl uppercase text-xs tracking-widest">Cancel</button>
-            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl uppercase text-xs tracking-widest">Save</button>
+            <button onclick="closeModal('location')" class="bg-gray-700 text-white font-black py-3 px-6 rounded-xl text-sm">Cancel</button>
+            <button onclick="saveLoc()" class="bg-blue-600 text-white font-black py-3 px-8 rounded-xl shadow-xl text-sm">Save</button>
         </div>
     </div>
 </div>
@@ -846,7 +903,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <h2 id="noticeTitle" class="text-2xl font-black text-white mb-3 uppercase tracking-tight leading-tight"></h2>
         <div id="noticeContent" class="text-gray-400 text-base mb-10 leading-relaxed text-left max-h-56 overflow-y-auto pr-3 scrollbar-hide"></div>
         
-        <button id="btnAckNotice" onclick="acknowledgeNotice()" class="w-full py-6 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-xl uppercase tracking-widest active:scale-95 transition-all">
+        <button id="btnAckNotice" onclick="acknowledgeNotice()" class="w-full py-6 bg-blue-600 text-white font-black rounded-2xl text-lg shadow-xl active:scale-95 transition-all">
             I have read and understood
         </button>
     </div>
@@ -929,7 +986,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button onclick="closeModal('formsLibrary')" class="text-2xl text-gray-400">×</button>
         </div>
         <div id="formsLibraryList" class="flex-1 overflow-y-auto space-y-3 pr-2"></div>
-        <button onclick="closeModal('formsLibrary')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400 uppercase tracking-widest">Close</button>
+        <button onclick="closeModal('formsLibrary')" class="mt-6 w-full py-4 bg-gray-700 rounded-xl font-black text-gray-400">Close</button>
     </div>
 </div>
 
@@ -946,7 +1003,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         <div id="hubContent" class="flex-1 overflow-y-auto p-8 pt-2 space-y-4 scrollbar-hide"></div>
         
         <div class="p-8 pt-0">
-            <button onclick="closeModal('resourceHub')" class="w-full py-4 bg-gray-800 text-gray-400 font-black rounded-2xl uppercase tracking-widest">Close</button>
+            <button onclick="closeModal('resourceHub')" class="w-full py-4 bg-gray-800 text-gray-400 font-black rounded-2xl">Close</button>
         </div>
     </div>
 </div>
@@ -1003,7 +1060,7 @@ let isDimmed = false;
 const DIM_DELAY = 10000; // 10 seconds
 let checkinIntervalId;
 let travellingInterval;
-let timerInt;
+// timerInt retired: tickIntervalId is the sole interval handle for tick().
 let deferredPrompt;
 let lastAlertTime = 0;
 let lastGPS = null;
@@ -1145,6 +1202,9 @@ function closeModal(id) {
     const modal = document.getElementById(id + 'Modal');
     if (modal) {
         modal.classList.add('hidden');
+        // Clear any inline display style: checkActiveNotice sets style.display='flex'
+        // directly, which overrides the hidden class and prevents dismissal.
+        modal.style.display = '';
     }
 }
 
@@ -1332,7 +1392,7 @@ function submitReport() {
     }
 
     if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
-    if (timerInt) { clearInterval(timerInt); timerInt = null; }
+    if (tickIntervalId) { clearInterval(tickIntervalId); tickIntervalId = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
@@ -1935,7 +1995,8 @@ function preDepart() {
 
     // 1. TRAVEL ROUTING: Handle travel sessions regardless of specific site selection
     if (isTravelSession) {
-        const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
+        // Per-trip flag lives in state so it auto-resets after each visit
+        const noReport = !!(state && state.travelNoReport);
         
         if (noReport) {
             submitReport(); 
@@ -1958,11 +2019,11 @@ function preDepart() {
                         calculatedDist = { km: dist.toFixed(2), type: 'crow', offline: true };
                     }
                 }
-                if (btnDepart) btnDepart.textContent = 'HOLD TO END';
+                if (btnDepart) btnDepart.textContent = 'Hold to End';
                 loadFormAndShow('Travel Report'); // Correctly loads Travel template
             },
             (err) => {
-                if (btnDepart) btnDepart.textContent = 'HOLD TO END';
+                if (btnDepart) btnDepart.textContent = 'Hold to End';
                 calculatedDist = null;
                 loadFormAndShow('Travel Report');
             },
@@ -2029,10 +2090,12 @@ function enterLockedScreen() {
     const btnSafe = document.getElementById('btnSafe');
     if (btnSafe) setupLongPress(btnSafe, 1800, iamSafe);
     
-    // Start the countdown timer
-    if (!timerInt) {
-        tickIntervalId = setInterval(tick, TICK_NORMAL);
-    }
+    // Start the countdown timer. Always clear first to avoid duplicate intervals,
+    // then start fresh. The old timerInt guard caused tick() to never start
+    // on the app-restore path where timerInt was already set.
+    if (tickIntervalId) clearInterval(tickIntervalId);
+    tickIntervalId = setInterval(tick, TICK_NORMAL);
+    tick(); // Immediate first tick so the display is right straight away
     
     startCheckinTimer();
 }
@@ -2139,6 +2202,25 @@ function iamSafe() {
  * THE MASTER HEARTBEAT: Unified Safety Engine
  * Logic: Manages UI Throttling, Battery Safety, Warning Escalations, and Grace Periods.
  */
+/**
+ * Formats a number of seconds into a readable countdown string.
+ * Under 60 minutes: MM:SS  e.g. "14:32"
+ * 60 minutes or more: Xh Ym  e.g. "2h 15m"
+ * Prepends "-" when overdue.
+ */
+function formatCountdown(totalSeconds) {
+    const sign = totalSeconds < 0 ? '-' : '';
+    const abs = Math.abs(totalSeconds);
+    if (abs >= 3600) {
+        const h = Math.floor(abs / 3600);
+        const m = Math.floor((abs % 3600) / 60);
+        return sign + h + 'h ' + m + 'm';
+    }
+    const m = Math.floor(abs / 60);
+    const s = Math.floor(abs % 60);
+    return sign + m + ':' + String(s).padStart(2, '0');
+}
+
 function tick() {
     if (!state || !state.activeVisit) return;
 
@@ -2148,14 +2230,15 @@ function tick() {
     const remaining = state.activeVisit.duration - (now - state.activeVisit.startTime) / 1000;
     const diffMins = (state.activeVisit.anticipatedDepartureTime - now) / 60000;
     
-    // Capture state for the HUD
-    const mins = Math.floor(Math.abs(remaining) / 60);
-    const secs = Math.floor(Math.abs(remaining) % 60);
-    state.timerDisplay = (remaining <= 0 ? "-" : "") + `${mins}:${secs.toString().padStart(2, '0')}`;
+    // Capture state for the battery saver HUD
+    state.timerDisplay = formatCountdown(remaining);
 
     // 2. UI THROTTLE BRANCH
     // If Battery Saver is active, update the HUD and EXIT early to save GPU/CPU.
-    if (document.getElementById('mainContent').style.display === 'none') {
+    // Use the batterySaver element itself as the state indicator - mainContent
+    // does not exist in this build and caused a TypeError that silently killed tick().
+    const saverEl = document.getElementById('batterySaver');
+    if (saverEl && !saverEl.classList.contains('hidden')) {
         updateBatterySaverHUD();
         // Still check for 15m expiry in background
         if (remaining <= 0 && Math.abs(diffMins) >= 15 && !state.activeVisit.criticalSent) {
@@ -2207,7 +2290,7 @@ function tick() {
 
         if (overdueLabel) overdueLabel.classList.remove('hidden');
         if (timerEl) {
-            timerEl.innerHTML = `-${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+            timerEl.textContent = formatCountdown(remaining);
             timerEl.classList.add('text-red-500', 'animate-pulse');
         }
         
@@ -2232,7 +2315,7 @@ function tick() {
         // NORMAL UI STATE
         if (overdueLabel) overdueLabel.classList.add('hidden');
         if (timerEl) {
-            timerEl.innerHTML = `${mins}:${secs.toString().padStart(2, '0')}<span class="text-3xl ml-2 font-black">min</span>`;
+            timerEl.textContent = formatCountdown(remaining);
             timerEl.classList.remove('text-red-500', 'animate-pulse');
         }
         if (document.getElementById('btnSafe')) document.getElementById('btnSafe').classList.add('hidden');
@@ -2545,7 +2628,7 @@ window.addEventListener('beforeunload', () => {
     stopGPSMonitoring();
     if (checkinIntervalId) clearInterval(checkinIntervalId);
     if (travellingInterval) clearInterval(travellingInterval);
-    if (timerInt) clearInterval(timerInt);
+    if (tickIntervalId) clearInterval(tickIntervalId);
 });
 
 // ============================================================================
@@ -2666,36 +2749,47 @@ function toggleHighRiskUI() {
 }
 
 /**
- * 1A. Travel Tile: Toggles Travel Mode
+ * Travel Tile: Toggles Travel Mode.
+ * Info button (only visible when tile is selected) opens the travel settings panel.
  */
 function createTravelTile() {
     const isActive = state && state.isTravelActive;
-    const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
-    
+    // Per-trip toggle lives in state so it resets automatically after each visit
+    const noReport = !!(state && state.travelNoReport);
+
     const tile = document.createElement('div');
-    tile.className = `w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4 cursor-pointer transition-all border-2 ${
+    tile.className = [
+        'w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4',
+        'cursor-pointer transition-all border-2',
+        'bg-gradient-to-r from-indigo-600 to-purple-700',
         isActive ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-gray-700 hover:border-white/20'
-    } bg-gradient-to-r from-indigo-600 to-purple-700`;
-    
+    ].join(' ');
+
     tile.innerHTML = `
         <div class="flex items-center gap-2">
             <div class="text-xl">🚗</div>
             <div>
                 <div class="text-sm font-bold text-white tracking-tight leading-none">Travel Mode</div>
-                <div class="text-[11px] text-indigo-100 font-bold uppercase mt-0.5">${noReport ? 'Report optional' : 'Report required'}</div>
+                <div class="text-[11px] text-indigo-100 font-bold mt-0.5">${noReport ? 'Personal travel – no report' : 'Report required'}</div>
             </div>
         </div>
+        ${isActive ? `<button class="text-indigo-200 hover:text-white p-1 -mr-1 z-20 text-xl"
+            onclick="openTravelSettings(event)">ℹ️</button>` : ''}
     `;
-    
-    tile.onclick = () => {
+
+    tile.onclick = (e) => {
+        // Don't toggle when the info button is tapped
+        if (e.target.closest('button')) return;
         state.isTravelActive = !state.isTravelActive;
+        // Reset per-trip no-report flag when deselecting
+        if (!state.isTravelActive) state.travelNoReport = false;
         const slider = document.getElementById('durationSlider');
         if (slider) { slider.value = 0; updateDurationDisplay(); }
         renderLocations();
         updateArrivedButtonState();
     };
-    return tile; // FIXED: Added return
-} // FIXED: Added closing brace
+    return tile;
+}
 
     
 /**
@@ -2724,6 +2818,7 @@ function createLocationTile(loc) {
         <div>
             ${loc.companyName ? `<div class="text-xs font-bold text-gray-400 uppercase truncate leading-none mb-1">${escapeHtml(loc.companyName)}</div>` : ''}
             <div class="text-[13px] font-black text-white truncate leading-tight">${escapeHtml(loc.name)}</div>
+            ${loc.noReport ? `<div class="text-[10px] text-gray-500 font-bold mt-0.5">No report</div>` : ''}
         </div>
     `;
     
@@ -2736,21 +2831,27 @@ function createLocationTile(loc) {
 }
 
 
-// Edit travel settings (report required toggle)
-function editTravelSettings() {
-    const noReport = localStorage.getItem('otg_user_travel_pref') === 'true';
-    
-    const confirmed = confirm(
-        noReport 
-            ? 'Currently: Report OPTIONAL\n\nChange to require report after travel?' 
-            : 'Currently: Report REQUIRED\n\nChange to make report optional?'
-    );
-    
-    if (confirmed) {
-        localStorage.setItem('otg_user_travel_pref', (!noReport).toString());
-        renderLocations();
-        showToast('✅ Travel settings updated');
+/**
+ * Opens the travel settings modal for the current trip.
+ * Called from the info button on the travel tile.
+ */
+function openTravelSettings(event) {
+    if (event) event.stopPropagation();
+    const noReport = !!(state && state.travelNoReport);
+    const toggle = document.getElementById('travelNoReportToggle');
+    if (toggle) toggle.checked = noReport;
+    showModal('travelSettings');
+}
+
+function saveTravelSettings() {
+    const toggle = document.getElementById('travelNoReportToggle');
+    if (state) {
+        state.travelNoReport = !!(toggle && toggle.checked);
+        saveState();
     }
+    closeModal('travelSettings');
+    renderLocations(); // Refresh tile subtitle
+    showToast('✅ Travel settings updated');
 }
  
 function updateArrivedButtonState() {
@@ -2822,11 +2923,13 @@ async function startVisit(isSkipCheck = false) {
     if (btn && btn.disabled) return; 
     if (btn) btn.disabled = true;
 
-    isMidVisitUpdate = false; 
+    isMidVisitUpdate = false;
 
-    if (!isSkipCheck && typeof checkVehicleBeforeVisit === 'function' && checkVehicleBeforeVisit()) {
+    // Determine travel mode early so the WOF check knows whether to apply.
+    const isTravelEarly = !!state.isTravelActive;
+    if (!isSkipCheck && typeof checkVehicleBeforeVisit === 'function' && checkVehicleBeforeVisit(isTravelEarly)) {
         if (btn) btn.disabled = false;
-        return; 
+        return;
     }
 
     try {
@@ -2886,7 +2989,8 @@ async function startVisit(isSkipCheck = false) {
         warn90Sent: false
     };
 
-    state.isTravelActive = false; 
+    state.isTravelActive = false;
+    state.travelNoReport = false; // Reset per-trip flag after visit begins
     saveState();
 
     const alarmStatus = isTravelMode ? "TRAVELLING" : "ARRIVED";
@@ -3515,12 +3619,13 @@ window.onload = () => {
         navigate(state.activeVisit ? 'locked' : 'main');
         renderLocations(); 
         setupHoldToStart(); 
-        checkVehicleStatus(); 
+        checkVehicleStatus();
+        checkWofOnLoad();   // Show WOF reminder if expiring within 14 days
         checkActiveNotice();
         
         if (state.activeVisit) {
             enterLockedScreen();
-            if (!timerInt) timerInt = setInterval(tick, 1000);
+            // enterLockedScreen() starts tickIntervalId - no duplicate needed here
         }
 
         const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
@@ -3633,10 +3738,17 @@ function openAddLocationModal() {
     document.getElementById('locContactPhone').value = '';
     document.getElementById('locContactEmail').value = '';
     document.getElementById('locCritical').checked = false;
+    const reqReport = document.getElementById('locRequiresReport');
+    if (reqReport) reqReport.checked = true; // Default: report required
+    const tmpl = document.getElementById('locTemplate');
+    if (tmpl) tmpl.value = '';
     
     const btnDel = document.getElementById('btnDelLoc');
     if (btnDel) btnDel.classList.add('hidden');
-    
+
+    const titleEl = document.querySelector('#locationModal h2');
+    if (titleEl) titleEl.textContent = 'Add Location';
+
     showModal('location');
 }
 
@@ -3662,10 +3774,17 @@ function editManualLocation(id) {
     
     const criticalCheckbox = document.getElementById('locCritical');
     if (criticalCheckbox) criticalCheckbox.checked = location.isCritical || false;
-    
+
+    const reqReport = document.getElementById('locRequiresReport');
+    // noReport=true means report NOT required, so toggle is checked when noReport=false
+    if (reqReport) reqReport.checked = !location.noReport;
+
+    const tmpl = document.getElementById('locTemplate');
+    if (tmpl) tmpl.value = location.templateName || '';
+
     const btnDel = document.getElementById('btnDelLoc');
     if (btnDel) btnDel.classList.remove('hidden');
-    
+
     showModal('location');
 }
 
@@ -3801,34 +3920,89 @@ function startVehicleCheck() {
     // Ensure this matches the EXACT name in your spreadsheet 'Templates' tab
     loadFormAndShow('Vehicle Safety Check'); 
 }
-function checkVehicleBeforeVisit() {
+function checkVehicleBeforeVisit(isTravelMode) {
     if (!state || !state.meta) return false;
-    
-    // Check if WOF is expired
+    // WOF checks only apply to vehicle travel - site visits are unaffected.
+    if (!isTravelMode) return false;
+
     if (state.meta.wofExpiry) {
         const wofDate = new Date(state.meta.wofExpiry);
         if (wofDate < new Date()) {
+            // Expired - hard block on travel
             showModal('wofBlock');
-            return true; // Blocked
+            return true;
         }
         
-        // Check if expiring within 14 days
+        // Expiring within 14 days - warn but allow with acknowledgment
         const daysUntil = (wofDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
         if (daysUntil > 0 && daysUntil < 14) {
-            const wofWarnText = document.getElementById('wofWarnText');
-            if (wofWarnText) {
-                wofWarnText.innerText = `${Math.ceil(daysUntil)} days`;
-            }
-            showModal('wofWarn');
-            return true; // Needs acknowledgment
+            openWofWarnAsVisitGate(Math.ceil(daysUntil));
+            return true;
         }
     }
-    
-    return false; // OK to proceed
+
+    return false;
 }
 
 function closeWofBlocker() {
     closeModal('wofBlock');
+}
+
+/**
+ * Called once on every app open. Shows a reminder if WOF expires within 14 days.
+ * No localStorage suppression - intentionally shows every session so workers
+ * are reminded until they renew and submit a Vehicle Safety Check.
+ */
+function checkWofOnLoad() {
+    if (!state || !state.meta || !state.meta.wofExpiry) return;
+    const wofDate = new Date(state.meta.wofExpiry);
+    const daysUntil = (wofDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    if (daysUntil >= 0 && daysUntil < 14) {
+        openWofWarnAsReminder(Math.ceil(daysUntil));
+    }
+}
+
+/**
+ * Opens the WOF warning modal in visit-gate mode.
+ * Shows the acknowledgment checkbox and Continue button;
+ * on Continue the visit resumes via startVisit(true).
+ */
+function openWofWarnAsVisitGate(daysUntil) {
+    const modal = document.getElementById('wofWarnModal');
+    const warnText = document.getElementById('wofWarnText');
+    const visitSection = document.getElementById('wofWarnVisitSection');
+    const continueBtn = document.getElementById('btnWofContinue');
+    const dismissBtn = document.getElementById('btnWofDismiss');
+    const checkbox = document.getElementById('chkWofAck');
+
+    if (warnText) warnText.innerText = daysUntil + ' day' + (daysUntil === 1 ? '' : 's');
+    if (modal) modal.setAttribute('data-mode', 'visit');
+    if (visitSection) visitSection.classList.remove('hidden');
+    if (continueBtn) { continueBtn.classList.remove('hidden'); continueBtn.disabled = true;
+        continueBtn.classList.add('bg-gray-700', 'text-gray-500');
+        continueBtn.classList.remove('bg-blue-600', 'text-white'); }
+    if (dismissBtn) dismissBtn.classList.add('hidden');
+    if (checkbox) checkbox.checked = false;
+    showModal('wofWarn');
+}
+
+/**
+ * Opens the WOF warning modal in load-reminder mode.
+ * Shows only the dismissal button - no visit gating.
+ */
+function openWofWarnAsReminder(daysUntil) {
+    const modal = document.getElementById('wofWarnModal');
+    const warnText = document.getElementById('wofWarnText');
+    const visitSection = document.getElementById('wofWarnVisitSection');
+    const continueBtn = document.getElementById('btnWofContinue');
+    const dismissBtn = document.getElementById('btnWofDismiss');
+
+    if (warnText) warnText.innerText = daysUntil + ' day' + (daysUntil === 1 ? '' : 's');
+    if (modal) modal.setAttribute('data-mode', 'load');
+    if (visitSection) visitSection.classList.add('hidden');
+    if (continueBtn) continueBtn.classList.add('hidden');
+    if (dismissBtn) dismissBtn.classList.remove('hidden');
+    showModal('wofWarn');
 }
 
 function toggleWofContinue() {
@@ -3848,17 +4022,17 @@ function toggleWofContinue() {
 }
 
 /**
- * FIXED: closeWofWarn
- * Logic: Resumes the visit start sequence after the worker acknowledges the warning.
+ * Dismisses the WOF warning modal.
+ * If in visit-gate mode, resumes startVisit(true).
+ * If in load-reminder mode, just closes.
  */
 function closeWofWarn() {
+    const modal = document.getElementById('wofWarnModal');
+    const isVisitGate = modal && modal.getAttribute('data-mode') === 'visit';
     const checkbox = document.getElementById('chkWofAck');
     if (checkbox) checkbox.checked = false;
-    
     closeModal('wofWarn');
-    
-    // NEW: Resume starting the visit, bypassing the check
-    startVisit(true); 
+    if (isVisitGate) startVisit(true);
 }
 
 /**
@@ -4113,7 +4287,7 @@ function updateLastSyncUI() {
  */
 function toggleBatterySaver() {
     const saver = document.getElementById('batterySaver');
-    const main = document.getElementById('mainContent');
+    const main = document.getElementById('lockedPage');
     const isActivating = saver.classList.contains('hidden');
 
     if (isActivating) {
@@ -4123,11 +4297,8 @@ function toggleBatterySaver() {
         // 2. RENDERING: Stop GPU/Layout calculations
         main.style.display = 'none';
 
-        // 3. CPU: Throttle the heartbeat - clear BOTH interval handles so timerInt
-        //    (running at 1s on the restore path) does not defeat the battery saver.
+        // 3. CPU: Throttle the heartbeat
         clearInterval(tickIntervalId);
-        clearInterval(timerInt);
-        timerInt = null;
         tickIntervalId = setInterval(tick, TICK_SAVER);
 
         // 4. Populate the HUD immediately so values show straight away
@@ -4141,11 +4312,9 @@ function toggleBatterySaver() {
         // 2. RENDERING: Resume UI
         main.style.display = 'block';
 
-        // 3. CPU: Restore normal heartbeat on both interval handles
+        // 3. CPU: Restore normal heartbeat
         clearInterval(tickIntervalId);
-        clearInterval(timerInt);
         tickIntervalId = setInterval(tick, TICK_NORMAL);
-        timerInt = setInterval(tick, TICK_NORMAL);
 
         // 4. Immediate tick so the main UI is up-to-date right away
         tick();
@@ -4202,6 +4371,10 @@ function saveLoc() {
     const name = document.getElementById('locName').value.trim();
     if (!name) { alert('Site name is required'); return; }
 
+    const templateInput = document.getElementById('locTemplate');
+    const requiresReportEl = document.getElementById('locRequiresReport');
+    const templateName = templateInput ? templateInput.value.trim() : '';
+
     const locationData = {
         id: locId || 'loc_' + Date.now(),
         name: name,
@@ -4210,7 +4383,10 @@ function saveLoc() {
         contactName: document.getElementById('locContactName').value.trim(),
         contactPhone: document.getElementById('locContactPhone').value.trim(),
         contactEmail: document.getElementById('locContactEmail').value.trim(),
-        isCritical: document.getElementById('locCritical').checked
+        isCritical: document.getElementById('locCritical').checked,
+        // New fields: per-site report preference and optional custom template
+        noReport: requiresReportEl ? !requiresReportEl.checked : false,
+        templateName: templateName || null
     };
 
     const idx = state.locations.findIndex(l => l.id === locationData.id);
@@ -4413,27 +4589,26 @@ function handleShakeMotion(event) {
     
     const now = Date.now();
     
-    // High threshold to avoid false positives (running, car, etc.)
-    if (magnitude > 25) {
-        // Add to buffer with timestamp
+    // Raised threshold: 35 (was 25) reduces false positives from running/vehicles.
+    // Requires 8 peaks in 2s (was 5) and tighter variance window.
+    if (magnitude > 35) {
         shakeBuffer.push({ magnitude, time: now });
         lastShakeTime = now;
         
         // Clean old entries (older than 2 seconds)
         shakeBuffer = shakeBuffer.filter(s => now - s.time < 2000);
         
-        // Check for 5 shakes in 2 seconds
-        if (shakeBuffer.length >= 5) {
-            // Check pattern consistency (deliberate shaking)
+        // Require 8 vigorous peaks in 2 seconds
+        if (shakeBuffer.length >= 8) {
             const avgMagnitude = shakeBuffer.reduce((sum, s) => sum + s.magnitude, 0) / shakeBuffer.length;
             const variance = shakeBuffer.reduce((sum, s) => sum + Math.pow(s.magnitude - avgMagnitude, 2), 0) / shakeBuffer.length;
             
-            // Low variance = consistent = deliberate
-            if (variance < 100) {
+            // Variance < 200 allows energetic but consistent shaking
+            if (variance < 200) {
                 enterShakeConfirmation();
             }
             
-            shakeBuffer = []; // Reset
+            shakeBuffer = [];
         }
     }
 }
@@ -4480,7 +4655,7 @@ function enterShakeConfirmation() {
             accel.z * accel.z
         );
         
-        if (magnitude > 25) {
+        if (magnitude > 35) {
             shakeBuffer.push(magnitude);
             
             // Need 3 shakes to confirm
@@ -4731,10 +4906,7 @@ function updateDimmedDisplay() {
     if (dimmedTimer) {
         const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
         const remaining = state.activeVisit.duration - elapsed;
-        const mins = Math.floor(Math.abs(remaining) / 60);
-        const secs = Math.abs(remaining) % 60;
-        const sign = remaining < 0 ? '-' : '';
-        dimmedTimer.textContent = `${sign}${mins}:${secs.toString().padStart(2, '0')}`;
+        dimmedTimer.textContent = formatCountdown(remaining);
     }
     
     // Update battery
@@ -5253,17 +5425,16 @@ function triggerPeek() {
  */
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === 'visible') {
-        console.log("App returned to foreground. Monitoring resumed.");
-        
-        // 1. Re-acquire the Wake Lock
-        await requestWakeLock(); 
-        
-        // 2. Visual and haptic confirmation
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        showToast("✅ Safety Monitoring Active");
-        
-        // 3. Force immediate logic sync
-        if (typeof tick === 'function') tick(); 
+        // Re-acquire the Wake Lock regardless of visit state
+        await requestWakeLock();
+
+        // Only show monitoring confirmation and run tick if a visit is actually active.
+        // Without this guard the toast fired on every app open, settings visit, etc.
+        if (state && state.activeVisit) {
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            showToast("✅ Safety Monitoring Active");
+            if (typeof tick === 'function') tick();
+        }
     }
 });
     
