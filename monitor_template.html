@@ -182,7 +182,9 @@
     </div>
     <div class="log-area"><div class="p-2 bg-gray-800 border-b border-gray-700 font-bold text-[11px] text-gray-400 uppercase tracking-wider sticky top-0">Activity Log</div><div id="eventLogList" class="flex-1 overflow-y-auto px-2 py-2 space-y-1"></div></div>
 </div>
-
+<button id="btnAudioToggle" onclick="toggleAudioInit()" class="flex items-center gap-2 bg-slate-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:bg-slate-600 transition">
+    <span id="audioIcon">🔈</span> Audio System: <span id="audioStatus" class="text-red-400">Locked</span>
+</button>
 <script>
 // ============================================================================
 // ============================================================================
@@ -219,8 +221,28 @@ let audioEnabled = true;      // User toggle for mute/unmute
 let alertLoopInterval = null; // High-priority SOS siren loop
 let acknowledgedAlerts = new Set(); // Prevents repeat alarms for same event
 // ============================================================================
-// 2. SECURITY GATE & AUDIO INITIALIZATION
+// 5. SECURITY GATE & AUDIO INITIALIZATION
 // ============================================================================
+// NEW: Global Safety Registry
+let alarmAudio = null;
+let stickyAlarms = JSON.parse(localStorage.getItem('sticky_alarms') || '{}');
+
+/**
+ * MISSION-CRITICAL: Alarm Audio Controller
+ * Logic: Loops a siren sound if any unacknowledged alarms exist.
+ */
+function updateAlarmAudio(hasActiveAlarm) {
+    if (hasActiveAlarm) {
+        if (!alarmAudio) {
+            alarmAudio = new Audio('https://actions.google.com/sounds/v1/alarms/emergency_siren.ogg');
+            alarmAudio.loop = true;
+        }
+        alarmAudio.play().catch(e => console.warn("Audio blocked by browser. Click anywhere to enable."));
+    } else if (alarmAudio) {
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+    }
+}
 async function unlockMonitor(e) {
     if (e) e.preventDefault();
     
@@ -412,12 +434,34 @@ function getStatusClass(status) {
     return 'bg-slate-500/20 text-slate-400 border border-slate-500/50';
 }
 
+/**
+ * UI HELPER: Status Dot Color Logic
+ * Logic: Maps status strings to high-visibility Tailwind colors.
+ */
 function getStatusDot(status, isOverdue) {
-    if (status === 'DURESS' || status === 'SOS') return 'bg-purple-500 shadow-[0_0_10px_#d946ef]';
-    if (isOverdue) return 'bg-red-500 animate-ping';
-    if (status === 'ARRIVED') return 'bg-green-500';
-    if (status === 'TRAVELLING') return 'bg-blue-500';
-    return 'bg-slate-600';
+    if (!status) return 'bg-slate-500';
+    
+    // 1. Mission-Critical Alerts (Purple)
+    const isAlert = ['SOS', 'DURESS', 'PANIC', 'OVERDUE ALARM'].some(s => status.includes(s));
+    if (isAlert) return 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]';
+
+    // 2. Overdue Warning (Red)
+    if (isOverdue) return 'bg-red-500 animate-pulse';
+
+    // 3. Active States (Blue/Green)
+    switch (status.toUpperCase()) {
+        case 'ARRIVED':
+        case 'ON SITE':
+            return 'bg-green-500';
+        case 'TRAVELLING':
+            return 'bg-blue-500';
+        case 'DEPARTED':
+        case 'COMPLETED':
+        case 'USER_SAFE':
+            return 'bg-slate-600';
+        default:
+            return 'bg-slate-500';
+    }
 }
 
 function zoomToWorker(gps) {
@@ -513,12 +557,9 @@ function acknowledgeAlert() {
 }
 
 /**
- * UNIFIED RENDER ENGINE
- * Restores: Search, Counters, Battery, and Resolve buttons.
- */
 /**
- * RE-ENGINEERED: Dashboard Grid Renderer
- * Fixes: XSS Security, zoomToWorker Logic, and Key Alignment.
+ * MISSION-CRITICAL: Unified Dashboard Renderer
+ * Restores: Sticky Alerts, High-Priority Sort, and Direct GPS Mapping.
  */
 function renderGrid() {
     const grid = document.getElementById('workerGrid');
@@ -540,17 +581,15 @@ function renderGrid() {
         if (!isSafe) activeC++;
         if (isAlert) alertC++;
 
-        // Filter by Search Box
+        // Filter Logic
         const name = w['Worker Name'] || "";
         if (search && !name.toLowerCase().includes(search)) return false;
-        
-        // Filter by Active/All Toggle
         if (typeof currentFilter !== 'undefined' && currentFilter === 'ACTIVE' && isSafe && !isAlert) return false;
         
         return true;
     });
 
-    // 2. HIGH-PRIORITY SORT
+    // 2. HIGH-PRIORITY SORT: Ensures DURESS and SOS stay at the top
     filtered.sort((a, b) => {
         const priority = { 'DURESS': 1, 'SOS': 1, 'PANIC': 1, 'OVERDUE': 2, 'ARRIVED': 3, 'TRAVELLING': 3 };
         const scoreA = priority[a.Status] || 99;
@@ -560,27 +599,37 @@ function renderGrid() {
 
     // 3. RENDER CARDS
     grid.innerHTML = filtered.map(w => {
-        // GOLDEN PLACEMENT: Sanitization and logical flags
         const safeName = escapeHtml(w['Worker Name'] || 'Unknown');
-        const attrName = safeName.replace(/'/g, "\\'"); // Escapes single quotes for onclick attributes
+        const attrName = safeName.replace(/'/g, "\\'"); 
         const status = w.Status || "";
         
         const dueTime = new Date(w['Anticipated Departure Time']);
         const isOverdue = (dueTime < now) && !['DEPARTED', 'DURESS', 'SOS'].includes(status);
-        const isAlert = status.includes('SOS') || status.includes('DURESS') || status.includes('PANIC');
+        // SYNCED LOGIC: Ensures search doesn't hide counts of workers in danger
+let alertC = 0; 
+workerData.forEach(w => {
+    const status = w.Status || "";
+    // Expanded check to catch the new DURESS and OVERDUE ALARM triggers
+    if (['SOS', 'DURESS', 'PANIC', 'OVERDUE ALARM'].some(s => status.includes(s))) {
+        alertC++;
+    }
         
+        // NELSON GPS OPTIMIZATION: Uses Direct Coordinate Query for rural Diocese sites
+        const gps = w.gps || "0,0";
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
+
         const statusClass = isOverdue ? 'text-red-500 animate-pulse font-black' : 
                            (isAlert ? 'text-purple-400 font-black' : 'text-blue-400');
 
         return `
-            <div class="p-4 bg-slate-800/50 border ${isAlert ? 'border-purple-500 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'border-slate-700'} rounded-xl transition-all">
+            <div class="p-4 bg-slate-800/50 border ${isAlert ? 'border-purple-500 shadow-[0_0_15px_rgba(217,70,239,0.3)] bg-purple-900/10' : 'border-slate-700'} rounded-xl transition-all">
                 <div class="flex justify-between items-start mb-2">
                     <div class="flex items-center gap-2">
                         <span class="w-3 h-3 rounded-full ${getStatusDot(status, isOverdue)}"></span>
                         <h3 class="font-bold text-white truncate max-w-[150px] cursor-pointer hover:text-blue-400 transition" 
-                            onclick="focusWorker('${w.gps || ''}')">${safeName}</h3>
+                            onclick="focusWorker('${gps}')">${safeName}</h3>
                     </div>
-                    <div class="text-[10px] text-slate-500 font-bold">🔋 ${w['Battery Level'] || '--'}%</div>
+                    <div class="text-[10px] text-slate-500 font-bold">🔋 ${w['Battery Level'] || '--'}</div>
                 </div>
 
                 <div class="space-y-1 mb-4">
@@ -595,12 +644,12 @@ function renderGrid() {
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="zoomToWorker('${w.gps || '0,0'}')" class="bg-slate-700 text-white py-2 rounded text-xs font-bold hover:bg-slate-600 transition">📍 Map</button>
+                    <a href="${mapUrl}" target="_blank" class="bg-slate-700 text-white py-2 rounded text-xs font-bold hover:bg-slate-600 transition text-center flex items-center justify-center">📍 Map</a>
                     <a href="tel:${w['Worker Phone Number'] || ''}" class="bg-blue-600/20 text-blue-400 text-center py-2 rounded text-xs font-bold border border-blue-500/30">📞 CALL</a>
                 </div>
 
                 ${isAlert ? `
-                    <button onclick="openResolve('${attrName}')" class="mt-2 w-full bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold text-white shadow-lg">
+                    <button onclick="openResolve('${attrName}')" class="mt-2 w-full bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold text-white shadow-lg active:scale-95 transition-transform">
                         RESOLVE ALERT
                     </button>
                 ` : ''}
@@ -613,6 +662,9 @@ function renderGrid() {
     const alertEl = document.getElementById('alertCount');
     if (activeEl) activeEl.innerText = activeC;
     if (alertEl) alertEl.innerText = alertC;
+
+    // Trigger local siren if any alerts exist
+    if (typeof updateAlarmAudio === 'function') updateAlarmAudio(alertC > 0);
 }
 
 function escapeHtml(text) { return text ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : ""; }
@@ -785,7 +837,42 @@ function submitResolution() {
     })
     .catch(e => alert("Connection Error: " + e));
 }
+/**
+ * MAP HELPER: Marker Color Logic
+ * Ensures map markers match the Grid and the Status Dot colors.
+ */
+function getMarkerColor(worker) {
+    const status = worker.Status || "";
+    const dueTime = new Date(worker['Anticipated Departure Time']);
+    const isOverdue = (dueTime < Date.now()) && !['DEPARTED', 'DURESS', 'SOS'].includes(status);
     
+    // 1. Mission-Critical (Purple)
+    if (['SOS', 'DURESS', 'PANIC', 'OVERDUE ALARM'].some(s => status.includes(s))) {
+        return '#a855f7'; // Purple-500
+    }
+    
+    // 2. Overdue (Red)
+    if (isOverdue) return '#ef4444'; // Red-500
+    
+    // 3. Active (Green/Blue)
+    if (['ARRIVED', 'ON SITE'].includes(status.toUpperCase())) return '#22c55e'; // Green-500
+    return '#3b82f6'; // Blue-500
+}
+function toggleAudioInit() {
+    // Unlocks the siren audio engine
+    if (!alarmAudio) {
+        alarmAudio = new Audio('https://actions.google.com/sounds/v1/alarms/emergency_siren.ogg');
+        alarmAudio.loop = true;
+    }
+    // Briefly play/pause to satisfy browser 'user interaction' rules
+    alarmAudio.play().then(() => {
+        alarmAudio.pause();
+        document.getElementById('audioStatus').innerText = "Armed";
+        document.getElementById('audioStatus').className = "text-green-400";
+        document.getElementById('audioIcon').innerText = "🔊";
+        showToast("✅ Audio Monitoring Armed");
+    }).catch(e => showToast("❌ Click again to arm audio"));
+}    
 </script>
 </body>
 </html>
