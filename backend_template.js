@@ -673,7 +673,9 @@ function updateStaffStatus(p) {
     const data = sheet.getDataRange().getValues();
     for(let i=1; i<data.length; i++) {
         if(data[i][0] === p['Worker Name']) {
-            sheet.getRange(i+1, 5).setValue(p['deviceId']); 
+            // NOTE: Column E (device ID) is intentionally NOT updated here.
+            // Device binding only happens via handleRegisterDevice. Writing it here
+            // on every POST would allow any device to silently hijack a worker account.
             if(p['Template Name'] && p['Template Name'].includes('Vehicle')) {
                 sheet.getRange(i+1, 6).setValue(new Date()); 
                 try {
@@ -1067,19 +1069,37 @@ function getSyncData(workerName, deviceId) {
     let workerGroups = ""; 
     let meta = {};
 
-    // 2. Identify Worker & Their Groups
+    // 2. Identify Worker, Their Groups, and Verify Device
     for (let i = 1; i < stData.length; i++) {
         if ((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
             workerFound = true;
-            // Column D (Index 3) is 'Group Membership'
-            workerGroups = (stData[i][3] || "").toString().toLowerCase(); 
+            workerGroups = (stData[i][3] || "").toString().toLowerCase(); // Column D: Group Membership
             meta.lastVehCheck = stData[i][5];
-            meta.wofExpiry = stData[i][6];
-            break; 
+            meta.wofExpiry    = stData[i][6];
+
+            // DEVICE CHECK: Column E holds the registered device ID
+            const registeredId = (stData[i][4] || "").toString().trim();
+
+            if (!registeredId) {
+                // No device registered yet — worker must complete setup wizard first
+                return { status: "error", message: "No device registered for this account. Complete setup on your device." };
+            }
+
+            if (registeredId !== (deviceId || "").toString().trim()) {
+                // A different device is trying to sync as this worker — block all data
+                console.warn(`Sync denied: ${workerName} sent deviceId '${deviceId}', registered is '${registeredId}'`);
+                return {
+                    status: "device_denied",
+                    message: "Sync denied: this device is not authorised for this worker account."
+                };
+            }
+
+            // Device matches — authorised, continue
+            break;
         }
     }
 
-    if (!workerFound) return {status: "error", message: "Access Denied."};
+    if (!workerFound) return { status: "error", message: "Access Denied." };
 
     // 3. Filter Sites
     const sites = [];
@@ -1301,7 +1321,14 @@ function handleSafetyResolution(p) {
 }
 /**
  * SECURITY COMPONENT: Device Identity Binding
- * Logic: Links a worker's name to a specific hardware ID to prevent spoofing.
+ *
+ * Flow:
+ *   1. Worker name must exist in the Staff tab — otherwise deny.
+ *   2. If column E is empty → this is a first registration → write the ID and confirm.
+ *   3. If column E already has an ID that MATCHES → confirm (app re-registering after reinstall
+ *      on the same device).
+ *   4. If column E already has a DIFFERENT ID → deny. The worker is already bound to
+ *      another device. An admin must clear column E to allow a new device.
  */
 function handleRegisterDevice(p) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1309,16 +1336,36 @@ function handleRegisterDevice(p) {
   if (!sheet) return { status: "error", message: "Staff sheet missing" };
 
   const data = sheet.getDataRange().getValues();
-  const workerName = p['Worker Name'];
-  const deviceId = p.deviceId;
+  const workerName = (p['Worker Name'] || "").trim();
+  const deviceId   = (p.deviceId || "").trim();
+
+  if (!workerName) return { status: "error", message: "Worker name missing" };
+  if (!deviceId)   return { status: "error", message: "Device ID missing" };
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === workerName) {
-      // Logic: Update Column E (Index 4) with the unique Device ID
-      sheet.getRange(i + 1, 5).setValue(deviceId);
-      return { status: "success", message: "Device successfully bound to " + workerName };
+    if ((data[i][0] || "").toString().trim() === workerName) {
+      const registeredId = (data[i][4] || "").toString().trim(); // Column E
+
+      // CASE A: No device registered yet — bind this device
+      if (!registeredId) {
+        sheet.getRange(i + 1, 5).setValue(deviceId);
+        console.log(`Device registered: ${workerName} → ${deviceId}`);
+        return { status: "success", message: "Device registered for " + workerName };
+      }
+
+      // CASE B: Same device re-registering (e.g. app reinstalled, same phone)
+      if (registeredId === deviceId) {
+        return { status: "success", message: "Device already registered for " + workerName };
+      }
+
+      // CASE C: Different device — deny
+      console.warn(`Device conflict: ${workerName} tried to register ${deviceId} but ${registeredId} is bound`);
+      return {
+        status: "device_denied",
+        message: "This worker account is already bound to a different device. Contact your administrator."
+      };
     }
   }
-  return { status: "error", message: "Worker not found in Staff registry" };
-}
 
+  return { status: "error", message: "Worker '" + workerName + "' not found in Staff list" };
+}
