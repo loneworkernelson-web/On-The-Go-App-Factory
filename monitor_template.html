@@ -758,6 +758,33 @@ function setFilter(f) {
     });
     renderGrid();
 }
+
+function submitResolution() {
+    const targetName = document.getElementById('resWorkerNameDisplay').innerText;
+    const typedName = document.getElementById('resNameInput').value.trim();
+    const note = document.getElementById('resNoteInput').value.trim();
+    
+    if(targetName !== typedName) { alert("Error: Name does not match exactly."); return; }
+    if(note.length < 5) { alert("Error: Please enter a resolution note."); return; }
+    
+    const formData = new FormData();
+    formData.append('action', 'resolve');
+    formData.append('key', API_KEY);
+    formData.append('Worker Name', targetName);
+    formData.append('Alarm Status', 'SAFE - MANUALLY CLEARED');
+    formData.append('Notes', `[HQ RESOLVED]: ${note}`);
+    formData.append('Battery Level', 'N/A');
+    formData.append('Location Name', 'HQ Manual Resolution');
+    
+    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formData })
+    .then(() => {
+        alert("Resolution Sent. Update may take 10s.");
+        closeResolve();
+        acknowledgedAlerts.add(targetName);
+        renderGrid();
+    })
+    .catch(e => alert("Connection Error: " + e));
+}
     
 </script>
 </body>
