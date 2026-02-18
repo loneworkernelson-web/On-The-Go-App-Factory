@@ -72,7 +72,7 @@ function doPost(e) {
   const p = e.parameter;
   const key = p.key;
   // Identify sensitive actions that require admin-level clearance
-  const isAdminAction = ['resolve'].includes(p.action)
+  const isAdminAction = ['resolve', 'broadcast'].includes(p.action)
 
   // 1. SECURITY: Enforce Master Key for admin-only actions
   if (isAdminAction && key !== CONFIG.MASTER_KEY) {
@@ -105,6 +105,9 @@ function doPost(e) {
           }
           else if (p.action === 'notifySafety') {
             return sendJSON(handleSafetyResolution(p));
+          }
+          else if(p.action === 'broadcast') {
+            return sendJSON(handleBroadcastPost(p));
           }
           else {
               handleWorkerPost(p);
@@ -1247,6 +1250,118 @@ function handleNoticeAck(p) {
 }
 
 /**
+ * MONITOR BROADCAST HANDLER
+ * Writes a new notice row to the Notices sheet.
+ * Workers receive it during their next sync cycle (≤30s) via getSyncData().
+ *
+ * Notices sheet column layout (matches existing rows):
+ *   A (0) : Date (ISO timestamp)
+ *   B (1) : Notice ID (unique — used for acknowledgment tracking)
+ *   C (2) : Priority  ('Critical' | 'Urgent' | 'Normal')
+ *   D (3) : Title
+ *   E (4) : Content (the broadcast message)
+ *   F (5) : Source   ('HQ Monitor' or similar)
+ *   G (6) : Status   ('Active' — getSyncData filters on this)
+ *   H (7) : Target   ('ALL' — isAuthorised() passes everything through for ALL)
+ *   I (8) : Acknowledged By (blank — filled in by workers as they confirm)
+ */
+function handleBroadcastPost(p) {
+    try {
+        const ss    = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName('Notices');
+
+        if (!sheet) {
+            return { status: "error", message: "Notices tab not found" };
+        }
+
+        // Sanitise inputs
+        const message  = (p.message  || "").toString().trim().substring(0, 500);
+        const source   = (p.source   || "HQ Monitor").toString().trim().substring(0, 50);
+        const rawPri   = (p.priority || "NORMAL").toString().toUpperCase();
+
+        if (!message) {
+            return { status: "error", message: "Message is required" };
+        }
+
+        // Map Monitor priority labels → Worker App priority labels
+        //   Monitor sends:  EMERGENCY | URGENT | NORMAL
+        //   Worker expects: Critical  | Urgent | Normal
+        const priorityMap = {
+            'EMERGENCY': 'Critical',
+            'URGENT':    'Urgent',
+            'NORMAL':    'Normal'
+        };
+        const priority = priorityMap[rawPri] || 'Normal';
+
+        // Build a title prefix that matches the priority so workers see it clearly
+        const titlePrefix = {
+            'Critical': '🚨 EMERGENCY BROADCAST',
+            'Urgent':   '⚠️ URGENT NOTICE',
+            'Normal':   '📢 Notice'
+        }[priority];
+
+        // Generate a unique notice ID (timestamp + random suffix prevents collisions
+        // if two managers broadcast within the same second)
+        const uniqueId = 'broadcast_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+        const now = new Date().toISOString();
+
+        // Append the row — column order must match the layout described above
+        sheet.appendRow([
+            now,          // A: Date
+            uniqueId,     // B: Notice ID
+            priority,     // C: Priority
+            titlePrefix,  // D: Title
+            message,      // E: Content (the broadcast message)
+            source,       // F: Source
+            'Active',     // G: Status  ← getSyncData() filters for 'Active'
+            'ALL',        // H: Target  ← isAuthorised() passes 'ALL' through for every worker
+            ''            // I: Acknowledged By (blank — workers populate this)
+        ]);
+
+        // Log to the Visits sheet as an audit trail
+        // Reuses the standard logging path so it appears in the activity log
+        const auditPayload = {
+            'Worker Name':  'HQ BROADCAST',
+            'Alarm Status': 'BROADCAST SENT',
+            'Notes':        `[${priority.toUpperCase()}] ${message.substring(0, 80)}`,
+            'Location Name': source
+        };
+        handleWorkerPost(auditPayload);
+
+        return { status: "success", noticeId: uniqueId };
+
+    } catch(err) {
+        return { status: "error", message: err.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTES
+//
+// 1. WORKER DELIVERY: Workers receive the broadcast at their next sync (≤30s).
+//    The getSyncData() function already reads the Notices sheet and returns
+//    the most recent 'Active' row as meta.activeNotice — no changes needed there.
+//
+// 2. ACKNOWLEDGMENT: Workers acknowledge via the existing acknowledgeNotice
+//    action, which appends their name to column I. No changes needed there either.
+//
+// 3. EXPIRING BROADCASTS: Broadcast rows stay 'Active' until manually set to
+//    'Inactive' in the sheet, or until your archiving logic runs. If you want
+//    broadcasts to expire automatically (e.g. after 2 hours), you can add:
+//
+//      const expiryMs = 2 * 60 * 60 * 1000;
+//      // ... then in getSyncData(), add a time check:
+//      if (nData[i][6] === 'Active' && (Date.now() - new Date(nData[i][0]).getTime()) < expiryMs)
+//
+// 4. TARGET GROUPS: 'ALL' is passed in column H. The isAuthorised() helper
+//    already returns true for 'ALL', so every active worker receives the notice.
+//    To target a specific group, change 'ALL' to the group name from your
+//    Staff sheet (e.g. 'Field', 'Drivers').
+//
+// ============================================================================
+
+/**
  * HELPER: Unified Escalation Handler
  * Logic: Appends row and routes to Primary (isDual=false) or Both (isDual=true).
  */
@@ -1369,4 +1484,5 @@ function handleRegisterDevice(p) {
 
   return { status: "error", message: "Worker '" + workerName + "' not found in Staff list" };
 }
+
 
