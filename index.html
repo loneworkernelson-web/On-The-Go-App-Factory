@@ -703,8 +703,9 @@ function testConnection() {
 
         
 
+const buildStamp = Date.now();
 const swCode = `
-const CACHE_NAME = 'otg-safety-v81.36-${buildTimestamp}';
+const CACHE_NAME = 'otg-safety-${org.replace(/[^a-z0-9]/gi,'')}-${buildStamp}';
 const CRITICAL_ASSETS = [
   './',
   './index.html',
@@ -760,8 +761,16 @@ self.addEventListener('activate', event => {
       keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
     )).then(() => self.clients.claim())
   );
-});`;
-     
+});
+
+// 4. SKIP_WAITING: Triggered by the main app when a new version is ready.
+//    Activates the waiting SW immediately without requiring all tabs to close.
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
         const manifest = { 
             name: org, 
             short_name: appShort, 
@@ -912,3 +921,4 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
