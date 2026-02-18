@@ -356,23 +356,53 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 <div id="wizStep2" class="wizard-step space-y-6">
             <div class="space-y-4">
                 <h2 class="text-base font-extrabold text-white uppercase tracking-widest">Safety & Duress PINs</h2>
-        
+
                 <div class="space-y-5 text-sm text-gray-200 leading-relaxed">
                     <p>
                         <strong class="text-blue-400 uppercase">Standard Safety PIN:</strong> This code is used exclusively to declare yourself safe <span class="font-black underline text-white">AFTER</span> an alarm has been activated. Entering this PIN is the only way to confirm to the system that you are secure and to stop the alert from escalating.
                     </p>
-                    <input id="wizPin" type="tel" maxlength="4" placeholder="Enter 4-digit Safety PIN" 
-                           oninput="state.pins.std = this.value; saveState()"
-                           class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-white tracking-[0.5em] focus:border-blue-500 outline-none transition-all">
-            
-                    <div class="border-t border-white/5 pt-4 mt-6">
+
+                    <!-- Safety PIN + Confirm -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] text-blue-400 font-black uppercase tracking-widest ml-1">Safety PIN</label>
+                            <input id="wizPin" type="tel" maxlength="4" placeholder="••••"
+                                   oninput="state.pins.std = this.value; saveState(); checkWizPinMatch()"
+                                   class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-white tracking-[0.5em] focus:border-blue-500 outline-none transition-all">
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] text-blue-400 font-black uppercase tracking-widest ml-1">Confirm PIN</label>
+                            <input id="wizPinConfirm" type="tel" maxlength="4" placeholder="••••"
+                                   oninput="checkWizPinMatch()"
+                                   class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-white tracking-[0.5em] focus:border-blue-500 outline-none transition-all">
+                        </div>
+                    </div>
+
+                    <div class="border-t border-white/5 pt-4 mt-2">
                         <p>
                             <strong class="text-purple-400 uppercase">Silent Duress PIN:</strong> This is used to silently declare yourself <span class="font-black underline text-white uppercase">UNSAFE</span> when you are required to clear an alarm under threat. The app will appear to clear the alarm normally, but it will <span class="font-black uppercase text-purple-300">immediately and silently</span> notify your contacts that you require help.
                         </p>
-                        <input id="wizDuress" type="tel" maxlength="4" placeholder="Enter 4-digit Duress PIN" 
-                               oninput="state.pins.duress = this.value; saveState()"
-                               class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-purple-400 tracking-[0.5em] focus:border-purple-500 outline-none transition-all mt-4">
+
+                        <!-- Duress PIN + Confirm -->
+                        <div class="grid grid-cols-2 gap-3 mt-4">
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] text-purple-400 font-black uppercase tracking-widest ml-1">Duress PIN</label>
+                                <input id="wizDuress" type="tel" maxlength="4" placeholder="••••"
+                                       oninput="state.pins.duress = this.value; saveState(); checkWizPinMatch()"
+                                       class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-purple-400 tracking-[0.5em] focus:border-purple-500 outline-none transition-all">
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <label class="text-[10px] text-purple-400 font-black uppercase tracking-widest ml-1">Confirm PIN</label>
+                                <input id="wizDuressConfirm" type="tel" maxlength="4" placeholder="••••"
+                                       oninput="checkWizPinMatch()"
+                                       class="w-full bg-white/10 border-2 border-white/10 rounded-2xl p-4 text-center text-3xl font-mono text-purple-400 tracking-[0.5em] focus:border-purple-500 outline-none transition-all">
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Validation feedback -->
+                    <div id="pinMatchError" class="hidden bg-red-900/40 border border-red-500/50 rounded-xl px-4 py-3 text-sm font-bold text-red-300"></div>
+                    <div id="pinMatchOk" class="hidden bg-green-900/40 border border-green-500/50 rounded-xl px-4 py-3 text-sm font-bold text-green-300">✅ PINs confirmed — tap Next to continue.</div>
                 </div>
             </div>
         </div>
@@ -853,7 +883,7 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
         <button onclick="dismissInstall('ios')" class="text-gray-500 font-black p-3 text-xl" aria-label="Dismiss">✕</button>
     </div>
-</div>>
+</div>
 
 <!-- Android Install Banner (Phase 3, Feature 17) -->
 <div id="installBanner" class="hidden fixed top-0 left-0 w-full bg-blue-600 text-white p-5 z-[150] shadow-xl flex items-center justify-between">
@@ -1085,6 +1115,23 @@ function navigate(page) {
 }
 
 // ============================================================================
+// ============================================================================
+// SECURITY: HTML ESCAPING
+// ============================================================================
+/**
+ * Escapes user/backend-sourced strings before injection into innerHTML.
+ * Prevents XSS from malicious spreadsheet content.
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // MODALS
 // ============================================================================
 function showModal(id) {
@@ -2302,6 +2349,18 @@ function prevWiz() {
 function nextWiz() {
     if (!state) return;
     
+    // Step 2: block advancement until both PIN pairs match and are non-identical
+    if (state.currentWizStep === 2) {
+        const pin    = document.getElementById('wizPin').value;
+        const pinC   = document.getElementById('wizPinConfirm').value;
+        const dur    = document.getElementById('wizDuress').value;
+        const durC   = document.getElementById('wizDuressConfirm').value;
+        if (pin.length < 4 || dur.length < 4 || pin !== pinC || dur !== durC) {
+            checkWizPinMatch(); // Ensure error message is showing
+            return;
+        }
+    }
+
     if (state.currentWizStep < 3) {
         document.getElementById(`wizStep${state.currentWizStep}`).classList.remove('active');
         state.currentWizStep++;
@@ -2532,7 +2591,7 @@ function openFormsLibrary() {
 
             row.innerHTML = `
                 <div class="text-3xl mb-2">${icon}</div>
-                <div class="text-[11px] font-extrabold tracking-tight text-white leading-tight">${form.name}</div>
+                <div class="text-[11px] font-extrabold tracking-tight text-white leading-tight">${escapeHtml(form.name)}</div>
                 <div class="text-xs text-blue-400 font-bold uppercase mt-1">${form.questions.length} Checks</div>
             `;
             
@@ -2618,11 +2677,11 @@ function createLocationTile(loc) {
     tile.innerHTML = `
         <div class="flex justify-between items-start">
             <span class="text-2xl">${icon}</span>
-            ${hasInfo ? `<button class="text-gray-500 hover:text-white p-1 -mt-1 -mr-1 z-20 text-xl" onclick="showSiteInfo('${loc.id}', event)">ℹ️</button>` : ''}
+            ${hasInfo ? `<button class="text-gray-500 hover:text-white p-1 -mt-1 -mr-1 z-20 text-xl" onclick="showSiteInfo('${escapeHtml(loc.id)}', event)">ℹ️</button>` : ''}
         </div>
         <div>
-            ${loc.companyName ? `<div class="text-xs font-bold text-gray-400 uppercase truncate leading-none mb-1">${loc.companyName}</div>` : ''}
-            <div class="text-[13px] font-black text-white truncate leading-tight">${loc.name}</div>
+            ${loc.companyName ? `<div class="text-xs font-bold text-gray-400 uppercase truncate leading-none mb-1">${escapeHtml(loc.companyName)}</div>` : ''}
+            <div class="text-[13px] font-black text-white truncate leading-tight">${escapeHtml(loc.name)}</div>
         </div>
     `;
     
@@ -4662,34 +4721,59 @@ function exitLockedScreen() {
     releaseWakeLock();
 }
 
-    function checkWizPinMatch() {
-    const pin = document.getElementById('wizPin').value;
-    const pinConf = document.getElementById('wizPinConfirm').value;
-    const dur = document.getElementById('wizDuress').value;
-    const durConf = document.getElementById('wizDuressConfirm').value;
+function checkWizPinMatch() {
+    const pin    = document.getElementById('wizPin')?.value || '';
+    const pinC   = document.getElementById('wizPinConfirm')?.value || '';
+    const dur    = document.getElementById('wizDuress')?.value || '';
+    const durC   = document.getElementById('wizDuressConfirm')?.value || '';
     const btnNext = document.getElementById('btnWizNext');
-    const err = document.getElementById('pinMatchError');
+    const err    = document.getElementById('pinMatchError');
+    const ok     = document.getElementById('pinMatchOk');
 
-    const pinsMatch = (pin === pinConf && pin !== '') && (dur === durConf && dur !== '');
-    
-    if (pinsMatch) {
-        btnNext.disabled = false;
-        btnNext.classList.remove('opacity-50');
-        err.classList.add('hidden');
+    // Only show feedback once the user has started filling in confirm fields
+    const hasInput = pinC !== '' || durC !== '';
+
+    // Validation rules
+    const pinFull       = pin.length === 4 && dur.length === 4;
+    const pinsMatch     = pin === pinC && dur === durC;
+    const pinsDistinct  = pin !== dur;
+    const allGood       = pinFull && pinsMatch && pinsDistinct;
+
+    // Update Next button
+    if (btnNext) {
+        btnNext.disabled = !allGood;
+        btnNext.classList.toggle('opacity-50', !allGood);
+    }
+
+    // Hide both feedback elements first
+    err?.classList.add('hidden');
+    ok?.classList.add('hidden');
+
+    if (!hasInput) return; // No feedback until user starts confirming
+
+    if (allGood) {
+        ok?.classList.remove('hidden');
     } else {
-        btnNext.disabled = true;
-        btnNext.classList.add('opacity-50');
-        if (pinConf !== '' || durConf !== '') err.classList.remove('hidden');
+        if (err) {
+            if (!pinsDistinct && pinFull) {
+                err.textContent = '⚠️ Safety PIN and Duress PIN must be different.';
+            } else if (pinFull && !pinsMatch) {
+                err.textContent = '⚠️ PINs do not match — please re-enter.';
+            } else if (pinC !== '' && pin !== pinC) {
+                err.textContent = '⚠️ Safety PIN confirmation does not match.';
+            } else if (durC !== '' && dur !== durC) {
+                err.textContent = '⚠️ Duress PIN confirmation does not match.';
+            } else {
+                err.textContent = '⚠️ Both PINs must be 4 digits and confirmed.';
+            }
+            err.classList.remove('hidden');
+        }
     }
 }
 
 /**
- * FULL INTEGRATED PATCH: Site Info & Emergency Procedure Routing
- * Ensures workers can either view existing data or immediately update missing info.
- */
-/**
- * FULL INTEGRATED PATCH: Site Info & Context-Aware Procedure Submission
- * Ensures workers can view existing info or submit new info linked to this specific site.
+ * Site Info Modal: renders location details and routes to emergency procedures
+ * or context-aware procedure submission if none are on file.
  */
 function populateSiteInfoModal(location) {
     const content = document.getElementById('siteInfoContent');
@@ -4699,11 +4783,11 @@ function populateSiteInfoModal(location) {
     let html = `<div class="space-y-4">
         <div>
             <label class="text-xs text-blue-400 font-black uppercase tracking-widest">Site Name</label>
-            <div class="text-lg font-bold text-white">${location.name}</div>
+            <div class="text-lg font-bold text-white">${escapeHtml(location.name)}</div>
         </div>`;
 
-    if (location.companyName) html += `<div><label class="text-xs text-gray-500 font-black uppercase tracking-widest">Company</label><div class="text-white">${location.companyName}</div></div>`;
-    if (location.address) html += `<div><label class="text-xs text-gray-500 font-black uppercase tracking-widest">Address</label><div class="text-white">${location.address}</div></div>`;
+    if (location.companyName) html += `<div><label class="text-xs text-gray-500 font-black uppercase tracking-widest">Company</label><div class="text-white">${escapeHtml(location.companyName)}</div></div>`;
+    if (location.address) html += `<div><label class="text-xs text-gray-500 font-black uppercase tracking-widest">Address</label><div class="text-white">${escapeHtml(location.address)}</div></div>`;
     
     // 2. EMERGENCY INFO LOGIC: View existing or trigger context-aware submission
     if (location['Emergency Procedures']) {
@@ -4730,15 +4814,15 @@ function populateSiteInfoModal(location) {
     if (location.contactName || location.contactPhone) {
         html += `<div class="pt-2 border-t border-gray-700">
             <label class="text-xs text-red-400 font-black uppercase tracking-widest">Contact</label>
-            <div class="text-white font-bold">${location.contactName || 'Primary Contact'}</div>
-            ${location.contactPhone ? `<div class="text-gray-400 text-xs">${location.contactPhone}</div>` : ''}
+            <div class="text-white font-bold">${escapeHtml(location.contactName || 'Primary Contact')}</div>
+            ${location.contactPhone ? `<div class="text-gray-400 text-xs">${escapeHtml(location.contactPhone)}</div>` : ''}
         </div>`;
     }
 
     if (location.notes) {
         html += `<div class="p-3 bg-blue-900/10 rounded-xl border border-blue-500/20 mt-2">
             <label class="text-xs text-blue-400 font-black uppercase tracking-widest mb-1 block">Notes</label>
-            <div class="text-xs text-gray-300 italic">${location.notes}</div>
+            <div class="text-xs text-gray-300 italic">${escapeHtml(location.notes)}</div>
         </div>`;
     }
 
@@ -4909,21 +4993,16 @@ async function acknowledgeNotice() {
         localStorage.setItem('otg_acknowledged_notices', JSON.stringify(ackList));
     }
 
-    // 3. LOG TO BACKEND: Targets Column I in the Notices Tab
+    // 3. LOG TO BACKEND
     const payload = buildPayload({
         "action": "acknowledgeNotice",
         "noticeId": notice.id,
-        "Alarm Status": "NOTICE_ACK", // Matches Monitor App filters
+        "Alarm Status": "NOTICE_ACK",
         "Notes": `Confirmed: ${notice.title}`
     });
 
-    try {
-        // Use await to ensure the queue processes correctly
-        await processUploadQueue(payload); 
-        showToast('✅ Acknowledgment Saved');
-    } catch (e) {
-        console.error("Notice sync failed:", e);
-    }
+    processUploadQueue(payload);
+    showToast('✅ Acknowledgment queued');
 }
     
 /**
@@ -4978,10 +5057,10 @@ function renderResources() {
     const container = document.getElementById('hubContent');
     const items = state.meta.resources || [];
     container.innerHTML = items.length ? items.map(r => `
-        <div class="p-4 bg-white/5 border border-white/5 rounded-2xl active:scale-95 transition" onclick="window.open('${r.url}', '_blank')">
-            <div class="text-xs text-blue-400 font-black uppercase tracking-widest mb-1">${r.category}</div>
-            <div class="text-sm font-bold text-white">${r.title}</div>
-            <div class="text-[9px] text-gray-500 mt-2 uppercase font-black">Open ${r.type} ↗</div>
+        <div class="p-4 bg-white/5 border border-white/5 rounded-2xl active:scale-95 transition" onclick="window.open('${escapeHtml(r.url)}', '_blank')">
+            <div class="text-xs text-blue-400 font-black uppercase tracking-widest mb-1">${escapeHtml(r.category)}</div>
+            <div class="text-sm font-bold text-white">${escapeHtml(r.title)}</div>
+            <div class="text-[9px] text-gray-500 mt-2 uppercase font-black">Open ${escapeHtml(r.type)} ↗</div>
         </div>
     `).join('') : '<p class="text-center text-xs opacity-40 py-10">No resources assigned.</p>';
 }
@@ -4991,11 +5070,12 @@ function renderNoticeArchive() {
     const items = state.meta.noticeHistory || [];
     container.innerHTML = items.length ? items.map(n => `
         <div class="p-4 bg-white/5 border border-white/5 rounded-2xl opacity-60">
-            <div class="text-xs text-gray-500 font-black uppercase tracking-widest mb-1">${new Date(n.date).toLocaleDateString()}</div>
-            <div class="text-sm font-bold text-white mb-1">${n.title}</div>
-            <div class="text-xs text-gray-400 leading-snug">${n.content}</div>
+            <div class="text-xs text-gray-500 font-black uppercase tracking-widest mb-1">${escapeHtml(new Date(n.date).toLocaleDateString())}</div>
+            <div class="text-sm font-bold text-white mb-1">${escapeHtml(n.title)}</div>
+            <div class="text-xs text-gray-400 leading-snug">${escapeHtml(n.content)}</div>
         </div>
     `).join('') : '<p class="text-center text-xs opacity-40 py-10">Archive empty.</p>';
+}
 }
 
 /**
@@ -5129,4 +5209,3 @@ document.addEventListener("visibilitychange", async () => {
 
 </body>
 </html>
-
