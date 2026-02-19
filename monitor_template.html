@@ -577,22 +577,36 @@ async function unlockMonitor(e) {
             synth = new Tone.Synth().toDestination();
         }
 
-        // Validate key against the backend
-        const resp = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true`);
-        const data = await resp.json();
+        // Validate key against the backend using JSONP (avoids CORS when hosted cross-origin)
+        await new Promise((resolve, reject) => {
+            const cbName = '_gasLogin_' + Date.now();
+            const script = document.createElement('script');
+            const timeout = setTimeout(() => {
+                script.remove(); delete window[cbName];
+                reject(new Error("Timeout"));
+            }, 15000);
 
-        if (data.status === "success") {
-            API_KEY = activeKey;
-            // Persist for auto-login across refreshes
-            try { localStorage.setItem('monitor_master_key', activeKey); } catch(err) {}
-            // Also keep an encrypted copy in sessionStorage
-            await secureStoreKey(activeKey);
+            window[cbName] = function(data) {
+                clearTimeout(timeout); script.remove(); delete window[cbName];
+                if (data.status === "success") resolve(data);
+                else reject(new Error("Invalid Key"));
+            };
+            script.onerror = () => {
+                clearTimeout(timeout); script.remove(); delete window[cbName];
+                reject(new Error("Network error"));
+            };
+            script.src = `${SCRIPT_URL}?key=${encodeURIComponent(activeKey)}&test=true&callback=${cbName}&_cb=${Date.now()}`;
+            document.head.appendChild(script);
+        });
 
-            document.getElementById('audioGate').classList.add('hidden');
-            startPolling();
-        } else {
-            throw new Error("Invalid Key");
-        }
+        API_KEY = activeKey;
+        // Persist for auto-login across refreshes
+        try { localStorage.setItem('monitor_master_key', activeKey); } catch(err) {}
+        // Also keep an encrypted copy in sessionStorage
+        await secureStoreKey(activeKey);
+
+        document.getElementById('audioGate').classList.add('hidden');
+        startPolling();
     } catch(err) {
         const errLabel = document.getElementById('loginError');
         if (errLabel) errLabel.classList.remove('hidden');
@@ -632,15 +646,28 @@ function startPolling() {
     }, 10000));
 }
 
-async function fetchData() {
+function fetchData() {
     if (!API_KEY) return;
     const statusLabel = document.getElementById('connectionStatus');
 
-    try {
-        const resp = await fetch(`${SCRIPT_URL}?action=getMonitorData&key=${encodeURIComponent(API_KEY)}&_cb=${Date.now()}`);
-        if (!resp.ok) throw new Error("Offline");
+    // JSONP avoids CORS entirely — GAS returns callbackFn({...}) which we eval via script tag.
+    // The backend's sendResponse() already supports ?callback=xxx.
+    const cbName  = '_gasCallback_' + Date.now();
+    const script  = document.createElement('script');
+    const timeout = setTimeout(() => {
+        script.remove();
+        delete window[cbName];
+        failureCount++;
+        if (statusLabel) {
+            statusLabel.textContent = "● RECONNECTING...";
+            statusLabel.className   = "text-orange-500 animate-pulse font-black text-[10px]";
+        }
+    }, 15000);
 
-        const data = await resp.json();
+    window[cbName] = function(data) {
+        clearTimeout(timeout);
+        script.remove();
+        delete window[cbName];
 
         if (data.status === "error" && data.message?.includes("Key")) {
             return stopPollingAndLock();
@@ -660,14 +687,20 @@ async function fetchData() {
                 handleData(data);
             }
         }
-    } catch(e) {
-        if (e.message?.includes('connection') || e.message?.includes('Receiving end')) return;
+    };
+
+    script.src = `${SCRIPT_URL}?key=${encodeURIComponent(API_KEY)}&callback=${cbName}&_cb=${Date.now()}`;
+    script.onerror = () => {
+        clearTimeout(timeout);
+        script.remove();
+        delete window[cbName];
         failureCount++;
         if (statusLabel) {
             statusLabel.textContent = "● RECONNECTING...";
             statusLabel.className   = "text-orange-500 animate-pulse font-black text-[10px]";
         }
-    }
+    };
+    document.head.appendChild(script);
 }
 
 function stopPollingAndLock() {
