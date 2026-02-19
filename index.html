@@ -264,6 +264,7 @@
             </div>
             <div class="space-y-4">
                 <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-semibold text-gray-200">Enable mileage tracking</span></label>
+                <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkTravelReport" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-semibold text-gray-200">Require travel report on visit completion</span></label>
                 
                 <div>
                     <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700" onchange="toggleCheckin(); saveInput(this)"><span class="text-sm font-semibold text-gray-200">Periodic check-in reminders</span></label>
@@ -538,12 +539,19 @@
         Templates: `Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?`,
     };
     let TEMPLATES = {};
-    const REGION_DATA = { "+64": { term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" }, "+61": { term: "Rego", locale: "en-AU", tz: "Australia/Sydney" }, "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London" }, "+1": { term: "Inspection", locale: "en-US", tz: "America/New_York" } };
+    const REGION_DATA = {
+        "+64": { term: "WOF",        locale: "en-NZ", tz: "Pacific/Auckland",  mapLat: -40.9,  mapLng:  174.9  },
+        "+61": { term: "Rego",       locale: "en-AU", tz: "Australia/Sydney",  mapLat: -33.87, mapLng:  151.21 },
+        "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London",     mapLat:  51.51, mapLng:   -0.13 },
+        "+1":  { term: "Inspection", locale: "en-US", tz: "America/New_York",  mapLat:  39.09, mapLng:  -94.58 }
+    };
     let selectedConfig = REGION_DATA["+64"];
 
     // Computed once at load time so every build from this session shares the same stamp.
     // Used by both generateScript() and downloadZip() for consistent version labelling.
+    const APP_VERSION    = 'v81.36'; // ← update this single line when version bumps
     const buildTimestamp = new Date().toISOString().slice(0, 10) + '-' + Date.now().toString(36);
+    const BUILD_STAMP    = APP_VERSION + ' · ' + new Date().toISOString().slice(0, 10);
 
   window.onload = async () => {
         document.getElementById('mainContent').classList.remove('blur-sm');
@@ -650,7 +658,7 @@ function applyPreset(p, a, el) {
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin', 'chkTravelReport'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { 
         const sel = document.getElementById('countrySelect').value; 
         selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; 
@@ -688,15 +696,27 @@ function applyPreset(p, a, el) {
     
     function generateScript() {
         if(!TEMPLATES.backend) return;
+        // Token injection — every %%TOKEN%% in backend_template.js is resolved here
         document.getElementById('codeDisplay').textContent = TEMPLATES.backend
-            .replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value)
-            .replace(/%%ORS_API_KEY%%/g, document.getElementById('orsKey').value).replace(/%%GEMINI_API_KEY%%/g, document.getElementById('geminiKey').value)
-            .replace(/%%TEXTBELT_API_KEY%%/g, document.getElementById('textbeltKey').value).replace(/%%PHOTOS_FOLDER_ID%%/g, document.getElementById('folderId').value)
-            .replace(/%%ORGANISATION_NAME%%/g, document.getElementById('orgName').value).replace(/%%TIMEZONE%%/g, document.getElementById('timezoneVal').value)
-            .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%ENABLE_REDACTION%%/g, document.getElementById('chkRedaction').checked)
-            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
-            .replace(/%%LOCALE%%/g, selectedConfig.locale)
-            .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
+            // Security keys
+            .replace(/%%SECRET_KEY%%/g,         document.getElementById('secretKey').value)
+            .replace(/%%WORKER_KEY%%/g,          document.getElementById('workerKey').value)
+            // API keys
+            .replace(/%%ORS_API_KEY%%/g,         document.getElementById('orsKey').value)
+            .replace(/%%GEMINI_API_KEY%%/g,      document.getElementById('geminiKey').value)
+            .replace(/%%TEXTBELT_API_KEY%%/g,    document.getElementById('textbeltKey').value)
+            .replace(/%%PHOTOS_FOLDER_ID%%/g,    document.getElementById('folderId').value)
+            // Organisation & localisation
+            .replace(/%%ORG_NAME%%/g,            document.getElementById('orgName').value)
+            .replace(/%%TIMEZONE%%/g,            document.getElementById('timezoneVal').value)
+            .replace(/%%VEHICLE_TERM%%/g,        selectedConfig.term)
+            .replace(/%%COUNTRY_PREFIX%%/g,      document.getElementById('countrySelect').value)
+            .replace(/%%LOCALE%%/g,              selectedConfig.locale)
+            // Safety settings
+            .replace(/%%ESCALATION_MINUTES%%/g,  document.getElementById('escalationMins').value)
+            .replace(/%%ENABLE_REDACTION%%/g,    document.getElementById('chkRedaction').checked)
+            // Build stamp
+            .replace(/%%BACKEND_VERSION%%/g,     BUILD_STAMP);
     }
 
    // NEW: Logic to sync the UI Mockup with user inputs
@@ -795,28 +815,32 @@ function testConnection() {
         const primary = localStorage.getItem('otg_theme_primary') || "#1e40af";
         const accent = localStorage.getItem('otg_theme_accent') || "#3b82f6";
         
-        // FIX: Re-added all 18 missing injection handlers
+        // Token injection — every %%TOKEN%% in worker_template.html is resolved here
         let wHtml = TEMPLATES.worker
-            .replace(/--primary:\s*#[a-fA-F0-9]{6}/g, `--primary: ${primary}`) // FIXED: Corrected regex & removed extra semicolon
-            .replace(/--accent:\s*#[a-fA-F0-9]{6}/g, `--accent: ${accent}`)
+            // Branding & identity
+            .replace(/%%PRIMARY_COLOR%%/g, primary)
+            .replace(/%%ACCENT_COLOR%%/g, accent)
             .replace(/%%ORG_NAME%%/g, org)
-            .replace(/%%ORGANISATION_NAME%%/g, org)
             .replace(/%%APP_NAME%%/g, appShort)
+            .replace(/%%LOGO_DATA%%/g, logoData)
+            // Backend connection
             .replace(/%%GOOGLE_SHEET_URL%%/g, url)
             .replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value)
-            .replace(/%%IS_ADVANCED%%/g, "true")
+            // Features
             .replace(/%%ENABLE_MILEAGE%%/g, document.getElementById('chkMileage').checked)
             .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
+            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
+            .replace(/%%REQ_TRAVEL_REPORT%%/g, document.getElementById('chkTravelReport').checked)
+            // Timing
             .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
-            .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
             .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
+            // Localisation
             .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
-            .replace(/%%REQ_TRAVEL_REPORT%%/g, "true")
             .replace(/%%VEHICLE_TERM%%/g, document.getElementById('vehTermDisplay').innerText)
             .replace(/%%VOICE_LOCALE%%/g, document.getElementById('voiceLocaleDisplay').innerText)
-            .replace(/%%LOGO_DATA%%/g, logoData)
-                        .replace(/%%BUILD_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
+            // Build stamp
+            .replace(/%%BUILD_VERSION%%/g, BUILD_STAMP);
 
         
 
@@ -907,13 +931,21 @@ self.addEventListener('message', event => {
         workerFolder.file("icon.png", logoData.split(',')[1], {base64:true});
         workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%SHEET_URL%%/g, url)
-        .replace(/%%LOGO_URL%%/g, logoData)
-        .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
-        .replace(/%%PRIMARY_COLOR%%/g, primary) // ADDED
-        .replace(/%%ACCENT_COLOR%%/g, accent)   // ADDED
-          );        
+            // Branding & identity
+            .replace(/%%PRIMARY_COLOR%%/g, primary)
+            .replace(/%%ACCENT_COLOR%%/g, accent)
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%LOGO_URL%%/g, logoData)
+            // Backend connection
+            .replace(/%%SHEET_URL%%/g, url)
+            // Localisation
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
+            // Map centre — derived from selected country
+            .replace(/%%MAP_LAT%%/g, selectedConfig.mapLat)
+            .replace(/%%MAP_LNG%%/g, selectedConfig.mapLng)
+            // Build stamp
+            .replace(/%%BUILD_VERSION%%/g, BUILD_STAMP)
+        );        
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value));
         
