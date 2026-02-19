@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-  VERSION: "%%BACKEND_VERSION%%",
+  VERSION: "v79.35", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -52,43 +52,26 @@ function doGet(e) {
           const dist = getRouteDistance(p.start, p.end);
           return sendResponse(e, { status: "success", km: dist });
       } 
-     // GOLDEN FIX: Support the explicit 'getMonitorData' action
-      if (p.key === CONFIG.MASTER_KEY && (p.action === 'getMonitorData' || !p.action)) {
-          return sendResponse(e, getDashboardData());
-      }
+      if(p.test) return (p.key === CONFIG.MASTER_KEY) ? sendResponse(e, {status:"success"}) : sendResponse(e, {status:"error"});
+      if(p.key === CONFIG.MASTER_KEY && !p.action) return sendResponse(e, getDashboardData());
       if(p.action === 'sync') return (p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) ? sendResponse(e, getSyncData(p.worker, p.deviceId)) : sendResponse(e, {status:"error"});
       if(p.action === 'getGlobalForms') return sendResponse(e, getGlobalForms());
-      return sendResponse(e, {status:"error", message: "Invalid Key or Action"}); 
+      return sendResponse(e, {status:"error"});
   } catch(err) { return sendResponse(e, {status:"error", message: err.toString()}); }
 }
 
 /**
- * RE-ENGINEERED: Secure Entry Point
- * Logic: Implements tiered key access and input sanitisation.
+ * PATCHED: Master Entry Point
+ * Integrated routing for Site Procedures and Notice Acknowledgments.
  */
 function doPost(e) {
   if(!e || !e.parameter) return sendJSON({status:"error"});
+  if(e.parameter.key !== CONFIG.MASTER_KEY && e.parameter.key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
   
-  const p = e.parameter;
-  const key = p.key;
-  // Identify sensitive actions that require admin-level clearance
-  const isAdminAction = ['resolve', 'broadcast'].includes(p.action)
-
-  // 1. SECURITY: Enforce Master Key for admin-only actions
-  if (isAdminAction && key !== CONFIG.MASTER_KEY) {
-      return sendJSON({status:"error", message: "Admin privileges required"});
-  }
-
-  // 2. SECURITY: Validate key access and enforce 32-character entropy standard
-  if (key !== CONFIG.MASTER_KEY && key !== CONFIG.WORKER_KEY) return sendJSON({status:"error"});
-
   const lock = LockService.getScriptLock();
   if (lock.tryLock(10000)) { 
       try {
-          // 3. VALIDATION: Sanitise worker name to prevent spreadsheet injection or logic abuse
-          if (p['Worker Name']) {
-              p['Worker Name'] = p['Worker Name'].trim().substring(0, 50);
-          }
+          const p = e.parameter;
           
           if(p.action === 'resolve') {
               handleResolvePost(p); 
@@ -96,6 +79,7 @@ function doPost(e) {
           else if(p.action === 'registerDevice') {
               return sendJSON(handleRegisterDevice(p));
           }
+          // NEW 3: Handle Notice Acknowledgments
           else if(p.action === 'acknowledgeNotice') {
               return sendJSON(handleNoticeAck(p));
           }
@@ -105,9 +89,6 @@ function doPost(e) {
           }
           else if (p.action === 'notifySafety') {
             return sendJSON(handleSafetyResolution(p));
-          }
-          else if(p.action === 'broadcast') {
-            return sendJSON(handleBroadcastPost(p));
           }
           else {
               handleWorkerPost(p);
@@ -125,6 +106,7 @@ function doPost(e) {
       return sendJSON({status:"error", message:"Busy"}); 
   }
 }
+
 // ==========================================
 // 4. REPORTING ENGINE (BI LAYER)
 // ==========================================
@@ -183,11 +165,12 @@ function runMonthlyStats() {
   const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
 
   const stats = {}; 
-  const clientList = indexSheet.getDataRange().getValues().map(r => r[0]); // MOVE OUTSIDE THE LOOP
-    data.forEach(row => {
+
+  data.forEach(row => {
       const d = new Date(row[dateIdx]);
       if (d >= start && d <= end) {
           let client = "Unknown";
+          const clientList = indexSheet.getDataRange().getValues().map(r => r[0]);
           const locName = row[compIdx].toString();
           
           const matchedClient = clientList.find(c => locName.includes(c));
@@ -412,7 +395,6 @@ function handleWorkerPost(p, e) {
     const templateName = p['Template Name'] || "";
     const isNoteToSelf = (templateName.trim().toLowerCase() === 'note to self');
 
-    // 1. ASSET CAPTURE: Retains your existing saveImage logic
     let p1="", p2="", p3="", p4="", sig="";
     if(p['Photo 1']) p1 = saveImage(p['Photo 1'], workerName);
     if(p['Photo 2']) p2 = saveImage(p['Photo 2'], workerName);
@@ -427,7 +409,6 @@ function handleWorkerPost(p, e) {
 
     let distanceValue = p['Distance'] || ""; 
 
-    // 2. SMARTSCRIBE & DISTANCE LOGIC: Preserved exactly
     if (hasFormData) {
         try {
             const reportObj = JSON.parse(p['Visit Report Data']);
@@ -453,9 +434,7 @@ function handleWorkerPost(p, e) {
         const lastRow = sheet.getLastRow();
         const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         const distColIdx = headers.indexOf("Distance (km)");
-        const antColIdx = headers.indexOf("Anticipated Departure Time"); // Essential for timer
         
-        // 3. UPDATE LOGIC: Now correctly updates Anticipated Departure Time
         if (lastRow > 1) {
             const startRow = Math.max(2, lastRow - 50); 
             const numRows = lastRow - startRow + 1;
@@ -470,21 +449,7 @@ function handleWorkerPost(p, e) {
                         const targetRow = startRow + i;
                         sheet.getRange(targetRow, 1).setValue(ts.toISOString()); 
                         sheet.getRange(targetRow, 11).setValue(p['Alarm Status']); 
-
-                        // GOLDEN FIX: Updates the expiry timestamp so the App timer stays in sync
-                        if (p['Anticipated Departure Time'] && antColIdx > -1) {
-                            sheet.getRange(targetRow, antColIdx + 1).setValue(p['Anticipated Departure Time']);
-                        }
-
-                        // Write media links to respective columns during update
-                        if (p1) sheet.getRange(targetRow, headers.indexOf("Photo 1") + 1).setValue(p1);
-                        if (p2) sheet.getRange(targetRow, headers.indexOf("Photo 2") + 1).setValue(p2);
-                        if (p3) sheet.getRange(targetRow, headers.indexOf("Photo 3") + 1).setValue(p3);
-                        if (p4) sheet.getRange(targetRow, headers.indexOf("Photo 4") + 1).setValue(p4);
-                        if (sig) sheet.getRange(targetRow, headers.indexOf("Signature") + 1).setValue(sig);
-                        
                         if (distanceValue && distColIdx > -1) sheet.getRange(targetRow, distColIdx + 1).setValue(distanceValue);
-                        
                         if (polishedNotes && polishedNotes !== rowData[11]) {
                              const oldNotes = sheet.getRange(targetRow, 12).getValue();
                              if (!oldNotes.includes(polishedNotes)) sheet.getRange(targetRow, 12).setValue((oldNotes + "\n" + polishedNotes).trim());
@@ -498,44 +463,42 @@ function handleWorkerPost(p, e) {
             }
         }
 
-        // 4. FALLBACK LOGIC: Corrects "Unknown Site" mapping
-        const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
-        const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
-        const finalLocName = p['Location Name'] || p['siteName'] || "Unknown Site";
+// Ensure these fallbacks are in your backend script to catch the frontend keys
+const emgPhone = p['Emergency Contact Number'] || p['Emergency Contact Phone'] || "";
+const escPhone = p['Escalation Contact Number'] || p['Escalation Contact Phone'] || "";
 
-        if (!rowUpdated) {
-            const row = [
-                ts.toISOString(), 
-                dateStr, 
-                workerName, 
-                p['Worker Phone Number'], 
-                p['Emergency Contact Name'], 
-                emgPhone, 
-                p['Emergency Contact Email'], 
-                p['Escalation Contact Name'], 
-                escPhone, 
-                p['Escalation Contact Email'], 
-                p['Alarm Status'], 
-                polishedNotes, 
-                finalLocName, // FIXED: Prioritizes siteName if Location Name is missing
-                p['Location Address'], 
-                p['Last Known GPS'], 
-                p['Timestamp'], 
-                p['Battery Level'], 
-                p1, 
-                distanceValue, 
-                p['Visit Report Data'], 
-                p['Anticipated Departure Time'], 
-                sig, 
-                p2, 
-                p3, 
-                p4
-            ];
-            sheet.appendRow(row);
-        }
+if (!rowUpdated) {
+    const row = [
+        ts.toISOString(), 
+        dateStr, 
+        workerName, 
+        p['Worker Phone Number'], 
+        p['Emergency Contact Name'], 
+        emgPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
+        p['Emergency Contact Email'], 
+        p['Escalation Contact Name'], 
+        escPhone, // FIXED: Maps frontend 'Phone' to backend 'Number'
+        p['Escalation Contact Email'], 
+        p['Alarm Status'], 
+        polishedNotes, 
+        p['Location Name'], 
+        p['Location Address'], 
+        p['Last Known GPS'], 
+        p['Timestamp'], 
+        p['Battery Level'], 
+        p1, 
+        distanceValue, 
+        p['Visit Report Data'], 
+        p['Anticipated Departure Time'], 
+        sig, 
+        p2, 
+        p3, 
+        p4
+    ];
+    sheet.appendRow(row);
+}
     }
 
-    // 5. POST-PROCESS: Retains existing staff updates and alert triggers
     updateStaffStatus(p);
     if(hasFormData) {
         try {
@@ -548,7 +511,6 @@ function handleWorkerPost(p, e) {
         triggerAlerts(p, "IMMEDIATE");
     }
 }
-
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     const templateName = p['Template Name'] || "";
     if (!templateName) return;
@@ -604,7 +566,7 @@ let mapHtml = "";
     if (p['Last Known GPS']) {
         const gps = p['Last Known GPS'];
         // FIXED: Added missing $ and corrected template literal syntax
-        const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(gps)}`;
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
             <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location Intelligence</p>
@@ -676,9 +638,7 @@ function updateStaffStatus(p) {
     const data = sheet.getDataRange().getValues();
     for(let i=1; i<data.length; i++) {
         if(data[i][0] === p['Worker Name']) {
-            // NOTE: Column E (device ID) is intentionally NOT updated here.
-            // Device binding only happens via handleRegisterDevice. Writing it here
-            // on every POST would allow any device to silently hijack a worker account.
+            sheet.getRange(i+1, 5).setValue(p['deviceId']); 
             if(p['Template Name'] && p['Template Name'].includes('Vehicle')) {
                 sheet.getRange(i+1, 6).setValue(new Date()); 
                 try {
@@ -709,49 +669,175 @@ function _cleanPhone(num) {
 }
 
 /**
+ * HELPER: Convert internal status codes to plain-English descriptions for alert emails.
+ */
+function _humanizeStatus(status) {
+    const s = (status || '').toUpperCase();
+    if (s.includes('CRITICAL TIMING'))
+        return 'This worker did not return from a visit they had flagged as high-risk, and their check-in deadline has now passed.';
+    if (s.includes('60MIN') || (s.includes('EMERGENCY') && s.includes('BREACH')))
+        return 'This worker is now 60 minutes overdue. They have not responded to any check-in requests. This requires urgent action.';
+    if (s.includes('45MIN'))
+        return 'This worker is now 45 minutes overdue and has not confirmed they are safe.';
+    if (s.includes('30MIN'))
+        return 'This worker is now 30 minutes overdue and has not confirmed they are safe.';
+    if (s.includes('15MIN'))
+        return 'This worker is now 15 minutes overdue and has not confirmed they are safe.';
+    if (s.includes('PANIC'))
+        return 'This worker has activated the PANIC alert on their safety app. This indicates they may be in immediate danger.';
+    if (s.includes('DURESS'))
+        return 'This worker has activated a DURESS signal. This may mean they are under threat and unable to speak freely. Please treat this as a real emergency.';
+    if (s.includes('SOS') || s.includes('EMERGENCY'))
+        return 'This worker has triggered an emergency SOS alert from their safety app.';
+    return 'The worker\'s safety status has been flagged as requiring attention: ' + status;
+}
+
+/**
+ * HELPER: Build a personalised plain-text alert email body for one recipient.
+ */
+function _buildAlertEmailBody(p, recipientName, recipientRole, gpsLink, hasGps) {
+    const workerName      = p['Worker Name']        || 'Unknown worker';
+    const workerPhone     = p['Worker Phone Number']|| 'Not on record';
+    const status          = p['Alarm Status']        || '';
+    const locationName    = p['Location Name']       || 'Unknown location';
+    const locationAddress = p['Location Address']    || '';
+    const companyName     = p['Company Name']        || '';
+    const battery         = p['Battery Level']       || 'Unknown';
+    const org             = CONFIG.ORG_NAME           || 'Your organisation';
+    const timestamp       = new Date().toLocaleString();
+    const statusDesc      = _humanizeStatus(status);
+    const divider         = '='.repeat(55);
+    const hairline        = '-'.repeat(55);
+
+    // Build location block
+    let locationLines = '  Site:     ' + locationName;
+    if (companyName)     locationLines += '\n  Company:  ' + companyName;
+    if (locationAddress) locationLines += '\n  Address:  ' + locationAddress;
+
+    // GPS line
+    const gpsLine = hasGps
+        ? '  GPS link: ' + gpsLink
+        : '  GPS:      Not available — please use the address above to locate the worker.';
+
+    return (
+        'SAFETY ALERT — ' + org + '\n' +
+        divider + '\n\n' +
+        'Dear ' + recipientName + ',\n\n' +
+        'You are receiving this message because you are listed as ' + workerName + '\'s ' + recipientRole + '.\n\n' +
+        'WHAT HAS HAPPENED\n' +
+        statusDesc + '\n\n' +
+        'WORKER DETAILS\n' +
+        '  Name:     ' + workerName + '\n' +
+        '  Phone:    ' + workerPhone + '\n\n' +
+        'LAST KNOWN LOCATION\n' +
+        locationLines + '\n' +
+        gpsLine + '\n\n' +
+        'WHAT YOU SHOULD DO NOW\n' +
+        '  1. Try to call or text ' + workerName + ' on ' + workerPhone + '\n' +
+        '  2. If you cannot reach them within a few minutes, go to the location above\n' +
+        '  3. If you believe they are in danger, contact emergency services (111)\n' +
+        '  4. Once contact is made, please notify your safety manager to resolve the alert\n\n' +
+        'ALERT DETAILS\n' +
+        '  Status:   ' + status + '\n' +
+        '  Battery:  ' + battery + '%\n' +
+        '  Sent at:  ' + timestamp + '\n\n' +
+        hairline + '\n' +
+        'This alert was sent automatically by the ' + org + ' Safety System.\n' +
+        'Please do not reply to this email.'
+    );
+}
+
+/**
  * RE-ENGINEERED: High-Urgency Alert Router
- * Fixes: GPS Variable injection and Dual-Contact SMS Routing.
+ * Now sends personalised emails to each contact individually and includes
+ * full location, company, address, worker phone, and a clear call to action.
+ * Fixes: GPS URL bug, 0,0 coordinates treated as no GPS, dual-contact personalisation.
  */
 function triggerAlerts(p, type) {
-    // FIXED: Added missing $ for template literal variable injection
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps?q=${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
-    
-    // DEFAULT CONTENT
-    let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    let body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+    // If company/address not in payload (e.g. direct worker SOS), look it up from Sites
+    if (!p['Company Name'] && p['Location Name']) {
+        try {
+            const ss = SpreadsheetApp.getActiveSpreadsheet();
+            const sitesSheet = ss.getSheetByName('Sites');
+            if (sitesSheet) {
+                const sitesData = sitesSheet.getDataRange().getValues();
+                for (let i = 1; i < sitesData.length; i++) {
+                    if (sitesData[i][3] === p['Location Name']) {
+                        p['Company Name'] = sitesData[i][2] || '';
+                        if (!p['Location Address']) p['Location Address'] = sitesData[i][4] || '';
+                        break;
+                    }
+                }
+            }
+        } catch(e) { console.warn('Sites lookup in triggerAlerts failed: ' + e.toString()); }
+    }
 
-    // SPECIAL CASE: CRITICAL TIMING MODE
-    if (p['Alarm Status'].includes("CRITICAL TIMING")) {
-        subject = `🚨 URGENT: CRITICAL SAFETY BREACH - ${p['Worker Name']}`;
-        body = `⚠️ URGENT SAFETY ALERT (CRITICAL TIMING MODE)\n\n` +
-               `The worker, ${p['Worker Name']}, is now OVERDUE from a visit they self-identified as high-risk.\n\n` +
-               `In this mode, 15 minutes is considered mission-critical. Please attempt to make contact with the worker IMMEDIATELY.\n\n` +
-               `Location: ${p['Location Name']}\n` +
-               `Last Known GPS: ${gpsLink}\n` +
-               `Device Battery: ${p['Battery Level']}`;
-    }
-    
-    // EMAIL ROUTING: Filter valid addresses and join for multi-recipient delivery
-    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if(emails.length > 0) { 
-        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
-    }
-    
-    // SMS ROUTING: Sent immediately to all active contacts in the payload
-    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        // Ensure we capture both phone keys used in the worker app
+    // Build GPS link — treat missing or 0,0 coordinates as no GPS
+    const gpsRaw = (p['Last Known GPS'] || '').toString().trim();
+    const hasGps = gpsRaw.length > 3 && !gpsRaw.startsWith('0,0') && !gpsRaw.startsWith('0.0,0.0');
+    const gpsLink = hasGps
+        ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(gpsRaw)
+        : null;
+
+    const workerName = p['Worker Name'] || 'Unknown';
+    const status = p['Alarm Status'] || '';
+
+    // Build subject line
+    let subject;
+    if (type === 'IMMEDIATE' && status.includes('PANIC'))
+        subject = '🚨 PANIC ALERT: ' + workerName + ' may be in immediate danger';
+    else if (type === 'IMMEDIATE' && status.includes('DURESS'))
+        subject = '🚨 DURESS ALERT: ' + workerName + ' has triggered a silent distress signal';
+    else if (type === 'IMMEDIATE')
+        subject = '🚨 EMERGENCY SOS: ' + workerName + ' has triggered a safety alarm';
+    else if (type === 'CRITICAL ESCALATION')
+        subject = '🚨 CRITICAL: ' + workerName + ' is now 60 minutes overdue — urgent action required';
+    else
+        subject = '⚠️ Safety Alert: ' + workerName + ' is overdue — please make contact';
+
+    // Send a personalised email to each contact
+    const contacts = [
+        {
+            name:  p['Emergency Contact Name']   || 'Emergency Contact',
+            email: p['Emergency Contact Email'],
+            role:  'Emergency Contact'
+        },
+        {
+            name:  p['Escalation Contact Name']   || 'Escalation Contact',
+            email: p['Escalation Contact Email'],
+            role:  'Escalation Contact'
+        }
+    ];
+
+    contacts.forEach(function(contact) {
+        if (!contact.email || !contact.email.includes('@')) return;
+        const body = _buildAlertEmailBody(p, contact.name, contact.role, gpsLink, hasGps);
+        try {
+            MailApp.sendEmail({ to: contact.email, subject: subject, body: body });
+        } catch(e) { console.error('Alert email failed to ' + contact.email + ': ' + e.toString()); }
+    });
+
+    // SMS: brief, actionable message to all contacts with valid numbers
+    if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
+        const workerPhone = p['Worker Phone Number'] || 'see records';
+        const locationShort = (p['Company Name'] ? p['Company Name'] + ', ' : '') + (p['Location Name'] || '');
+        const smsBody = subject + '\n' +
+            'Call ' + workerName + ' on ' + workerPhone + '. ' +
+            'Location: ' + locationShort + '.' +
+            (hasGps ? ' GPS: ' + gpsLink : '');
+
         const numbers = [
-            p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
+            p['Emergency Contact Number'] || p['Emergency Contact Phone'],
             p['Escalation Contact Number'] || p['Escalation Contact Phone']
-        ].map(n => _cleanPhone(n)).filter(n => n);
-        
-        numbers.forEach(num => { 
+        ].map(function(n) { return _cleanPhone(n); }).filter(function(n) { return n; });
+
+        numbers.forEach(function(num) {
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
-                    'method': 'post',
-                    'payload': { 'phone': num, 'message': `${subject}\nGPS: ${gpsLink}`, 'key': CONFIG.TEXTBELT_API_KEY }
-                }); 
-            } catch(e) { console.error("SMS Failed: " + e.toString()); }
+                    method: 'post',
+                    payload: { phone: num, message: smsBody, key: CONFIG.TEXTBELT_API_KEY }
+                });
+            } catch(e) { console.error('SMS failed to ' + num + ': ' + e.toString()); }
         });
     }
 }
@@ -816,54 +902,22 @@ function checkOverdueVisits() {
     });
 }
 
-/**
- * RE-ENGINEERED: Monitor Data Aggregator
- * Logic: Maps spreadsheet columns to exact JSON keys expected by Monitor App.
- */
 function getDashboardData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Visits");
-  if (!sheet) return { status: "error", message: "Visits sheet not found" };
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  // 1. RAW LOG: Convert Date objects to ISO Strings for stable transmission
-  const allRows = rows.map(row => {
-    let obj = {};
-    headers.forEach((h, i) => {
-      let val = row[i];
-      if (val instanceof Date) val = val.toISOString(); // GOLDEN FIX: Prevents empty {} in JSON
-      obj[h] = val;
-    });
-    return obj;
-  });
-
-  // 2. ACTIVE WORKERS: Map keys precisely for the Monitor App
-  const activeWorkers = allRows.filter(r => 
-    r['Alarm Status'] && !['DEPARTED', 'COMPLETED', 'DATA_ENTRY_ONLY'].includes(r['Alarm Status'].toUpperCase())
-  ).map(r => {
-    return {
-      "Worker Name": r['Worker Name'],
-      "Status": r['Alarm Status'],
-      "Location Name": r['Location Name'],
-      "Anticipated Departure Time": r['Anticipated Departure Time'],
-      "Battery Level": (() => {
-    let b = r['Battery Level'];
-    if (typeof b === 'number' && b >= 0 && b <= 1) b = Math.round(b * 100);
-    return b || '0';
-})(),
-      "Worker Phone Number": r['Worker Phone Number'] || '',
-      "gps": r['Last Known GPS'] || '0,0' // FIXED: Matches spreadsheet header precisely
-    };
-  });
-
-  return {
-    status: "success",
-    workers: activeWorkers,
-    all: allRows.slice(-100)
-  };
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits');
+    const staffSheet = ss.getSheetByName('Staff');
+    if(!sheet) return {workers: []};
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return {workers: []}; 
+    const startRow = Math.max(2, lastRow - 500); 
+    const data = sheet.getRange(startRow, 1, lastRow - startRow + 1, 25).getValues();
+    const headers = ["Timestamp", "Date", "Worker Name", "Worker Phone Number", "Emergency Contact Name", "Emergency Contact Number", "Emergency Contact Email", "Escalation Contact Name", "Escalation Contact Number", "Escalation Contact Email", "Alarm Status", "Notes", "Location Name", "Location Address", "Last Known GPS", "GPS Timestamp", "Battery Level", "Photo 1", "Distance (km)", "Visit Report Data", "Anticipated Departure Time", "Signature", "Photo 2", "Photo 3", "Photo 4"];
+    const workers = data.map(r => { let obj = {}; headers.forEach((h, i) => obj[h] = r[i]); return obj; });
+    if(staffSheet) {
+        const sData = staffSheet.getDataRange().getValues();
+        workers.forEach(w => { for(let i=1; i<sData.length; i++) { if(sData[i][0] === w['Worker Name']) { w['WOFExpiry'] = sData[i][6]; } } });
+    }
+    return {workers: workers, escalation_limit: CONFIG.ESCALATION_MINUTES};
 }
 
 function getGlobalForms() {
@@ -1072,37 +1126,19 @@ function getSyncData(workerName, deviceId) {
     let workerGroups = ""; 
     let meta = {};
 
-    // 2. Identify Worker, Their Groups, and Verify Device
+    // 2. Identify Worker & Their Groups
     for (let i = 1; i < stData.length; i++) {
         if ((stData[i][0] || "").toString().toLowerCase().trim() === wNameSafe) {
             workerFound = true;
-            workerGroups = (stData[i][3] || "").toString().toLowerCase(); // Column D: Group Membership
+            // Column D (Index 3) is 'Group Membership'
+            workerGroups = (stData[i][3] || "").toString().toLowerCase(); 
             meta.lastVehCheck = stData[i][5];
-            meta.wofExpiry    = stData[i][6];
-
-            // DEVICE CHECK: Column E holds the registered device ID
-            const registeredId = (stData[i][4] || "").toString().trim();
-
-            if (!registeredId) {
-                // No device registered yet — worker must complete setup wizard first
-                return { status: "error", message: "No device registered for this account. Complete setup on your device." };
-            }
-
-            if (registeredId !== (deviceId || "").toString().trim()) {
-                // A different device is trying to sync as this worker — block all data
-                console.warn(`Sync denied: ${workerName} sent deviceId '${deviceId}', registered is '${registeredId}'`);
-                return {
-                    status: "device_denied",
-                    message: "Sync denied: this device is not authorised for this worker account."
-                };
-            }
-
-            // Device matches — authorised, continue
-            break;
+            meta.wofExpiry = stData[i][6];
+            break; 
         }
     }
 
-    if (!workerFound) return { status: "error", message: "Access Denied." };
+    if (!workerFound) return {status: "error", message: "Access Denied."};
 
     // 3. Filter Sites
     const sites = [];
@@ -1250,239 +1286,131 @@ function handleNoticeAck(p) {
 }
 
 /**
- * MONITOR BROADCAST HANDLER
- * Writes a new notice row to the Notices sheet.
- * Workers receive it during their next sync cycle (≤30s) via getSyncData().
- *
- * Notices sheet column layout (matches existing rows):
- *   A (0) : Date (ISO timestamp)
- *   B (1) : Notice ID (unique — used for acknowledgment tracking)
- *   C (2) : Priority  ('Critical' | 'Urgent' | 'Normal')
- *   D (3) : Title
- *   E (4) : Content (the broadcast message)
- *   F (5) : Source   ('HQ Monitor' or similar)
- *   G (6) : Status   ('Active' — getSyncData filters on this)
- *   H (7) : Target   ('ALL' — isAuthorised() passes everything through for ALL)
- *   I (8) : Acknowledged By (blank — filled in by workers as they confirm)
- */
-function handleBroadcastPost(p) {
-    try {
-        const ss    = SpreadsheetApp.getActiveSpreadsheet();
-        const sheet = ss.getSheetByName('Notices');
-
-        if (!sheet) {
-            return { status: "error", message: "Notices tab not found" };
-        }
-
-        // Sanitise inputs
-        const message  = (p.message  || "").toString().trim().substring(0, 500);
-        const source   = (p.source   || "HQ Monitor").toString().trim().substring(0, 50);
-        const rawPri   = (p.priority || "NORMAL").toString().toUpperCase();
-
-        if (!message) {
-            return { status: "error", message: "Message is required" };
-        }
-
-        // Map Monitor priority labels → Worker App priority labels
-        //   Monitor sends:  EMERGENCY | URGENT | NORMAL
-        //   Worker expects: Critical  | Urgent | Normal
-        const priorityMap = {
-            'EMERGENCY': 'Critical',
-            'URGENT':    'Urgent',
-            'NORMAL':    'Normal'
-        };
-        const priority = priorityMap[rawPri] || 'Normal';
-
-        // Build a title prefix that matches the priority so workers see it clearly
-        const titlePrefix = {
-            'Critical': '🚨 EMERGENCY BROADCAST',
-            'Urgent':   '⚠️ URGENT NOTICE',
-            'Normal':   '📢 Notice'
-        }[priority];
-
-        // Generate a unique notice ID (timestamp + random suffix prevents collisions
-        // if two managers broadcast within the same second)
-        const uniqueId = 'broadcast_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-
-        const now = new Date().toISOString();
-
-        // Append the row — column order must match the layout described above
-        sheet.appendRow([
-            now,          // A: Date
-            uniqueId,     // B: Notice ID
-            priority,     // C: Priority
-            titlePrefix,  // D: Title
-            message,      // E: Content (the broadcast message)
-            source,       // F: Source
-            'Active',     // G: Status  ← getSyncData() filters for 'Active'
-            'ALL',        // H: Target  ← isAuthorised() passes 'ALL' through for every worker
-            ''            // I: Acknowledged By (blank — workers populate this)
-        ]);
-
-        // Log to the Visits sheet as an audit trail
-        // Reuses the standard logging path so it appears in the activity log
-        const auditPayload = {
-            'Worker Name':  'HQ BROADCAST',
-            'Alarm Status': 'BROADCAST SENT',
-            'Notes':        `[${priority.toUpperCase()}] ${message.substring(0, 80)}`,
-            'Location Name': source
-        };
-        handleWorkerPost(auditPayload);
-
-        return { status: "success", noticeId: uniqueId };
-
-    } catch(err) {
-        return { status: "error", message: err.toString() };
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTES
-//
-// 1. WORKER DELIVERY: Workers receive the broadcast at their next sync (≤30s).
-//    The getSyncData() function already reads the Notices sheet and returns
-//    the most recent 'Active' row as meta.activeNotice — no changes needed there.
-//
-// 2. ACKNOWLEDGMENT: Workers acknowledge via the existing acknowledgeNotice
-//    action, which appends their name to column I. No changes needed there either.
-//
-// 3. EXPIRING BROADCASTS: Broadcast rows stay 'Active' until manually set to
-//    'Inactive' in the sheet, or until your archiving logic runs. If you want
-//    broadcasts to expire automatically (e.g. after 2 hours), you can add:
-//
-//      const expiryMs = 2 * 60 * 60 * 1000;
-//      // ... then in getSyncData(), add a time check:
-//      if (nData[i][6] === 'Active' && (Date.now() - new Date(nData[i][0]).getTime()) < expiryMs)
-//
-// 4. TARGET GROUPS: 'ALL' is passed in column H. The isAuthorised() helper
-//    already returns true for 'ALL', so every active worker receives the notice.
-//    To target a specific group, change 'ALL' to the group name from your
-//    Staff sheet (e.g. 'Field', 'Drivers').
-//
-// ============================================================================
-
-/**
  * HELPER: Unified Escalation Handler
  * Logic: Appends row and routes to Primary (isDual=false) or Both (isDual=true).
+ * IMPROVED: Now includes worker phone, company name, full address in payload.
  */
 function triggerEscalation(sheet, entry, newStatus, isDual) {
     const newRow = [...entry];
     newRow[0] = new Date().toISOString(); 
     newRow[10] = newStatus; 
-    newRow[11] = entry[11] + ` [AUTO-${newStatus}]`;
+    newRow[11] = entry[11] + ' [AUTO-' + newStatus + ']';
     sheet.appendRow(newRow);
 
+    // Look up company name and confirm address from Sites sheet using Location Name
+    let companyName = '';
+    let locationAddress = entry[13] || '';
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sitesSheet = ss.getSheetByName('Sites');
+        if (sitesSheet) {
+            const sitesData = sitesSheet.getDataRange().getValues();
+            for (let i = 1; i < sitesData.length; i++) {
+                if (sitesData[i][3] === entry[12]) { // Match on Site Name (col index 3)
+                    companyName = sitesData[i][2] || '';
+                    if (!locationAddress) locationAddress = sitesData[i][4] || '';
+                    break;
+                }
+            }
+        }
+    } catch(e) { console.warn('Company lookup failed: ' + e.toString()); }
+
     const payload = {
-        'Worker Name': entry[2],
-        'Alarm Status': newStatus,
-        'Location Name': entry[12],
-        'Notes': `Alert: Worker is ${newStatus}.`,
-        'Last Known GPS': entry[14],
-        'Battery Level': entry[16],
-        'Emergency Contact Email': entry[6],
-        'Emergency Contact Number': entry[5], // Map frontend 'Phone' to backend 'Number'
-        'Escalation Contact Email': isDual ? entry[9] : "",
-        'Escalation Contact Number': isDual ? entry[8] : ""
+        'Worker Name':               entry[2],
+        'Worker Phone Number':       entry[3],
+        'Alarm Status':              newStatus,
+        'Location Name':             entry[12],
+        'Location Address':          locationAddress,
+        'Company Name':              companyName,
+        'Notes':                     entry[11] || '',
+        'Last Known GPS':            entry[14],
+        'Battery Level':             entry[16],
+        'Emergency Contact Name':    entry[4],
+        'Emergency Contact Email':   entry[6],
+        'Emergency Contact Number':  entry[5],
+        'Escalation Contact Name':   isDual ? entry[7] : '',
+        'Escalation Contact Email':  isDual ? entry[9] : '',
+        'Escalation Contact Number': isDual ? entry[8] : ''
     };
     triggerAlerts(payload, isDual ? "CRITICAL ESCALATION" : "OVERDUE WARNING");
 }
 
 /**
- * NEW: handleSafetyResolution
- * Logic: Notifies both contacts that the emergency has ended.
+ * IMPROVED: handleSafetyResolution
+ * Logic: Sends personalised "All Clear" messages to each contact individually.
  */
 function handleSafetyResolution(p) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const staffSheet = ss.getSheetByName('Staff');
-    const staffData = staffSheet.getDataRange().getValues();
-    
-    // 1. DEVICE VERIFICATION: Check if the sending device matches the registered one
-    const worker = staffData.find(r => r[0] === p['Worker Name']);
-    if (worker && worker[4] !== p.deviceId) {
-        return { status: "error", message: "Unauthorized device for this worker" };
-    }
-    handleWorkerPost(p); 
+    // 1. Update the Visit Record for the audit trail
+    handleWorkerPost(p);
 
-    // 2. Draft the Resolution Messages
-    const subject = `✅ ALL CLEAR: ${p['Worker Name']} is Safe`;
-    const body = `SAFETY RESOLUTION\n\n` +
-                 `The worker, ${p['Worker Name']}, has checked in and confirmed they are SAFE.\n\n` +
-                 `The previous safety alert is now resolved. No further action is required.\n\n` +
-                 `Timestamp: ${new Date().toLocaleString()}\n` +
-                 `Location: ${p['Location Name']}`;
+    const workerName      = p['Worker Name']         || 'Unknown worker';
+    const locationName    = p['Location Name']        || 'Unknown location';
+    const locationAddress = p['Location Address']     || '';
+    const companyName     = p['Company Name']         || '';
+    const workerPhone     = p['Worker Phone Number']  || 'Not on record';
+    const org             = CONFIG.ORG_NAME            || 'Your organisation';
+    const timestamp       = new Date().toLocaleString();
+    const divider         = '='.repeat(55);
+    const hairline        = '-'.repeat(55);
 
-    // 3. Dual-Contact Email
-    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if(emails.length > 0) { 
-        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
-    }
-    
-    // 4. Dual-Contact SMS
-    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
+    const subject = '✅ ALL CLEAR: ' + workerName + ' is safe — ' + org;
+
+    // Build location block
+    let locationLines = '  Site:    ' + locationName;
+    if (companyName)     locationLines += '\n  Company: ' + companyName;
+    if (locationAddress) locationLines += '\n  Address: ' + locationAddress;
+
+    const contacts = [
+        {
+            name:  p['Emergency Contact Name']   || 'Emergency Contact',
+            email: p['Emergency Contact Email'],
+            role:  'Emergency Contact'
+        },
+        {
+            name:  p['Escalation Contact Name']   || 'Escalation Contact',
+            email: p['Escalation Contact Email'],
+            role:  'Escalation Contact'
+        }
+    ];
+
+    // 2. Send a personalised resolution email to each contact
+    contacts.forEach(function(contact) {
+        if (!contact.email || !contact.email.includes('@')) return;
+        const body = (
+            'ALL CLEAR — ' + org + '\n' +
+            divider + '\n\n' +
+            'Dear ' + contact.name + ',\n\n' +
+            'Good news. ' + workerName + ' has checked in and confirmed they are safe.\n\n' +
+            'The safety alert has been resolved. No further action is required from you.\n\n' +
+            'RESOLUTION DETAILS\n' +
+            '  Worker:    ' + workerName + '\n' +
+            '  Phone:     ' + workerPhone + '\n' +
+            locationLines + '\n' +
+            '  Resolved:  ' + timestamp + '\n\n' +
+            hairline + '\n' +
+            'Thank you for being a safety contact for ' + org + '.\n' +
+            'This message was sent automatically by the ' + org + ' Safety System.'
+        );
+        try {
+            MailApp.sendEmail({ to: contact.email, subject: subject, body: body });
+        } catch(e) { console.error('Resolution email failed: ' + e.toString()); }
+    });
+
+    // 3. SMS resolution message
+    if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
+        const smsMsg = 'ALL CLEAR: ' + workerName + ' is safe and has checked in. No further action needed. — ' + org;
         const numbers = [
-    p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
-    p['Escalation Contact Number'] || p['Escalation Contact Phone']
-].map(n => _cleanPhone(n)).filter(n => n);
-        numbers.forEach(num => { 
+            p['Emergency Contact Number'] || p['Emergency Contact Phone'],
+            p['Escalation Contact Number'] || p['Escalation Contact Phone']
+        ].map(function(n) { return _cleanPhone(n); }).filter(function(n) { return n; });
+        numbers.forEach(function(num) {
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
-                    'method': 'post',
-                    'payload': { 'phone': num, 'message': `${subject}. Alert resolved.`, 'key': CONFIG.TEXTBELT_API_KEY }
-                }); 
+                    method: 'post',
+                    payload: { phone: num, message: smsMsg, key: CONFIG.TEXTBELT_API_KEY }
+                });
             } catch(e) {}
         });
     }
-    return { status: "success" };
+    return { status: 'success' };
 }
-/**
- * SECURITY COMPONENT: Device Identity Binding
- *
- * Flow:
- *   1. Worker name must exist in the Staff tab — otherwise deny.
- *   2. If column E is empty → this is a first registration → write the ID and confirm.
- *   3. If column E already has an ID that MATCHES → confirm (app re-registering after reinstall
- *      on the same device).
- *   4. If column E already has a DIFFERENT ID → deny. The worker is already bound to
- *      another device. An admin must clear column E to allow a new device.
- */
-function handleRegisterDevice(p) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Staff');
-  if (!sheet) return { status: "error", message: "Staff sheet missing" };
-
-  const data = sheet.getDataRange().getValues();
-  const workerName = (p['Worker Name'] || "").trim();
-  const deviceId   = (p.deviceId || "").trim();
-
-  if (!workerName) return { status: "error", message: "Worker name missing" };
-  if (!deviceId)   return { status: "error", message: "Device ID missing" };
-
-  for (let i = 1; i < data.length; i++) {
-    if ((data[i][0] || "").toString().trim() === workerName) {
-      const registeredId = (data[i][4] || "").toString().trim(); // Column E
-
-      // CASE A: No device registered yet — bind this device
-      if (!registeredId) {
-        sheet.getRange(i + 1, 5).setValue(deviceId);
-        console.log(`Device registered: ${workerName} → ${deviceId}`);
-        return { status: "success", message: "Device registered for " + workerName };
-      }
-
-      // CASE B: Same device re-registering (e.g. app reinstalled, same phone)
-      if (registeredId === deviceId) {
-        return { status: "success", message: "Device already registered for " + workerName };
-      }
-
-      // CASE C: Different device — deny
-      console.warn(`Device conflict: ${workerName} tried to register ${deviceId} but ${registeredId} is bound`);
-      return {
-        status: "device_denied",
-        message: "This worker account is already bound to a different device. Contact your administrator."
-      };
-    }
-  }
-
-  return { status: "error", message: "Worker '" + workerName + "' not found in Staff list" };
-}
-
-
