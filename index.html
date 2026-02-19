@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>On-The-Go App Factory v80.0</title>
+  <title>On-The-Go Safety AppSuite Builder</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
@@ -36,35 +36,45 @@
     .preset-swatch.selected { outline: 4px solid #3b82f6; outline-offset: 3px; transform: scale(1.05); border-color: white; }
     .swatch-half { flex: 1; height: 100%; }
     /* HIGH CONTRAST INSTRUCTION TEXT */
-    .help-text { color: #ffffff !important; font-weight: 800; font-size: 11px; margin-top: 4px; line-height: 1.3; }
+    .help-text { color: #ffffff !important; font-weight: 600; font-size: 12px; margin-top: 6px; line-height: 1.5; }
+    .label-text { text-transform: none !important; letter-spacing: 0 !important; font-size: 0.75rem; font-weight: 700; }
+    .section-title { text-transform: none !important; letter-spacing: 0 !important; }
+    .accordion-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: #1e293b; border: 1px solid #475569; border-radius: 0.75rem; color: #94a3b8; font-weight: 700; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; }
+    .accordion-toggle:hover { background: #334155; color: white; }
+    .accordion-body { display: none; }
+    .accordion-body.open { display: block; }
   </style>
 </head>
 <body class="min-h-screen py-8 px-4 relative">
 
   <div id="disclaimerModal" class="modal-backdrop" style="display: flex;">
       <div class="modal-content border-yellow-600">
-          <h2 class="text-2xl font-extrabold text-white mb-2">⚠️ Safety Notice</h2>
-          <div class="space-y-4 text-gray-200 text-sm mb-6 font-bold">
-              <p>The <strong>OTG AppSuite</strong> is a professional serverless safety solution.</p>
-              <ul class="list-disc pl-5 space-y-2">
-                  <li><strong>Active Use:</strong> Tracking requires staff to keep the app active on the device.</li>
-                  <li><strong>Connectivity:</strong> Emergency alerts require internet data and valid API keys.</li>
-              </ul>
+          <h2 class="text-2xl font-extrabold text-white mb-3">👋 Welcome to the OTG Safety AppSuite Builder</h2>
+          <div class="space-y-3 text-gray-200 text-sm mb-6">
+              <p class="text-white font-semibold">This free tool builds a lone-worker safety app for your organisation in about 20 minutes. No technical skills required — just follow the steps.</p>
+              <div class="bg-yellow-900/40 border-l-4 border-yellow-500 p-4 rounded-r mt-4">
+                  <p class="text-yellow-200 font-semibold text-sm mb-2">Before you begin, please note:</p>
+                  <ul class="space-y-2 text-yellow-100 text-sm">
+                      <li>• <strong>Workers need to keep the app open</strong> on their phone for location tracking to work.</li>
+                      <li>• <strong>An internet connection is required</strong> for emergency alerts to be sent.</li>
+                  </ul>
+              </div>
           </div>
-          <div class="pt-4 border-t border-gray-700 font-bold">
+          <div class="pt-4 border-t border-gray-700">
               <label class="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" id="chkAccept" class="mt-1 w-5 h-5" onchange="toggleEnterBtn()">
-                  <span class="text-sm text-gray-300">I accept these technical and safety requirements.</span>
+                  <span class="text-sm text-gray-300 font-semibold">I understand that the app requires workers to have internet access and keep the app open on their phone.</span>
               </label>
-              <button id="btnEnter" disabled onclick="closeModal('disclaimerModal')" class="mt-4 w-full py-4 bg-gray-700 text-gray-500 font-extrabold rounded-xl transition-all">Enter Factory</button>
+              <button id="btnEnter" disabled onclick="closeModal('disclaimerModal')" class="mt-4 w-full py-4 bg-gray-700 text-gray-500 font-extrabold rounded-xl transition-all">Get Started →</button>
           </div>
       </div>
   </div>
 
   <div id="driveHelpModal" class="modal-backdrop">
       <div class="modal-content border-blue-500">
-          <h2 class="text-xl font-extrabold text-white mb-4">📂 How to get a Drive Folder ID</h2>
-          <p class="text-sm text-white font-bold mb-4">Open your Google Drive folder. Copy the long string of letters and numbers at the very end of the URL.</p>
+          <h2 class="text-xl font-extrabold text-white mb-4">📂 How to find your Google Drive Folder ID</h2>
+          <p class="text-sm text-white font-semibold mb-3">This is optional. If you skip it, photos from worker reports will still be saved — they just won't be organised into a named folder.</p>
+          <p class="text-sm text-gray-300 font-semibold mb-4">If you do want to use a folder, open it in Google Drive and copy the long string of letters and numbers at the end of the web address:</p>
           <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all font-bold">
               drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
           </div>
@@ -74,83 +84,94 @@
 
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
-      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-white font-extrabold tracking-widest text-sm uppercase">v79.35 | Master Edition (Full Feature Restoration)</p>
+      <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG Safety AppSuite Builder</h1>
+      <p class="text-white font-semibold text-sm">Free for everyone &middot; No coding required</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
       <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base">
-        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
-        <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Database</button>
-        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Cloud System</button>
-        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Build & Download</button>
-        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
+        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Your Details</button>
+        <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Your Spreadsheet</button>
+        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Connect It Up</button>
+        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Get Your Files</button>
+        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Go Live</button>
       </div>
 
       <div class="p-6 md:p-10">
 
         <div id="step1" class="step-section active space-y-8">
+          <!-- Step time estimate -->
+          <div class="bg-blue-900/30 border border-blue-500/40 rounded-xl px-4 py-3 text-sm text-blue-200 font-semibold">
+            ⏱ About 5 minutes &nbsp;·&nbsp; Have your organisation logo ready if you have one
+          </div>
+
           <div class="grid md:grid-cols-2 gap-8">
             <div class="space-y-6">
               <div>
-                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">1. Organisation Name</label>
+                  <label class="block text-blue-300 font-bold mb-1 text-sm">1. Organisation name</label>
                   <input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)">
-                  <p class="help-text italic">Appears in app headers, report emails, and generated safety manuals.</p>
+                  <p class="help-text">This appears in app headers, report emails, and your generated operations manual.</p>
               </div>
               
               <div>
                   <div class="flex justify-between items-center mb-1">
-                      <label class="block text-blue-300 font-extrabold text-xs uppercase tracking-widest">2. App Icon Label</label>
-                      <span class="text-[11px] text-gray-300 font-black" id="charCount">6/12</span>
+                      <label class="block text-blue-300 font-bold text-sm">2. App icon label</label>
+                      <span class="text-[11px] text-gray-300 font-bold" id="charCount">6/12</span>
                   </div>
                   <input type="text" id="appName" maxlength="12" class="input-field text-center font-black text-green-400 border-green-600/50" value="Safety" oninput="updateCharCount(this); saveInput(this)">
-                  <p class="help-text italic">The short name workers see under the app icon on their phone (Max 12 chars).</p>
+                  <p class="help-text">The short name workers see under the app icon on their phone. Maximum 12 characters.</p>
               </div>
 
 <div class="p-4 bg-gray-900 rounded-2xl border border-gray-700 shadow-inner">
-    <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest border-b border-gray-800 pb-2">🔐 Security Connection Keys</h3>
+    <h3 class="text-white font-bold mb-1 text-sm border-b border-gray-800 pb-2">🔐 Your app passwords</h3>
+    <p class="text-gray-400 text-xs font-semibold mb-4 mt-1">These are generated automatically — you don't need to change them. If you ever build a second version of the app, keep a note of these so you can reuse them.</p>
     
 <div class="mb-4">
     <div class="flex justify-between items-end mb-1">
-        <label class="block text-blue-300 font-extrabold text-xs">Secret Key (Admin Only)</label>
-        <span id="keyLenCounter" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">0 / 32–64</span>
+        <label class="block text-blue-300 font-bold text-sm">Admin password</label>
+        <span id="keyLenCounter" class="text-[10px] font-bold text-slate-500">0 / 32–64 chars</span>
     </div>
     <div class="flex gap-2">
         <input type="text" id="secretKey" 
                class="input-field text-yellow-400 font-mono text-sm py-2" 
                placeholder="e.g. kauri-harbour-ember-summit-47-rimu"
                oninput="updateKeyCounter(); saveInput(this); validateKey();">
-        <button onclick="generateSecureKey('secretKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2">🔄</button>
+        <button onclick="generateSecureKey('secretKey')" title="Generate a different one for me" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2 text-xs whitespace-nowrap">🔄 New one</button>
     </div>
-    <p class="help-text italic">Used by administrators to access the spreadsheet. <strong>Do not share.</strong></p>
+    <p class="help-text">This is the password you use to log into the HQ Monitor dashboard. Keep it private — do not share it with field workers. You can also type your own.</p>
 </div>
     <div>
-        <label class="block text-blue-300 font-extrabold mb-1 text-xs">Worker Key (App Setup)</label>
+        <label class="block text-blue-300 font-bold mb-1 text-sm">Worker key <span class="text-gray-400 font-normal text-xs">(automatically written into the worker app — workers never need to type this)</span></label>
         <div class="flex gap-2">
             <input type="text" id="workerKey" class="input-field text-green-400 font-mono text-sm py-2" oninput="saveInput(this)">
-            <button onclick="generateSecureKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2">🔄</button>
+            <button onclick="generateSecureKey('workerKey')" title="Generate a different one for me" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2 text-xs whitespace-nowrap">🔄 New one</button>
         </div>
+        <p class="help-text">This key is baked into the app automatically. You can also type your own if you prefer.</p>
     </div>
 </div>
 
               <div>
-                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">3. Regional Logic</label>
-                  <select id="countrySelect" class="input-field cursor-pointer py-3 text-sm font-black" onchange="updateRegionInfo()">
+                  <label class="block text-blue-300 font-bold mb-1 text-sm">3. Your country</label>
+                  <select id="countrySelect" class="input-field cursor-pointer py-3 text-sm font-semibold" onchange="updateRegionInfo()">
                       <option value="+64">New Zealand (+64)</option><option value="+61">Australia (+61)</option><option value="+44">United Kingdom (+44)</option><option value="+1">USA / Canada (+1)</option>
                   </select>
-                  <div class="mt-2 bg-gray-900 p-3 rounded text-[10px] text-white grid grid-cols-2 gap-2 border border-gray-800 font-black font-mono">
-                      <p>Timezone: <span id="detectedTz" class="text-blue-400">...</span></p><p>Term: <span id="vehTermDisplay" class="text-green-400">WOF</span></p>
-                      <p>Voice: <span id="voiceLocaleDisplay" class="text-yellow-400">en-NZ</span></p><p>Prefix: <span id="phoneFmtDisplay" class="text-purple-400">+64</span></p>
+                  <div class="mt-2 bg-gray-900/60 border border-gray-700 rounded-lg px-4 py-3">
+                      <p id="regionSummary" class="text-sm text-green-300 font-semibold"></p>
+                  </div>
+                  <!-- Hidden fields still needed by generateScript() -->
+                  <div class="hidden">
+                      <span id="detectedTz"></span><span id="vehTermDisplay"></span>
+                      <span id="voiceLocaleDisplay"></span><span id="phoneFmtDisplay"></span>
                   </div>
                   <input type="hidden" id="timezoneVal">
               </div>
             </div>
             
             <div class="highlight-box flex flex-col items-center justify-center text-center">
-              <label class="block text-blue-300 font-extrabold mb-3 text-sm uppercase tracking-widest">4. App Branding (Customise)</label>
+              <label class="block text-blue-300 font-bold mb-3 text-sm">4. App branding (optional)</label>
               <div id="dropZone" class="drop-zone w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-4 border-4" onclick="document.getElementById('logoInput').click()">
                 <img id="logoImg" class="hidden h-full w-full object-cover">
-                <span id="logoText" class="text-white text-[11px] uppercase font-black px-4 leading-tight">Drag Logo Here or Click to Upload</span>
+                <span id="logoText" class="text-white text-[11px] font-semibold px-4 leading-tight">Drag your logo here, or click to upload</span>
               </div>
               <input type="file" id="logoInput" accept="image/*" class="hidden" onchange="handleLogo(this)"><input type="hidden" id="logoUrl" oninput="saveInput(this)">
 
@@ -158,14 +179,14 @@
     
     <div class="mb-4 text-left">
         <div class="flex justify-between items-center mb-1">
-            <span class="text-[10px] text-gray-200 font-black uppercase tracking-widest leading-none">1. Extract Brand Pairs</span>
-            <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-black hover:underline leading-none">↻ Resample</button>
+            <span class="text-[10px] text-gray-200 font-bold leading-none">1. Colours from your logo</span>
+            <button onclick="triggerResample()" class="text-[10px] text-blue-400 font-bold hover:underline leading-none">↻ Try again</button>
         </div>
-        <p class="text-[11px] text-gray-400 italic">Identify logical Primary and Accent pairs from your logo.</p>
+        <p class="text-[11px] text-gray-400">We've identified colour pairs from your logo — pick the one that looks best.</p>
     </div>
 
     <div class="mb-8">
-        <span class="block text-[10px] text-gray-200 font-black uppercase tracking-widest mb-3 text-left">2. Choose Preferred Scheme</span>
+        <span class="block text-[10px] text-gray-200 font-bold mb-3 text-left">2. Choose your preferred colours</span>
         <div class="flex gap-4 justify-center" id="logoClusterSwatches">
             </div>
     </div>
@@ -173,16 +194,16 @@
     <div class="pt-6 border-t border-gray-800 flex gap-10 justify-center items-center">
         <div class="flex flex-col items-center gap-2">
             <div id="primaryColorBox" class="w-14 h-14 rounded-2xl border-2 border-white/20 shadow-2xl transition-colors duration-500"></div>
-            <span class="text-[9px] text-gray-400 font-black uppercase tracking-widest">Primary</span>
+            <span class="text-[9px] text-gray-400 font-bold">Primary</span>
         </div>
         <div class="flex flex-col items-center gap-2">
             <div id="accentColorBox" class="w-14 h-14 rounded-2xl border-2 border-white/20 shadow-2xl transition-colors duration-500"></div>
-            <span class="text-[9px] text-gray-400 font-black uppercase tracking-widest">Accent</span>
+            <span class="text-[9px] text-gray-400 font-bold">Accent</span>
         </div>
     </div>
 
     <div class="mt-8 pt-8 border-t border-gray-700">
-    <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest text-center">📱 Live App Preview</h3>   
+    <h3 class="text-white font-bold mb-4 text-sm text-center">📱 Live preview</h3>   
     
     <div id="appMockup" class="mx-auto w-64 h-[450px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative transition-all duration-500">
         
@@ -219,7 +240,7 @@
             <div id="mockMainBtn" class="h-10 w-full rounded-xl flex items-center justify-center font-black text-[10px] text-white uppercase tracking-widest shadow-lg transition-colors duration-500">Start Visit</div>
         </div>
     </div> </div>
-</div> <p class="text-[10px] text-gray-400 mt-6 uppercase font-black mb-3 tracking-[0.2em] text-center border-t border-gray-800 pt-4">Enterprise Safe Fallbacks</p>
+</div> <p class="text-[10px] text-gray-400 mt-6 mb-3 text-center border-t border-gray-800 pt-4 font-semibold">Or choose a preset colour scheme</p>
 <div class="flex gap-4 justify-center flex-wrap" id="fallbackSwatches">
     <div class="preset-swatch" onclick="applyPreset('#1e40af', '#3b82f6', this)" title="Blue"><div class="swatch-half bg-[#1e40af]"></div><div class="swatch-half bg-[#3b82f6]"></div></div>
     <div class="preset-swatch" onclick="applyPreset('#064e3b', '#10b981', this)" title="Green"><div class="swatch-half bg-[#064e3b]"></div><div class="swatch-half bg-[#10b981]"></div></div>
@@ -233,97 +254,164 @@
 </div>
 
 </div> </div> <div class="highlight-box border-blue-500/30 mt-8">
-    <div class="flex items-center gap-3 mb-6"><span class="text-2xl">🛡️</span><h3 class="text-xl font-black text-white uppercase tracking-widest">Safety & Fleet Options</h3></div>
+    <div class="flex items-center gap-3 mb-4"><span class="text-2xl">🛡️</span><h3 class="text-xl font-bold text-white">Safety &amp; fleet options</h3></div>
     <div class="grid md:grid-cols-2 gap-10">
         <div class="space-y-6">
             <div>
-                <label class="block text-white font-black text-xs uppercase tracking-widest">Alarm Grace Period (Mins)</label>
+                <label class="block text-white font-bold text-sm mb-1">Alarm grace period (minutes)</label>
                 <input type="number" id="escalationMins" value="15" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-black text-xl" oninput="saveInput(this)">
-                <p class="help-text italic leading-tight">Time allowed for workers to mark themselves "Safe" before the emergency alert fires.</p>
+                <p class="help-text">How long a worker has to tap "I'm safe" before an emergency alert is sent to their contacts. 15 minutes is the recommended default.</p>
             </div>
             <div class="space-y-4">
-                <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Enable Mileage Tracking</span></label>
+                <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-semibold text-gray-200">Enable mileage tracking</span></label>
                 
                 <div>
-                    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700" onchange="toggleCheckin(); saveInput(this)"><span class="text-sm font-black text-gray-200 uppercase">Periodic Check-in</span></label>
-                    <div id="checkinOptions" class="hidden ml-9 mt-1 items-center gap-2 font-black"><input type="number" id="checkinMins" value="60" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white" oninput="saveInput(this)"><span>mins</span></div>
+                    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700" onchange="toggleCheckin(); saveInput(this)"><span class="text-sm font-semibold text-gray-200">Periodic check-in reminders</span></label>
+                    <div id="checkinOptions" class="hidden ml-9 mt-1 items-center gap-2 font-semibold text-sm text-gray-300"><input type="number" id="checkinMins" value="60" class="bg-gray-800 border border-gray-600 rounded p-1 w-16 text-center text-white" oninput="saveInput(this)"><span>mins between check-ins</span></div>
                 </div>
                 <div>
-                    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkVehicle" class="w-6 h-6 rounded bg-gray-700" onchange="toggleVehicle(); saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Vehicle Maintenance Tracking</span></label>
-                    <div id="vehOptions" class="ml-9 mt-1 text-[11px] text-white font-black italic">Repeats every <input type="number" id="vehFreq" value="120" class="bg-gray-800 border border-gray-600 rounded p-1 w-12 text-center" oninput="saveInput(this)"> Days.</div>
+                    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkVehicle" class="w-6 h-6 rounded bg-gray-700" onchange="toggleVehicle(); saveInput(this)" checked><span class="text-sm font-semibold text-gray-200">Vehicle maintenance reminders</span></label>
+                    <div id="vehOptions" class="ml-9 mt-1 text-sm text-gray-300 font-semibold">Remind workers every <input type="number" id="vehFreq" value="120" class="bg-gray-800 border border-gray-600 rounded p-1 w-12 text-center" oninput="saveInput(this)"> days.</div>
                 </div>
-                <label class="flex items-start gap-3 cursor-pointer pt-4 border-t border-gray-700"><input type="checkbox" id="chkRedaction" class="mt-1 w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><div><span class="text-sm font-black text-white uppercase tracking-widest">AI Privacy Redaction</span><p class="text-[10px] text-red-400 font-black uppercase leading-tight mt-1 tracking-widest">Crucial: Removes staff names before sending notes to Gemini AI.</p></div></label>
+                <label class="flex items-start gap-3 cursor-pointer pt-4 border-t border-gray-700"><input type="checkbox" id="chkRedaction" class="mt-1 w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><div><span class="text-sm font-bold text-white">Privacy protection (recommended)</span><p class="text-xs text-green-400 font-semibold mt-1">Before any report notes are processed by AI, all personal information is automatically removed — names, phone numbers, email addresses, and physical addresses. This is on by default.</p></div></label>
             </div>
         </div>
         <div class="space-y-6">
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Textbelt Key (SMS Alerts)</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Essential for sending high-priority SMS alerts to contacts if an alarm fires.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Gemini AI Key (Grammar)</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Used to automatically professionalise worker reports and fix spelling.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">ORS Key (Mileage Tracking)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Required for road-accurate mileage tracking. This key is hidden from workers.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Photo Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where is this?</a></div><input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Organises all report photos into a dedicated Drive folder for the Diocese.</p></div>
+            <!-- Optional extras accordion -->
+            <button type="button" class="accordion-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.acc-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼'">
+                <span>⚙️ Optional extras — SMS alerts, AI report polishing, mileage tracking</span>
+                <span class="acc-arrow">▼</span>
+            </button>
+            <div class="accordion-body space-y-5 mt-3 pl-1">
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-sm font-bold text-indigo-300">Textbelt key (SMS alerts)</label>
+                        <a href="https://textbelt.com/#pricing" target="_blank" class="link">Get a free key</a>
+                    </div>
+                    <input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)">
+                    <p class="help-text">Lets the system send text message alerts to emergency contacts when an alarm fires. Optional — the system works without this, but SMS alerts will not be sent.</p>
+                </div>
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-sm font-bold text-indigo-300">Gemini AI key (report polishing)</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get a free key</a>
+                    </div>
+                    <input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)">
+                    <p class="help-text">Automatically fixes spelling and tidies up language in worker reports before they are filed. Optional — reports are still saved without this, just as the worker typed them.</p>
+                </div>
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-sm font-bold text-indigo-300">ORS key (road-accurate mileage)</label>
+                        <a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get a free key</a>
+                    </div>
+                    <input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)">
+                    <p class="help-text">Used to calculate accurate road distances for mileage tracking. Optional — straight-line distance is used if this is left blank.</p>
+                </div>
+                <div>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-sm font-bold text-indigo-300">Photo folder ID</label>
+                        <a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where do I find this?</a>
+                    </div>
+                    <input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)">
+                    <p class="help-text">Organises all report photos into a dedicated Google Drive folder. Optional — photos are still saved without this, but won't be grouped into a folder.</p>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-          <div class="flex justify-end pt-6"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-black uppercase tracking-widest">Next: Database Setup →</button></div>
+          <div class="flex justify-end pt-6"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-bold">Next: Your spreadsheet →</button></div>
         </div>
         <div id="step2" class="step-section space-y-8">
+            <!-- Step time estimate -->
+            <div class="bg-blue-900/30 border border-blue-500/40 rounded-xl px-4 py-3 text-sm text-blue-200 font-semibold">
+              ⏱ About 2 minutes &nbsp;·&nbsp; You'll need a free Google account for this step
+            </div>
+
             <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-10 rounded-3xl border border-blue-500 shadow-xl text-center">
-                <h2 class="text-3xl font-black text-white mb-2 uppercase tracking-widest">Option A: The Automated Way</h2>
-                <div class="bg-yellow-900/40 border-l-8 border-yellow-500 p-5 mb-8 text-left max-w-2xl mx-auto rounded-r font-black">
-                    <p class="text-yellow-300 text-sm flex items-center gap-2 italic tracking-widest uppercase">⭐ Recommended for Trial Owners</p>
-                    <p class="text-white text-xs mt-2 leading-relaxed uppercase tracking-tighter">Sign into the dedicated <strong>Google Account</strong> you want to own this system before clicking below.</p>
+                <h2 class="text-3xl font-black text-white mb-2">The easy way — one click</h2>
+                <div class="bg-yellow-900/40 border-l-8 border-yellow-500 p-5 mb-6 text-left max-w-2xl mx-auto rounded-r">
+                    <p class="text-yellow-300 text-sm font-semibold mb-2">⭐ Recommended for everyone — this takes about 30 seconds</p>
+                    <p class="text-white text-sm mt-2 leading-relaxed">Make sure you're logged into the Google account where you want to store your safety data — this is usually your work Google account. Then click the button below and it will create a copy of the spreadsheet for you automatically.</p>
+                    <p class="text-gray-300 text-xs mt-3">Don't have a Google account? <a href="https://accounts.google.com/signup" target="_blank" class="text-blue-300 underline font-bold">Create a free one here</a> — it takes about 2 minutes and you don't need a Gmail address.</p>
                 </div>
-                <button onclick="openMagicLink()" class="btn btn-success text-xl px-12 py-6 shadow-2xl transform hover:-translate-y-2 font-black uppercase tracking-widest">✨ Create Database Copy</button>
+                <button onclick="openMagicLink()" class="btn btn-success text-xl px-12 py-6 shadow-2xl transform hover:-translate-y-2 font-black">✨ Create my spreadsheet</button>
             </div>
             <div class="border border-gray-700 rounded-2xl p-6 bg-gray-900/30 shadow-inner">
-                <button onclick="document.getElementById('manualSetup').classList.toggle('hidden')" class="w-full flex justify-between items-center text-gray-400 hover:text-white font-black uppercase tracking-[0.2em] text-xs"><span>Option B: Manual Setup Blueprints</span><span>▼</span></button>
+                <button onclick="document.getElementById('manualSetup').classList.toggle('hidden')" class="w-full flex justify-between items-center text-gray-400 hover:text-white font-bold text-sm"><span>Advanced: set up the spreadsheet manually</span><span>▼</span></button>
                 <div id="manualSetup" class="hidden mt-8 space-y-6">
-                    <div class="grid md:grid-cols-2 gap-6 text-center font-black">
-                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-blue-400 text-xs mb-3 uppercase tracking-widest">Visits Tab</h3><button onclick="copyData('Visits')" class="w-full bg-blue-700 text-white py-2 rounded-lg text-xs uppercase font-black">Copy Blueprint</button></div>
-                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-purple-400 text-xs mb-3 uppercase tracking-widest">Templates Tab</h3><button onclick="copyData('Templates')" class="w-full bg-purple-700 text-white py-2 rounded-lg text-xs uppercase font-black">Copy Blueprint</button></div>
-                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-green-400 text-xs mb-3 uppercase tracking-widest">Sites Tab</h3><button onclick="copyData('Sites')" class="w-full bg-green-700 text-white py-2 rounded-lg text-xs uppercase font-black">Copy Blueprint</button></div>
-                        <div class="bg-gray-900 p-6 rounded-2xl border border-red-600 shadow-lg"><h3 class="text-red-400 text-xs mb-3 uppercase tracking-widest">Staff Tab</h3><button onclick="copyData('Staff')" class="w-full bg-red-800 text-white py-2 rounded-lg text-xs uppercase font-black">Copy Blueprint</button></div>
+                    <div class="grid md:grid-cols-2 gap-6 text-center font-bold">
+                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-blue-400 text-xs mb-3 font-bold">Visits tab</h3><button onclick="copyData('Visits')" class="w-full bg-blue-700 text-white py-2 rounded-lg text-xs font-bold">Copy blueprint</button></div>
+                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-purple-400 text-xs mb-3 font-bold">Templates tab</h3><button onclick="copyData('Templates')" class="w-full bg-purple-700 text-white py-2 rounded-lg text-xs font-bold">Copy blueprint</button></div>
+                        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-600 shadow-lg"><h3 class="text-green-400 text-xs mb-3 font-bold">Sites tab</h3><button onclick="copyData('Sites')" class="w-full bg-green-700 text-white py-2 rounded-lg text-xs font-bold">Copy blueprint</button></div>
+                        <div class="bg-gray-900 p-6 rounded-2xl border border-red-600 shadow-lg"><h3 class="text-red-400 text-xs mb-3 font-bold">Staff tab</h3><button onclick="copyData('Staff')" class="w-full bg-red-800 text-white py-2 rounded-lg text-xs font-bold">Copy blueprint</button></div>
                     </div>
                 </div>
             </div>
-            <div class="mt-4 p-8 bg-blue-900/20 border border-blue-500/30 rounded-3xl font-black shadow-inner"><h4 class="font-black text-blue-300 text-sm uppercase mb-3 tracking-widest">💡 Identity Matching</h4><p class="text-sm text-white leading-relaxed uppercase tracking-tighter">Worker names in the <strong>'Staff'</strong> sheet must match what they type into the app <strong>exactly</strong> (case-sensitive).</p></div>
-            <div class="flex justify-between pt-8"><button onclick="gotoStep(1)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg shadow-2xl font-black uppercase tracking-widest">Next: Cloud System →</button></div>
+            <div class="mt-4 p-6 bg-amber-900/20 border border-amber-500/30 rounded-3xl shadow-inner">
+                <h4 class="font-bold text-amber-300 text-sm mb-2">⚠️ Important: names must match exactly</h4>
+                <p class="text-sm text-white leading-relaxed">Worker names in the <strong>Staff</strong> tab of your spreadsheet must match what they type into the app exactly — including capital letters. For example, if you enter <strong>Jane Smith</strong> in the spreadsheet, the worker must type <strong>Jane Smith</strong> in the app, not <em>jane smith</em> or <em>JANE SMITH</em>.</p>
+            </div>
+            <div class="flex justify-between pt-8"><button onclick="gotoStep(1)" class="text-white font-bold text-sm">← Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg shadow-2xl font-bold">Next: Connect it up →</button></div>
         </div>
 
         <div id="step3" class="step-section space-y-10">
+          <!-- Step time estimate -->
+          <div class="bg-blue-900/30 border border-blue-500/40 rounded-xl px-4 py-3 text-sm text-blue-200 font-semibold">
+            ⏱ About 10 minutes &nbsp;·&nbsp; This is the most involved step, but the instructions below walk you through it one click at a time
+          </div>
+
+          <div class="bg-gray-900/50 border border-gray-600 rounded-2xl p-6 text-sm text-gray-200 leading-relaxed font-semibold">
+            <strong class="text-white">What is this step?</strong> Google Apps Script is a free tool that's built into your Google Spreadsheet. It acts as the "brain" of your safety system — receiving check-ins from workers, watching for overdue alarms, and sending emergency alerts. You just need to copy and paste some code into it, then click "Deploy."
+          </div>
+
           <div class="bg-gray-900 p-8 rounded-3xl border border-gray-600 space-y-6 shadow-2xl">
-              <h3 class="font-black text-green-400 text-xl uppercase tracking-widest">1. Install System "Brain"</h3>
-              <p class="text-sm text-white font-black italic">This script handles all safety logic and database synchronization.</p>
+              <h3 class="font-black text-green-400 text-xl">1. Install the system brain</h3>
+              <p class="text-sm text-white font-semibold">Copy the code below, then follow these steps inside your spreadsheet:</p>
               <div class="space-y-3">
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Click "Copy Code" below.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Go to Spreadsheet > <strong>Extensions > Apps Script</strong>.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Delete any text already in the editor.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter"><strong>Paste</strong> the code and click <strong>Save</strong> (Disk Icon).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Click "Copy system code" below.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Open your spreadsheet. In the top menu, click <strong>Extensions</strong>, then <strong>Apps Script</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Delete any existing text in the editor (there's usually just a few placeholder lines — you can safely remove it all).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Paste the copied code and click the <strong>Save</strong> button (the floppy disk icon in the toolbar).</span></div>
               </div>
-              <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full font-black shadow-2xl py-4 uppercase tracking-widest text-lg">📋 COPY SYSTEM CODE</button>
+              <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full font-black shadow-2xl py-4 text-lg">📋 Copy system code</button>
               <div id="codeContainer" class="hidden mt-4"><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
           </div>
 
+          <div class="bg-gray-900 p-8 rounded-3xl border border-green-600/50 space-y-6 shadow-2xl">
+              <h3 class="font-black text-green-400 text-xl">2. Deploy the system</h3>
+              <p class="text-sm text-white font-semibold leading-relaxed">Still inside Apps Script, you now need to "deploy" the code so your app can talk to it. Follow these steps exactly:</p>
+              <div class="space-y-3">
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Click the blue <strong>Deploy</strong> button (top right), then choose <strong>New deployment</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Click the gear icon ⚙️ next to "Select type" and choose <strong>Web app</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Set <strong>"Execute as"</strong> to <strong>Me</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Set <strong>"Who has access"</strong> to <strong>Anyone</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Click <strong>Deploy</strong>. Google may ask you to authorise the app — click through and accept.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-semibold">Copy the <strong>Web App URL</strong> that appears (it starts with https://script.google.com...) and paste it in the box below.</span></div>
+              </div>
+          </div>
+
           <div class="bg-gray-900 p-8 rounded-3xl border border-purple-600/50 space-y-6 shadow-2xl">
-              <h3 class="font-black text-purple-400 text-xl uppercase tracking-widest">2. Set the Watchdog Alarms (Triggers)</h3>
-              <p class="text-sm text-white font-black italic leading-relaxed uppercase tracking-tighter">Follow these steps exactly to automate your safety checks:</p>
+              <h3 class="font-black text-purple-400 text-xl">3. Set up automatic safety checks</h3>
+              <p class="text-sm text-white font-semibold leading-relaxed">These scheduled tasks tell Google to check for overdue workers every 10 minutes, and to clean up private data every hour. Still inside Apps Script:</p>
               <div class="grid md:grid-cols-2 gap-8">
                   <div class="bg-gray-800 p-6 rounded-3xl border border-purple-500/30 shadow-lg">
-                      <h4 class="font-black text-white text-xs mb-4 uppercase tracking-[0.2em]">A. Safety Watchdog</h4>
-                      <ol class="list-decimal ml-5 space-y-2 text-[12px] text-white font-black uppercase tracking-tighter leading-tight">
-                          <li>Click the <strong>Alarm Clock Icon</strong> (Triggers) on the sidebar.</li>
+                      <h4 class="font-bold text-white text-sm mb-4">A. Overdue worker check</h4>
+                      <ol class="list-decimal ml-5 space-y-2 text-sm text-white font-semibold leading-snug">
+                          <li>In the left sidebar, click the <strong>clock icon</strong> (Triggers).</li>
                           <li>Click <strong>+ Add Trigger</strong> (bottom right).</li>
-                          <li>Function: <strong>checkOverdueVisits</strong>.</li>
-                          <li>Source: <strong>Time-driven</strong>.</li>
-                          <li>Type: <strong>Minutes timer</strong> | <strong>Every 10 minutes</strong>.</li>
+                          <li>Function: <strong>checkOverdueVisits</strong></li>
+                          <li>Event source: <strong>Time-driven</strong></li>
+                          <li>Type: <strong>Minutes timer</strong> → <strong>Every 10 minutes</strong></li>
+                          <li>Click <strong>Save</strong>.</li>
                       </ol>
                   </div>
                   <div class="bg-indigo-900/30 p-6 rounded-3xl border border-indigo-500/30 shadow-lg">
-                      <h4 class="font-black text-white text-xs mb-4 uppercase tracking-[0.2em]">B. Privacy Shredder</h4>
-                      <ol class="list-decimal ml-5 space-y-2 text-[12px] text-white font-black uppercase tracking-tighter leading-tight">
-                          <li>Add a second trigger.</li>
-                          <li>Choose <strong>cleanupPrivateSentNotes</strong>.</li>
-                          <li>Source: <strong>Time-driven</strong>.</li>
-                          <li>Type: <strong>Hour timer</strong> | <strong>Every Hour</strong>.</li>
+                      <h4 class="font-bold text-white text-sm mb-4">B. Privacy clean-up</h4>
+                      <ol class="list-decimal ml-5 space-y-2 text-sm text-white font-semibold leading-snug">
+                          <li>Click <strong>+ Add Trigger</strong> again.</li>
+                          <li>Function: <strong>cleanupPrivateSentNotes</strong></li>
+                          <li>Event source: <strong>Time-driven</strong></li>
+                          <li>Type: <strong>Hour timer</strong> → <strong>Every hour</strong></li>
                           <li>Click <strong>Save</strong>.</li>
                       </ol>
                   </div>
@@ -331,94 +419,107 @@
           </div>
 
           <div id="urlInputSection" class="space-y-6 pt-8 border-t border-gray-700">
-              <label class="block text-green-400 font-black text-center uppercase tracking-[0.3em] text-sm">3. Paste your Web App URL here:</label>
+              <label class="block text-green-400 font-bold text-center text-sm">4. Paste your Web App URL here:</label>
               <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50 text-xl" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)">
               <div class="flex justify-center">
-                  <button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-black py-5 px-16 rounded-2xl shadow-2xl uppercase tracking-widest text-lg">📡 TEST SYSTEM CONNECTION</button>
+                  <button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-black py-5 px-16 rounded-2xl shadow-2xl text-lg">📡 Test the connection</button>
               </div>
-              <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-black uppercase tracking-widest"></div>
+              <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-bold"></div>
           </div>
-          <div class="flex justify-between pt-8"><button onclick="gotoStep(2)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed shadow-2xl font-black uppercase tracking-widest">Next: Build App →</button></div>
+          <div class="flex justify-between pt-8"><button onclick="gotoStep(2)" class="text-white font-bold text-sm">← Back</button><button id="btnNextDownload" onclick="gotoStep(4)" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed shadow-2xl font-bold">Next: Get your files →</button></div>
         </div>
 
         <div id="step4" class="step-section text-center space-y-12 py-12">
             <div class="text-emerald-400 text-8xl mb-4 animate-bounce">✨</div>
-            <h2 class="text-5xl font-black text-white uppercase tracking-widest">Production Build Ready</h2>
-            <p class="help-text text-xl">Your ZIP will contain the Worker App (with sw.js), User Guide, and Private Backend Code.</p>
-            <button onclick="downloadZip()" class="btn btn-success py-8 text-3xl w-full max-w-2xl shadow-2xl transform hover:scale-105 transition-all font-black uppercase tracking-widest">Download OTG_AppSuite.zip</button>
-            <div class="flex justify-between pt-12"><button onclick="gotoStep(3)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button onclick="gotoStep(5)" class="btn btn-primary shadow-2xl font-black uppercase tracking-widest">Next: Deployment →</button></div>
+            <h2 class="text-5xl font-black text-white">Your app is ready to download!</h2>
+            <p class="help-text text-xl max-w-2xl mx-auto">Your download includes the Worker App, a User Guide for your staff, and the backend code that's already been installed in the previous step.</p>
+            <button onclick="downloadZip()" class="btn btn-success py-8 text-3xl w-full max-w-2xl shadow-2xl transform hover:scale-105 transition-all font-black">⬇️ Download OTG_AppSuite.zip</button>
+            <div class="flex justify-between pt-12"><button onclick="gotoStep(3)" class="text-white font-bold text-sm">← Back</button><button onclick="gotoStep(5)" class="btn btn-primary shadow-2xl font-bold">Next: Go live →</button></div>
         </div>
 
 <div id="step5" class="step-section space-y-12">
+            <!-- Step time estimate -->
+            <div class="bg-blue-900/30 border border-blue-500/40 rounded-xl px-4 py-3 text-sm text-blue-200 font-semibold">
+              ⏱ About 5 minutes &nbsp;·&nbsp; You'll need a free Netlify account (or your own web server)
+            </div>
+
             <div class="bg-gray-900 p-10 rounded-3xl border border-gray-700 shadow-2xl">
                 <div class="flex items-center gap-4 mb-6">
                     <span class="text-4xl">🚀</span>
-                    <h2 class="text-3xl font-black text-white uppercase tracking-widest">Host the Worker App</h2>
+                    <h2 class="text-3xl font-black text-white">Host the Worker App</h2>
                 </div>
                 
-                <div class="bg-red-900/40 border-l-8 border-red-600 p-5 mb-10 font-black uppercase tracking-tighter">
-                    <p class="text-red-400 text-sm leading-relaxed italic">⚠️ CRITICAL: Once uploaded, you MUST click "Sign up to claim your site" immediately. Without a free account, the link will expire and your workers will be locked out after 1 hour.</p>
+                <div class="bg-blue-900/30 border border-blue-500/40 rounded-xl px-5 py-4 mb-8 text-sm text-blue-100 font-semibold leading-relaxed">
+                    <strong>What is Netlify?</strong> Netlify is a free website hosting service. You don't need an account to get started — just drag and drop your files and you'll have a working link within seconds. You only need to create a free account to make the link permanent.
+                </div>
+
+                <div class="bg-amber-900/30 border-l-4 border-amber-500 rounded-r-xl px-5 py-4 mb-10 text-sm text-amber-100 font-semibold">
+                    📌 <strong>Important:</strong> After Netlify gives you a link, click "Sign up to claim your site" straight away. This is free and takes about one minute. Without this, your link will stop working after one hour and your workers will be locked out.
                 </div>
                 
                 <div class="grid gap-10">
                     <div class="flex gap-6">
                         <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl shrink-0 shadow-lg border-2 border-blue-400">1</div>
                         <div>
-                            <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">Prepare the Package</p>
-                            <p class="text-white font-bold text-sm leading-relaxed">Extract (unzip) the <strong>AppSuite.zip</strong> file you just downloaded. Inside, locate the folder named <strong>"WorkerApp"</strong>. This folder contains your personal production code and the <strong>USER_GUIDE.html</strong> for your staff.</p>
+                            <p class="text-blue-300 font-bold text-sm mb-1">Prepare your files</p>
+                            <p class="text-white font-semibold text-sm leading-relaxed">Extract (unzip) the <strong>AppSuite.zip</strong> file you just downloaded. Inside, find the folder named <strong>WorkerApp</strong>. This folder contains your customised app and a <strong>USER_GUIDE.html</strong> file for your staff.</p>
                         </div>
                     </div>
 
                     <div class="flex gap-6">
                         <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl shrink-0 shadow-lg border-2 border-blue-400">2</div>
                         <div>
-                            <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">One-Drag Deployment</p>
-                            <p class="text-white font-bold text-sm leading-relaxed">Open <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-black">Netlify Drop</a> in a new tab. Drag the entire <strong>WorkerApp</strong> folder onto the page. Netlify will instantly provide a temporary public URL.</p>
+                            <p class="text-blue-300 font-bold text-sm mb-1">Upload with one drag</p>
+                            <p class="text-white font-semibold text-sm leading-relaxed">Open <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-bold">Netlify Drop</a> in a new tab. Drag the entire <strong>WorkerApp</strong> folder onto the page. Netlify will instantly give you a temporary public link.</p>
                         </div>
                     </div>
 
                     <div class="flex gap-6">
                         <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl shrink-0 shadow-lg border-2 border-blue-400">3</div>
                         <div>
-                            <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">Final Branding</p>
-                            <p class="text-white font-bold text-sm leading-relaxed">Once logged in, go to <strong>Site Overview > Site Settings > Change Site Name</strong>. Enter a professional URL like <code>nelson-diocese-safety.netlify.app</code> to make the link official.</p>
+                            <p class="text-blue-300 font-bold text-sm mb-1">Give it a professional name</p>
+                            <p class="text-white font-semibold text-sm leading-relaxed">Once logged in, go to <strong>Site overview → Site settings → Change site name</strong> and give it a clear, professional address — for example: <code class="text-green-400 bg-gray-800 px-1 rounded">yourorg-safety.netlify.app</code></p>
                         </div>
                     </div>
+                </div>
+
+                <div class="mt-10 p-5 bg-gray-800/60 border border-gray-600 rounded-2xl text-sm text-gray-300 font-semibold leading-relaxed">
+                    💡 <strong class="text-white">Already have your own website?</strong> If your organisation has its own web server, you can upload the <strong>WorkerApp</strong> folder there instead. This gives you full control and removes any dependency on a third-party free service.
                 </div>
             </div>
 
             <div class="bg-indigo-900/30 p-10 rounded-3xl border border-indigo-500/50 shadow-2xl">
                 <div class="flex items-center gap-4 mb-6">
                     <span class="text-4xl">📢</span>
-                    <h2 class="text-3xl font-black text-white uppercase tracking-widest">Staff Onboarding Pack</h2>
+                    <h2 class="text-3xl font-black text-white">Staff onboarding pack</h2>
                 </div>
-                <p class="text-gray-200 font-bold text-sm mb-8 leading-relaxed">Paste your final, professional Netlify URL below. This will generate your official "Welcome" pack for your staff trial.</p>
+                <p class="text-gray-200 font-semibold text-sm mb-8 leading-relaxed">Paste your final Netlify URL below to generate a ready-to-send welcome email and QR code for your staff.</p>
                 
                 <div class="mb-10">
-                    <label class="block text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-2 ml-1">Your Final Production URL</label>
-                    <input type="url" id="workerAppUrl" class="input-field shadow-inner font-black border-2 border-indigo-500/30 bg-gray-900 focus:border-blue-500 placeholder-gray-600" placeholder="https://your-org-safety.netlify.app" oninput="generateLaunchPack()">
+                    <label class="block text-sm text-indigo-300 font-bold mb-2 ml-1">Your app URL</label>
+                    <input type="url" id="workerAppUrl" class="input-field shadow-inner font-bold border-2 border-indigo-500/30 bg-gray-900 focus:border-blue-500 placeholder-gray-600" placeholder="https://yourorg-safety.netlify.app" oninput="generateLaunchPack()">
                 </div>
 
                 <div id="launchPack" class="hidden grid md:grid-cols-3 gap-10">
                     <div class="md:col-span-2">
-                        <label class="block text-[10px] text-gray-400 font-black uppercase tracking-widest mb-3 ml-1">Official Welcome Email</label>
-                        <textarea id="launchEmail" class="w-full h-56 bg-gray-900 border border-indigo-500/50 rounded-2xl p-6 text-sm text-white font-mono shadow-inner font-bold leading-relaxed" readonly></textarea>
+                        <label class="block text-sm text-gray-400 font-bold mb-3 ml-1">Ready-to-send welcome email</label>
+                        <textarea id="launchEmail" class="w-full h-56 bg-gray-900 border border-indigo-500/50 rounded-2xl p-6 text-sm text-white font-mono shadow-inner font-semibold leading-relaxed" readonly></textarea>
                         <div class="mt-4 flex items-center gap-3">
-                            <span class="px-3 py-1 bg-indigo-900/50 text-indigo-300 text-[10px] font-black uppercase rounded-lg border border-indigo-500/30">Onboarding Pack Ready</span>
-                            <span class="text-[10px] text-gray-500 font-bold">Copy this email and send to your staff team.</span>
+                            <span class="px-3 py-1 bg-indigo-900/50 text-indigo-300 text-xs font-bold rounded-lg border border-indigo-500/30">Onboarding pack ready</span>
+                            <span class="text-xs text-gray-500 font-semibold">Copy this email and send it to your staff.</span>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-3xl flex flex-col items-center justify-center shadow-2xl border-4 border-white transition-transform hover:scale-105">
                         <img id="qrImage" src="" class="w-44 h-44 mb-4">
-                        <p class="text-gray-900 text-[10px] font-black uppercase tracking-widest text-center leading-tight">Worker App<br>Setup QR Code</p>
-                        <p class="text-gray-500 text-[8px] font-bold mt-2 uppercase tracking-tighter">(Right-click image to save)</p>
+                        <p class="text-gray-900 text-xs font-black text-center leading-tight">Worker app setup QR code</p>
+                        <p class="text-gray-500 text-[8px] font-bold mt-2">(Right-click to save)</p>
                     </div>
                 </div>
             </div>
 
             <div class="flex justify-start pt-8">
-                <button onclick="gotoStep(4)" class="text-white/50 hover:text-white font-black uppercase tracking-[0.2em] text-[10px] transition-colors group flex items-center gap-2">
-                    <span class="group-hover:-translate-x-1 transition-transform">←</span> Return to Build Configuration
+                <button onclick="gotoStep(4)" class="text-white/50 hover:text-white font-bold text-sm transition-colors group flex items-center gap-2">
+                    <span class="group-hover:-translate-x-1 transition-transform">←</span> Back to download
                 </button>
             </div>
         </div>
@@ -550,7 +651,23 @@ function applyPreset(p, a, el) {
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
     function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
-    function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
+    function updateRegionInfo() { 
+        const sel = document.getElementById('countrySelect').value; 
+        selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; 
+        document.getElementById('detectedTz').textContent = selectedConfig.tz; 
+        document.getElementById('vehTermDisplay').textContent = selectedConfig.term; 
+        document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; 
+        document.getElementById('phoneFmtDisplay').textContent = sel; 
+        document.getElementById('timezoneVal').value = selectedConfig.tz;
+        // Friendly summary line
+        const countryNames = { "+64": "New Zealand", "+61": "Australia", "+44": "United Kingdom", "+1": "USA / Canada" };
+        const tzShort = { "+64": "NZT", "+61": "AEST", "+44": "GMT", "+1": "ET" };
+        const country = countryNames[sel] || "your region";
+        const tz = tzShort[sel] || selectedConfig.tz;
+        const term = selectedConfig.term;
+        const summaryEl = document.getElementById('regionSummary');
+        if (summaryEl) summaryEl.textContent = `✓ Great — we'll use ${country} settings: ${tz} timezone, ${term} terminology, and ${country} phone numbers.`;
+    }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() {
     const btn = document.getElementById('btnEnter');
@@ -630,21 +747,21 @@ function testConnection() {
     
     if (!url.startsWith('https://script.google.com')) {
         resBox.classList.remove('hidden');
-        resBox.textContent = "❌ INVALID URL: MUST START WITH HTTPS://SCRIPT.GOOGLE.COM";
-        resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-black uppercase";
+        resBox.textContent = "❌ That URL doesn't look right — it should start with https://script.google.com";
+        resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-bold";
         return;
     }
 
     resBox.classList.remove('hidden');
-    resBox.textContent = "📡 ATTEMPTING HANDSHAKE...";
-    resBox.className = "mt-4 p-4 rounded-xl text-center bg-gray-900 text-yellow-400 font-black animate-pulse uppercase";
+    resBox.textContent = "📡 Testing your connection...";
+    resBox.className = "mt-4 p-4 rounded-xl text-center bg-gray-900 text-yellow-400 font-bold animate-pulse";
 
     fetch(url + '?test=1&key=' + encodeURIComponent(key))
         .then(r => r.json())
         .then(d => {
             if (d.status === "success") {
-                resBox.textContent = "✅ SYSTEM LINK ESTABLISHED";
-                resBox.className = "mt-4 p-4 rounded-xl text-center bg-green-900 text-white font-black block shadow-2xl uppercase";
+                resBox.textContent = "✅ Connected successfully — your system is working!";
+                resBox.className = "mt-4 p-4 rounded-xl text-center bg-green-900 text-white font-bold block shadow-2xl";
                 document.getElementById('btnNextDownload').disabled = false;
                 document.getElementById('btnNextDownload').classList.remove('opacity-50', 'cursor-not-allowed');
             } else {
@@ -652,8 +769,8 @@ function testConnection() {
             }
         })
         .catch((err) => {
-            resBox.textContent = "❌ LINK FAILED: CHECK YOUR WEB APP URL & SECRET KEY";
-            resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-black block uppercase";
+            resBox.textContent = "❌ Connection failed — please double-check your Web App URL and admin password, then try again.";
+            resBox.className = "mt-4 p-4 rounded-xl text-center bg-red-900 text-white font-bold block";
             console.error(err);
         });
 }
@@ -663,9 +780,9 @@ function testConnection() {
         const len = mKey.length;
         // GOLDEN FIX: Physical security gate
         if (mKey.length < 32 || mKey.length > 64) {
-            alert("🚨 SECURITY REQUIREMENT: The Secret Key must be between 32 and 64 characters.\n\n" +
-                  "Current Length: " + mKey.length + " characters.\n\n" +
-                  "Please use the 🔄 button to generate a secure passphrase.");
+            alert("Your admin password needs to be between 32 and 64 characters long.\n\n" +
+                  "Current length: " + mKey.length + " characters.\n\n" +
+                  "Click the '🔄 New one' button next to the admin password field to generate a secure one automatically.");
             document.getElementById('secretKey').focus();
             return;
     }
@@ -921,4 +1038,3 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
-
