@@ -1,10 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.35
+ * OTG APPSUITE - MASTER BACKEND %%BACKEND_VERSION%%
  * FIXED: SOS Map URLs, SMS Payloads, and GAS Environment Stability
  */
 
 const CONFIG = {
-  VERSION: "v79.35", // New diagnostic property
+  VERSION: "%%BACKEND_VERSION%%", // Injected by Factory at build time
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -12,7 +12,7 @@ const CONFIG = {
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
   REPORT_TEMPLATE_ID: "",   
-  ORG_NAME: "%%ORGANISATION_NAME%%",
+  ORG_NAME: "%%ORG_NAME%%",
   TIMEZONE: "%%TIMEZONE%%", 
   ARCHIVE_DAYS: 30,
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%,
