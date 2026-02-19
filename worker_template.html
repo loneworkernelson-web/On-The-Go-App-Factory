@@ -1970,7 +1970,7 @@ function loadFormAndShow(templateName, context = null) {
         newBtn.textContent = label;
         
         // Standardises the hold duration to 1.8 seconds (1800ms)
-        setupLongPress(newBtn, 1800, submitReport); 
+        setupLongPress(newBtn, 1500, submitReport); 
     }
 }
     
@@ -2081,13 +2081,13 @@ function enterLockedScreen() {
     
     // Setup long-press handlers for buttons
     const btnDepart = document.getElementById('btnDepart');
-    if (btnDepart) setupLongPress(btnDepart, 1800, preDepart);
+    if (btnDepart) setupLongPress(btnDepart, 1500, preDepart);
     
     const btnExtend = document.getElementById('btnExtend');
-    if (btnExtend) setupLongPress(btnExtend, 1800, () => showModal('extend'));
+    if (btnExtend) setupLongPress(btnExtend, 1500, () => showModal('extend'));
     
     const btnSafe = document.getElementById('btnSafe');
-    if (btnSafe) setupLongPress(btnSafe, 1800, iamSafe);
+    if (btnSafe) setupLongPress(btnSafe, 1500, iamSafe);
     
     // Start the countdown timer. Always clear first to avoid duplicate intervals,
     // then start fresh. The old timerInt guard caused tick() to never start
@@ -2592,7 +2592,7 @@ if ('serviceWorker' in navigator) {
         .then(registration => {
             console.log('Service Worker registered:', registration.scope);
 
-            // Poll for updates every 60s (browser default is 24h — far too slow)
+            // Poll for updates every 60s (browser default is 24h — too slow for deployments)
             setInterval(() => registration.update(), 60000);
 
             registration.addEventListener('updatefound', () => {
@@ -2618,6 +2618,7 @@ if ('serviceWorker' in navigator) {
         }
     });
 }
+
 // ============================================================================
 // INSTALL PROMPTS (PC & Android)
 // ============================================================================
@@ -2915,7 +2916,7 @@ function setupHoldToStart() {
     
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     
-    setupLongPress('btnStart', 1800, () => {
+    setupLongPress('btnStart', 1500, () => {
         // MANDATORY: Block start if time is zero
         if (durationMins <= 0) return showToast('⏳ Select a duration first');
         
@@ -3208,7 +3209,7 @@ function renderPanicState() {
     const btnSafe = document.getElementById('btnSafe');
     if (btnSafe) {
         btnSafe.classList.remove('hidden');
-        setupLongPress(btnSafe, 2000, iamSafe);
+        setupLongPress(btnSafe, 1500, iamSafe);
     }
 }
 
@@ -3608,9 +3609,9 @@ window.onload = () => {
     };
 
     // 2. Bind high-sensitivity actions to long-press AFTER state load
-    setupLongPress('btnResetData', 1800, clearData);
-    setupLongPress('btnMainClearCache', 1800, clearFormsCache);
-    setupLongPress('btnDelLoc', 1800, deleteLoc);
+    setupLongPress('btnResetData', 1500, clearData);
+    setupLongPress('btnMainClearCache', 1500, clearFormsCache);
+    setupLongPress('btnDelLoc', 1500, deleteLoc);
 
     // 3. Ensure nested objects exist
     if (!state.meta) state.meta = {};
@@ -5411,17 +5412,7 @@ function updateBatterySaverHUD() {
 // initSlideToWake() using touch/pointer events on the pill container.
 // The wakeSlider range input is a visual-only element; its value is not read.
 
-/**
- * UI LOGIC: Safe Peek
- * Logic: Forces a single update of the HUD timer when the timer area is tapped.
- */
-function triggerPeek() {
-    console.log("Peek triggered: Syncing HUD timer...");
-    if (typeof updateBatterySaverHUD === 'function') {
-        updateBatterySaverHUD(); // Force an immediate refresh of the dark-mode stats
-        if (navigator.vibrate) navigator.vibrate(10); // Subtle haptic confirmation
-    }
-}
+
 
 /**
  * SAFETY COMPONENT: App Visibility Observer
@@ -5446,4 +5437,3 @@ document.addEventListener("visibilitychange", async () => {
 
 </body>
 </html>
-
