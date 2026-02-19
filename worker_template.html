@@ -1309,6 +1309,9 @@ async function refreshBatteryLevel() {
  * Ensures media, signatures, and site context are correctly transmitted.
  */
 function submitReport() {
+    // REQUIRED FIELD GATE: validate before doing anything else
+    if (!validateRequiredFields()) return;
+
     showToast('📤 Processing report...');
     
     // 1. GATHER DATA: Includes the recently patched signature and auto-filled fields
@@ -1472,6 +1475,13 @@ function setupLongPress(target, duration, callback) {
 // INACTIVITY DIM MODE
 // ============================================================================
 function resetInactivityTimer() {
+    // Guard: if the battery saver black screen is showing, any touch should be
+    // completely ignored here. The ONLY valid wake path is the slide gesture.
+    // Without this, the window-level inactivity listeners wake the screen on
+    // any tap regardless of stopPropagation on the #batterySaver div.
+    const saverEl = document.getElementById('batterySaver');
+    if (saverEl && !saverEl.classList.contains('hidden')) return;
+
     clearTimeout(dimTimer);
     if (state && state.activeVisit) {
         dimTimer = setTimeout(activateDimMode, DIM_DELAY);
@@ -1675,9 +1685,12 @@ function buildReportForm(templateName, fieldArea) {
     const questions = template.questions || [];
 
     questions.forEach((label, index) => {
-        const tagMatch = label.match(/^\[(.*?)\]\s*(.*)$/i);
+        // Required field: administrator prefixes the tag with * e.g. *[TEXT] or *[1TEXT]
+        const isRequired = /^\*\s*\[/.test(label);
+        const normalised = isRequired ? label.replace(/^\*\s*/, '') : label;
+        const tagMatch = normalised.match(/^\[(.*?)\]\s*(.*)$/i);
         const rawTag = tagMatch ? tagMatch[1].toUpperCase().trim() : "TEXT";
-        let cleanLabel = tagMatch ? tagMatch[2] : label;
+        let cleanLabel = tagMatch ? tagMatch[2] : normalised;
         
         let baseType = rawTag;
         let options = [];
@@ -1694,7 +1707,13 @@ function buildReportForm(templateName, fieldArea) {
         if (!['HEADING', 'HEAD', 'NOTE'].includes(baseType)) {
             const labelEl = document.createElement('label');
             labelEl.className = 'block text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1';
-            labelEl.innerText = cleanLabel;
+            if (isRequired) {
+                // Red asterisk — universal required-field convention
+                labelEl.innerHTML = escapeHtml(cleanLabel) +
+                    ' <span class="text-red-500 font-black" aria-label="required">*</span>';
+            } else {
+                labelEl.innerText = cleanLabel;
+            }
             wrapper.appendChild(labelEl);
         }
 
@@ -1746,8 +1765,8 @@ function buildReportForm(templateName, fieldArea) {
                 const card = document.createElement('div');
                 card.className = 'check-card active:bg-blue-900/20 transition-all';
                 card.innerHTML = `
-                    <span class="text-sm font-bold text-gray-300">${cleanLabel}</span>
-                    <input type="checkbox" id="${fieldId}" data-key="${cleanLabel}" class="w-7 h-7 rounded-lg accent-blue-500">
+                    <span class="text-sm font-bold text-gray-300">${cleanLabel}${isRequired ? ' <span class="text-red-500 font-black" aria-label="required">*</span>' : ''}</span>
+                    <input type="checkbox" id="${fieldId}" data-key="${cleanLabel}" class="w-7 h-7 rounded-lg accent-blue-500"${isRequired ? ' data-required="true" data-label="' + cleanLabel + '"' : ''}>
                 `;
                 wrapper.innerHTML = ''; 
                 wrapper.appendChild(card);
@@ -1759,6 +1778,11 @@ function buildReportForm(templateName, fieldArea) {
                 grid.className = 'flex gap-2';
                 input = document.createElement('input');
                 input.type = 'hidden';
+                if (isRequired) {
+                    input.setAttribute('data-required', 'true');
+                    input.setAttribute('data-label', cleanLabel);
+                    input.setAttribute('data-yesno', 'true');
+                }
                 ["Yes", "No"].forEach(val => {
                     const b = document.createElement('button');
                     b.type = 'button';
@@ -1791,6 +1815,10 @@ function buildReportForm(templateName, fieldArea) {
                 const status = document.createElement('div');
                 status.id = `lbl_${fieldId}`; 
                 status.className = 'text-[11px] text-blue-400 font-bold mt-2 uppercase text-center';
+                if (isRequired) {
+                    status.setAttribute('data-required-photo', fieldId);
+                    status.setAttribute('data-label', cleanLabel);
+                }
                 wrapper.appendChild(status);
                 fieldArea.appendChild(wrapper);
                 return;
@@ -1800,6 +1828,10 @@ function buildReportForm(templateName, fieldArea) {
                 const canvas = document.createElement('canvas');
                 canvas.id = `sig-canvas-${index}`;
                 canvas.className = 'border-2 border-gray-600 rounded-2xl bg-white w-full h-32 shadow-inner';
+                if (isRequired) {
+                    canvas.setAttribute('data-required-sig', 'true');
+                    canvas.setAttribute('data-label', cleanLabel);
+                }
                 wrapper.appendChild(canvas);
                 const clearBtn = document.createElement('button');
                 clearBtn.className = 'ttext-xs text-gray-500 font-bold uppercase mt-2 ml-1';
@@ -1861,6 +1893,11 @@ function buildReportForm(templateName, fieldArea) {
                 input.className = (input.className || '') + ' form-input';
             }
             input.setAttribute('data-key', cleanLabel);
+            if (isRequired) {
+                input.setAttribute('data-required', 'true');
+                // Store label for error messages
+                input.setAttribute('data-label', cleanLabel);
+            }
             wrapper.appendChild(input);
         }
         fieldArea.appendChild(wrapper);
@@ -3156,6 +3193,103 @@ function processUploadQueue(d) {
  * PATCHED: High-Integrity Data Gathering Engine
  * Ensures signatures and auto-filled site data are correctly captured for the backend.
  */
+
+/**
+ * REQUIRED FIELD VALIDATION
+ * Checks all fields marked data-required="true" before form submission.
+ * Returns true if all required fields have a value, false otherwise.
+ * Highlights empty fields in red and shows a summary toast.
+ */
+function validateRequiredFields() {
+    const missing = [];
+
+    // Standard inputs / textareas / selects / hidden (YESNO, GPS)
+    document.querySelectorAll('[data-required="true"]').forEach(el => {
+        const label = el.getAttribute('data-label') || el.getAttribute('data-key') || 'Field';
+        let empty = false;
+
+        if (el.type === 'checkbox') {
+            // Required checkbox must be ticked
+            empty = !el.checked;
+        } else if (el.getAttribute('data-yesno')) {
+            // YESNO: hidden input value is set by button click
+            empty = !el.value;
+        } else {
+            empty = !el.value || el.value.trim() === '';
+        }
+
+        if (empty) {
+            missing.push(label);
+            // Highlight the closest form-input or card border
+            const formInput = el.closest('.mb-5')?.querySelector('.form-input, .check-card');
+            if (formInput) {
+                formInput.style.borderColor = '#ef4444';
+                formInput.style.borderWidth = '2px';
+                // Auto-clear highlight when worker starts typing
+                const clear = () => {
+                    formInput.style.borderColor = '';
+                    formInput.style.borderWidth = '';
+                    el.removeEventListener('input', clear);
+                    el.removeEventListener('change', clear);
+                };
+                el.addEventListener('input',  clear, { once: true });
+                el.addEventListener('change', clear, { once: true });
+            }
+        }
+    });
+
+    // PHOTO fields: check that the status label has been populated
+    document.querySelectorAll('[data-required-photo]').forEach(statusEl => {
+        const label = statusEl.getAttribute('data-label') || 'Photo';
+        const hasPhoto = statusEl.textContent && statusEl.textContent.trim().length > 0;
+        if (!hasPhoto) {
+            missing.push(label);
+            const photoBtn = statusEl.previousElementSibling;
+            if (photoBtn) {
+                photoBtn.style.borderColor = '#ef4444';
+            }
+        }
+    });
+
+    // SIGNATURE fields: check canvas has at least one non-white pixel
+    document.querySelectorAll('canvas[data-required-sig]').forEach(canvas => {
+        const label = canvas.getAttribute('data-label') || 'Signature';
+        let isSigned = false;
+        try {
+            const ctx = canvas.getContext('2d');
+            const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            // Count drawn pixels — require at least 50 to rule out accidental taps
+            let drawnPixels = 0;
+            for (let i = 3; i < pixels.length; i += 4) {
+                if (pixels[i] > 0) {
+                    drawnPixels++;
+                    if (drawnPixels >= 50) { isSigned = true; break; }
+                }
+            }
+        } catch(e) { isSigned = true; } // Cross-origin guard — don't block on error
+        if (!isSigned) {
+            missing.push(label);
+            canvas.style.borderColor = '#ef4444';
+            canvas.style.borderWidth = '3px';
+            // Clear red border once they start signing
+            canvas.addEventListener('pointerdown', () => {
+                canvas.style.borderColor = '';
+                canvas.style.borderWidth = '';
+            }, { once: true });
+        }
+    });
+
+    if (missing.length > 0) {
+        const names = missing.slice(0, 3).join(', ') + (missing.length > 3 ? '…' : '');
+        showToast(`⚠️ Required: ${names}`, 4000);
+        // Scroll to first empty required field
+        const firstEmpty = document.querySelector('[data-required="true"]');
+        if (firstEmpty) firstEmpty.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return false;
+    }
+    return true;
+}
+
 function gatherFormData() {
     const d = { custom: {}, notes: '', sig: null, jsonPayload: {} };
     
