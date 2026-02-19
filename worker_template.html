@@ -286,7 +286,8 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
   <p id="toastText" class="font-bold text-sm"></p>
 </div>
 
-<div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white select-none">
+<div id="batterySaver" class="fixed inset-0 bg-black z-[9999] hidden flex flex-col items-center justify-between py-16 px-10 text-white select-none"
+     ontouchstart="event.stopPropagation()" onclick="event.stopPropagation()">
     
     <div class="text-center space-y-4">
     <div class="bg-blue-900/30 border border-blue-500/30 rounded-full py-1.5 px-5 mb-2 animate-pulse">
@@ -1121,6 +1122,11 @@ document.addEventListener('click', initAudio, { once: true });
 document.addEventListener('touchstart', initAudio, { once: true });
 ['mousedown', 'touchstart', 'scroll', 'keydown'].forEach(evt => {
     document.addEventListener(evt, () => {
+        // Guard: do not reset idle clock while battery saver black screen is showing.
+        // Without this, any touch on the black screen resets idleSeconds and can
+        // interfere with dim/wake state tracking.
+        const saverEl = document.getElementById('batterySaver');
+        if (saverEl && !saverEl.classList.contains('hidden')) return;
         if (state && state.activeVisit) {
             state.idleSeconds = 0; // Activity detected, reset the clock
         }
