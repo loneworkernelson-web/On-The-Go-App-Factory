@@ -697,17 +697,37 @@ function _humanizeStatus(status) {
  */
 function _buildAlertEmailBody(p, recipientName, recipientRole, gpsLink, hasGps) {
     const workerName      = p['Worker Name']        || 'Unknown worker';
-    const workerPhone     = p['Worker Phone Number']|| 'Not on record';
     const status          = p['Alarm Status']        || '';
     const locationName    = p['Location Name']       || 'Unknown location';
     const locationAddress = p['Location Address']    || '';
     const companyName     = p['Company Name']        || '';
-    const battery         = p['Battery Level']       || 'Unknown';
     const org             = CONFIG.ORG_NAME           || 'Your organisation';
     const timestamp       = new Date().toLocaleString();
     const statusDesc      = _humanizeStatus(status);
     const divider         = '='.repeat(55);
     const hairline        = '-'.repeat(55);
+
+    // FIX: Restore leading zero stripped by Google Sheets numeric cell formatting.
+    // NZ/AU local numbers are stored as e.g. 211234567 (9 digits) — restore the '0' prefix.
+    // Also handles numbers already correctly formatted (10 digits starting with 0).
+    const rawPhone = (p['Worker Phone Number'] || '').toString().trim();
+    let workerPhone;
+    if (!rawPhone || rawPhone === '0') {
+        workerPhone = 'Not on record';
+    } else if (/^[2-9]\d{7,8}$/.test(rawPhone)) {
+        // Looks like a local NZ/AU mobile with leading zero stripped by Sheets
+        workerPhone = '0' + rawPhone;
+    } else {
+        workerPhone = rawPhone;
+    }
+
+    // FIX: Battery display — strip any stray '%' already in the value before appending,
+    // then clamp to a plausible range so a browser misreporting 1% doesn't cause alarm.
+    const battRaw  = (p['Battery Level'] || '').toString().replace(/%/g, '').trim();
+    const battNum  = parseInt(battRaw, 10);
+    const battery  = (!isNaN(battNum) && battNum >= 1 && battNum <= 100)
+        ? battNum + '%'
+        : 'Unknown';
 
     // Build location block
     let locationLines = '  Site:     ' + locationName;
@@ -734,12 +754,20 @@ function _buildAlertEmailBody(p, recipientName, recipientRole, gpsLink, hasGps) 
         gpsLine + '\n\n' +
         'WHAT YOU SHOULD DO NOW\n' +
         '  1. Try to call or text ' + workerName + ' on ' + workerPhone + '\n' +
-        '  2. If you cannot reach them within a few minutes, go to the location above\n' +
+        '  2. If you cannot reach them within a few minutes please contact someone at the\n' +
+        '     site and ask them to check on their safety, or seek help another way.\n' +
         '  3. If you believe they are in danger, contact emergency services (111)\n' +
-        '  4. Once contact is made, please notify your safety manager to resolve the alert\n\n' +
+        '  4. Once contact is made, please remind them to resolve the alert using their\n' +
+        '     app, or call their Safety Manager\n\n' +
+        'PLEASE NOTE\n' +
+        '  Before escalating to police, consider that the worker may:\n' +
+        '  - Be out of mobile data coverage (the app requires data to send updates)\n' +
+        '  - Have closed or lost their safety app, triggering a false alert\n' +
+        '  - Have a flat battery or be in a low-signal area\n' +
+        '  Try calling, texting, and other contact methods first.\n\n' +
         'ALERT DETAILS\n' +
         '  Status:   ' + status + '\n' +
-        '  Battery:  ' + battery + '%\n' +
+        '  Battery:  ' + battery + '\n' +
         '  Sent at:  ' + timestamp + '\n\n' +
         hairline + '\n' +
         'This alert was sent automatically by the ' + org + ' Safety System.\n' +
@@ -819,7 +847,8 @@ function triggerAlerts(p, type) {
 
     // SMS: brief, actionable message to all contacts with valid numbers
     if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const workerPhone = p['Worker Phone Number'] || 'see records';
+        const _rawSmsPhone = (p['Worker Phone Number'] || '').toString().trim();
+        const workerPhone = /^[2-9]\d{7,8}$/.test(_rawSmsPhone) ? '0' + _rawSmsPhone : (_rawSmsPhone || 'see records');
         const locationShort = (p['Company Name'] ? p['Company Name'] + ', ' : '') + (p['Location Name'] || '');
         const smsBody = subject + '\n' +
             'Call ' + workerName + ' on ' + workerPhone + '. ' +
