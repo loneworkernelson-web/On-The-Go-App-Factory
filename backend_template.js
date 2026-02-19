@@ -1286,6 +1286,50 @@ function handleNoticeAck(p) {
 }
 
 /**
+ * SECURITY COMPONENT: Device Identity Binding
+ *
+ * Flow:
+ *   1. Worker name must exist in the Staff tab — otherwise deny.
+ *   2. If column E is empty → this is a first registration → write the ID and confirm.
+ *   3. If column E already has an ID that MATCHES → confirm (app re-registering after reinstall
+ *      on the same device).
+ *   4. If column E already has a DIFFERENT ID → deny. The worker is already bound to
+ *      another device. An admin must clear column E to allow a new device.
+ */
+function handleRegisterDevice(p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { status: "error", message: "Staff sheet missing" };
+  const data = sheet.getDataRange().getValues();
+  const workerName = (p['Worker Name'] || "").trim();
+  const deviceId   = (p.deviceId || "").trim();
+  if (!workerName) return { status: "error", message: "Worker name missing" };
+  if (!deviceId)   return { status: "error", message: "Device ID missing" };
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() === workerName) {
+      const registeredId = (data[i][4] || "").toString().trim(); // Column E
+      // CASE A: No device registered yet — bind this device
+      if (!registeredId) {
+        sheet.getRange(i + 1, 5).setValue(deviceId);
+        console.log(`Device registered: ${workerName} → ${deviceId}`);
+        return { status: "success", message: "Device registered for " + workerName };
+      }
+      // CASE B: Same device re-registering (e.g. app reinstalled, same phone)
+      if (registeredId === deviceId) {
+        return { status: "success", message: "Device already registered for " + workerName };
+      }
+      // CASE C: Different device — deny
+      console.warn(`Device conflict: ${workerName} tried to register ${deviceId} but ${registeredId} is bound`);
+      return {
+        status: "device_denied",
+        message: "This worker account is already bound to a different device. Contact your administrator."
+      };
+    }
+  }
+  return { status: "error", message: "Worker '" + workerName + "' not found in Staff list" };
+}
+
+/**
  * HELPER: Unified Escalation Handler
  * Logic: Appends row and routes to Primary (isDual=false) or Both (isDual=true).
  * IMPROVED: Now includes worker phone, company name, full address in payload.
