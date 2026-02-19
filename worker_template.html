@@ -3016,7 +3016,11 @@ async function startVisit(isSkipCheck = false) {
     const durationMins = DURATION_MAP[parseInt(slider.value)];
     const isHighRisk = document.getElementById('chkHighRisk')?.checked || false;
 
-    let verifiedStartGPS = lastGPS || "0,0";
+    // GPS is only relevant for travel (live tracking) and alarm states (locate worker).
+    // For a regular named-site visit the site address is the authoritative location —
+    // capturing the phone's physical position implies a precision that isn't meaningful
+    // (worker may be selecting the site from home / office) and misleads the monitor map.
+    let verifiedStartGPS = "0,0";
     if (isTravelMode || locId === 'travel') {
         showToast('📍 Locking GPS signal...');
         try {
@@ -3032,6 +3036,9 @@ async function startVisit(isSkipCheck = false) {
         }
         if (typeof startGPSMonitoring === 'function') startGPSMonitoring(); 
     }
+    // For regular site visits lastGPS stays as whatever it was from a prior session;
+    // reset it so any later alarm GPS is clearly fresh rather than stale.
+    if (!isTravelMode && locId !== 'travel') lastGPS = null;
 
     const startTime = Date.now();
     const durationSec = durationMins * 60;
@@ -3063,15 +3070,19 @@ async function startVisit(isSkipCheck = false) {
     const alarmStatus = isTravelMode ? "TRAVELLING" : "ARRIVED";
     const logNote = isTravelMode ? `Travel to ${loc.name} started.` : `${loc.name} visit started.`;
 
-    processUploadQueue(buildPayload({
+    const arrivalPayload = {
         'action': 'logVisit',
         'Alarm Status': alarmStatus,
-        'Location Name': loc.name, 
-        'Location Address': loc.address || "", // ADDED: Immediate sync for initial row
+        'Location Name': loc.name,
+        'Location Address': loc.address || "",
         'Notes': `${logNote} Duration: ${durationMins}m`,
-        'Last Known GPS': verifiedStartGPS,
         'Anticipated Departure Time': new Date(anticipatedDeparture).toISOString()
-    }));
+    };
+    // Only include GPS in the arrival row for travel — for site visits the address IS the location.
+    if (isTravelMode || locId === 'travel') {
+        arrivalPayload['Last Known GPS'] = verifiedStartGPS;
+    }
+    processUploadQueue(buildPayload(arrivalPayload));
 
     announce(isTravelMode ? `Travelling to ${loc.name}.` : `${loc.name} started.`);
     
