@@ -560,7 +560,8 @@
                     const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
                     const d = c.toDataURL('image/png'); document.getElementById('logoImg').src = d; 
                     document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoUrl').value = d;
-                    saveInput(document.getElementById('logoUrl')); triggerResample();
+                    saveInput(document.getElementById('logoUrl')); 
+                    triggerResample(img); // Pass the local 'img' variable that is already loaded
                 };
                 img.src = e.target.result;
             };
@@ -568,10 +569,11 @@
         }
     }
 
-function triggerResample() {
-        const img = document.getElementById('logoImg');
-        if (!img.src || img.src.length < 100) return;
-
+function triggerResample(incomingImg) {
+    // Use the passed image, or fall back to the DOM element
+    const img = incomingImg || document.getElementById('logoImg');
+    if (!img || (!img.src && !incomingImg) || (img.src && img.src.length < 100)) return;
+    console.log("Resampling logo...");
         // ── Colour space helpers ─────────────────────────────────────────────────
         function rgbToHsl(r, g, b) {
             r /= 255; g /= 255; b /= 255;
@@ -1128,3 +1130,4 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
