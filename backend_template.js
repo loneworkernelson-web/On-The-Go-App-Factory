@@ -745,7 +745,8 @@ function _buildAlertEmailBody(p, recipientName, recipientRole, gpsLink, hasGps) 
         'Dear ' + recipientName + ',\n\n' +
         'You are receiving this message because you are listed as ' + workerName + '\'s ' + recipientRole + '.\n\n' +
         'WHAT HAS HAPPENED\n' +
-        statusDesc + '\n\n' +
+        statusDesc + '\n' +
+        (p['Notes'] && !p['Notes'].includes('Automated') ? '  Note: ' + p['Notes'] + '\n' : '') + '\n' +
         'WORKER DETAILS\n' +
         '  Name:     ' + workerName + '\n' +
         '  Phone:    ' + workerPhone + '\n\n' +
@@ -900,7 +901,7 @@ function checkOverdueVisits() {
             const entry = latest[worker].rowData;
             const status = String(entry[10]); 
             const dueTimeStr = entry[20]; 
-            const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY");
+            const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY") || status.includes("USER_SAFE");
             
             if(!isClosed && dueTimeStr) {
                 const due = new Date(dueTimeStr);
@@ -1426,6 +1427,11 @@ function handleSafetyResolution(p) {
     const divider         = '='.repeat(55);
     const hairline        = '-'.repeat(55);
 
+    // Detect how the original alert was triggered for the all-clear context
+    const originalNotes = (p['Notes'] || '').toLowerCase();
+    const triggeredByShake = originalNotes.includes('shake');
+    const triggerMethod = triggeredByShake ? 'Shake to Alert (covert)' : 'Manual safety action';
+
     const subject = '✅ ALL CLEAR: ' + workerName + ' is safe — ' + org;
 
     // Build location block
@@ -1453,13 +1459,18 @@ function handleSafetyResolution(p) {
             'ALL CLEAR — ' + org + '\n' +
             divider + '\n\n' +
             'Dear ' + contact.name + ',\n\n' +
-            'Good news. ' + workerName + ' has checked in and confirmed they are safe.\n\n' +
-            'The safety alert has been resolved. No further action is required from you.\n\n' +
+            'Good news. ' + workerName + ' has confirmed they are safe.\n\n' +
             'RESOLUTION DETAILS\n' +
-            '  Worker:    ' + workerName + '\n' +
-            '  Phone:     ' + workerPhone + '\n' +
+            '  Worker:      ' + workerName + '\n' +
+            '  Phone:       ' + workerPhone + '\n' +
             locationLines + '\n' +
-            '  Resolved:  ' + timestamp + '\n\n' +
+            '  Triggered by: ' + triggerMethod + '\n' +
+            '  Resolved:    ' + timestamp + '\n\n' +
+            'No further action is required from you.\n' +
+            'If you have already contacted emergency services, please let them know the worker is safe.\n\n' +
+            'PLEASE NOTE\n' +
+            'You may receive additional automated alert emails sent before this resolution\n' +
+            'was processed. Please disregard any alerts timestamped before this message.\n\n' +
             hairline + '\n' +
             'Thank you for being a safety contact for ' + org + '.\n' +
             'This message was sent automatically by the ' + org + ' Safety System.'
