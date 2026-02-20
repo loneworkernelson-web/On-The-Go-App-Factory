@@ -577,6 +577,15 @@ function triggerResample() {
         const img = document.getElementById('logoImg');
         if (!img.src || img.src.length < 100) return;
 
+        // ── Image-ready guard ────────────────────────────────────────────────────
+        // ctx.drawImage() draws a blank frame if the element's src was just changed
+        // and hasn't finished loading yet (browsers may load data: URLs asynchronously).
+        // If not complete, defer until onload fires — then clean up to avoid double-calls.
+        if (!img.complete || img.naturalWidth === 0) {
+            img.onload = () => { img.onload = null; triggerResample(); };
+            return;
+        }
+
         // ── Colour space helpers ─────────────────────────────────────────────────
         function rgbToHsl(r, g, b) {
             r /= 255; g /= 255; b /= 255;
