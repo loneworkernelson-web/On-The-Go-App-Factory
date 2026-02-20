@@ -707,23 +707,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
         
-        <!-- Personal Sites Transfer -->
-        <div class="mb-6">
-            <h2 class="text-xl font-bold text-green-400 mb-1">My Sites</h2>
-            <p class="text-xs text-gray-500 font-bold mb-4">Transfer personal sites you've added manually to a new device.</p>
-            <div id="mySitesSummary" class="text-xs text-gray-400 font-bold mb-3"></div>
-            <div class="flex gap-2">
-                <button onclick="exportMySites()"
-                        class="flex-1 bg-green-700 hover:bg-green-600 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wide shadow">
-                    📤 Export My Sites
-                </button>
-                <button onclick="showModal('importSites')"
-                        class="flex-1 bg-blue-700 hover:bg-blue-600 text-white py-3 rounded-xl text-xs font-black uppercase tracking-wide shadow">
-                    📥 Import Sites
-                </button>
-            </div>
-        </div>
-
         <!-- System Info Section -->
         <div class="mb-6">
             <h2 class="text-xl font-bold text-gray-400 mb-4">System Info</h2>
@@ -806,24 +789,6 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
         </div>
         <button id="btnWofContinue" disabled onclick="closeWofWarn()" class="hidden w-full py-4 bg-gray-700 text-gray-500 font-black rounded-2xl text-lg transition-all mb-3">Continue to Travel</button>
         <button id="btnWofDismiss" onclick="closeWofWarn()" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-2xl text-lg">Got it</button>
-    </div>
-</div>
-
-<!-- Personal Sites Import Modal -->
-<div id="importSitesModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
-    <div class="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-700">
-        <h2 class="text-xl font-black text-white mb-1 uppercase tracking-widest">Import My Sites</h2>
-        <p class="text-xs text-gray-400 font-bold mb-4">Paste the export code from your old device below.</p>
-        <textarea id="importSitesPayload"
-                  class="w-full h-32 bg-gray-800 border border-gray-600 text-white text-xs font-mono rounded-xl p-3 resize-none focus:border-blue-500 focus:outline-none"
-                  placeholder="Paste your export code here..."></textarea>
-        <div id="importSitesError" class="hidden mt-2 text-xs text-red-400 font-bold"></div>
-        <div class="flex gap-3 mt-4">
-            <button onclick="closeModal('importSites')"
-                    class="flex-1 bg-gray-700 text-gray-300 font-black py-3 rounded-xl text-sm">Cancel</button>
-            <button onclick="importMySites()"
-                    class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl text-sm shadow-lg">Import</button>
-        </div>
     </div>
 </div>
 
@@ -1001,14 +966,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 </div>
     
 <!-- Shake-to-Alert Confirmation Modal -->
-<div id="shakeConfirmModal" class="hidden fixed inset-0 z-[500] bg-red-900 flex items-center justify-center">
-    <div class="text-center text-white px-8">
-        <div class="text-8xl mb-4">🤫</div>
-        <h1 class="text-4xl font-black mb-2 tracking-tight">SHAKE DETECTED</h1>
-        <p class="text-yellow-300 text-xl font-black mb-2">Shake again to send covert alert</p>
-        <p class="text-red-200 text-sm font-bold mb-8">Stop shaking, then shake once more to confirm</p>
-        <div class="text-8xl font-mono font-black animate-pulse" id="shakeCountdown">5</div>
-        <p class="text-red-300 text-xs mt-4 font-bold uppercase tracking-widest">Covert duress alert — silent activation</p>
+<div id="shakeConfirmModal" class="hidden fixed inset-0 z-[500] bg-red-900/90 flex items-center justify-center">
+    <div class="text-center text-white animate-pulse">
+        <div class="text-8xl mb-4">⚠️</div>
+        <h1 class="text-4xl font-black mb-4">SHAKE DETECTED</h1>
+        <p class="text-yellow-400 text-lg font-bold mb-6">Shake again to confirm panic alert</p>
+        <div class="text-6xl font-mono" id="shakeCountdown">3</div>
+        <p class="text-xs mt-4 text-gray-400">Covert alert activation</p>
     </div>
 </div>
 
@@ -1214,7 +1178,6 @@ function navigate(page) {
         if (page === 'settings') {
             populateSettingsForm();
             updateSystemInfo(); // Update backend connection status
-            updateMySitesSummary(); // Refresh personal sites count
         }
         
         resetInactivityTimer();
@@ -2194,17 +2157,6 @@ function enterLockedScreen() {
  * Logic: Distinguishes between audible SOS and stealth Duress.
  */
 async function triggerPanic(duress = false) {
-    // GUARD: Prevent a second duress/panic from firing while one is already active.
-    // This stops repeated shakes (while thinking it failed) from queuing multiple alerts.
-    if (duress && state?.activeVisit?.isDuress) {
-        console.log('Duress already active — ignoring repeat trigger.');
-        return;
-    }
-    if (!duress && state?.activeVisit?.isPanic && !state?.activeVisit?.isDuress) {
-        console.log('Panic already active — ignoring repeat trigger.');
-        return;
-    }
-
     if (gpsWatchId === null && typeof startGPSMonitoring === 'function') startGPSMonitoring();
     
     // 1. DURESS (SILENT) LOGIC
@@ -2230,7 +2182,7 @@ async function triggerPanic(duress = false) {
     }
     
     // 3. BACKEND LOGGING
-    await logSafety(duress ? "DURESS" : "PANIC", duress ? "Silent duress alert — triggered via Shake to Alert." : "Manual SOS");
+    await logSafety(duress ? "DURESS" : "PANIC", duress ? "Silent trigger" : "Manual SOS");
     
     if (state && state.activeVisit) {
         state.activeVisit.isPanic = true;
@@ -2274,7 +2226,6 @@ function iamSafe() {
         // 4. STATE MANAGEMENT: Reset safety flags
         state.activeVisit.isSafeConfirmed = true; 
         state.activeVisit.isPanic = false;
-        state.activeVisit.isDuress = false;
         state.activeVisit.criticalSent = false;
         saveState();
         
@@ -2338,24 +2289,6 @@ function tick() {
     // If Battery Saver is active, update the HUD and EXIT early to save GPU/CPU.
     // Use the batterySaver element itself as the state indicator - mainContent
     // does not exist in this build and caused a TypeError that silently killed tick().
-    // WARNING ESCALATION (Pre-Expiry)
-    // These MUST run before any early-return branches — the battery saver screen
-    // is active when the phone goes idle, which is exactly when warnings are most
-    // likely to be needed. Vibration and speech work fine behind the saver overlay.
-    if (remaining > 0) {
-        if (diffMins <= 5 && diffMins > 4.9 && !state.activeVisit.warn5minSent) {
-            if (navigator.vibrate) navigator.vibrate([800, 200, 800, 200, 800]);
-            state.activeVisit.warn5minSent = true;
-            saveState();
-        }
-        if (diffMins <= 2 && diffMins > 1.9 && !state.activeVisit.warn2minSent) {
-            if (navigator.vibrate) navigator.vibrate([1000, 500, 1000]);
-            speakWarning("Warning. Safety alarm will activate in two minutes.");
-            state.activeVisit.warn2minSent = true;
-            saveState();
-        }
-    }
-
     const saverEl = document.getElementById('batterySaver');
     if (saverEl && !saverEl.classList.contains('hidden')) {
         updateBatterySaverHUD();
@@ -2372,6 +2305,21 @@ function tick() {
     const gpsIndicator = document.getElementById('gpsIndicator');
     if (gpsIndicator) {
         gpsIndicator.classList.toggle('gps-pulse', state.activeVisit.locationId === 'travel');
+    }
+
+    // WARNING ESCALATION (Pre-Expiry)
+    if (remaining > 0) {
+        if (diffMins <= 5 && diffMins > 4.9 && !state.activeVisit.warn5minSent) {
+            if (navigator.vibrate) navigator.vibrate([800, 200, 800, 200, 800]);
+            state.activeVisit.warn5minSent = true;
+            saveState();
+        }
+        if (diffMins <= 2 && diffMins > 1.9 && !state.activeVisit.warn2minSent) {
+            if (navigator.vibrate) navigator.vibrate([1000, 500, 1000]);
+            speakWarning("Warning. Safety alarm will activate in two minutes.");
+            state.activeVisit.warn2minSent = true;
+            saveState();
+        }
     }
 
     // OVERDUE & GRACE PERIOD UI
@@ -4016,125 +3964,11 @@ function editManualLocation(id) {
 }
 
 // Clear forms cache and resync
-// ============================================================================
-// PERSONAL SITES EXPORT / IMPORT
-// ============================================================================
-
-/**
- * Export all manually-added sites (loc_ prefix) as a compact signed JSON string.
- * Uses the Web Share API on mobile (native share sheet) and falls back to
- * copying to clipboard on desktop.
- */
-function exportMySites() {
-    const manual = (state.locations || []).filter(l => l && l.id && l.id.startsWith('loc_'));
-
-    if (manual.length === 0) {
-        showToast('⚠️ No personal sites to export');
-        return;
-    }
-
-    // Strip the id field — it will be regenerated on import so there's no collision risk
-    // if the worker imports back to the same device or imports multiple times.
-    const exportData = {
-        v: 1,
-        worker: state.worker?.name || '',
-        exported: new Date().toISOString().slice(0, 10),
-        sites: manual.map(({ id, ...rest }) => rest)
-    };
-
-    const payload = btoa(JSON.stringify(exportData));
-    const msg = `OTG Sites Export — ${manual.length} site${manual.length !== 1 ? 's' : ''}\n\n${payload}`;
-
-    if (navigator.share) {
-        navigator.share({ title: 'My Safety App Sites', text: msg })
-            .catch(err => { if (err.name !== 'AbortError') showToast('⚠️ Share failed'); });
-    } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(payload)
-            .then(() => showToast(`✅ ${manual.length} site${manual.length !== 1 ? 's' : ''} copied to clipboard`))
-            .catch(() => showToast('⚠️ Copy failed — try long-pressing the code'));
-    } else {
-        showToast('⚠️ Sharing not supported on this browser');
-    }
-}
-
-/**
- * Import personal sites from a pasted export payload.
- * Skips any site whose name already exists (case-insensitive) to prevent duplicates.
- * Always generates fresh loc_ IDs so there are no collisions.
- */
-function importMySites() {
-    const textarea = document.getElementById('importSitesPayload');
-    const errorEl  = document.getElementById('importSitesError');
-
-    const raw = (textarea?.value || '').trim();
-    if (!raw) {
-        if (errorEl) { errorEl.textContent = 'Please paste your export code first.'; errorEl.classList.remove('hidden'); }
-        return;
-    }
-
-    let exportData;
-    try {
-        exportData = JSON.parse(atob(raw));
-    } catch (e) {
-        if (errorEl) { errorEl.textContent = 'Invalid code — make sure you pasted the full export text.'; errorEl.classList.remove('hidden'); }
-        return;
-    }
-
-    if (!exportData || exportData.v !== 1 || !Array.isArray(exportData.sites)) {
-        if (errorEl) { errorEl.textContent = 'Unrecognised format. Export again from your old device.'; errorEl.classList.remove('hidden'); }
-        return;
-    }
-
-    const existingNames = new Set(
-        (state.locations || []).map(l => (l.name || '').toLowerCase().trim())
-    );
-
-    let added = 0, skipped = 0;
-    exportData.sites.forEach(site => {
-        const nameLower = (site.name || '').toLowerCase().trim();
-        if (!nameLower) return;
-        if (existingNames.has(nameLower)) { skipped++; return; }
-        state.locations.push({ ...site, id: 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
-        existingNames.add(nameLower);
-        added++;
-    });
-
-    saveState();
-    renderLocations();
-    closeModal('importSites');
-
-    if (textarea) textarea.value = '';
-    if (errorEl)  errorEl.classList.add('hidden');
-
-    const msg = skipped > 0
-        ? `✅ ${added} imported, ${skipped} already existed`
-        : `✅ ${added} site${added !== 1 ? 's' : ''} imported`;
-    showToast(msg);
-}
-
-/**
- * Updates the "X personal sites" summary label shown on the Settings page.
- * Called each time the Settings page is opened.
- */
-function updateMySitesSummary() {
-    const el = document.getElementById('mySitesSummary');
-    if (!el) return;
-    const count = (state.locations || []).filter(l => l && l.id && l.id.startsWith('loc_')).length;
-    el.textContent = count === 0
-        ? 'No personal sites saved on this device.'
-        : `${count} personal site${count !== 1 ? 's' : ''} saved on this device.`;
-}
-
 function clearFormsCache() {
     if (!state) return;
     state.cachedForms = {};
     state.globalForms = [];
-    // Also clear backend-sourced locations so stale site names don't survive a failed sync.
-    // Manual locations (loc_ prefix) are preserved — only backend sites (site_ prefix) are dropped.
-    const existingManual = state.locations ? state.locations.filter(x => x && x.id && x.id.startsWith('loc_')) : [];
-    state.locations = existingManual;
     saveState();
-    renderLocations(); // Show "No Sites Synced" immediately so worker knows a refresh is in progress
     showToast('🔄 Clearing cache and resyncing...');
     setTimeout(() => forceSync(true), 500);
 }
@@ -4518,7 +4352,7 @@ function forceSync(showUI) {
     const deviceId = getDeviceID();
     const workerName = state.worker.name;
     
-    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(workerName)}&key=${CONFIG.key}&deviceId=${deviceId}&_cb=${Date.now()}`)
+    fetch(`${CONFIG.url}?action=sync&worker=${encodeURIComponent(workerName)}&key=${CONFIG.key}&deviceId=${deviceId}`)
         .then(r => r.json())
         .then(data => {
             const banner = document.getElementById('uploadBanner');
@@ -4975,7 +4809,7 @@ function enterShakeConfirmation() {
     }
     
     // Countdown
-    let countdown = 5;
+    let countdown = 3;
     const countdownEl = document.getElementById('shakeCountdown');
     const countdownInterval = setInterval(() => {
         countdown--;
@@ -5011,12 +4845,12 @@ function enterShakeConfirmation() {
     
     window.addEventListener('devicemotion', confirmListener, false);
     
-    // Timeout after 5 seconds — 3s was too fast for workers to notice.
+    // Timeout after 3 seconds
     shakeConfirmationTimeout = setTimeout(() => {
         window.removeEventListener('devicemotion', confirmListener);
         clearInterval(countdownInterval);
         cancelShakeConfirmation();
-    }, 5000);
+    }, 3000);
 }
 
 function confirmShakePanic() {
@@ -5095,7 +4929,7 @@ function enterVolumeConfirmation() {
     }
     
     // Countdown
-    let countdown = 5;
+    let countdown = 3;
     const countdownEl = document.getElementById('volumeCountdown');
     const countdownInterval = setInterval(() => {
         countdown--;
@@ -5680,9 +5514,7 @@ function triggerGraceExpiryAlarm() {
 
     // 2. UI Lock & Audio
     document.body.classList.add('bg-red-900', 'panic-mode');
-    const _numContacts = [state.worker?.emgName, state.worker?.escName].filter(Boolean).length;
-    const _contactWord = _numContacts === 1 ? "contact has" : "contacts have";
-    announce(`Safety Alarm Activated. Your emergency ${_contactWord} been notified.`);
+    announce("Safety Alarm Activated. Your emergency contacts have been notified.");
     
     const overdueLabel = document.getElementById('overdueLabel');
     if (overdueLabel) {
