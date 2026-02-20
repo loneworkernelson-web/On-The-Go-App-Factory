@@ -90,6 +90,9 @@ function doPost(e) {
           else if (p.action === 'notifySafety') {
             return sendJSON(handleSafetyResolution(p));
           }
+          else if (p.action === 'broadcast') {
+              return sendJSON(handleBroadcast(p));
+          }
           else {
               handleWorkerPost(p);
           }
@@ -443,7 +446,7 @@ function handleWorkerPost(p, e) {
                 const rowData = data[i];
                 if (rowData[2] === workerName) {
                     const status = String(rowData[10]);
-                    const isClosed = status.includes('DEPARTED') || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY');
+                    const isClosed = status.includes('DEPARTED') || status.includes('COMPLETED') || status.includes('DATA_ENTRY_ONLY') || status.includes('USER_SAFE');
                     
                     if (!isClosed) {
                         const targetRow = startRow + i;
@@ -561,15 +564,26 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    // NEW: Visit Location Intelligence Block
+    // Visit Location Intelligence Block
+    // Only show map link when GPS contains a real, parseable coordinate pair
+    // (not "0,0", "0.0,0.0", missing, or "Not available")
 let mapHtml = "";
-    if (p['Last Known GPS']) {
-        const gps = p['Last Known GPS'];
-        // FIXED: Added missing $ and corrected template literal syntax
-        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
+    const rawGps = (p['Last Known GPS'] || '').toString().trim();
+    const gpsParts = rawGps.split(',');
+    const gpsLat  = parseFloat(gpsParts[0]);
+    const gpsLng  = parseFloat(gpsParts[1]);
+    const hasValidGps = gpsParts.length === 2
+        && !isNaN(gpsLat) && !isNaN(gpsLng)
+        && Math.abs(gpsLat) > 0.001   // excludes 0,0 and near-zero noise
+        && Math.abs(gpsLng) > 0.001
+        && Math.abs(gpsLat) <= 90
+        && Math.abs(gpsLng) <= 180;
+
+    if (hasValidGps) {
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawGps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
-            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location Intelligence</p>
+            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location</p>
             <a href="${mapUrl}" style="display:inline-block; padding:12px 24px; background:#1e40af; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">View Location on Google Maps</a>
         </div>`;
     }
@@ -587,7 +601,12 @@ let mapHtml = "";
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
             <tbody>`;
         
+    // Skip fields that are rendered separately (signature image, GPS map block)
+    // and skip data-URI blobs that would bloat the table row
+    const skipKeys = new Set(['Signature', 'GPS', 'Last Known GPS', 'Photo 1', 'Photo 2', 'Photo 3', 'Photo 4']);
     for (const [key, value] of Object.entries(reportObj)) {
+        if (skipKeys.has(key)) continue;
+        if (typeof value === 'string' && value.startsWith('data:')) continue; // raw blob
         html += `<tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:8px 0;font-size:13px;color:#6b7280;width:40%;">${key}</td><td style="padding:8px 0;font-size:13px;font-weight:600;color:#111827;">${value}</td></tr>`;
     }
     
@@ -1238,6 +1257,40 @@ function getSyncData(workerName, deviceId) {
     
     return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
 }
+/**
+ * ISSUE 4 FIX: Handle broadcast messages from Monitor App
+ * Writes a new row to the Notices sheet so every worker receives it on next sync.
+ * Columns: [0]=date [1]=id [2]=priority [3]=title [4]=content [5]=sender [6]=status [7]=target [8]=ackedBy
+ */
+function handleBroadcast(p) {
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        let sheet = ss.getSheetByName('Notices');
+        if (!sheet) {
+            // Create the Notices sheet if it doesn't exist yet
+            sheet = ss.insertSheet('Notices');
+            sheet.appendRow(['Date', 'ID', 'Priority', 'Title', 'Content', 'Sender', 'Status', 'Target', 'Acknowledged By']);
+        }
+        const id  = 'BC-' + Date.now().toString(36).toUpperCase();
+        const row = [
+            new Date(),                         // [0] Date
+            id,                                 // [1] ID (unique, used for ack dedup)
+            p.priority  || 'Standard',          // [2] Priority
+            'Broadcast from HQ',               // [3] Title
+            p.message   || '',                  // [4] Content
+            p.source    || 'Monitor',           // [5] Sender
+            'Active',                           // [6] Status — workers receive until expired
+            'ALL',                              // [7] Target — all workers
+            ''                                  // [8] Acknowledged By
+        ];
+        sheet.appendRow(row);
+        return { status: 'success', id: id };
+    } catch(err) {
+        console.error('handleBroadcast error: ' + err);
+        return { status: 'error', message: err.toString() };
+    }
+}
+
 /**
  * BACKEND logic: Specifically updates the 'Sites' tab
  */
