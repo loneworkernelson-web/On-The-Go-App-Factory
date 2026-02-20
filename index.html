@@ -529,7 +529,12 @@
 
     // Computed once at load time so every build from this session shares the same stamp.
     // Used by both generateScript() and downloadZip() for consistent version labelling.
-    const buildTimestamp = new Date().toISOString().slice(0, 10) + '-' + Date.now().toString(36);
+    // buildTimestamp includes date + time-of-build (HH:MM) + a short random token.
+    // This ensures two builds on the same day produce distinct version strings,
+    // which forces the service worker to treat them as genuinely new versions.
+    const _bd = new Date();
+    const _hhmm = _bd.toTimeString().slice(0, 5).replace(':', '');
+    const buildTimestamp = _bd.toISOString().slice(0, 10) + '-' + _hhmm + '-' + Date.now().toString(36);
 
   window.onload = async () => {
         document.getElementById('mainContent').classList.remove('blur-sm');
@@ -560,8 +565,7 @@
                     const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 192, 192);
                     const d = c.toDataURL('image/png'); document.getElementById('logoImg').src = d; 
                     document.getElementById('logoImg').classList.remove('hidden'); document.getElementById('logoUrl').value = d;
-                    saveInput(document.getElementById('logoUrl')); 
-                    triggerResample(img); // Pass the local 'img' variable that is already loaded
+                    saveInput(document.getElementById('logoUrl')); triggerResample();
                 };
                 img.src = e.target.result;
             };
@@ -569,11 +573,10 @@
         }
     }
 
-function triggerResample(incomingImg) {
-    // Use the passed image, or fall back to the DOM element
-    const img = incomingImg || document.getElementById('logoImg');
-    if (!img || (!img.src && !incomingImg) || (img.src && img.src.length < 100)) return;
-    console.log("Resampling logo...");
+function triggerResample() {
+        const img = document.getElementById('logoImg');
+        if (!img.src || img.src.length < 100) return;
+
         // ── Colour space helpers ─────────────────────────────────────────────────
         function rgbToHsl(r, g, b) {
             r /= 255; g /= 255; b /= 255;
@@ -775,7 +778,7 @@ function _applyMockupColors(p, a) {
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%ENABLE_REDACTION%%/g, document.getElementById('chkRedaction').checked)
             .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
             .replace(/%%LOCALE%%/g, selectedConfig.locale)
-            .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
+            .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
     }
 
    // NEW: Logic to sync the UI Mockup with user inputs
@@ -906,7 +909,7 @@ function testConnection() {
             .replace(/%%VEHICLE_TERM%%/g, document.getElementById('vehTermDisplay').innerText)
             .replace(/%%VOICE_LOCALE%%/g, document.getElementById('voiceLocaleDisplay').innerText)
             .replace(/%%LOGO_DATA%%/g, logoData)
-                        .replace(/%%BUILD_VERSION%%/g, 'v81.36 · ' + buildTimestamp.slice(0, 10));
+                        .replace(/%%BUILD_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
 
         
 
@@ -1130,4 +1133,3 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
-
