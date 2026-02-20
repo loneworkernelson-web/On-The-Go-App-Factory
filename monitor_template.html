@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%%ORG_NAME%% Safety Monitor</title>
+    <title>%%ORG_NAME%% Monitor</title>
     <link rel="icon" href="%%LOGO_URL%%">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -225,12 +225,12 @@
 <!-- ═══════════════════════════════════════════════════════════════════
      HEADER BAR
 ═══════════════════════════════════════════════════════════════════════ -->
-<header class="border-b border-black/20 px-4 py-2 flex items-center justify-between flex-shrink-0 gap-3 flex-wrap" style="background-color: var(--brand-primary)">
+<header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center justify-between flex-shrink-0 gap-3 flex-wrap">
 
     <!-- Left: identity + live counters -->
     <div class="flex items-center gap-4 min-w-0">
-        <span class="font-black text-sm uppercase tracking-widest whitespace-nowrap text-brand">%%ORG_NAME%%</span>
-        <span id="serverStatus" class="text-[10px] font-bold whitespace-nowrap text-brand" style="opacity:0.6">● CONNECTING</span>
+        <span class="font-black text-white text-sm uppercase tracking-widest whitespace-nowrap">%%ORG_NAME%%</span>
+        <span id="serverStatus" class="text-[10px] font-bold text-gray-500 whitespace-nowrap">● CONNECTING</span>
         <div class="flex items-center gap-1.5 text-[11px] whitespace-nowrap">
             <span class="text-gray-500">Active:</span>
             <span id="activeCount" class="font-black text-green-400">0</span>
@@ -331,14 +331,14 @@
     <span style="font-size:10px;color:#334155;font-family:monospace;letter-spacing:0.05em;">%%ORG_NAME%% Safety Monitor &nbsp;·&nbsp; %%BUILD_VERSION%%</span>
 </div>
 
-<script data-cfasync="false">
+<script>
 // ============================================================================
 // 1. CONFIGURATION
 // ============================================================================
 const SCRIPT_URL   = "%%SHEET_URL%%";
 const VEHICLE_TERM = "%%VEHICLE_TERM%%";
-const MAP_LAT      = parseFloat("%%MAP_LAT%%") || -40.9;  // Factory-injected map centre latitude
-const MAP_LNG      = parseFloat("%%MAP_LNG%%") || 174.9; // Factory-injected map centre longitude
+const MAP_LAT      = %%MAP_LAT%% || -40.9;    // Factory-injected map centre latitude
+const MAP_LNG      = %%MAP_LNG%% || 174.9;   // Factory-injected map centre longitude
 
 // ============================================================================
 // 2. SESSION STATE
@@ -926,19 +926,8 @@ function renderGrid() {
             ? 'text-amber-400 font-bold animate-pulse'
             : 'text-slate-500';
 
-        const gps = w.gps || w['Last Known GPS'] || "0,0";
-        // Use live GPS when worker is in alarm/travel state AND a real fix exists.
-        // For normal named-site visits, use the recorded site address — it's the
-        // authoritative location and avoids showing where the worker's phone happened
-        // to be when they tapped Hold to Start.
-        const GPS_STATUSES = ['TRAVELLING','OVERDUE','PANIC','SOS','DURESS','EMERGENCY'];
-        const statusIsGps  = GPS_STATUSES.some(s => statusUp.includes(s));
-        const hasRealGps   = gps !== '0,0' && gps !== '0.0,0.0' && gps.includes(',');
-        const address  = w['Location Address'] || w['Location Name'] || "";
-        const mapQuery = (statusIsGps && hasRealGps) ? gps : address;
-        const mapUrl   = mapQuery
-            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
-            : null;
+        const gps    = w.gps || w['Last Known GPS'] || "0,0";
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gps)}`;
 
         const statusClass = isAlert   ? 'text-purple-400 font-black animate-pulse' :
                             isOverdue ? 'text-red-500 animate-pulse font-black' :
@@ -964,7 +953,7 @@ function renderGrid() {
                     <div class="flex items-center gap-2">
                         <span class="w-3 h-3 rounded-full flex-shrink-0 ${getStatusDot(status, isOverdue, isStale)}"></span>
                         <h3 class="font-bold text-white truncate max-w-[150px] cursor-pointer hover:text-blue-400 transition"
-                            onclick="if(hasRealGps) focusWorker('${gps}')">${safeName}</h3>
+                            onclick="focusWorker('${gps}')">${safeName}</h3>
                     </div>
                     <div class="text-[10px] text-slate-500 font-bold flex-shrink-0 ml-2">🔋 ${escapeHtml(String(bat))}</div>
                 </div>
@@ -986,14 +975,10 @@ function renderGrid() {
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
-                    ${mapUrl
-                        ? `<a href="${mapUrl}" target="_blank"
-                              class="bg-slate-700 text-white py-2 rounded text-xs font-bold hover:bg-slate-600 transition text-center"
-                              title="${(statusIsGps && hasRealGps) ? 'Live GPS location' : 'Recorded site address'}">
-                               ${(statusIsGps && hasRealGps) ? '📡' : '📍'} Map
-                           </a>`
-                        : `<span class="bg-slate-800 text-slate-600 py-2 rounded text-xs font-bold text-center cursor-default select-none">📍 No map</span>`
-                    }
+                    <a href="${mapUrl}" target="_blank"
+                       class="bg-slate-700 text-white py-2 rounded text-xs font-bold hover:bg-slate-600 transition text-center">
+                        📍 Map
+                    </a>
                     <a href="tel:${escapeHtml(phone)}"
                        class="bg-blue-600/20 text-blue-400 text-center py-2 rounded text-xs font-bold border border-blue-500/30">
                         📞 Call
@@ -1111,7 +1096,7 @@ function renderMap() {
         if (w.history?.length > 1) {
             const path = w.history.map(h => h.split(',').map(Number)).filter(p => !isNaN(p[0]));
             if (path.length > 1) {
-                L.polyline(path, { color: getComputedStyle(document.documentElement).getPropertyValue('--brand-accent').trim() || '#3b82f6', weight: 3, opacity: 0.5 })
+                L.polyline(path, { color: 'var(--brand-accent)', weight: 3, opacity: 0.5 })
                  .addTo(markersLayer);
             }
         }
