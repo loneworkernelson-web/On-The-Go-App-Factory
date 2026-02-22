@@ -5891,11 +5891,15 @@ function updateBatterySaverHUD() {
  */
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === 'visible') {
-        // Re-acquire the Wake Lock regardless of visit state
-        await requestWakeLock();
+        // Only re-acquire wake lock if in alarm/panic state — not on every
+        // foreground event. Holding it during normal visits prevents the OS
+        // from sleeping the screen and drains battery all shift.
+        const inAlarm = state && state.activeVisit &&
+                        (state.activeVisit.isPanic || state.activeVisit.criticalSent);
+        if (inAlarm && typeof requestWakeLock === 'function') {
+            await requestWakeLock();
+        }
 
-        // Only show monitoring confirmation and run tick if a visit is actually active.
-        // Without this guard the toast fired on every app open, settings visit, etc.
         if (state && state.activeVisit) {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             showToast("✅ Safety Monitoring Active");
