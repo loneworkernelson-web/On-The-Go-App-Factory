@@ -229,6 +229,12 @@
 
     <!-- Left: identity + live counters -->
     <div class="flex items-center gap-4 min-w-0">
+        <!-- Organisation logo -->
+        <img src="%%LOGO_URL%%"
+             alt="%%ORG_NAME%%"
+             onerror="this.style.display='none'"
+             class="h-8 w-8 rounded object-contain flex-shrink-0"
+             style="background:transparent">
         <span class="font-black text-sm uppercase tracking-widest whitespace-nowrap text-brand">%%ORG_NAME%%</span>
         <span id="serverStatus" class="text-xs font-bold whitespace-nowrap text-brand" style="opacity:0.6">● CONNECTING</span>
         <div class="flex items-center gap-1.5 text-xs whitespace-nowrap">
@@ -719,12 +725,11 @@ function stopPollingAndLock() {
 // 10. INITIALISATION
 // ============================================================================
 window.onload = () => {
-    // navigator.storage.persist() is the W3C standard API (not the deprecated
-    // webkitPersistentStorage). Chrome may log a spurious ".persistent" warning
-    // for quota-type reporting — it does not relate to this call.
-    if (navigator.storage && navigator.storage.persist) {
-        navigator.storage.persist().catch(() => {}); // non-fatal; silences unhandled rejection
-    }
+    // navigator.storage.persist() intentionally omitted: despite being the modern
+    // W3C API it still triggers Chrome's "StorageType.persistent is deprecated"
+    // DevTools warning via the underlying quota-management layer. The call is
+    // purely advisory (hints the browser not to evict cached data under pressure)
+    // and has no effect on Monitor functionality, so it is not called here.
     if (API_KEY) unlockMonitor();
     initMap();
 };
