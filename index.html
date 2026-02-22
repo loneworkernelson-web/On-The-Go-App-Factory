@@ -776,21 +776,29 @@ const CRITICAL_ASSETS = [
 //1. Robust Install: Handles redirects for Tailwind/ToneJS
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('Finalizing Offline Safety Cache...');
-      for (const url of CRITICAL_ASSETS) {
-        try {
-          // Use 'no-cors' for external CDNs to ensure they can be cached
-          const response = await fetch(url, { 
-            mode: url.includes('http') ? 'no-cors' : 'cors', 
-            redirect: 'follow' 
-          });
-          await cache.put(url, response);
-        } catch (err) {
-          console.warn('Could not cache offline asset:', url);
+    caches.open(CACHE_NAME)
+      .then(async (cache) => {
+        console.log('Finalizing Offline Safety Cache...');
+        for (const url of CRITICAL_ASSETS) {
+          try {
+            const response = await fetch(url, {
+              mode: url.includes('http') ? 'no-cors' : 'cors',
+              redirect: 'follow'
+            });
+            await cache.put(url, response);
+          } catch (err) {
+            // Non-fatal: asset unavailable at install time (e.g. offline).
+            // The fetch handler will try again at runtime.
+            console.warn('Could not pre-cache:', url);
+          }
         }
-      }
-    }).then(() => self.skipWaiting())
+      })
+      .then(() => self.skipWaiting())
+      .catch((err) => {
+        // caches.open() failure is fatal to install but should not
+        // produce an unhandled rejection that surfaces as a console error.
+        console.error('SW install failed:', err);
+      })
   );
 });
 
@@ -798,16 +806,28 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) return response;
-      return fetch(event.request).then((networkResponse) => {
-        // FIXED: Only cache valid internal responses (status 200) or valid opaque CDNs (status 0)
-        if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 0)) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => { cache.put(event.request, responseToCache); });
-        }
-        return networkResponse;
-      });
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((networkResponse) => {
+          // Only cache valid same-origin responses (200) or opaque CDN responses (0).
+          // Never cache errors — that would permanently break offline fallback.
+          if (networkResponse &&
+              (networkResponse.status === 200 || networkResponse.status === 0)) {
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Network failed and nothing cached — return a minimal offline stub
+          // so event.respondWith() never rejects (which would throw an uncaught error).
+          return caches.match('./') || new Response('Offline', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        });
     })
   );
 });
@@ -825,7 +845,10 @@ self.addEventListener('activate', event => {
 //    Activates the waiting SW immediately without requiring all tabs to close.
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    // event.waitUntil() keeps the service worker alive until skipWaiting()
+    // resolves. Without it, the SW can be terminated mid-flight and Chrome
+    // throws "message channel closed before a response was received".
+    event.waitUntil(self.skipWaiting());
   }
 });`;
 
@@ -845,24 +868,59 @@ self.addEventListener('message', event => {
         workerFolder.file("index.html", wHtml);
         workerFolder.file("sw.js", swCode);
         workerFolder.file("manifest.json", JSON.stringify(manifest, null, 2));
-        workerFolder.file("icon.png", logoData.split(',')[1], {base64:true});
+        // Guard: only embed icon if a valid data-URI is available
+        const iconB64 = logoData && logoData.includes(',') ? logoData.split(',')[1] : null;
+        if (iconB64) workerFolder.file("icon.png", iconB64, {base64: true});
+
         workerFolder.file("USER_GUIDE.html", TEMPLATES.guide.replace(/%%ORG_NAME%%/g, org));
         zip.folder("MonitorApp").file("index.html", TEMPLATES.monitor
-        .replace(/%%ORG_NAME%%/g, org)
-        .replace(/%%SHEET_URL%%/g, url)
-        .replace(/%%LOGO_URL%%/g, logoData)
-        .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
-        .replace(/%%PRIMARY_COLOR%%/g, primary)
-        .replace(/%%ACCENT_COLOR%%/g,  accent)
-        .replace(/%%SURFACE_COLOR%%/g, surface)
-        .replace(/%%ACCENT_GLOW%%/g,   accentGlow)
-          );        
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%SHEET_URL%%/g, url)
+            .replace(/%%LOGO_URL%%/g, logoData)
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term)
+            .replace(/%%PRIMARY_COLOR%%/g, primary)
+            .replace(/%%ACCENT_COLOR%%/g,  accent)
+            .replace(/%%SURFACE_COLOR%%/g, surface)
+            .replace(/%%ACCENT_GLOW%%/g,   accentGlow)
+        );
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
-        zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual.replace(/%%ORG_NAME%%/g, org).replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value).replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value));
-        
-        zip.generateAsync({type:"blob"}).then(b => {
-            const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = org.replace(/ /g,'_') + "_AppSuite.zip"; a.click();
-        });
+        zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual
+            .replace(/%%ORG_NAME%%/g, org)
+            .replace(/%%SECRET_KEY%%/g, document.getElementById('secretKey').value)
+            .replace(/%%WORKER_KEY%%/g, document.getElementById('workerKey').value)
+        );
+
+        // Show progress while JSZip compresses (can take a few seconds for large apps)
+        const dlBtn = document.querySelector('[onclick="downloadZip()"]');
+        const origLabel = dlBtn ? dlBtn.textContent : '';
+        if (dlBtn) dlBtn.textContent = '⏳ Building ZIP…';
+
+        zip.generateAsync({ type: "blob" })
+            .then(blob => {
+                const filename = (org || 'AppSuite').replace(/[^a-z0-9_\-]/gi, '_') + '_AppSuite.zip';
+                const url = URL.createObjectURL(blob);
+
+                // Anchor MUST be in the DOM for the click to trigger a download
+                // reliably across Chrome, Firefox and Safari.
+                const a = document.createElement('a');
+                a.href     = url;
+                a.download = filename;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+
+                // Revoke the object URL shortly after — keeps memory clean
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    if (dlBtn) dlBtn.textContent = origLabel;
+                }, 500);
+            })
+            .catch(err => {
+                if (dlBtn) dlBtn.textContent = origLabel;
+                console.error('ZIP generation failed:', err);
+                alert('❌ Download failed: ' + (err.message || err));
+            });
     }
 
    // NEW: Logic to sync the UI Mockup with user inputs
@@ -981,4 +1039,3 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
-
