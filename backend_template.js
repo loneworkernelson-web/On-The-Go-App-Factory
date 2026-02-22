@@ -1,10 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND %%BACKEND_VERSION%%
+ * OTG APPSUITE - MASTER BACKEND v79.35
  * FIXED: SOS Map URLs, SMS Payloads, and GAS Environment Stability
  */
 
 const CONFIG = {
-  VERSION: "%%BACKEND_VERSION%%", // Injected by Factory at build time
+  VERSION: "v79.35", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -12,7 +12,7 @@ const CONFIG = {
   TEXTBELT_API_KEY: "%%TEXTBELT_API_KEY%%",
   PHOTOS_FOLDER_ID: "%%PHOTOS_FOLDER_ID%%", 
   REPORT_TEMPLATE_ID: "",   
-  ORG_NAME: "%%ORG_NAME%%",
+  ORG_NAME: "%%ORGANISATION_NAME%%",
   TIMEZONE: "%%TIMEZONE%%", 
   ARCHIVE_DAYS: 30,
   ESCALATION_MINUTES: %%ESCALATION_MINUTES%%,
@@ -564,26 +564,23 @@ function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
         if (sigBlob) inlineImages['signature'] = sigBlob;
     }
 
-    // Visit Location Intelligence Block
-    // Only show map link when GPS contains a real, parseable coordinate pair
-    // (not "0,0", "0.0,0.0", missing, or "Not available")
-let mapHtml = "";
-    const rawGps = (p['Last Known GPS'] || '').toString().trim();
+    // GPS map link — validate before using (no 0,0, no near-zero noise)
+    let mapHtml = "";
+    const rawGps  = (p['Last Known GPS'] || '').toString().trim();
     const gpsParts = rawGps.split(',');
-    const gpsLat  = parseFloat(gpsParts[0]);
-    const gpsLng  = parseFloat(gpsParts[1]);
+    const gpsLat   = parseFloat(gpsParts[0]);
+    const gpsLng   = parseFloat(gpsParts[1]);
     const hasValidGps = gpsParts.length === 2
         && !isNaN(gpsLat) && !isNaN(gpsLng)
-        && Math.abs(gpsLat) > 0.001   // excludes 0,0 and near-zero noise
+        && Math.abs(gpsLat) > 0.001
         && Math.abs(gpsLng) > 0.001
         && Math.abs(gpsLat) <= 90
         && Math.abs(gpsLng) <= 180;
-
     if (hasValidGps) {
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawGps)}`;
         mapHtml = `
         <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-radius:8px; border:1px solid #cfe2ff; text-align:center;">
-            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location</p>
+            <p style="margin:0 0 10px 0; font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">📍 Visit Location Intelligence</p>
             <a href="${mapUrl}" style="display:inline-block; padding:12px 24px; background:#1e40af; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">View Location on Google Maps</a>
         </div>`;
     }
@@ -601,12 +598,11 @@ let mapHtml = "";
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
             <tbody>`;
         
-    // Skip fields that are rendered separately (signature image, GPS map block)
-    // and skip data-URI blobs that would bloat the table row
+    // Skip fields rendered separately (signature, GPS) and raw data-URI blobs
     const skipKeys = new Set(['Signature', 'GPS', 'Last Known GPS', 'Photo 1', 'Photo 2', 'Photo 3', 'Photo 4']);
     for (const [key, value] of Object.entries(reportObj)) {
         if (skipKeys.has(key)) continue;
-        if (typeof value === 'string' && value.startsWith('data:')) continue; // raw blob
+        if (typeof value === 'string' && value.startsWith('data:')) continue;
         html += `<tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:8px 0;font-size:13px;color:#6b7280;width:40%;">${key}</td><td style="padding:8px 0;font-size:13px;font-weight:600;color:#111827;">${value}</td></tr>`;
     }
     
@@ -688,205 +684,49 @@ function _cleanPhone(num) {
 }
 
 /**
- * HELPER: Convert internal status codes to plain-English descriptions for alert emails.
- */
-function _humanizeStatus(status) {
-    const s = (status || '').toUpperCase();
-    if (s.includes('CRITICAL TIMING'))
-        return 'This worker did not return from a visit they had flagged as high-risk, and their check-in deadline has now passed.';
-    if (s.includes('60MIN') || (s.includes('EMERGENCY') && s.includes('BREACH')))
-        return 'This worker is now 60 minutes overdue. They have not responded to any check-in requests. This requires urgent action.';
-    if (s.includes('45MIN'))
-        return 'This worker is now 45 minutes overdue and has not confirmed they are safe.';
-    if (s.includes('30MIN'))
-        return 'This worker is now 30 minutes overdue and has not confirmed they are safe.';
-    if (s.includes('15MIN'))
-        return 'This worker is now 15 minutes overdue and has not confirmed they are safe.';
-    if (s.includes('PANIC'))
-        return 'This worker has activated the PANIC alert on their safety app. This indicates they may be in immediate danger.';
-    if (s.includes('DURESS'))
-        return 'This worker has activated a DURESS signal. This may mean they are under threat and unable to speak freely. Please treat this as a real emergency.';
-    if (s.includes('SOS') || s.includes('EMERGENCY'))
-        return 'This worker has triggered an emergency SOS alert from their safety app.';
-    return 'The worker\'s safety status has been flagged as requiring attention: ' + status;
-}
-
-/**
- * HELPER: Build a personalised plain-text alert email body for one recipient.
- */
-function _buildAlertEmailBody(p, recipientName, recipientRole, gpsLink, hasGps) {
-    const workerName      = p['Worker Name']        || 'Unknown worker';
-    const status          = p['Alarm Status']        || '';
-    const locationName    = p['Location Name']       || 'Unknown location';
-    const locationAddress = p['Location Address']    || '';
-    const companyName     = p['Company Name']        || '';
-    const org             = CONFIG.ORG_NAME           || 'Your organisation';
-    const timestamp       = new Date().toLocaleString();
-    const statusDesc      = _humanizeStatus(status);
-    const divider         = '='.repeat(55);
-    const hairline        = '-'.repeat(55);
-
-    // FIX: Restore leading zero stripped by Google Sheets numeric cell formatting.
-    // NZ/AU local numbers are stored as e.g. 211234567 (9 digits) — restore the '0' prefix.
-    // Also handles numbers already correctly formatted (10 digits starting with 0).
-    const rawPhone = (p['Worker Phone Number'] || '').toString().trim();
-    let workerPhone;
-    if (!rawPhone || rawPhone === '0') {
-        workerPhone = 'Not on record';
-    } else if (/^[2-9]\d{7,8}$/.test(rawPhone)) {
-        // Looks like a local NZ/AU mobile with leading zero stripped by Sheets
-        workerPhone = '0' + rawPhone;
-    } else {
-        workerPhone = rawPhone;
-    }
-
-    // FIX: Battery display — strip any stray '%' already in the value before appending,
-    // then clamp to a plausible range so a browser misreporting 1% doesn't cause alarm.
-    const battRaw  = (p['Battery Level'] || '').toString().replace(/%/g, '').trim();
-    const battNum  = parseInt(battRaw, 10);
-    const battery  = (!isNaN(battNum) && battNum >= 1 && battNum <= 100)
-        ? battNum + '%'
-        : 'Unknown';
-
-    // Build location block
-    let locationLines = '  Site:     ' + locationName;
-    if (companyName)     locationLines += '\n  Company:  ' + companyName;
-    if (locationAddress) locationLines += '\n  Address:  ' + locationAddress;
-
-    // GPS line
-    const gpsLine = hasGps
-        ? '  GPS link: ' + gpsLink
-        : '  GPS:      Not available — please use the address above to locate the worker.';
-
-    return (
-        'SAFETY ALERT — ' + org + '\n' +
-        divider + '\n\n' +
-        'Dear ' + recipientName + ',\n\n' +
-        'You are receiving this message because you are listed as ' + workerName + '\'s ' + recipientRole + '.\n\n' +
-        'WHAT HAS HAPPENED\n' +
-        statusDesc + '\n' +
-        (p['Notes'] && !p['Notes'].includes('Automated') ? '  Note: ' + p['Notes'] + '\n' : '') + '\n' +
-        'WORKER DETAILS\n' +
-        '  Name:     ' + workerName + '\n' +
-        '  Phone:    ' + workerPhone + '\n\n' +
-        'LAST KNOWN LOCATION\n' +
-        locationLines + '\n' +
-        gpsLine + '\n\n' +
-        'WHAT YOU SHOULD DO NOW\n' +
-        '  1. Try to call or text ' + workerName + ' on ' + workerPhone + '\n' +
-        '  2. If you cannot reach them within a few minutes please contact someone at the\n' +
-        '     site and ask them to check on their safety, or seek help another way.\n' +
-        '  3. If you believe they are in danger, contact emergency services (111)\n' +
-        '  4. Once contact is made, please remind them to resolve the alert using their\n' +
-        '     app, or call their Safety Manager\n\n' +
-        'PLEASE NOTE\n' +
-        '  Before escalating to police, consider that the worker may:\n' +
-        '  - Be out of mobile data coverage (the app requires data to send updates)\n' +
-        '  - Have closed or lost their safety app, triggering a false alert\n' +
-        '  - Have a flat battery or be in a low-signal area\n' +
-        '  Try calling, texting, and other contact methods first.\n\n' +
-        'ALERT DETAILS\n' +
-        '  Status:   ' + status + '\n' +
-        '  Battery:  ' + battery + '\n' +
-        '  Sent at:  ' + timestamp + '\n\n' +
-        hairline + '\n' +
-        'This alert was sent automatically by the ' + org + ' Safety System.\n' +
-        'Please do not reply to this email.'
-    );
-}
-
-/**
  * RE-ENGINEERED: High-Urgency Alert Router
- * Now sends personalised emails to each contact individually and includes
- * full location, company, address, worker phone, and a clear call to action.
- * Fixes: GPS URL bug, 0,0 coordinates treated as no GPS, dual-contact personalisation.
+ * Fixes: GPS Variable injection and Dual-Contact SMS Routing.
  */
 function triggerAlerts(p, type) {
-    // If company/address not in payload (e.g. direct worker SOS), look it up from Sites
-    if (!p['Company Name'] && p['Location Name']) {
-        try {
-            const ss = SpreadsheetApp.getActiveSpreadsheet();
-            const sitesSheet = ss.getSheetByName('Sites');
-            if (sitesSheet) {
-                const sitesData = sitesSheet.getDataRange().getValues();
-                for (let i = 1; i < sitesData.length; i++) {
-                    if (sitesData[i][3] === p['Location Name']) {
-                        p['Company Name'] = sitesData[i][2] || '';
-                        if (!p['Location Address']) p['Location Address'] = sitesData[i][4] || '';
-                        break;
-                    }
-                }
-            }
-        } catch(e) { console.warn('Sites lookup in triggerAlerts failed: ' + e.toString()); }
+    // FIXED: Added missing $ for template literal variable injection
+    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
+    
+    // DEFAULT CONTENT
+    let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
+    let body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
+
+    // SPECIAL CASE: CRITICAL TIMING MODE
+    if (p['Alarm Status'].includes("CRITICAL TIMING")) {
+        subject = `🚨 URGENT: CRITICAL SAFETY BREACH - ${p['Worker Name']}`;
+        body = `⚠️ URGENT SAFETY ALERT (CRITICAL TIMING MODE)\n\n` +
+               `The worker, ${p['Worker Name']}, is now OVERDUE from a visit they self-identified as high-risk.\n\n` +
+               `In this mode, 15 minutes is considered mission-critical. Please attempt to make contact with the worker IMMEDIATELY.\n\n` +
+               `Location: ${p['Location Name']}\n` +
+               `Last Known GPS: ${gpsLink}\n` +
+               `Device Battery: ${p['Battery Level']}`;
     }
-
-    // Build GPS link — treat missing or 0,0 coordinates as no GPS
-    const gpsRaw = (p['Last Known GPS'] || '').toString().trim();
-    const hasGps = gpsRaw.length > 3 && !gpsRaw.startsWith('0,0') && !gpsRaw.startsWith('0.0,0.0');
-    const gpsLink = hasGps
-        ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(gpsRaw)
-        : null;
-
-    const workerName = p['Worker Name'] || 'Unknown';
-    const status = p['Alarm Status'] || '';
-
-    // Build subject line
-    let subject;
-    if (type === 'IMMEDIATE' && status.includes('PANIC'))
-        subject = '🚨 PANIC ALERT: ' + workerName + ' may be in immediate danger';
-    else if (type === 'IMMEDIATE' && status.includes('DURESS'))
-        subject = '🚨 DURESS ALERT: ' + workerName + ' has triggered a silent distress signal';
-    else if (type === 'IMMEDIATE')
-        subject = '🚨 EMERGENCY SOS: ' + workerName + ' has triggered a safety alarm';
-    else if (type === 'CRITICAL ESCALATION')
-        subject = '🚨 CRITICAL: ' + workerName + ' is now 60 minutes overdue — urgent action required';
-    else
-        subject = '⚠️ Safety Alert: ' + workerName + ' is overdue — please make contact';
-
-    // Send a personalised email to each contact
-    const contacts = [
-        {
-            name:  p['Emergency Contact Name']   || 'Emergency Contact',
-            email: p['Emergency Contact Email'],
-            role:  'Emergency Contact'
-        },
-        {
-            name:  p['Escalation Contact Name']   || 'Escalation Contact',
-            email: p['Escalation Contact Email'],
-            role:  'Escalation Contact'
-        }
-    ];
-
-    contacts.forEach(function(contact) {
-        if (!contact.email || !contact.email.includes('@')) return;
-        const body = _buildAlertEmailBody(p, contact.name, contact.role, gpsLink, hasGps);
-        try {
-            MailApp.sendEmail({ to: contact.email, subject: subject, body: body });
-        } catch(e) { console.error('Alert email failed to ' + contact.email + ': ' + e.toString()); }
-    });
-
-    // SMS: brief, actionable message to all contacts with valid numbers
-    if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const _rawSmsPhone = (p['Worker Phone Number'] || '').toString().trim();
-        const workerPhone = /^[2-9]\d{7,8}$/.test(_rawSmsPhone) ? '0' + _rawSmsPhone : (_rawSmsPhone || 'see records');
-        const locationShort = (p['Company Name'] ? p['Company Name'] + ', ' : '') + (p['Location Name'] || '');
-        const smsBody = subject + '\n' +
-            'Call ' + workerName + ' on ' + workerPhone + '. ' +
-            'Location: ' + locationShort + '.' +
-            (hasGps ? ' GPS: ' + gpsLink : '');
-
+    
+    // EMAIL ROUTING: Filter valid addresses and join for multi-recipient delivery
+    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
+    if(emails.length > 0) { 
+        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
+    }
+    
+    // SMS ROUTING: Sent immediately to all active contacts in the payload
+    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
+        // Ensure we capture both phone keys used in the worker app
         const numbers = [
-            p['Emergency Contact Number'] || p['Emergency Contact Phone'],
+            p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
             p['Escalation Contact Number'] || p['Escalation Contact Phone']
-        ].map(function(n) { return _cleanPhone(n); }).filter(function(n) { return n; });
-
-        numbers.forEach(function(num) {
+        ].map(n => _cleanPhone(n)).filter(n => n);
+        
+        numbers.forEach(num => { 
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
-                    method: 'post',
-                    payload: { phone: num, message: smsBody, key: CONFIG.TEXTBELT_API_KEY }
-                });
-            } catch(e) { console.error('SMS failed to ' + num + ': ' + e.toString()); }
+                    'method': 'post',
+                    'payload': { 'phone': num, 'message': `${subject}\nGPS: ${gpsLink}`, 'key': CONFIG.TEXTBELT_API_KEY }
+                }); 
+            } catch(e) { console.error("SMS Failed: " + e.toString()); }
         });
     }
 }
@@ -920,7 +760,7 @@ function checkOverdueVisits() {
             const entry = latest[worker].rowData;
             const status = String(entry[10]); 
             const dueTimeStr = entry[20]; 
-            const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY") || status.includes("USER_SAFE");
+            const isClosed = status.includes("DEPARTED") || status.includes("COMPLETED") || status.includes("DATA_ENTRY_ONLY");
             
             if(!isClosed && dueTimeStr) {
                 const due = new Date(dueTimeStr);
@@ -1258,30 +1098,28 @@ function getSyncData(workerName, deviceId) {
     return {sites, forms, cachedTemplates, meta, version: CONFIG.VERSION};
 }
 /**
- * ISSUE 4 FIX: Handle broadcast messages from Monitor App
+ * FIX: Handle broadcast messages from Monitor App.
  * Writes a new row to the Notices sheet so every worker receives it on next sync.
- * Columns: [0]=date [1]=id [2]=priority [3]=title [4]=content [5]=sender [6]=status [7]=target [8]=ackedBy
  */
 function handleBroadcast(p) {
     try {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         let sheet = ss.getSheetByName('Notices');
         if (!sheet) {
-            // Create the Notices sheet if it doesn't exist yet
             sheet = ss.insertSheet('Notices');
             sheet.appendRow(['Date', 'ID', 'Priority', 'Title', 'Content', 'Sender', 'Status', 'Target', 'Acknowledged By']);
         }
         const id  = 'BC-' + Date.now().toString(36).toUpperCase();
         const row = [
-            new Date(),                         // [0] Date
-            id,                                 // [1] ID (unique, used for ack dedup)
-            p.priority  || 'Standard',          // [2] Priority
-            'Broadcast from HQ',               // [3] Title
-            p.message   || '',                  // [4] Content
-            p.source    || 'Monitor',           // [5] Sender
-            'Active',                           // [6] Status — workers receive until expired
-            'ALL',                              // [7] Target — all workers
-            ''                                  // [8] Acknowledged By
+            new Date(),
+            id,
+            p.priority  || 'Standard',
+            'Broadcast from HQ',
+            p.message   || '',
+            p.source    || 'Monitor',
+            'Active',
+            'ALL',
+            ''
         ];
         sheet.appendRow(row);
         return { status: 'success', id: id };
@@ -1369,185 +1207,93 @@ function handleNoticeAck(p) {
 }
 
 /**
- * SECURITY COMPONENT: Device Identity Binding
- *
- * Flow:
- *   1. Worker name must exist in the Staff tab — otherwise deny.
- *   2. If column E is empty → this is a first registration → write the ID and confirm.
- *   3. If column E already has an ID that MATCHES → confirm (app re-registering after reinstall
- *      on the same device).
- *   4. If column E already has a DIFFERENT ID → deny. The worker is already bound to
- *      another device. An admin must clear column E to allow a new device.
- */
-function handleRegisterDevice(p) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Staff');
-  if (!sheet) return { status: "error", message: "Staff sheet missing" };
-  const data = sheet.getDataRange().getValues();
-  const workerName = (p['Worker Name'] || "").trim();
-  const deviceId   = (p.deviceId || "").trim();
-  if (!workerName) return { status: "error", message: "Worker name missing" };
-  if (!deviceId)   return { status: "error", message: "Device ID missing" };
-  for (let i = 1; i < data.length; i++) {
-    if ((data[i][0] || "").toString().trim() === workerName) {
-      const registeredId = (data[i][4] || "").toString().trim(); // Column E
-      // CASE A: No device registered yet — bind this device
-      if (!registeredId) {
-        sheet.getRange(i + 1, 5).setValue(deviceId);
-        console.log(`Device registered: ${workerName} → ${deviceId}`);
-        return { status: "success", message: "Device registered for " + workerName };
-      }
-      // CASE B: Same device re-registering (e.g. app reinstalled, same phone)
-      if (registeredId === deviceId) {
-        return { status: "success", message: "Device already registered for " + workerName };
-      }
-      // CASE C: Different device — deny
-      console.warn(`Device conflict: ${workerName} tried to register ${deviceId} but ${registeredId} is bound`);
-      return {
-        status: "device_denied",
-        message: "This worker account is already bound to a different device. Contact your administrator."
-      };
-    }
-  }
-  return { status: "error", message: "Worker '" + workerName + "' not found in Staff list" };
-}
-
-/**
  * HELPER: Unified Escalation Handler
  * Logic: Appends row and routes to Primary (isDual=false) or Both (isDual=true).
- * IMPROVED: Now includes worker phone, company name, full address in payload.
  */
 function triggerEscalation(sheet, entry, newStatus, isDual) {
     const newRow = [...entry];
     newRow[0] = new Date().toISOString(); 
     newRow[10] = newStatus; 
-    newRow[11] = entry[11] + ' [AUTO-' + newStatus + ']';
+    newRow[11] = entry[11] + ` [AUTO-${newStatus}]`;
     sheet.appendRow(newRow);
 
-    // Look up company name and confirm address from Sites sheet using Location Name
-    let companyName = '';
-    let locationAddress = entry[13] || '';
-    try {
-        const ss = SpreadsheetApp.getActiveSpreadsheet();
-        const sitesSheet = ss.getSheetByName('Sites');
-        if (sitesSheet) {
-            const sitesData = sitesSheet.getDataRange().getValues();
-            for (let i = 1; i < sitesData.length; i++) {
-                if (sitesData[i][3] === entry[12]) { // Match on Site Name (col index 3)
-                    companyName = sitesData[i][2] || '';
-                    if (!locationAddress) locationAddress = sitesData[i][4] || '';
-                    break;
-                }
-            }
-        }
-    } catch(e) { console.warn('Company lookup failed: ' + e.toString()); }
-
     const payload = {
-        'Worker Name':               entry[2],
-        'Worker Phone Number':       entry[3],
-        'Alarm Status':              newStatus,
-        'Location Name':             entry[12],
-        'Location Address':          locationAddress,
-        'Company Name':              companyName,
-        'Notes':                     entry[11] || '',
-        'Last Known GPS':            entry[14],
-        'Battery Level':             entry[16],
-        'Emergency Contact Name':    entry[4],
-        'Emergency Contact Email':   entry[6],
-        'Emergency Contact Number':  entry[5],
-        'Escalation Contact Name':   isDual ? entry[7] : '',
-        'Escalation Contact Email':  isDual ? entry[9] : '',
-        'Escalation Contact Number': isDual ? entry[8] : ''
+        'Worker Name': entry[2],
+        'Alarm Status': newStatus,
+        'Location Name': entry[12],
+        'Notes': `Alert: Worker is ${newStatus}.`,
+        'Last Known GPS': entry[14],
+        'Battery Level': entry[16],
+        'Emergency Contact Email': entry[6],
+        'Emergency Contact Number': entry[5], // Map frontend 'Phone' to backend 'Number'
+        'Escalation Contact Email': isDual ? entry[9] : "",
+        'Escalation Contact Number': isDual ? entry[8] : ""
     };
     triggerAlerts(payload, isDual ? "CRITICAL ESCALATION" : "OVERDUE WARNING");
 }
 
 /**
- * IMPROVED: handleSafetyResolution
- * Logic: Sends personalised "All Clear" messages to each contact individually.
+ * NEW: handleSafetyResolution
+ * Logic: Notifies both contacts that the emergency has ended.
  */
 function handleSafetyResolution(p) {
     // 1. Update the Visit Record for the audit trail
     handleWorkerPost(p);
 
-    const workerName      = p['Worker Name']         || 'Unknown worker';
-    const locationName    = p['Location Name']        || 'Unknown location';
-    const locationAddress = p['Location Address']     || '';
-    const companyName     = p['Company Name']         || '';
-    const workerPhone     = p['Worker Phone Number']  || 'Not on record';
-    const org             = CONFIG.ORG_NAME            || 'Your organisation';
-    const timestamp       = new Date().toLocaleString();
-    const divider         = '='.repeat(55);
-    const hairline        = '-'.repeat(55);
-
-    // Detect how the original alert was triggered for the all-clear context
-    const originalNotes = (p['Notes'] || '').toLowerCase();
-    const triggeredByShake = originalNotes.includes('shake');
-    const triggerMethod = triggeredByShake ? 'Shake to Alert (covert)' : 'Manual safety action';
-
-    const subject = '✅ ALL CLEAR: ' + workerName + ' is safe — ' + org;
-
-    // Build location block
-    let locationLines = '  Site:    ' + locationName;
-    if (companyName)     locationLines += '\n  Company: ' + companyName;
-    if (locationAddress) locationLines += '\n  Address: ' + locationAddress;
-
-    const contacts = [
-        {
-            name:  p['Emergency Contact Name']   || 'Emergency Contact',
-            email: p['Emergency Contact Email'],
-            role:  'Emergency Contact'
-        },
-        {
-            name:  p['Escalation Contact Name']   || 'Escalation Contact',
-            email: p['Escalation Contact Email'],
-            role:  'Escalation Contact'
+    // GUARD: Only send All Clear if an overdue/alarm alert was actually sent.
+    // If the worker resolved quickly before any alert fired, contacts never
+    // received an alert — sending All Clear would be confusing and alarming.
+    const workerNameCheck = (p['Worker Name'] || '').toString().trim();
+    let alertWasSent = false;
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sheet = ss.getSheetByName('Visits');
+        if (sheet) {
+            const data = sheet.getDataRange().getValues();
+            const alarmStatuses = ['OVERDUE', 'PANIC', 'SOS', 'DURESS', 'EMERGENCY'];
+            for (let i = data.length - 1; i > 0 && i > data.length - 200; i--) {
+                if ((data[i][2] || '').toString().trim() === workerNameCheck) {
+                    const rowStatus = (data[i][10] || '').toString().toUpperCase();
+                    if (alarmStatuses.some(s => rowStatus.includes(s))) { alertWasSent = true; break; }
+                    if (rowStatus.includes('DEPARTED') || rowStatus.includes('SAFE')) break;
+                }
+            }
         }
-    ];
+    } catch(e) { console.warn('All Clear guard: ' + e); }
 
-    // 2. Send a personalised resolution email to each contact
-    contacts.forEach(function(contact) {
-        if (!contact.email || !contact.email.includes('@')) return;
-        const body = (
-            'ALL CLEAR — ' + org + '\n' +
-            divider + '\n\n' +
-            'Dear ' + contact.name + ',\n\n' +
-            'Good news. ' + workerName + ' has confirmed they are safe.\n\n' +
-            'RESOLUTION DETAILS\n' +
-            '  Worker:      ' + workerName + '\n' +
-            '  Phone:       ' + workerPhone + '\n' +
-            locationLines + '\n' +
-            '  Triggered by: ' + triggerMethod + '\n' +
-            '  Resolved:    ' + timestamp + '\n\n' +
-            'No further action is required from you.\n' +
-            'If you have already contacted emergency services, please let them know the worker is safe.\n\n' +
-            'PLEASE NOTE\n' +
-            'You may receive additional automated alert emails sent before this resolution\n' +
-            'was processed. Please disregard any alerts timestamped before this message.\n\n' +
-            hairline + '\n' +
-            'Thank you for being a safety contact for ' + org + '.\n' +
-            'This message was sent automatically by the ' + org + ' Safety System.'
-        );
-        try {
-            MailApp.sendEmail({ to: contact.email, subject: subject, body: body });
-        } catch(e) { console.error('Resolution email failed: ' + e.toString()); }
-    });
+    if (!alertWasSent) {
+        console.log('All Clear suppressed — no alarm was sent for ' + workerNameCheck);
+        return { status: 'success', allClearSuppressed: true };
+    }
 
-    // 3. SMS resolution message
-    if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        const smsMsg = 'ALL CLEAR: ' + workerName + ' is safe and has checked in. No further action needed. — ' + org;
+    // 2. Draft the Resolution Messages
+    const subject = `✅ ALL CLEAR: ${p['Worker Name']} is Safe`;
+    const body = `SAFETY RESOLUTION\n\n` +
+                 `The worker, ${p['Worker Name']}, has checked in and confirmed they are SAFE.\n\n` +
+                 `The previous safety alert is now resolved. No further action is required.\n\n` +
+                 `Timestamp: ${new Date().toLocaleString()}\n` +
+                 `Location: ${p['Location Name']}`;
+
+    // 3. Dual-Contact Email
+    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
+    if(emails.length > 0) { 
+        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
+    }
+    
+    // 4. Dual-Contact SMS
+    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [
-            p['Emergency Contact Number'] || p['Emergency Contact Phone'],
-            p['Escalation Contact Number'] || p['Escalation Contact Phone']
-        ].map(function(n) { return _cleanPhone(n); }).filter(function(n) { return n; });
-        numbers.forEach(function(num) {
+    p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
+    p['Escalation Contact Number'] || p['Escalation Contact Phone']
+].map(n => _cleanPhone(n)).filter(n => n);
+        numbers.forEach(num => { 
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
-                    method: 'post',
-                    payload: { phone: num, message: smsMsg, key: CONFIG.TEXTBELT_API_KEY }
-                });
+                    'method': 'post',
+                    'payload': { 'phone': num, 'message': `${subject}. Alert resolved.`, 'key': CONFIG.TEXTBELT_API_KEY }
+                }); 
             } catch(e) {}
         });
     }
-    return { status: 'success' };
+    return { status: "success" };
 }
