@@ -1114,9 +1114,12 @@ let travellingInterval;
 let deferredPrompt;
 let lastAlertTime = 0;
 let lastGPS = null;
+let lastGPSCoords = null;       // Raw {lat, lng} of previous fix — used for Haversine distance calc
+let gpsCurrentIntervalMs = 0;   // Live adaptive poll interval — set by startGPSMonitoring()
+let gpsTrail = [];              // Breadcrumb trail [{lat, lng}] for the current travel session
 let synth; // Tone.js synth - initialized after user interaction
 let audioReady = false;
-let gpsWatchId = null; // Track GPS watch for cleanup
+let gpsWatchId = null; // Holds setTimeout ID (or -1 sentinel) when GPS monitoring is active; null when stopped
 
 // PHASE 1 ADDITIONS
 let isMidVisitUpdate = false; // Track if we're updating mid-visit vs ending
@@ -1609,49 +1612,112 @@ if (wakeButton) {
 // ============================================================================
 // GPS MONITORING
 // ============================================================================
-// GPS_POLL_INTERVAL_MS: how often to request a fresh fix during travel/alarm.
-// watchPosition with enableHighAccuracy keeps the GPS chip powered continuously.
-// A timed poll lets the chip sleep between readings — same accuracy, ~70% less
-// GPS battery drain. 5 minutes matches the travelling pulse interval.
-const GPS_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Adaptive timed polling replaces watchPosition to let the GPS chip sleep
+// between readings (~70% battery saving).
+//
+// Interval adapts after every successful fix based on movement since the last:
+//   < 200 m  → worker is stationary/slow  → back off  (double, max 10 min)
+//   > 500 m  → worker is moving           → poll more  (halve,  min  2 min)
+//   200–500m → normal travel pace         → hold current interval
+//
+// On the first fix there is no previous position, so the default 5 min is used.
+
+const GPS_MIN_INTERVAL_MS     = 2  * 60 * 1000; //  2 minutes — fast movement
+const GPS_DEFAULT_INTERVAL_MS = 5  * 60 * 1000; //  5 minutes — default / first fix
+const GPS_MAX_INTERVAL_MS     = 10 * 60 * 1000; // 10 minutes — stationary
+
+/**
+ * Haversine great-circle distance between two WGS-84 coordinates.
+ * Returns distance in metres.
+ */
+function _gpsHaversineMetres(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth radius, metres
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function startGPSMonitoring() {
     if (gpsWatchId !== null) {
-        clearInterval(gpsWatchId);
+        clearTimeout(gpsWatchId);
         gpsWatchId = null;
     }
     if (!navigator.geolocation) return;
-    // Immediate fix first so we don't wait 5 minutes for the first reading
+
+    // Reset adaptive state for each new monitoring session
+    lastGPSCoords = null;
+    gpsCurrentIntervalMs = GPS_DEFAULT_INTERVAL_MS;
+
+    // -1 sentinel: non-null (monitoring is active) but not a real timer ID.
+    // The first fix is in flight; the callback will overwrite this with a
+    // real setTimeout ID. clearTimeout(-1) is a safe no-op in all browsers.
+    gpsWatchId = -1;
     _takeSingleGPSFix();
-    gpsWatchId = setInterval(_takeSingleGPSFix, GPS_POLL_INTERVAL_MS);
 }
 
 function _takeSingleGPSFix() {
     navigator.geolocation.getCurrentPosition(
         pos => {
-            lastGPS = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            lastGPS = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             updateGPSBars(pos);
+
+            // --- Adaptive interval logic ---
+            if (lastGPSCoords !== null) {
+                const dist = _gpsHaversineMetres(lastGPSCoords.lat, lastGPSCoords.lng, lat, lng);
+                if (dist < 200) {
+                    // Stationary or very slow — ease off
+                    gpsCurrentIntervalMs = Math.min(gpsCurrentIntervalMs * 2, GPS_MAX_INTERVAL_MS);
+                } else if (dist > 500) {
+                    // Actively moving — keep resolution up
+                    gpsCurrentIntervalMs = Math.max(gpsCurrentIntervalMs / 2, GPS_MIN_INTERVAL_MS);
+                }
+                // 200–500 m: pace unchanged
+            }
+            lastGPSCoords = { lat, lng };
+
+            // Record breadcrumb during an active travel session.
+            // Skip if within 50 m of the last breadcrumb — avoids inflating the
+            // trail with near-duplicate readings while the worker is stationary.
+            if (state && state.activeVisit && state.activeVisit.isTravel) {
+                const last = gpsTrail[gpsTrail.length - 1];
+                if (!last || _gpsHaversineMetres(last.lat, last.lng, lat, lng) > 50) {
+                    gpsTrail.push({ lat, lng });
+                }
+            }
+
+            // Schedule next poll — only if stopGPSMonitoring() hasn't been called
+            if (gpsWatchId !== null) {
+                gpsWatchId = setTimeout(_takeSingleGPSFix, gpsCurrentIntervalMs);
+            }
         },
         err => {
             console.warn('GPS fix failed:', err.message);
-            const bars = document.querySelectorAll('.gps-bar');
-            bars.forEach(b => {
+            document.querySelectorAll('.gps-bar').forEach(b => {
                 b.classList.remove('active-red', 'active-amber', 'active-green');
                 b.style.backgroundColor = '#374151';
             });
+            // Retry at the current interval — same outward behaviour as before
+            if (gpsWatchId !== null) {
+                gpsWatchId = setTimeout(_takeSingleGPSFix, gpsCurrentIntervalMs);
+            }
         },
         {
             enableHighAccuracy: true,
             timeout: 15000,
-            maximumAge: 60000   // Accept a fix up to 1 min old — avoids waking
-                                // the chip if a recent reading is already cached
+            maximumAge: 60000   // Accept a cached fix up to 1 min old to avoid
+                                // waking the GPS chip unnecessarily
         }
     );
 }
 
 function stopGPSMonitoring() {
     if (gpsWatchId !== null) {
-        clearInterval(gpsWatchId);
+        clearTimeout(gpsWatchId); // clearTimeout(-1) is a no-op; real IDs are cancelled
         gpsWatchId = null;
     }
 }
@@ -2165,10 +2231,19 @@ function preDepart() {
             async (pos) => {
                 const endGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
                 const startGPS = state.activeVisit.startGPS;
-                
+
+                // Seal the breadcrumb trail with the departure position.
+                // Only append if it's meaningfully different from the last breadcrumb
+                // (50 m threshold — same rule as _takeSingleGPSFix).
+                const eLat = pos.coords.latitude, eLng = pos.coords.longitude;
+                const trailLast = gpsTrail[gpsTrail.length - 1];
+                if (!trailLast || _gpsHaversineMetres(trailLast.lat, trailLast.lng, eLat, eLng) > 50) {
+                    gpsTrail.push({ lat: eLat, lng: eLng });
+                }
+
                 if (startGPS && endGPS) {
                     try {
-                        calculatedDist = await getDistance(startGPS, endGPS);
+                        calculatedDist = await getDistance(startGPS, endGPS, gpsTrail);
                     } catch (err) {
                         const dist = haversine(startGPS, endGPS);
                         calculatedDist = { km: dist.toFixed(2), type: 'crow', offline: true };
@@ -3191,7 +3266,17 @@ async function startVisit(isSkipCheck = false) {
         } catch (e) {
             console.warn('GPS signal lock deferred.');
         }
-        if (typeof startGPSMonitoring === 'function') startGPSMonitoring(); 
+        if (typeof startGPSMonitoring === 'function') {
+            // Reset breadcrumb trail for this trip and seed with the verified start position.
+            // The trail is built up by _takeSingleGPSFix() during the trip and then consumed
+            // by getDistance() at departure for more accurate waypoint-based ORS routing.
+            gpsTrail = [];
+            if (verifiedStartGPS && verifiedStartGPS !== '0,0') {
+                const [sLat, sLng] = verifiedStartGPS.split(',').map(Number);
+                if (!isNaN(sLat) && !isNaN(sLng)) gpsTrail.push({ lat: sLat, lng: sLng });
+            }
+            startGPSMonitoring();
+        }
     }
     // For regular site visits lastGPS stays as whatever it was from a prior session;
     // reset it so any later alarm GPS is clearly fresh rather than stale.
@@ -4937,24 +5022,52 @@ function haversine(p1, p2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-async function getDistance(p1, p2) {
+async function getDistance(p1, p2, trail = []) {
     if (!p1 || !p2) return { km: 0, type: 'none' };
-    
-    // Try backend API if online
+
+    // TIER 1: ORS road routing with breadcrumb waypoints — most accurate.
+    // Sends the actual intermediate positions taken during the trip so ORS
+    // snaps to the road network along the path the worker really drove.
+    if (navigator.onLine && CONFIG.url && trail.length >= 3) {
+        try {
+            const trailStr = trail.map(p => `${p.lat},${p.lng}`).join('|');
+            const url = `${CONFIG.url}?action=getDistanceWithTrail&trail=${encodeURIComponent(trailStr)}&key=${CONFIG.key}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.status === 'success' && data.km) {
+                return { km: data.km, type: 'road-trail' };
+            }
+        } catch (e) {
+            console.warn('Trail ORS failed, falling back:', e);
+        }
+
+        // TIER 2: Sum of Haversine segments along actual breadcrumbs.
+        // Less accurate than ORS (crow-flies between each reading) but still
+        // far better than a single A→B estimate for indirect journeys.
+        let totalM = 0;
+        for (let i = 1; i < trail.length; i++) {
+            totalM += _gpsHaversineMetres(trail[i-1].lat, trail[i-1].lng, trail[i].lat, trail[i].lng);
+        }
+        if (totalM > 0) {
+            return { km: (totalM / 1000).toFixed(2), type: 'trail-crow' };
+        }
+    }
+
+    // TIER 3: Standard ORS A→B road routing (no waypoints).
     if (navigator.onLine && CONFIG.url) {
         try {
             const url = `${CONFIG.url}?action=getDistance&start=${p1}&end=${p2}&key=${CONFIG.key}`;
-            const response = await fetch(url, { timeout: 5000 });
+            const response = await fetch(url);
             const data = await response.json();
-            if (data.status === "success" && data.km) {
+            if (data.status === 'success' && data.km) {
                 return { km: data.km, type: 'road' };
             }
         } catch (e) {
-            console.warn('Distance API failed, using haversine:', e);
+            console.warn('A→B ORS failed, using haversine:', e);
         }
     }
-    
-    // Fallback to haversine
+
+    // TIER 4: Haversine A→B — always available, works offline.
     const dist = haversine(p1, p2);
     return { km: dist.toFixed(2), type: 'crow' };
 }
