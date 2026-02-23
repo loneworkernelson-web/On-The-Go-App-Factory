@@ -19,7 +19,8 @@ const CONFIG = {
   ENABLE_REDACTION: %%ENABLE_REDACTION%%,
   VEHICLE_TERM: "%%VEHICLE_TERM%%",
   COUNTRY_CODE: "%%COUNTRY_PREFIX%%", 
-  LOCALE: "%%LOCALE%%"
+  LOCALE: "%%LOCALE%%",
+  HEALTH_EMAIL: "%%HEALTH_EMAIL%%"   // Optional: override recipient for daily health email. Leave blank to use script owner.
 };
 
 const sp = PropertiesService.getScriptProperties();
@@ -33,6 +34,7 @@ function onOpen() {
       .addItem('2. Run Monthly Stats', 'runMonthlyStats')
       .addItem('3. Run Travel Report', 'generateWorkerTravelReport')
       .addSeparator()
+      .addItem('Send Health Email Now', 'sendHealthEmail')
       .addItem('Force Sync Forms', 'getGlobalForms')
       .addToUi();
 }
@@ -708,8 +710,18 @@ function triggerAlerts(p, type) {
     
     // EMAIL ROUTING: Filter valid addresses and join for multi-recipient delivery
     const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if(emails.length > 0) { 
-        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
+    if (emails.length > 0) {
+        try {
+            MailApp.sendEmail({to: emails.join(','), subject: subject, body: body});
+        } catch (mailErr) {
+            console.error("ALERT EMAIL FAILED: " + mailErr.toString());
+            // Increment daily fail counter so sendHealthEmail() can report it
+            try {
+                const failCount = parseInt(sp.getProperty('DAILY_FAIL_COUNT') || '0', 10);
+                sp.setProperty('DAILY_FAIL_COUNT', String(failCount + 1));
+                sp.setProperty('LAST_FAIL_DETAIL', `${new Date().toISOString()} | Worker: ${p['Worker Name']} | ${mailErr.toString().substring(0, 200)}`);
+            } catch (propErr) { console.error("Could not write fail counter: " + propErr.toString()); }
+        }
     }
     
     // SMS ROUTING: Sent immediately to all active contacts in the payload
@@ -740,6 +752,9 @@ function triggerAlerts(p, type) {
  * Logic: Handles 15/30/45 alerts and immediate [CRITICAL_TIMING] dual-alerts.
  */
 function checkOverdueVisits() {
+    // Record successful trigger execution time for health email reporting
+    try { sp.setProperty('LAST_TRIGGER_TIME', new Date().toISOString()); } catch(e) {}
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Visits');
     if(!sheet) return;
@@ -789,6 +804,175 @@ function checkOverdueVisits() {
             }
         } catch (err) { console.error(`Escalation Error: ${err.toString()}`); }
     });
+}
+
+/**
+ * OBSERVABILITY HEALTH EMAIL
+ * Run on a daily time-based trigger (e.g. 07:00 each morning).
+ * Also available from the OTG Admin menu for manual execution.
+ *
+ * Reports:
+ *   - Visit count in the last 24 hours
+ *   - Escalation alerts dispatched in the last 24 hours
+ *   - Failed alert emails (tracked via PropertiesService DAILY_FAIL_COUNT)
+ *   - Timestamp of the last successful checkOverdueVisits() trigger run
+ *   - Any workers with an open visit older than 24 hours (likely a missed departure)
+ */
+function sendHealthEmail() {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const tz = CONFIG.TIMEZONE || 'UTC';
+    const fmtTime = d => Utilities.formatDate(new Date(d), tz, "dd MMM yyyy HH:mm z");
+
+    // --- 1. Read Visits sheet ---
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Visits');
+
+    let visitCount = 0;
+    let escalationCount = 0;
+    const stalledVisits = []; // Open visits that started > 24h ago
+
+    const ESCALATION_STATUSES = ['OVERDUE', 'EMERGENCY', 'PANIC', 'SOS', 'DURESS'];
+    const CLOSED_STATUSES     = ['DEPARTED', 'COMPLETED', 'DATA_ENTRY_ONLY', 'USER_SAFE', 'NOTICE_ACK'];
+
+    if (sheet && sheet.getLastRow() > 1) {
+        const data = sheet.getDataRange().getValues();
+        // Track the most recent row per worker to detect stalled open visits
+        const latestRowPerWorker = {};
+
+        for (let i = 1; i < data.length; i++) {
+            const row       = data[i];
+            const rowTime   = new Date(row[0]);   // col A: Timestamp
+            const worker    = String(row[2]);      // col C: Worker Name
+            const status    = String(row[10]);     // col K: Alarm Status
+
+            // Count visits and escalations in the last 24h
+            if (rowTime > oneDayAgo) {
+                visitCount++;
+                if (ESCALATION_STATUSES.some(s => status.toUpperCase().includes(s))) {
+                    escalationCount++;
+                }
+            }
+
+            // Track the latest row per worker for stall detection
+            if (!latestRowPerWorker[worker] || rowTime > latestRowPerWorker[worker].time) {
+                latestRowPerWorker[worker] = { time: rowTime, status: status, location: String(row[12]) };
+            }
+        }
+
+        // Flag workers whose latest row is open and older than 24h
+        Object.keys(latestRowPerWorker).forEach(worker => {
+            const entry = latestRowPerWorker[worker];
+            const isClosed = CLOSED_STATUSES.some(s => entry.status.toUpperCase().includes(s));
+            if (!isClosed && entry.time < oneDayAgo) {
+                stalledVisits.push({
+                    worker:   worker,
+                    since:    fmtTime(entry.time),
+                    status:   entry.status,
+                    location: entry.location
+                });
+            }
+        });
+    }
+
+    // --- 2. Read PropertiesService counters ---
+    const failCount      = parseInt(sp.getProperty('DAILY_FAIL_COUNT') || '0', 10);
+    const lastFailDetail = sp.getProperty('LAST_FAIL_DETAIL') || 'None';
+    const lastTriggerRaw = sp.getProperty('LAST_TRIGGER_TIME');
+    const lastTriggerStr = lastTriggerRaw ? fmtTime(lastTriggerRaw) : '<strong style="color:#c0392b">Never recorded — is the 1-minute trigger set up?</strong>';
+
+    // --- 3. Build HTML email ---
+    const statusColour = (val, bad) => `color:${val > 0 && bad ? '#c0392b' : val > 0 ? '#e67e22' : '#27ae60'}`;
+
+    const stalledRows = stalledVisits.length === 0
+        ? '<tr><td colspan="4" style="color:#27ae60;padding:8px 12px">None — all visits closed within 24 hours ✓</td></tr>'
+        : stalledVisits.map(v =>
+            `<tr>
+               <td style="padding:8px 12px">${v.worker}</td>
+               <td style="padding:8px 12px">${v.since}</td>
+               <td style="padding:8px 12px">${v.status}</td>
+               <td style="padding:8px 12px">${v.location}</td>
+             </tr>`
+          ).join('');
+
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;color:#1a1a1a">
+  <div style="background:#1e3a5f;padding:20px 24px;border-radius:6px 6px 0 0">
+    <h2 style="margin:0;color:#fff;font-size:18px">🛡️ OTG Daily Health Report — ${CONFIG.ORG_NAME}</h2>
+    <p style="margin:4px 0 0;color:#adc8e8;font-size:13px">Generated ${fmtTime(now)}</p>
+  </div>
+
+  <div style="background:#f4f6f9;padding:20px 24px">
+
+    <h3 style="margin:0 0 12px;font-size:15px;color:#1e3a5f">Last 24 Hours — Activity Summary</h3>
+    <table style="border-collapse:collapse;width:100%;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)">
+      <tr style="background:#e8edf3">
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Metric</th>
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Value</th>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border-top:1px solid #eee">Worker visits logged</td>
+        <td style="padding:10px 12px;border-top:1px solid #eee"><strong>${visitCount}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border-top:1px solid #eee">Escalation alerts dispatched</td>
+        <td style="padding:10px 12px;border-top:1px solid #eee"><strong style="${statusColour(escalationCount, false)}">${escalationCount}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border-top:1px solid #eee">Failed alert emails <em style="font-size:11px;color:#888">(since last report)</em></td>
+        <td style="padding:10px 12px;border-top:1px solid #eee"><strong style="${statusColour(failCount, true)}">${failCount}</strong>
+          ${failCount > 0 ? `<br><span style="font-size:11px;color:#888">Last: ${lastFailDetail}</span>` : ''}
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border-top:1px solid #eee">Escalation engine last ran</td>
+        <td style="padding:10px 12px;border-top:1px solid #eee">${lastTriggerStr}</td>
+      </tr>
+    </table>
+
+    <h3 style="margin:20px 0 12px;font-size:15px;color:#1e3a5f">Open Visits Older Than 24 Hours <em style="font-weight:normal;font-size:13px;color:#888">(likely missed departures)</em></h3>
+    <table style="border-collapse:collapse;width:100%;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)">
+      <tr style="background:#e8edf3">
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Worker</th>
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Open Since</th>
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Last Status</th>
+        <th style="text-align:left;padding:10px 12px;font-size:13px">Location</th>
+      </tr>
+      ${stalledRows}
+    </table>
+
+    ${failCount > 0 ? `
+    <div style="background:#fdf3f3;border-left:4px solid #c0392b;padding:12px 16px;margin-top:16px;border-radius:0 4px 4px 0">
+      <strong style="color:#c0392b">⚠ Alert email failures detected.</strong>
+      Check Apps Script &gt; Executions log for full stack traces.
+    </div>` : ''}
+
+    ${stalledVisits.length > 0 ? `
+    <div style="background:#fef9ec;border-left:4px solid #e67e22;padding:12px 16px;margin-top:16px;border-radius:0 4px 4px 0">
+      <strong style="color:#e67e22">⚠ ${stalledVisits.length} worker(s) have open visits older than 24 hours.</strong>
+      These may represent missed departures or a visit the worker forgot to close. Follow up manually.
+    </div>` : ''}
+
+  </div>
+  <div style="background:#e8edf3;padding:10px 24px;border-radius:0 0 6px 6px;font-size:11px;color:#888">
+    OTG AppSuite ${CONFIG.VERSION} — this report was sent by <em>sendHealthEmail()</em>. To unsubscribe, remove the daily trigger from Apps Script.
+  </div>
+</div>`;
+
+    // --- 4. Send ---
+    const recipient = (CONFIG.HEALTH_EMAIL && CONFIG.HEALTH_EMAIL.includes('@'))
+        ? CONFIG.HEALTH_EMAIL
+        : Session.getEffectiveUser().getEmail();
+
+    const subject = `${stalledVisits.length > 0 || failCount > 0 ? '⚠️' : '✅'} OTG Health Report — ${CONFIG.ORG_NAME} — ${Utilities.formatDate(now, tz, "dd MMM yyyy")}`;
+
+    MailApp.sendEmail({ to: recipient, subject: subject, htmlBody: html });
+
+    // --- 5. Reset daily fail counter now that it's been reported ---
+    sp.setProperty('DAILY_FAIL_COUNT', '0');
+    sp.deleteProperty('LAST_FAIL_DETAIL');
+
+    console.log(`Health email sent to ${recipient}. Visits: ${visitCount}, Escalations: ${escalationCount}, Fails: ${failCount}, Stalled: ${stalledVisits.length}`);
 }
 
 function getDashboardData() {
