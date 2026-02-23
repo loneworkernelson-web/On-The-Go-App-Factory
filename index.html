@@ -266,6 +266,14 @@
                 <input type="email" id="healthEmail" class="input-field py-2 text-xs font-mono font-bold" placeholder="admin@yourorg.com (optional)" oninput="saveInput(this)">
                 <p class="help-text italic leading-tight">A daily system health summary is emailed here each morning — visit counts, escalations triggered, failed alert emails, and any workers with an open visit older than 24 hours. Leave blank to send to the Google account that owns the Apps Script.</p>
             </div>
+            <div class="pt-4 border-t border-gray-700">
+                <div class="flex justify-between items-end mb-1">
+                    <label class="text-[11px] font-black text-amber-300 uppercase tracking-widest">Healthchecks.io Ping URL</label>
+                    <a href="https://healthchecks.io" target="_blank" class="link">Free signup →</a>
+                </div>
+                <input type="url" id="healthcheckUrl" class="input-field py-2 text-xs font-mono font-bold" placeholder="https://hc-ping.com/your-uuid-here (optional)" oninput="saveInput(this)">
+                <p class="help-text italic leading-tight">Dead-man's switch: the backend pings this URL after every successful escalation-engine run (~every 15 min). If it goes silent, Healthchecks.io emails you within ~35 minutes — catching silent GAS trigger failures before any worker reaches overdue status. Free tier supports up to 20 checks. Create one check, set period to 20 min and grace to 15 min, paste the ping URL here.</p>
+            </div>
         </div>
     </div>
 </div>
@@ -624,7 +632,7 @@ function applyPreset(p, a, el) {
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'healthcheckUrl', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() {
@@ -655,6 +663,7 @@ function applyPreset(p, a, el) {
             .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
             .replace(/%%LOCALE%%/g, selectedConfig.locale)
             .replace(/%%HEALTH_EMAIL%%/g, document.getElementById('healthEmail').value)
+            .replace(/%%HEALTHCHECK_URL%%/g, document.getElementById('healthcheckUrl').value)
             .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
     }
 
