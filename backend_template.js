@@ -1,10 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v80
+ * OTG APPSUITE - MASTER BACKEND v79.35
  * FIXED: SOS Map URLs, SMS Payloads, and GAS Environment Stability
  */
 
 const CONFIG = {
-  VERSION: "v80", // New diagnostic property
+  VERSION: "v79.35", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -20,7 +20,8 @@ const CONFIG = {
   VEHICLE_TERM: "%%VEHICLE_TERM%%",
   COUNTRY_CODE: "%%COUNTRY_PREFIX%%", 
   LOCALE: "%%LOCALE%%",
-  HEALTH_EMAIL: "%%HEALTH_EMAIL%%"   // Optional: override recipient for daily health email. Leave blank to use script owner.
+  HEALTH_EMAIL: "%%HEALTH_EMAIL%%",   // Optional: override recipient for daily health email. Leave blank to use script owner.
+  HEALTHCHECK_URL: "%%HEALTHCHECK_URL%%"  // Optional: Healthchecks.io ping URL. Pinged after each successful checkOverdueVisits() run.
 };
 
 const sp = PropertiesService.getScriptProperties();
@@ -783,6 +784,27 @@ function triggerAlerts(p, type) {
  * RE-ENGINEERED: Multi-Stage Escalation Engine
  * Logic: Handles 15/30/45 alerts and immediate [CRITICAL_TIMING] dual-alerts.
  */
+/**
+ * DEAD-MAN'S SWITCH PING
+ * Fires a silent HTTP GET to the Healthchecks.io check URL after every
+ * successful checkOverdueVisits() run. If Healthchecks.io doesn't receive
+ * a ping within the configured grace window (~35 min), it emails the admin
+ * to report that the escalation engine has gone silent.
+ *
+ * Skipped silently if HEALTHCHECK_URL is blank or not yet configured.
+ * All errors are caught — a failed ping must never crash the escalation engine.
+ */
+function _pingHealthcheck() {
+    const url = CONFIG.HEALTHCHECK_URL;
+    if (!url || url.includes('%%') || url.length < 10) return;
+    try {
+        UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+        console.log('Healthcheck ping sent.');
+    } catch (e) {
+        console.warn('Healthcheck ping failed (non-critical): ' + e.toString());
+    }
+}
+
 function checkOverdueVisits() {
     // Record successful trigger execution time for health email reporting
     try { sp.setProperty('LAST_TRIGGER_TIME', new Date().toISOString()); } catch(e) {}
@@ -836,6 +858,11 @@ function checkOverdueVisits() {
             }
         } catch (err) { console.error(`Escalation Error: ${err.toString()}`); }
     });
+
+    // Ping dead-man's switch — confirms the escalation engine ran to completion.
+    // Only fires here (after the loop) so a crash or early return leaves Healthchecks
+    // without a ping, which it correctly interprets as a system failure.
+    _pingHealthcheck();
 }
 
 /**
@@ -1581,5 +1608,3 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
-
-
