@@ -642,6 +642,16 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <button id="btnSafe" class="hidden long-press-btn w-full py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-xl shadow-2xl animate-pulse">
                 I Am Safe
             </button>
+
+            <!-- REDUNDANT ESCALATION: Direct mailto fallback shown when alarm fires.
+                 Completely independent of the backend — uses the device's native mail
+                 client. Visible to worker or any bystander. Hidden until alarm fires. -->
+            <button id="btnDirectAlert"
+                    class="hidden w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-black rounded-2xl shadow-2xl flex flex-col items-center justify-center"
+                    onclick="sendDirectAlert()">
+                <span class="text-base uppercase tracking-widest">📧 Send Emergency Email Direct</span>
+                <span class="text-xs font-normal opacity-80 mt-0.5">Backup — bypasses app, opens your email</span>
+            </button>
         </div>
     </div>
 </div>
@@ -2422,7 +2432,13 @@ async function triggerPanic(duress = false) {
     closeModal('resourceHub');
     
     // Switch to the Panic UI only for loud mode
-    if (!duress) renderPanicState(); 
+    if (!duress) {
+        renderPanicState();
+        // Show the direct email fallback — independent of the backend,
+        // covers the case where the GAS script fails to dispatch the alert.
+        const btnDirect = document.getElementById('btnDirectAlert');
+        if (btnDirect) btnDirect.classList.remove('hidden');
+    }
 }
 
 /**
@@ -2466,9 +2482,11 @@ function iamSafe() {
         const btnSafe = document.getElementById('btnSafe');
         const btnDepart = document.getElementById('btnDepart');
         const btnExtend = document.getElementById('btnExtend');
+        const btnDirect = document.getElementById('btnDirectAlert');
         if (btnSafe) btnSafe.classList.add('hidden');
         if (btnDepart) btnDepart.classList.remove('hidden');
         if (btnExtend) btnExtend.classList.remove('hidden');
+        if (btnDirect) btnDirect.classList.add('hidden');
         
         showToast("✅ Safety status confirmed");
     });
@@ -6232,6 +6250,79 @@ function triggerGraceExpiryAlarm() {
         overdueLabel.innerText = "ALARM ACTIVATED";
         overdueLabel.classList.add('border-white', 'text-white');
     }
+
+    // Show the direct mailto fallback button — visible to worker and any bystander.
+    const btnDirect = document.getElementById('btnDirectAlert');
+    if (btnDirect) btnDirect.classList.remove('hidden');
+}
+
+/**
+ * REDUNDANT ESCALATION — DIRECT MAILTO FALLBACK
+ * Constructs a pre-addressed, pre-filled email to all configured emergency
+ * contacts using the device's native mail client. Completely independent of
+ * the backend — works even if the GAS script has failed, quota is exhausted,
+ * or the spreadsheet is inaccessible.
+ *
+ * Called from btnDirectAlert on the alarm screen. Also accessible to any
+ * bystander who picks up the worker's phone.
+ */
+function sendDirectAlert() {
+    const w  = state?.worker || {};
+    const v  = state?.activeVisit || {};
+
+    // Gather all configured email contacts, deduplicate, drop blanks
+    const contacts = [...new Set([
+        w.emgEmail  || w.iceEmail,
+        w.escEmail  || w.ice2Email
+    ])].filter(Boolean);
+
+    if (contacts.length === 0) {
+        showToast('⚠️ No email contacts configured — add them in Settings');
+        return;
+    }
+
+    const workerName = w.name           || 'Unknown Worker';
+    const location   = v.locationName   || 'Unknown Location';
+    const address    = v.locationAddress || '';
+    const gps        = lastGPS || v.startGPS || null;
+    const alarmTime  = new Date().toLocaleString([], {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+
+    const mapsLine = (gps && gps !== '0,0')
+        ? `GPS Location:  https://maps.google.com/?q=${gps}`
+        : 'GPS Location:  Not available';
+
+    const subject = encodeURIComponent(
+        `⚠️ SAFETY ALARM — ${workerName} — ${location}`
+    );
+
+    // Keep body concise — some mail clients truncate long mailto: URIs
+    const bodyLines = [
+        `SAFETY ALARM — DIRECT DEVICE ALERT`,
+        ``,
+        `Worker:    ${workerName}`,
+        `Location:  ${location}`,
+        address ? `Address:   ${address}` : null,
+        mapsLine,
+        `Time:      ${alarmTime}`,
+        ``,
+        `This alert was sent DIRECTLY from ${workerName}'s device.`,
+        `The worker did not check in as scheduled.`,
+        ``,
+        `Please attempt contact immediately.`,
+        `If unreachable, contact emergency services and provide the location above.`,
+        ``,
+        `— OTG Lone Worker Safety`
+    ].filter(l => l !== null).join('\n');
+
+    const mailto = `mailto:${contacts.join(',')}?subject=${subject}&body=${encodeURIComponent(bodyLines)}`;
+
+    // Open native mail client
+    window.location.href = mailto;
+
+    showToast('📧 Opening email — tap Send to dispatch');
 }
 
     /**
