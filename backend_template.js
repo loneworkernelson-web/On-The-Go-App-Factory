@@ -53,7 +53,13 @@ function doGet(e) {
       if (p.action === 'getDistance' && p.start && p.end) {
           const dist = getRouteDistance(p.start, p.end);
           return sendResponse(e, { status: "success", km: dist });
-      } 
+      }
+      if (p.action === 'getDistanceWithTrail' && p.trail) {
+          const dist = getRouteDistanceWithTrail(p.trail);
+          return dist !== null
+              ? sendResponse(e, { status: 'success', km: dist, type: 'road-trail' })
+              : sendResponse(e, { status: 'error', message: 'ORS waypoint routing failed' });
+      }
       if(p.test) return (p.key === CONFIG.MASTER_KEY) ? sendResponse(e, {status:"success"}) : sendResponse(e, {status:"error"});
       if(p.key === CONFIG.MASTER_KEY && !p.action) return sendResponse(e, getDashboardData());
       if(p.action === 'sync') return (p.key === CONFIG.MASTER_KEY || p.key === CONFIG.WORKER_KEY) ? sendResponse(e, getSyncData(p.worker, p.deviceId)) : sendResponse(e, {status:"error"});
@@ -1153,6 +1159,74 @@ function getRouteDistance(start, end) {
   }
   return null;
 }
+
+/**
+ * ORS WAYPOINT ROUTING
+ * Accepts a pipe-delimited breadcrumb trail ("lat,lng|lat,lng|...") collected
+ * by the worker app during a travel session. Decimates to ≤25 points (well
+ * within the ORS free-tier limit), then POST-routes through all of them.
+ *
+ * This gives road-accurate distance along the path actually driven, rather than
+ * the theoretical A→B route that getRouteDistance() returns.
+ *
+ * ORS POST endpoint returns json.routes[0].summary.distance in metres.
+ * Note: ORS expects coordinates as [longitude, latitude] — opposite of our
+ * internal convention of "lat,lng".
+ */
+function getRouteDistanceWithTrail(trailStr) {
+    if (!CONFIG.ORS_API_KEY || CONFIG.ORS_API_KEY.length < 5) return null;
+
+    // Parse "lat,lng|lat,lng|..." into ORS-format [lng, lat] pairs
+    const points = trailStr.split('|').map(seg => {
+        const parts = seg.split(',');
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        return (!isNaN(lat) && !isNaN(lng)) ? [lng, lat] : null;
+    }).filter(Boolean);
+
+    if (points.length < 2) return null;
+
+    const coords = _decimateTrail(points, 25);
+
+    try {
+        const response = UrlFetchApp.fetch(
+            'https://api.openrouteservice.org/v2/directions/driving-car',
+            {
+                method: 'post',
+                contentType: 'application/json; charset=utf-8',
+                headers: { 'Authorization': CONFIG.ORS_API_KEY },
+                payload: JSON.stringify({ coordinates: coords }),
+                muteHttpExceptions: true
+            }
+        );
+
+        if (response.getResponseCode() === 200) {
+            const json = JSON.parse(response.getContentText());
+            const metres = json.routes[0].summary.distance;
+            return (metres / 1000).toFixed(2);
+        }
+        console.warn('ORS waypoint HTTP ' + response.getResponseCode() + ': ' + response.getContentText().substring(0, 200));
+    } catch (e) {
+        console.warn('ORS Waypoints Error: ' + e.toString());
+    }
+    return null;
+}
+
+/**
+ * Decimates a coordinate array to at most maxPoints by uniform sampling,
+ * always preserving the first and last points (trip start and end).
+ */
+function _decimateTrail(points, maxPoints) {
+    if (points.length <= maxPoints) return points;
+    const result = [points[0]];
+    const step = (points.length - 1) / (maxPoints - 1);
+    for (let i = 1; i < maxPoints - 1; i++) {
+        result.push(points[Math.round(i * step)]);
+    }
+    result.push(points[points.length - 1]);
+    return result;
+}
+
 /**
  * PRIVACY SWEEP: Automatically moves private 'Note to Self' sent emails to the trash.
  * This should be set to run on a time-based trigger (e.g., every hour).
