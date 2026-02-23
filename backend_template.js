@@ -400,6 +400,32 @@ function handleResolvePost(p) {
     handleSafetyResolution(p); 
 }
 function handleWorkerPost(p, e) {
+    // ── IDEMPOTENCY GUARD ────────────────────────────────────────────────────
+    // The IndexedDB outbox on the worker device retries failed deliveries until
+    // it receives an HTTP 200. Under no-cors mode the response is always opaque,
+    // so the outbox cannot distinguish a genuine failure from a GAS redirect —
+    // it retries conservatively. Without a dedup check a single alarm event
+    // could produce multiple spreadsheet rows.
+    //
+    // Strategy: maintain a rolling set of the last 200 seen keys in a single
+    // PropertiesService entry (JSON array, ~5 KB — well under the 9 KB limit).
+    // Keys are only present when the worker app sends them; legacy payloads
+    // without the field are passed through unchanged.
+    if (p.idempotencyKey) {
+        const IDEM_PROP = 'IDEM_KEYS_V1';
+        const seen = JSON.parse(sp.getProperty(IDEM_PROP) || '[]');
+        if (seen.includes(p.idempotencyKey)) {
+            // Duplicate delivery — silently ack without writing to the sheet.
+            console.log('Outbox dedup: discarding duplicate key ' + p.idempotencyKey);
+            return;
+        }
+        // Register the key, keep the window trimmed to 200 entries.
+        seen.push(p.idempotencyKey);
+        if (seen.length > 200) seen.splice(0, seen.length - 200);
+        sp.setProperty(IDEM_PROP, JSON.stringify(seen));
+    }
+    // ── END IDEMPOTENCY GUARD ────────────────────────────────────────────────
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
     const workerName = p['Worker Name'];
