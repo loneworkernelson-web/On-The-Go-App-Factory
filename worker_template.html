@@ -755,6 +755,36 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
         </div>
         
+        <!-- Outbox Diagnostic Panel -->
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-gray-400 mb-4">Event Outbox</h2>
+            <div class="setting-card border-gray-600">
+                <!-- Summary row -->
+                <div class="flex gap-2 mb-3">
+                    <div class="flex-1 text-center">
+                        <div class="text-xs text-gray-400 uppercase font-bold mb-1">Pending</div>
+                        <div id="outboxPending" class="text-xl font-black text-yellow-400">–</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-xs text-gray-400 uppercase font-bold mb-1">Sent</div>
+                        <div id="outboxSent" class="text-xl font-black text-green-400">–</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-xs text-gray-400 uppercase font-bold mb-1">Last Sent</div>
+                        <div id="outboxLastSent" class="text-xs font-mono text-gray-300">–</div>
+                    </div>
+                </div>
+                <!-- Recent events list -->
+                <div id="outboxHistory" class="text-xs font-mono text-gray-400 max-h-36 overflow-y-auto space-y-1 mb-3 bg-gray-900/50 rounded-lg p-2">
+                    <div class="text-gray-600 text-center py-2">Loading…</div>
+                </div>
+                <button onclick="outboxProcess(); showToast('🔄 Flushing outbox…')"
+                        class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">
+                    Flush Outbox Now
+                </button>
+            </div>
+        </div>
+
         <div class="space-y-3">
             <button onclick="saveSettings()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg">
                 💾 Save Settings
@@ -1325,7 +1355,10 @@ async function logSafety(type, message) {
     const fullPayload = buildPayload(data);
     fullPayload['action'] = 'logVisit'; // Ensure action is explicit for ingestion
 
-    processUploadQueue(fullPayload);
+    // await: ensures the IndexedDB write is confirmed durable before this
+    // async function returns. triggerPanic() awaits logSafety(), so the alarm
+    // event is on disk before any UI change is made.
+    await outboxEnqueue(fullPayload);
 }
 
 async function getBatteryPercent() {
@@ -3408,49 +3441,217 @@ return {
     };
 }
 
-/**
- * ROBUST SYNC ENGINE - GAS COMPATIBLE
- * Handles the 'opaque' responses required by Google Apps Script.
- */
-let retryDelay = 2000; // Start with 2s backoff
-let _isProcessing = false;
+// ============================================================================
+// INDEXEDDB OUTBOX ENGINE
+// ============================================================================
+// Every safety event is written to a durable IndexedDB record BEFORE any
+// network operation begins. If the device crashes or loses power mid-flight,
+// the record survives and is retried automatically on next launch.
+//
+// Sent records are permanently retained (never deleted) — the outbox doubles
+// as a device-side audit trail of every event ever dispatched.
+//
+// Each record carries a stable idempotency key that is injected into the
+// backend payload. The backend rejects duplicate rows that carry a key it has
+// already seen, so retry storms can never inflate the Visits sheet.
+// ============================================================================
 
-function processUploadQueue(d) {
-    if (d) {
-        if (state.pendingUploads.length > 100) {
-            state.pendingUploads.shift(); 
-        }
-        state.pendingUploads.push(d);
+let _outboxDbInstance  = null; // Lazy IndexedDB singleton
+let _outboxProcessing  = false;
+let _outboxRetryDelay  = 2000;
+
+/** Lazy singleton opener for the 'otg-outbox' IndexedDB database. */
+function _outboxDB() {
+    if (_outboxDbInstance) return Promise.resolve(_outboxDbInstance);
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('otg-outbox', 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('events')) {
+                const store = db.createObjectStore('events', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('status',          'status',          { unique: false });
+                store.createIndex('idempotencyKey',  'idempotencyKey',  { unique: true  });
+            }
+        };
+        req.onsuccess = e => { _outboxDbInstance = e.target.result; resolve(_outboxDbInstance); };
+        req.onerror   = e => reject(e.target.error);
+        req.onblocked = () => console.warn('Outbox: IndexedDB open blocked by another tab.');
+    });
+}
+
+/**
+ * Enqueue a safety event in the durable IndexedDB outbox, then trigger the
+ * network processor. Returns a Promise that resolves once the write is confirmed.
+ *
+ * Safe to await in safety-critical async paths (triggerPanic → logSafety).
+ * Safe to fire-and-forget everywhere else — the write still completes before
+ * any network delivery attempt regardless of whether the caller awaits.
+ */
+async function outboxEnqueue(payload) {
+    if (!payload) return;
+
+    // Build a stable, unique idempotency key.
+    // Stable across retries:  key is stored in the record and reused on every attempt.
+    // Unique across events:   millisecond timestamp + 4-char random suffix prevents
+    //                         collisions even for rapid successive events of the same type.
+    const wn   = ((payload['Worker Name'] || state?.worker?.name || 'unknown')
+                    .replace(/[^a-zA-Z0-9]/g, '').slice(0, 20));
+    const st   = ((payload['Alarm Status'] || 'LOG')
+                    .replace(/[^A-Z0-9_\- ]/g, '').replace(/\s+/g, '_').slice(0, 30));
+    const rand = Math.random().toString(36).slice(2, 6);
+    const idempotencyKey = `${wn}:${st}:${Date.now()}:${rand}`;
+
+    const record = {
+        idempotencyKey,
+        payload:   { ...payload, idempotencyKey }, // key travels to backend with every attempt
+        status:    'pending',
+        createdAt: new Date().toISOString(),
+        sentAt:    null,
+        attempts:  0
+    };
+
+    try {
+        const db = await _outboxDB();
+        await new Promise((resolve, reject) => {
+            const tx  = db.transaction('events', 'readwrite');
+            const req = tx.objectStore('events').add(record);
+            req.onsuccess = resolve;
+            req.onerror   = e => reject(e.target.error);
+            tx.onerror    = e => reject(e.target.error);
+        });
+    } catch (e) {
+        // IndexedDB unavailable (private browsing on some browsers, storage quota hit).
+        // Fall back to the in-memory legacy queue so no event is silently dropped.
+        console.error('Outbox: IndexedDB write failed — falling back to legacy queue:', e);
+        _legacyEnqueue(payload);
+        return;
+    }
+
+    outboxProcess();
+}
+
+/** Find the oldest pending outbox record and attempt to deliver it. */
+async function outboxProcess() {
+    if (_outboxProcessing || !navigator.onLine) return;
+
+    let db;
+    try { db = await _outboxDB(); } catch (e) { return; }
+
+    // Cursor over the status index to find the oldest pending record.
+    const record = await new Promise(resolve => {
+        const tx  = db.transaction('events', 'readonly');
+        const req = tx.objectStore('events')
+                      .index('status')
+                      .openCursor(IDBKeyRange.only('pending'));
+        req.onsuccess = e => resolve(e.target.result?.value || null);
+        req.onerror   = () => resolve(null);
+    });
+
+    if (!record) return; // Nothing pending
+
+    _outboxProcessing = true;
+
+    const fd = new FormData();
+    for (const k in record.payload) fd.append(k, record.payload[k]);
+
+    try {
+        await fetch(CONFIG.url, { method: 'POST', body: fd, mode: 'no-cors' });
+
+        // Mark sent — keep the record permanently for the device-side audit trail.
+        await new Promise(resolve => {
+            const tx    = db.transaction('events', 'readwrite');
+            const store = tx.objectStore('events');
+            store.get(record.id).onsuccess = e => {
+                const row = e.target.result;
+                if (row) {
+                    row.status   = 'sent';
+                    row.sentAt   = new Date().toISOString();
+                    row.attempts = (row.attempts || 0) + 1;
+                    store.put(row).onsuccess = resolve;
+                } else { resolve(); }
+            };
+        });
+
+        _outboxRetryDelay = 2000;
+        _outboxProcessing = false;
+        setTimeout(outboxProcess, 500); // chain: immediately try the next pending item
+
+    } catch (e) {
+        // Network failure — increment attempt count and back off.
+        await new Promise(resolve => {
+            const tx    = db.transaction('events', 'readwrite');
+            const store = tx.objectStore('events');
+            store.get(record.id).onsuccess = e => {
+                const row = e.target.result;
+                if (row) { row.attempts = (row.attempts || 0) + 1; store.put(row).onsuccess = resolve; }
+                else { resolve(); }
+            };
+        });
+
+        console.warn(`Outbox: send failed. Retrying in ${_outboxRetryDelay / 1000}s…`);
+        _outboxProcessing  = false;
+        setTimeout(outboxProcess, _outboxRetryDelay);
+        _outboxRetryDelay  = Math.min(_outboxRetryDelay * 2, 60000);
+    }
+}
+
+/**
+ * One-time startup migration: drain any events still in the legacy localStorage
+ * pendingUploads queue into the durable IndexedDB outbox.
+ * No-op if the queue is empty (fresh installs, already-drained devices).
+ */
+async function _outboxDrainLegacy() {
+    const legacy = state?.pendingUploads;
+    if (!legacy || legacy.length === 0) return;
+    console.log(`Outbox: migrating ${legacy.length} legacy event(s) from localStorage → IndexedDB.`);
+    const items = [...legacy];
+    state.pendingUploads = [];
+    saveState();
+    for (const item of items) {
+        await outboxEnqueue(item); // sequential: preserves original event order
+    }
+}
+
+/**
+ * Minimal fallback queue for environments where IndexedDB is unavailable
+ * (e.g. iOS private browsing, storage quota exceeded).
+ * Behaviour is identical to the old processUploadQueue.
+ */
+let _legacyRetryDelay = 2000;
+let _legacyProcessing = false;
+function _legacyEnqueue(payload) {
+    if (payload) {
+        if (state.pendingUploads.length > 100) state.pendingUploads.shift();
+        state.pendingUploads.push(payload);
         saveState();
     }
-    
-    // LOCK: Prevent concurrent fetches from sending the same item twice
-    if (_isProcessing || !navigator.onLine || state.pendingUploads.length === 0) return;
-    _isProcessing = true;
+    if (_legacyProcessing || !navigator.onLine || state.pendingUploads.length === 0) return;
+    _legacyProcessing = true;
+    const item = state.pendingUploads[0];
+    const fd   = new FormData();
+    for (const k in item) fd.append(k, item[k]);
+    fetch(CONFIG.url, { method: 'POST', body: fd, mode: 'no-cors' })
+        .then(() => {
+            state.pendingUploads.shift(); saveState();
+            _legacyRetryDelay = 2000; _legacyProcessing = false;
+            if (state.pendingUploads.length > 0) setTimeout(_legacyEnqueue, 500);
+        })
+        .catch(() => {
+            _legacyProcessing = false;
+            setTimeout(_legacyEnqueue, _legacyRetryDelay);
+            _legacyRetryDelay = Math.min(_legacyRetryDelay * 2, 60000);
+        });
+}
 
-    const currentUpload = state.pendingUploads[0];
-    const fd = new FormData();
-    for (let k in currentUpload) { fd.append(k, currentUpload[k]); }
-
-    fetch(CONFIG.url, { 
-        method: 'POST', 
-        body: fd, 
-        mode: 'no-cors' 
-    }).then(() => {
-        state.pendingUploads.shift();
-        saveState();
-        retryDelay = 2000;
-        _isProcessing = false;  // UNLOCK
-        
-        if (state.pendingUploads.length > 0) {
-            setTimeout(processUploadQueue, 500);
-        }
-    }).catch(e => {
-        console.warn(`Sync deferred. Retrying in ${retryDelay/1000}s...`);
-        _isProcessing = false;  // UNLOCK on failure too
-        setTimeout(processUploadQueue, retryDelay);
-        retryDelay = Math.min(retryDelay * 2, 60000); 
-    });
+/**
+ * Backward-compatibility shim.
+ * All existing processUploadQueue(payload) call sites are automatically
+ * routed through the durable outbox. Call with no argument to trigger a
+ * flush of any pending items (e.g. from an online event handler).
+ */
+function processUploadQueue(payload) {
+    if (payload) outboxEnqueue(payload);
+    else outboxProcess();
 }
 
 /**
@@ -4086,6 +4287,18 @@ window.onload = () => {
     // Keep currentBatteryLevel accurate for all buildPayload calls
     refreshBatteryLevel();
     setInterval(refreshBatteryLevel, 60000);
+
+    // OUTBOX: Migrate any events still in the localStorage legacy queue to
+    // the durable IndexedDB store. No-op if the queue is already empty.
+    _outboxDrainLegacy();
+
+    // OUTBOX: Resume delivery of any pending events as soon as connectivity
+    // is (re)established — covers app-launch-while-offline then going online,
+    // and mid-session reconnects after a tunnel / building / dead-zone drop.
+    window.addEventListener('online', () => {
+        console.log('Network restored — flushing outbox.');
+        setTimeout(outboxProcess, 1000); // 1 s settling delay for routing to stabilise
+    });
 };
 
 // ============================================================================
@@ -4401,6 +4614,76 @@ function updateSystemInfo() {
             syncStatus.className = 'text-sm font-mono text-gray-400';
         }
     }
+
+    // Always refresh the outbox panel when settings page opens
+    updateOutboxStatus();
+}
+
+// ============================================================================
+// OUTBOX DIAGNOSTIC PANEL RENDERER
+// ============================================================================
+/**
+ * Reads the IndexedDB outbox and populates the Event Outbox panel in Settings.
+ * Called every time the settings page is opened via updateSystemInfo().
+ */
+async function updateOutboxStatus() {
+    const pendingEl   = document.getElementById('outboxPending');
+    const sentEl      = document.getElementById('outboxSent');
+    const lastSentEl  = document.getElementById('outboxLastSent');
+    const historyEl   = document.getElementById('outboxHistory');
+    if (!pendingEl || !sentEl || !lastSentEl || !historyEl) return;
+
+    let db;
+    try { db = await _outboxDB(); } catch (e) {
+        historyEl.innerHTML = '<div class="text-red-400 text-center py-2">IndexedDB unavailable</div>';
+        return;
+    }
+
+    // Read all records — most deployments will have fewer than a few hundred.
+    const allRecords = await new Promise(resolve => {
+        const tx   = db.transaction('events', 'readonly');
+        const req  = tx.objectStore('events').getAll();
+        req.onsuccess = e => resolve(e.target.result || []);
+        req.onerror   = () => resolve([]);
+    });
+
+    const pending = allRecords.filter(r => r.status === 'pending');
+    const sent    = allRecords.filter(r => r.status === 'sent');
+
+    pendingEl.textContent = pending.length;
+    pendingEl.className   = `text-xl font-black ${pending.length > 0 ? 'text-yellow-400' : 'text-green-400'}`;
+    sentEl.textContent    = sent.length;
+
+    // Most recent sent record
+    const lastSent = sent.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt))[0];
+    if (lastSent?.sentAt) {
+        const d = new Date(lastSent.sentAt);
+        lastSentEl.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                 + ' ' + d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    } else {
+        lastSentEl.textContent = 'Never';
+    }
+
+    // Build history list — show newest 15 records across both statuses
+    const recent = [...allRecords]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 15);
+
+    if (recent.length === 0) {
+        historyEl.innerHTML = '<div class="text-gray-600 text-center py-2">No events recorded yet</div>';
+        return;
+    }
+
+    historyEl.innerHTML = recent.map(r => {
+        const alarmStatus = r.payload?.['Alarm Status'] || 'LOG';
+        const ts          = r.createdAt ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '?';
+        const dot         = r.status === 'sent' ? '🟢' : '🟡';
+        const attempts    = r.attempts > 0 ? ` ×${r.attempts}` : '';
+        return `<div class="flex justify-between items-center py-0.5">
+                    <span>${dot} <span class="text-white">${alarmStatus}</span>${attempts}</span>
+                    <span class="text-gray-500">${ts}</span>
+                </div>`;
+    }).join('');
 }
 
 // ============================================================================
@@ -4686,7 +4969,9 @@ function updateOnlineStatus() {
     
     if (navigator.onLine) {
         banner.classList.add('hidden');
-        // Try to sync pending uploads
+        // Resume outbox delivery — catches any events queued while offline
+        setTimeout(outboxProcess, 500);
+        // Sync location/forms data if the legacy queue also has items
         if (state && state.pendingUploads && state.pendingUploads.length > 0) {
             setTimeout(() => forceSync(false), 1000);
         }
