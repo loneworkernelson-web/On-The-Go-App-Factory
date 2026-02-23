@@ -177,6 +177,7 @@
         </div>
         <div class="flex flex-col items-center gap-2">
             <div id="accentColorBox" class="w-14 h-14 rounded-2xl border-2 border-white/20 shadow-2xl transition-colors duration-500"></div>
+                <div id="contrastBadge" class="mt-2 w-full text-xs font-bold py-1.5 px-2 rounded-lg bg-gray-900/70 border border-gray-700 space-y-0.5 text-center"><div id="badgePrimary" class="text-gray-400">–</div><div id="badgeAccent" class="text-gray-400">–</div></div>
             <span class="text-[9px] text-gray-400 font-black uppercase tracking-widest">Accent</span>
         </div>
     </div>
@@ -447,6 +448,10 @@
     const buildTimestamp = _bd.toISOString().slice(0, 10) + '-' + _hhmm + '-' + Date.now().toString(36);
 
   window.onload = async () => {
+        _updateContrastBadge(
+            localStorage.getItem('otg_theme_primary') || '#1e40af',
+            localStorage.getItem('otg_theme_accent')  || '#3b82f6'
+        );
         document.getElementById('mainContent').classList.remove('blur-sm');
         loadPersistedData();
         if(!document.getElementById('secretKey').value) generateSecureKey('secretKey');
@@ -525,11 +530,49 @@ function triggerResample() {
         document.getElementById('paletteArea').classList.remove('hidden');
     }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WCAG CONTRAST ENGINE — live badge + token injection at download time
+// ═══════════════════════════════════════════════════════════════════════════
+function _linearise(c) {
+    c /= 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function _luminance(hex) {
+    return 0.2126 * _linearise(parseInt(hex.slice(1,3),16))
+         + 0.7152 * _linearise(parseInt(hex.slice(3,5),16))
+         + 0.0722 * _linearise(parseInt(hex.slice(5,7),16));
+}
+function contrastRatio(h1, h2) {
+    const l1 = _luminance(h1), l2 = _luminance(h2);
+    return (Math.max(l1,l2) + 0.05) / (Math.min(l1,l2) + 0.05);
+}
+function bestTextColour(bgHex) {
+    return contrastRatio(bgHex,'#ffffff') >= contrastRatio(bgHex,'#000000')
+        ? '#ffffff' : '#000000';
+}
+function contrastGrade(r) {
+    if (r >= 7)   return {label:'AAA',      cls:'text-green-400'};
+    if (r >= 4.5) return {label:'AA ✓',     cls:'text-green-300'};
+    if (r >= 3)   return {label:'AA Large', cls:'text-yellow-300'};
+    return               {label:'FAIL ✗',  cls:'text-red-400'};
+}
+function _updateContrastBadge(primary, accent) {
+    const tP = bestTextColour(primary), tA = bestTextColour(accent);
+    const rP = contrastRatio(primary,tP), rA = contrastRatio(accent,tA);
+    const gP = contrastGrade(rP), gA = contrastGrade(rA);
+    const bp = document.getElementById('badgePrimary');
+    const ba = document.getElementById('badgeAccent');
+    if (bp) bp.innerHTML = 'Primary: <span class="'+gP.cls+' font-black">'+gP.label+' '+rP.toFixed(1)+':1</span>';
+    if (ba) ba.innerHTML = 'Accent: <span class="' +gA.cls+' font-black">'+gA.label+' '+rA.toFixed(1)+':1</span>';
+}
+
 function applyPreset(p, a, el) {
     document.getElementById('primaryColorBox').style.backgroundColor = p;
     document.getElementById('accentColorBox').style.backgroundColor = a;
-    localStorage.setItem('otg_theme_primary', p); 
+    localStorage.setItem('otg_theme_primary', p);
     localStorage.setItem('otg_theme_accent', a);
+    _updateContrastBadge(p, a);
     
     // 1. Target the mockup elements
     const mockup = document.getElementById('appMockup');
@@ -729,6 +772,17 @@ function testConnection() {
         const surface    = _hex(ph, ps, Math.max(5, pl - 10));
         const [aR,aG,aB] = [parseInt(accent.slice(1,3),16), parseInt(accent.slice(3,5),16), parseInt(accent.slice(5,7),16)];
         const accentGlow = `rgba(${aR},${aG},${aB},0.30)`;
+        const textOnPrimary = bestTextColour(primary);
+        const textOnAccent  = bestTextColour(accent);
+        const _rP = contrastRatio(primary, textOnPrimary);
+        const _rA = contrastRatio(accent,  textOnAccent);
+        if (_rP < 4.5 || _rA < 4.5) {
+            const msg = ['\u26a0\ufe0f Contrast Warning', ''];
+            if (_rP < 4.5) msg.push('Primary: ' + _rP.toFixed(1) + ':1  (WCAG AA = 4.5:1)');
+            if (_rA < 4.5) msg.push('Accent: '  + _rA.toFixed(1) + ':1  (WCAG AA = 4.5:1)');
+            msg.push('', 'Text may be hard to read. Choose darker/more vivid colours.', '', 'Download anyway?');
+            if (!confirm(msg.join('\n'))) return;
+        }
 
         // FIX: Re-added all 18 missing injection handlers
         let wHtml = TEMPLATES.worker
@@ -740,6 +794,8 @@ function testConnection() {
             .replace(/%%ACCENT_COLOR%%/g, accent)
             .replace(/%%SURFACE_COLOR%%/g, surface)
             .replace(/%%ACCENT_GLOW%%/g, accentGlow)
+            .replace(/%%TEXT_ON_PRIMARY%%/g, textOnPrimary)
+            .replace(/%%TEXT_ON_ACCENT%%/g,  textOnAccent)
             .replace(/%%ORG_NAME%%/g, org)
             .replace(/%%ORGANISATION_NAME%%/g, org)
             .replace(/%%APP_NAME%%/g, appShort)
@@ -882,6 +938,8 @@ self.addEventListener('message', event => {
             .replace(/%%ACCENT_COLOR%%/g,  accent)
             .replace(/%%SURFACE_COLOR%%/g, surface)
             .replace(/%%ACCENT_GLOW%%/g,   accentGlow)
+            .replace(/%%TEXT_ON_PRIMARY%%/g, textOnPrimary)
+            .replace(/%%TEXT_ON_ACCENT%%/g,  textOnAccent)
         );
         zip.file("Code.gs", document.getElementById('codeDisplay').textContent);
         zip.file("OPERATIONS_MANUAL.html", TEMPLATES.manual
@@ -1039,3 +1097,4 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
