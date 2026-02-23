@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-  VERSION: "v79.35", // New diagnostic property
+  VERSION: "v80", // New diagnostic property
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -1581,3 +1581,4 @@ function handleSafetyResolution(p) {
     }
     return { status: "success" };
 }
+
