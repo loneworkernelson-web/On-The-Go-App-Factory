@@ -261,6 +261,11 @@
             <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Gemini AI Key (Grammar)</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Used to automatically professionalise worker reports and fix spelling.</p></div>
             <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">ORS Key (Mileage Tracking)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Required for road-accurate mileage tracking. This key is hidden from workers.</p></div>
             <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Photo Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where is this?</a></div><input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Organises all report photos into a dedicated Drive folder for the Diocese.</p></div>
+            <div class="pt-4 border-t border-gray-700">
+                <label class="text-[11px] font-black text-emerald-300 uppercase tracking-widest block mb-1">System Health Report Email</label>
+                <input type="email" id="healthEmail" class="input-field py-2 text-xs font-mono font-bold" placeholder="admin@yourorg.com (optional)" oninput="saveInput(this)">
+                <p class="help-text italic leading-tight">A daily system health summary is emailed here each morning — visit counts, escalations triggered, failed alert emails, and any workers with an open visit older than 24 hours. Leave blank to send to the Google account that owns the Apps Script.</p>
+            </div>
         </div>
     </div>
 </div>
@@ -327,6 +332,23 @@
                           <li>Type: <strong>Hour timer</strong> | <strong>Every Hour</strong>.</li>
                           <li>Click <strong>Save</strong>.</li>
                       </ol>
+                  </div>
+              </div>
+              <div class="bg-emerald-900/20 p-6 rounded-3xl border border-emerald-500/30 shadow-lg">
+                  <div class="flex items-center gap-3 mb-4">
+                      <h4 class="font-black text-emerald-300 text-xs uppercase tracking-[0.2em]">C. Daily Health Report</h4>
+                      <span class="text-[10px] font-black text-emerald-500/70 uppercase tracking-widest border border-emerald-700 rounded px-2 py-0.5">Recommended</span>
+                  </div>
+                  <p class="text-[11px] text-gray-300 font-bold italic mb-4 leading-relaxed">This trigger emails a daily summary to your nominated health report address — visit counts, escalations fired, any failed alert emails, and workers with stale open visits. It is your early-warning system for silent backend failures.</p>
+                  <ol class="list-decimal ml-5 space-y-2 text-[12px] text-white font-black uppercase tracking-tighter leading-tight">
+                      <li>Add a third trigger.</li>
+                      <li>Choose <strong>sendHealthEmail</strong>.</li>
+                      <li>Source: <strong>Time-driven</strong>.</li>
+                      <li>Type: <strong>Day timer</strong> | choose a morning hour (e.g. <strong>7am–8am</strong>).</li>
+                      <li>Click <strong>Save</strong>.</li>
+                  </ol>
+                  <div class="mt-4 bg-gray-900/60 border border-gray-700 rounded-xl p-3">
+                      <p class="text-[11px] text-gray-300 font-bold leading-relaxed">📧 <strong class="text-white">Report recipient:</strong> Set in the <em>System Health Report Email</em> field on the Config tab. If left blank, the report goes to the Google account that owns the Apps Script. You can also run this manually at any time via <strong>OTG Admin &gt; Send Health Email Now</strong>.</p>
                   </div>
               </div>
           </div>
@@ -602,7 +624,7 @@ function applyPreset(p, a, el) {
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() {
@@ -632,6 +654,7 @@ function applyPreset(p, a, el) {
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value).replace(/%%ENABLE_REDACTION%%/g, document.getElementById('chkRedaction').checked)
             .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term).replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
             .replace(/%%LOCALE%%/g, selectedConfig.locale)
+            .replace(/%%HEALTH_EMAIL%%/g, document.getElementById('healthEmail').value)
             .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
     }
 
@@ -1097,4 +1120,3 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
-
