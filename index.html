@@ -275,6 +275,14 @@
                 <input type="url" id="healthcheckUrl" class="input-field py-2 text-xs font-mono font-bold" placeholder="https://hc-ping.com/your-uuid-here (optional)" oninput="saveInput(this)">
                 <p class="help-text italic leading-tight">Dead-man's switch: the backend pings this URL after every successful escalation-engine run (~every 15 min). If it goes silent, Healthchecks.io emails you within ~35 minutes — catching silent GAS trigger failures before any worker reaches overdue status. Free tier supports up to 20 checks. Create one check, set period to 20 min and grace to 15 min, paste the ping URL here.</p>
             </div>
+            <div class="pt-4 border-t border-gray-700">
+                <div class="flex justify-between items-end mb-1">
+                    <label class="text-[11px] font-black text-teal-300 uppercase tracking-widest">ntfy Push Notification Server</label>
+                    <a href="https://ntfy.sh" target="_blank" class="link">About ntfy →</a>
+                </div>
+                <input type="url" id="ntfyServer" class="input-field py-2 text-xs font-mono font-bold" placeholder="https://ntfy.sh (default — leave blank to use hosted service)" oninput="saveInput(this)">
+                <p class="help-text italic leading-tight">Enables instant push notifications to contacts' phones the moment an alarm fires — no polling, no email delay. Leave blank to use the free hosted ntfy.sh service. For higher privacy, self-host ntfy (open source, runs in Docker) and paste your server URL here. Workers add their contacts' ntfy topic names during setup; contacts install the free ntfy app and subscribe to their topic. A subscribe link is included automatically in every test alert email.</p>
+            </div>
         </div>
     </div>
 </div>
@@ -633,7 +641,7 @@ function applyPreset(p, a, el) {
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'healthcheckUrl', 'escalationMins', 'countrySelect', 'appName'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'healthcheckUrl', 'ntfyServer', 'escalationMins', 'countrySelect', 'appName', 'checkinMins'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() {
@@ -665,6 +673,7 @@ function applyPreset(p, a, el) {
             .replace(/%%LOCALE%%/g, selectedConfig.locale)
             .replace(/%%HEALTH_EMAIL%%/g, document.getElementById('healthEmail').value)
             .replace(/%%HEALTHCHECK_URL%%/g, document.getElementById('healthcheckUrl').value)
+            .replace(/%%NTFY_SERVER%%/g, document.getElementById('ntfyServer').value || 'https://ntfy.sh')
             .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
     }
 
@@ -839,6 +848,7 @@ function testConnection() {
             .replace(/%%CHECKIN_ENABLED%%/g, document.getElementById('chkCheckin').checked)
             .replace(/%%CHECKIN_INTERVAL%%/g, document.getElementById('checkinMins').value)
             .replace(/%%ESCALATION_MINUTES%%/g, document.getElementById('escalationMins').value)
+            .replace(/%%NTFY_SERVER%%/g, document.getElementById('ntfyServer').value || 'https://ntfy.sh')
             .replace(/%%VEHICLE_ENABLED%%/g, document.getElementById('chkVehicle').checked)
             .replace(/%%VEHICLE_INTERVAL%%/g, document.getElementById('vehFreq').value)
             .replace(/%%COUNTRY_PREFIX%%/g, document.getElementById('countrySelect').value)
@@ -903,8 +913,14 @@ self.addEventListener('fetch', (event) => {
           // Never cache errors — that would permanently break offline fallback.
           if (networkResponse &&
               (networkResponse.status === 200 || networkResponse.status === 0)) {
+            // IMPORTANT: clone() must be called synchronously here, before
+            // returning networkResponse to the browser. Once the browser starts
+            // consuming the response body, clone() throws "body already used".
+            // caches.open() is async — by the time its .then() runs, the original
+            // response body is gone. Cloning now keeps a separate readable copy.
+            const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse.clone());
+              cache.put(event.request, responseToCache);
             });
           }
           return networkResponse;
@@ -1130,3 +1146,4 @@ function updateKeyCounter() {
 </script>
 </body>
 </html>
+
