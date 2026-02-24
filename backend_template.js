@@ -854,13 +854,29 @@ function triggerAlerts(p, type) {
         const ntfyServer = (CONFIG.NTFY_SERVER && !CONFIG.NTFY_SERVER.includes('%%'))
             ? CONFIG.NTFY_SERVER.replace(/\/$/, '')
             : 'https://ntfy.sh';
-        const ntfySubscribeBlock = (status.includes('TEST_ALERT') && ntfyTopic && ntfyTopic.trim())
-            ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px 20px;margin:24px 0 0">
-                 <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#1e40af">📲 Enable Instant Push Notifications</p>
-                 <p style="margin:0 0 12px;font-size:13px;color:#374151">Install the free <strong>ntfy app</strong> on your phone and tap the button below to subscribe to <strong>${workerName}'s</strong> safety alerts. You'll receive a push notification the instant an alarm fires — no need to check your email.</p>
-                 <a href="${ntfyServer}/${ntfyTopic.trim()}" style="display:inline-block;background:#1d4ed8;color:#fff;font-size:13px;font-weight:bold;padding:10px 20px;border-radius:6px;text-decoration:none">Subscribe to Push Alerts →</a>
-                 <p style="margin:10px 0 0;font-size:11px;color:#6b7280">Download ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" style="color:#2563eb">iOS App Store</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" style="color:#2563eb">Google Play</a> · <a href="https://ntfy.sh" style="color:#2563eb">Web browser</a></p>
-               </div>`
+        // Always shown in TEST_ALERT emails — this is the onboarding moment.
+        // Two states: topic already configured (show subscribe button) or not yet set up (show instructions).
+        const ntfySubscribeBlock = status.includes('TEST_ALERT')
+            ? (ntfyTopic && ntfyTopic.trim()
+                ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px 20px;margin:24px 0 0">
+                     <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#1e40af">📲 Enable Instant Push Notifications</p>
+                     <p style="margin:0 0 12px;font-size:13px;color:#374151">Install the free <strong>ntfy app</strong> on your phone and tap the button below to subscribe to <strong>${workerName}'s</strong> safety alerts. You'll receive a push notification the instant an alarm fires — no need to check your email.</p>
+                     <a href="${ntfyServer}/${ntfyTopic.trim()}" style="display:inline-block;background:#1d4ed8;color:#fff;font-size:13px;font-weight:bold;padding:10px 20px;border-radius:6px;text-decoration:none">Subscribe to Push Alerts →</a>
+                     <p style="margin:10px 0 0;font-size:11px;color:#6b7280">Download ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" style="color:#2563eb">iOS App Store</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" style="color:#2563eb">Google Play</a> · <a href="https://ntfy.sh" style="color:#2563eb">Web browser</a></p>
+                   </div>`
+                : `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:24px 0 0">
+                     <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#166534">📲 Optional: Enable Instant Push Notifications</p>
+                     <p style="margin:0 0 10px;font-size:13px;color:#374151">As well as this email, you can receive an <strong>instant push notification</strong> on your phone the moment any alarm fires — even on a locked screen, with no delay.</p>
+                     <p style="margin:0 0 10px;font-size:13px;color:#374151"><strong>To set this up:</strong></p>
+                     <ol style="margin:0 0 12px 20px;padding:0;font-size:13px;color:#374151;line-height:1.8">
+                       <li>Download the free <strong>ntfy app</strong> (links below)</li>
+                       <li>Open the app and tap <strong>Subscribe to topic</strong></li>
+                       <li>Choose a private topic name — anything memorable, e.g. <em>jane-safety-alerts</em></li>
+                       <li>Share that topic name with <strong>${workerFirst}</strong> so they can enter it in their safety app</li>
+                     </ol>
+                     <p style="margin:0 0 4px;font-size:11px;color:#6b7280">Download ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" style="color:#16a34a">iOS App Store</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" style="color:#16a34a">Google Play</a> · <a href="https://ntfy.sh" style="color:#16a34a">Web browser</a></p>
+                     <p style="margin:4px 0 0;font-size:11px;color:#6b7280">ntfy is free and open source. Topics are private — nobody can find yours unless you share the name.</p>
+                   </div>`)
             : '';
         return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
