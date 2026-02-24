@@ -443,6 +443,11 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                                    oninput="state.worker.iceEmail = this.value; saveState()" 
                                    class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-blue-500 transition-all">
                         </div>
+                        <input id="wizContactNtfy" type="text" placeholder="ntfy topic (optional — for push alerts)" 
+                               autocomplete="off" autocorrect="off" spellcheck="false"
+                               oninput="state.worker.emgNtfy = this.value; saveState()" 
+                               class="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-teal-500 transition-all font-mono">
+                        <p class="text-xs text-teal-300/70 -mt-1 leading-relaxed">Ask your contact to install the <strong>ntfy app</strong>, create a private topic, and share the topic name with you. They'll get an instant push notification when any alarm fires.</p>
                     </div>
 
                     <div class="bg-blue-900/20 border border-blue-500/20 p-4 rounded-2xl space-y-3">
@@ -468,6 +473,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                                    oninput="state.worker.ice2Email = this.value; saveState()" 
                                    class="bg-white/10 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-orange-500 transition-all">
                         </div>
+                        <input id="wizEscNtfy" type="text" placeholder="ntfy topic (optional)" 
+                               autocomplete="off" autocorrect="off" spellcheck="false"
+                               oninput="state.worker.escNtfy = this.value; saveState()" 
+                               class="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-white text-sm outline-none focus:border-teal-500 transition-all font-mono">
                     </div>
                 </div>
             </div>
@@ -619,6 +628,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 OVERDUE
             </div>
             <div id="countdownTimer" class="text-8xl font-bold font-mono text-white tracking-tighter">00:00</div>
+            <!-- GPS accuracy warning — shown only when accuracy > 100m. Tappable for explanation. -->
+            <div id="gpsAccuracyBadge"
+                 class="hidden mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-900/60 border border-amber-600/60 cursor-pointer"
+                 onclick="showToast('Poor GPS signal — location may be inaccurate. Try moving closer to a window or outdoors.')">
+                <span class="text-amber-400 text-xs">📍</span>
+                <span class="text-amber-400 text-xs font-bold uppercase tracking-widest">GPS ±<span id="gpsAccuracyValue">?</span>m</span>
+            </div>
             <p class="text-gray-400 mt-2 font-bold uppercase text-[12px] tracking-widest">
                 Scheduled Departure: <span id="lockedAnticipatedTime" class="text-blue-400"></span>
             </p>
@@ -651,6 +667,15 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                     onclick="sendDirectAlert()">
                 <span class="text-base uppercase tracking-widest">📧 Send Emergency Email Direct</span>
                 <span class="text-xs font-normal opacity-80 mt-0.5">Backup — bypasses app, opens your email</span>
+            </button>
+
+            <!-- Quick-call to ICE contact — shown alongside direct email on alarm.
+                 One tap opens native dialler pre-filled. Useful for bystanders. -->
+            <button id="btnCallICE"
+                    class="hidden w-full py-4 bg-blue-700 hover:bg-blue-600 text-white font-black rounded-2xl shadow-2xl flex flex-col items-center justify-center"
+                    onclick="callICE()">
+                <span class="text-base uppercase tracking-widest">📞 Call Emergency Contact</span>
+                <span id="btnCallICELabel" class="text-xs font-normal opacity-80 mt-0.5"></span>
             </button>
         </div>
     </div>
@@ -702,11 +727,13 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <label class="setting-label lbl-red">Primary Emergency Contact</label>
             <input id="setEmgName" type="text" class="form-input-card">
             <input id="setEmgPhone" type="tel" class="form-input-card">
-            <input id="setEmgEmail" type="email" class="form-input mb-4">
+            <input id="setEmgEmail" type="email" class="form-input-card">
+            <input id="setEmgNtfy" type="text" placeholder="ntfy topic (optional push alerts)" autocomplete="off" autocorrect="off" spellcheck="false" class="form-input mb-4 font-mono text-sm">
             <label class="setting-label lbl-gray">Escalation Contact</label>
             <input id="setEscName" type="text" class="form-input-card">
             <input id="setEscPhone" type="tel" class="form-input-card">
-            <input id="setEscEmail" type="email" class="form-input">
+            <input id="setEscEmail" type="email" class="form-input-card">
+            <input id="setEscNtfy" type="text" placeholder="ntfy topic (optional push alerts)" autocomplete="off" autocorrect="off" spellcheck="false" class="form-input font-mono text-sm">
         </div>
         <div class="mb-6">
             <h2 class="text-xl font-bold text-purple-400 mb-4">Advanced</h2>
@@ -791,6 +818,19 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <button onclick="outboxProcess(); showToast('🔄 Flushing outbox…')"
                         class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded text-xs font-bold text-white uppercase">
                     Flush Outbox Now
+                </button>
+            </div>
+        </div>
+
+        <!-- Contact Test Alert -->
+        <div class="mb-6">
+            <h2 class="text-xl font-bold text-gray-400 mb-4">Contact Verification</h2>
+            <div class="setting-card border-gray-600">
+                <p class="text-xs text-gray-300 mb-3 leading-relaxed">Send a real test alert to your configured emergency contacts to verify their email addresses are correct and alerts are being delivered.</p>
+                <div id="testAlertResult" class="hidden text-xs font-bold rounded-lg px-3 py-2 mb-3"></div>
+                <button onclick="sendTestAlert()"
+                        class="w-full bg-blue-700 hover:bg-blue-600 py-3 rounded-lg text-sm font-black text-white uppercase tracking-widest">
+                    📧 Send Test Alert to Contacts
                 </button>
             </div>
         </div>
@@ -1056,6 +1096,29 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
     </div>
 </div>
 
+<!-- WELFARE CHECK MODAL
+     Shown at CONFIG.checkinInterval-minute intervals during active visits when
+     CONFIG.checkinEnabled === true. Worker has 2 minutes to tap confirm before
+     the safety alarm fires. z-[550] sits above all normal modals but below the
+     shake/volume confirmation overlays (z-[500] is theirs — note shake is 500
+     but this is 550 so it appears on top; shake is a 5-second self-dismissing
+     state that doesn't conflict). -->
+<div id="welfareCheckModal" class="hidden fixed inset-0 z-[550] flex flex-col items-center justify-center text-center px-8"
+     style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);">
+    <div class="text-7xl mb-5">🙋</div>
+    <h1 class="text-4xl font-black text-white mb-2 uppercase tracking-widest">Are You OK?</h1>
+    <p class="text-blue-300 text-base font-bold mb-1">Periodic welfare check-in</p>
+    <p class="text-gray-400 text-sm mb-8">Alarm fires if not confirmed within:</p>
+    <div class="text-8xl font-mono font-black text-white mb-10" id="welfareCountdown">2:00</div>
+    <button onclick="confirmWelfare()"
+            class="w-full max-w-xs py-8 bg-green-500 hover:bg-green-400 text-white font-black text-2xl rounded-3xl shadow-2xl active:scale-95 transition uppercase tracking-widest border-4 border-green-300">
+        ✅ I'm OK
+    </button>
+    <p class="text-gray-500 text-xs mt-6 max-w-xs leading-relaxed">
+        If you're unable to respond, ask someone nearby to tap the button for you.
+    </p>
+</div>
+
 <!-- Volume Panic Confirmation Modal -->
 <div id="volumeConfirmModal" class="hidden fixed inset-0 z-[500] bg-orange-900/90 flex items-center justify-center">
     <div class="text-center text-white">
@@ -1137,6 +1200,9 @@ const CONFIG = {
     // Requirements — injected by Factory
     reqTravelReport: %%REQ_TRAVEL_REPORT%%,
 
+    // ntfy push notifications — injected by Factory
+    ntfyServer:     "%%NTFY_SERVER%%",
+
     // Build stamp — injected by Factory
     buildVersion:  "%%BUILD_VERSION%%"
 };
@@ -1149,7 +1215,8 @@ let formExecutionContext = null;
 let dimTimer;
 let isDimmed = false;
 const DIM_DELAY = 10000; // 10 seconds
-let checkinIntervalId;
+let welfareIntervalId  = null;  // Drives the periodic welfare check schedule
+let welfareCountdownId = null;  // Drives the 2-minute countdown within the modal
 let travellingInterval;
 // timerInt retired: tickIntervalId is the sole interval handle for tick().
 let deferredPrompt;
@@ -1505,6 +1572,7 @@ function submitReport() {
     if (typeof travelTargetName !== 'undefined') travelTargetName = ""; 
     if (tickIntervalId) { clearInterval(tickIntervalId); tickIntervalId = null; }
         if (travellingInterval) { clearInterval(travellingInterval); travellingInterval = null; }
+        stopWelfareChecks(); // dismiss any pending welfare modal and clear the schedule
         if (typeof exitLockedScreen === 'function') exitLockedScreen(); 
         
         saveState();
@@ -1792,6 +1860,20 @@ function updateGPSBars(pos) {
         bars.forEach(b => b.classList.add('active-green'));
         if (label) label.textContent = 'GPS';
     }
+
+    // GPS accuracy badge on the locked screen.
+    // Shown only when accuracy is poor (>100 m) — a fine lock stays silent.
+    // Tapping the badge shows an explanatory toast.
+    const badge     = document.getElementById('gpsAccuracyBadge');
+    const badgeVal  = document.getElementById('gpsAccuracyValue');
+    if (badge && badgeVal) {
+        if (accuracy > 100) {
+            badgeVal.textContent = Math.round(accuracy);
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
 }
 
 // Capture GPS for forms
@@ -1818,20 +1900,123 @@ function captureGPS(btn) {
 // ============================================================================
 // CHECK-IN TIMER
 // ============================================================================
-function startCheckinTimer() {
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
-    // 10s resolution — matches TICK_NORMAL, saves a redundant 1Hz callback.
-    checkinIntervalId = setInterval(() => {
-        if (state && state.activeVisit) {
-            const elapsed = Math.floor((Date.now() - state.activeVisit.startTime) / 1000);
-            const timerEl = document.getElementById('visitTimer');
-            if (timerEl) {
-                const mins = Math.floor(elapsed / 60);
-                const secs = elapsed % 60;
-                timerEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+// ============================================================================
+// WELFARE CHECK ENGINE
+// Only active when CONFIG.checkinEnabled === true (set by Factory at build time).
+// Fires a full-screen "Are You OK?" modal every CONFIG.checkinInterval minutes
+// during an active visit. Worker has 2 minutes to confirm. If the countdown
+// expires without a tap, triggerGraceExpiryAlarm() fires immediately.
+//
+// Suppressed while: alarm already active, no active visit, modal already showing.
+// Cleared on: visit end, preDepart, app unload.
+// ============================================================================
+
+/**
+ * Start the welfare check schedule for an active visit.
+ * No-op if CONFIG.checkinEnabled is false — the timer simply never starts,
+ * so deployments without the feature are completely unaffected.
+ */
+function startWelfareChecks() {
+    if (!CONFIG.checkinEnabled) return;
+    stopWelfareChecks(); // clear any stale interval first
+
+    const intervalMs = (CONFIG.checkinInterval || 60) * 60 * 1000;
+    welfareIntervalId = setInterval(() => {
+        if (!state || !state.activeVisit) return;
+        // Don't interrupt if the alarm is already active — the worker has
+        // bigger problems than a welfare check.
+        if (state.activeVisit.criticalSent || state.activeVisit.isPanic) return;
+        // Don't stack if the modal is already visible (shouldn't happen, but guard it).
+        const modal = document.getElementById('welfareCheckModal');
+        if (modal && !modal.classList.contains('hidden')) return;
+
+        _showWelfareModal();
+    }, intervalMs);
+}
+
+/** Stop the welfare check schedule and dismiss any in-progress modal. */
+function stopWelfareChecks() {
+    if (welfareIntervalId)  { clearInterval(welfareIntervalId);  welfareIntervalId  = null; }
+    _clearWelfareCountdown();
+    const modal = document.getElementById('welfareCheckModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Display the welfare check modal and start the 2-minute countdown.
+ * If the countdown reaches zero the alarm fires.
+ */
+function _showWelfareModal() {
+    const modal   = document.getElementById('welfareCheckModal');
+    const countEl = document.getElementById('welfareCountdown');
+    if (!modal) return;
+
+    // Persist the deadline so the iOS suspension catch-up can detect a missed
+    // check even if the countdown never ran while the app was backgrounded.
+    const deadline = Date.now() + 120_000; // 2 minutes
+    if (state && state.activeVisit) {
+        state.activeVisit.welfareDeadline = deadline;
+        saveState();
+    }
+
+    modal.classList.remove('hidden');
+    if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400]);
+    announce('Welfare check. Are you OK? Please tap the confirm button.');
+
+    // Countdown — ticks every second, hides modal and fires alarm at zero.
+    let remaining = 120;
+    if (countEl) countEl.textContent = '2:00';
+
+    _clearWelfareCountdown();
+    welfareCountdownId = setInterval(() => {
+        remaining--;
+        if (countEl) {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            countEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        // Announce at 30s remaining so a nearby person can help
+        if (remaining === 30) announce('Welfare check. 30 seconds remaining.');
+
+        if (remaining <= 0) {
+            _clearWelfareCountdown();
+            modal.classList.add('hidden');
+            if (state && state.activeVisit) {
+                state.activeVisit.welfareDeadline = null;
+                saveState();
+            }
+            // Missed welfare check — escalate to alarm unless one is already active.
+            // NOTE: deliberately does NOT check isSafeConfirmed so the alarm can
+            // re-fire after a worker has cleared a prior alarm via PIN but remains
+            // in an active overdue visit.
+            if (state?.activeVisit && !state.activeVisit.criticalSent) {
+                console.warn('Welfare check timed out — triggering alarm');
+                triggerGraceExpiryAlarm();
             }
         }
-    }, 10000);
+    }, 1000);
+}
+
+/** Worker (or bystander) tapped "I'm OK". Log it and reset. */
+function confirmWelfare() {
+    _clearWelfareCountdown();
+    const modal = document.getElementById('welfareCheckModal');
+    if (modal) modal.classList.add('hidden');
+
+    if (state && state.activeVisit) {
+        state.activeVisit.lastWelfareCheck = Date.now();
+        state.activeVisit.welfareDeadline  = null;
+        saveState();
+    }
+
+    logSafety('WELFARE_OK', 'Worker confirmed welfare check-in.');
+    showToast('✅ Welfare check-in confirmed');
+    if (navigator.vibrate) navigator.vibrate(50);
+}
+
+/** Cancel the in-modal countdown interval. Safe to call even if not running. */
+function _clearWelfareCountdown() {
+    if (welfareCountdownId) { clearInterval(welfareCountdownId); welfareCountdownId = null; }
 }
 
 // ============================================================================
@@ -1840,7 +2025,9 @@ function startCheckinTimer() {
 function startTravellingPulse() {
     if (travellingInterval) clearInterval(travellingInterval);
     travellingInterval = setInterval(() => {
-        if (state && state.activeVisit && state.activeVisit.status === 'TRAVELLING') {
+        // FIX: was checking activeVisit.status === 'TRAVELLING' which is never set
+        // on the visit object (it's only sent as payload field). Correct flag is .isTravel.
+        if (state && state.activeVisit && state.activeVisit.isTravel) {
             // Send periodic location pulse
             logSafety('TRAVELLING', 'Location pulse');
         }
@@ -2226,6 +2413,7 @@ function directDepart() {
     if (typeof travellingInterval !== 'undefined' && travellingInterval) {
         clearInterval(travellingInterval); travellingInterval = null;
     }
+    stopWelfareChecks(); // dismiss any pending welfare modal and clear the schedule
     if (typeof exitLockedScreen === 'function') exitLockedScreen();
     saveState();
     navigate('main');
@@ -2374,7 +2562,7 @@ function enterLockedScreen() {
     tickIntervalId = setInterval(tick, TICK_NORMAL);
     tick(); // Immediate first tick so the display is right straight away
     
-    startCheckinTimer();
+    startWelfareChecks(); // Only fires if CONFIG.checkinEnabled — no-op otherwise
 }
 
 /**
@@ -2393,6 +2581,26 @@ async function triggerPanic(duress = false) {
         return;
     }
 
+    // GPS PRE-CAPTURE: Get a fresh fix BEFORE calling logSafety.
+    // For site visits lastGPS is null (cleared at visit start because the site
+    // address is the authoritative location). The adaptive GPS monitor fires
+    // getCurrentPosition asynchronously and may not resolve for several seconds —
+    // by which point logSafety has already sent "0,0" to the backend.
+    // Awaiting a direct getCurrentPosition here ensures we have real coordinates
+    // in the alert. 5-second timeout keeps UX snappy; failure falls through
+    // gracefully to whatever lastGPS currently holds.
+    await new Promise(resolve => {
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                lastGPS = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                resolve();
+            },
+            () => resolve(), // timeout / denied — lastGPS unchanged, alert still sends
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    });
+
+    // Start continuous GPS monitoring for ongoing location pulses
     if (gpsWatchId === null && typeof startGPSMonitoring === 'function') startGPSMonitoring();
     
     // 1. DURESS (SILENT) LOGIC
@@ -2434,10 +2642,9 @@ async function triggerPanic(duress = false) {
     // Switch to the Panic UI only for loud mode
     if (!duress) {
         renderPanicState();
-        // Show the direct email fallback — independent of the backend,
+        // Show direct email + call buttons — independent of the backend,
         // covers the case where the GAS script fails to dispatch the alert.
-        const btnDirect = document.getElementById('btnDirectAlert');
-        if (btnDirect) btnDirect.classList.remove('hidden');
+        _showAlarmButtons();
     }
 }
 
@@ -2479,14 +2686,16 @@ function iamSafe() {
         document.body.classList.remove('strobe-active');
         
         // 6. BUTTON INTERFACE RESET: Restore standard visit controls
-        const btnSafe = document.getElementById('btnSafe');
+        const btnSafe   = document.getElementById('btnSafe');
         const btnDepart = document.getElementById('btnDepart');
         const btnExtend = document.getElementById('btnExtend');
         const btnDirect = document.getElementById('btnDirectAlert');
-        if (btnSafe) btnSafe.classList.add('hidden');
+        const btnCall   = document.getElementById('btnCallICE');
+        if (btnSafe)   btnSafe.classList.add('hidden');
         if (btnDepart) btnDepart.classList.remove('hidden');
         if (btnExtend) btnExtend.classList.remove('hidden');
         if (btnDirect) btnDirect.classList.add('hidden');
+        if (btnCall)   btnCall.classList.add('hidden');
         
         showToast("✅ Safety status confirmed");
     });
@@ -2813,9 +3022,11 @@ async function saveWizard() {
         emgName: document.getElementById('wizContactName').value.trim(),
         emgPhone: document.getElementById('wizContactPhone').value.trim(),
         emgEmail: document.getElementById('wizContactEmail').value.trim(),
+        emgNtfy:  document.getElementById('wizContactNtfy').value.trim(),
         escName: document.getElementById('wizEscName').value.trim(),
         escPhone: document.getElementById('wizEscPhone').value.trim(),
-        escEmail: document.getElementById('wizEscEmail').value.trim()
+        escEmail: document.getElementById('wizEscEmail').value.trim(),
+        escNtfy:  document.getElementById('wizEscNtfy').value.trim()
     };
     
     if (!workerData.name || !workerData.pin || !workerData.duress) {
@@ -2845,9 +3056,11 @@ async function saveWizard() {
             'Emergency Contact Name':    workerData.emgName,
             'Emergency Contact Phone':   workerData.emgPhone,
             'Emergency Contact Email':   workerData.emgEmail,
+            'Emergency Contact Ntfy':    workerData.emgNtfy,
             'Escalation Contact Name':   workerData.escName,
             'Escalation Contact Phone':  workerData.escPhone,
             'Escalation Contact Email':  workerData.escEmail,
+            'Escalation Contact Ntfy':   workerData.escNtfy,
             'deviceId':                  state.deviceId,
             'Timestamp':                 new Date().toISOString()
         };
@@ -2977,7 +3190,7 @@ window.addEventListener('beforeinstallprompt', e => {
 // ============================================================================
 window.addEventListener('beforeunload', () => {
     stopGPSMonitoring();
-    if (checkinIntervalId) clearInterval(checkinIntervalId);
+    stopWelfareChecks();
     if (travellingInterval) clearInterval(travellingInterval);
     if (tickIntervalId) clearInterval(tickIntervalId);
 });
@@ -3445,9 +3658,11 @@ return {
         'Emergency Contact Name': state.worker?.emgName || state.worker?.iceName || "",
         'Emergency Contact Phone': state.worker?.emgPhone || state.worker?.icePhone || "",
         'Emergency Contact Email': state.worker?.emgEmail || state.worker?.iceEmail || "",
+        'Emergency Contact Ntfy':  state.worker?.emgNtfy || "",
         'Escalation Contact Name': state.worker?.escName || state.worker?.ice2Name || "",
         'Escalation Contact Phone': state.worker?.escPhone || state.worker?.ice2Phone || "",
         'Escalation Contact Email': state.worker?.escEmail || state.worker?.ice2Email || "",
+        'Escalation Contact Ntfy':  state.worker?.escNtfy || "",
         
         'Battery Level': currentBatteryLevel || "100%",
         'Location Name': ln,
@@ -4332,9 +4547,11 @@ function populateSettingsForm() {
     document.getElementById('setEmgName').value = s.emgName || '';
     document.getElementById('setEmgPhone').value = s.emgPhone || '';
     document.getElementById('setEmgEmail').value = s.emgEmail || '';
+    document.getElementById('setEmgNtfy').value  = s.emgNtfy  || '';
     document.getElementById('setEscName').value = s.escName || '';
     document.getElementById('setEscPhone').value = s.escPhone || '';
     document.getElementById('setEscEmail').value = s.escEmail || '';
+    document.getElementById('setEscNtfy').value  = s.escNtfy  || '';
 }
 
 function saveSettings() {
@@ -4346,9 +4563,11 @@ function saveSettings() {
     state.worker.emgName = document.getElementById('setEmgName').value.trim();
     state.worker.emgPhone = document.getElementById('setEmgPhone').value.trim();
     state.worker.emgEmail = document.getElementById('setEmgEmail').value.trim();
+    state.worker.emgNtfy  = document.getElementById('setEmgNtfy').value.trim();
     state.worker.escName = document.getElementById('setEscName').value.trim();
     state.worker.escPhone = document.getElementById('setEscPhone').value.trim();
     state.worker.escEmail = document.getElementById('setEscEmail').value.trim();
+    state.worker.escNtfy  = document.getElementById('setEscNtfy').value.trim();
     
     saveState();
     
@@ -4578,6 +4797,56 @@ function clearData() {
 }
 
 // Update system info on settings page  
+/**
+ * CONTACT VERIFICATION — SEND TEST ALERT
+ * Dispatches a real test email to all configured emergency contacts via the
+ * normal backend pipeline. Lets workers verify addresses are correct and that
+ * alert emails actually land in inboxes (and don't go to spam) before an
+ * emergency. The backend sends a clearly-marked "this is a test" email.
+ */
+async function sendTestAlert() {
+    const resultEl = document.getElementById('testAlertResult');
+
+    const w        = state?.worker || {};
+    const contacts = [
+        w.emgEmail || w.iceEmail,
+        w.escEmail || w.ice2Email
+    ].filter(Boolean);
+
+    if (contacts.length === 0) {
+        if (resultEl) {
+            resultEl.textContent = '⚠️ No email contacts configured. Add emergency contacts in Settings first.';
+            resultEl.className = 'text-xs font-bold rounded-lg px-3 py-2 mb-3 bg-amber-900/40 text-amber-400';
+            resultEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (resultEl) {
+        resultEl.textContent = '⏳ Sending test alert…';
+        resultEl.className = 'text-xs font-bold rounded-lg px-3 py-2 mb-3 bg-gray-700 text-gray-300';
+        resultEl.classList.remove('hidden');
+    }
+
+    try {
+        await outboxEnqueue(buildPayload({
+            'Alarm Status': 'TEST_ALERT',
+            'Notes':        'Manual test alert sent from Settings page to verify contact configuration.',
+            'Last Known GPS': lastGPS || '0,0'
+        }));
+
+        if (resultEl) {
+            resultEl.textContent = `✅ Test alert sent to: ${contacts.join(', ')} — ask them to check their inbox (and spam folder).`;
+            resultEl.className = 'text-xs font-bold rounded-lg px-3 py-2 mb-3 bg-green-900/40 text-green-400';
+        }
+    } catch (e) {
+        if (resultEl) {
+            resultEl.textContent = '⚠️ Failed to queue test alert. Check your connection and try again.';
+            resultEl.className = 'text-xs font-bold rounded-lg px-3 py-2 mb-3 bg-red-900/40 text-red-400';
+        }
+    }
+}
+
 function updateSystemInfo() {
     const backendUrl = document.getElementById('setBackendUrl');
     if (backendUrl) {
@@ -6251,9 +6520,9 @@ function triggerGraceExpiryAlarm() {
         overdueLabel.classList.add('border-white', 'text-white');
     }
 
-    // Show the direct mailto fallback button — visible to worker and any bystander.
-    const btnDirect = document.getElementById('btnDirectAlert');
-    if (btnDirect) btnDirect.classList.remove('hidden');
+    // Show both alarm escalation buttons — email and call — visible to worker
+    // and any bystander. Independent of the backend.
+    _showAlarmButtons();
 }
 
 /**
@@ -6323,6 +6592,47 @@ function sendDirectAlert() {
     window.location.href = mailto;
 
     showToast('📧 Opening email — tap Send to dispatch');
+}
+
+/**
+ * REDUNDANT ESCALATION — QUICK-CALL ICE CONTACT
+ * Opens the native phone dialler pre-filled with the primary emergency contact.
+ * Works for the worker or any bystander — no knowledge of the app required.
+ */
+function callICE() {
+    const w     = state?.worker || {};
+    const phone = w.emgPhone || w.icePhone;
+    const name  = w.emgName  || w.iceName  || 'Emergency Contact';
+    if (!phone) {
+        showToast('⚠️ No emergency contact phone configured — add one in Settings');
+        return;
+    }
+    // Strip spaces and non-numeric characters for a clean tel: link
+    window.location.href = `tel:${phone.replace(/[^\d+]/g, '')}`;
+}
+
+/**
+ * Show both alarm-escalation buttons (email + call) and populate the call
+ * button label with the contact's name and number so bystanders know who
+ * they are calling before they tap.
+ */
+function _showAlarmButtons() {
+    const btnDirect = document.getElementById('btnDirectAlert');
+    const btnCall   = document.getElementById('btnCallICE');
+    const callLabel = document.getElementById('btnCallICELabel');
+
+    if (btnDirect) btnDirect.classList.remove('hidden');
+
+    if (btnCall) {
+        const w     = state?.worker || {};
+        const name  = w.emgName  || w.iceName  || '';
+        const phone = w.emgPhone || w.icePhone || '';
+        if (phone) {
+            if (callLabel) callLabel.textContent = name ? `${name} — ${phone}` : phone;
+            btnCall.classList.remove('hidden');
+        }
+        // If no phone is configured, hide rather than show a non-functional button
+    }
 }
 
     /**
@@ -6396,6 +6706,77 @@ document.addEventListener("visibilitychange", async () => {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             showToast("✅ Safety Monitoring Active");
             if (typeof tick === 'function') tick();
+
+            // iOS SUSPENSION CATCH-UP — MAIN ALARM
+            // On iOS Safari, setInterval is throttled (or fully suspended) when
+            // the PWA is backgrounded. tick() runs normally here, but the alarm
+            // logic fires only within narrow time windows (e.g. diffMins >= 15
+            // for exactly one tick cycle). If the suspension bridged that window,
+            // the alarm never fires — the worker is overdue and nobody knows.
+            //
+            // Fix: independently evaluate the alarm condition after every
+            // foreground event, completely bypassing the tick window logic.
+            // This is unconditional arithmetic — no window dependency.
+            const v = state.activeVisit;
+            if (v.anticipatedDepartureTime &&
+                !v.criticalSent &&
+                !v.isSafeConfirmed) {
+                const minsOverdue = (Date.now() - v.anticipatedDepartureTime) / 60000;
+                if (minsOverdue >= 15) {
+                    console.warn(`iOS catch-up: alarm window missed during suspension (${minsOverdue.toFixed(1)} min overdue) — firing now`);
+                    triggerGraceExpiryAlarm();
+                }
+            }
+
+            // iOS SUSPENSION CATCH-UP — WELFARE CHECK
+            // If a welfare check was in progress (modal was shown) while the app
+            // was backgrounded, the 2-minute countdown stopped ticking. On restore,
+            // check if the deadline has already passed and fire the alarm if so.
+            // If the deadline is still in the future, re-show the modal with the
+            // adjusted (remaining) countdown so the worker can still confirm.
+            if (CONFIG.checkinEnabled && v.welfareDeadline) {
+                const now = Date.now();
+                if (now >= v.welfareDeadline) {
+                    // Deadline passed while suspended — treat as missed
+                    v.welfareDeadline = null;
+                    saveState();
+                    const modal = document.getElementById('welfareCheckModal');
+                    if (modal) modal.classList.add('hidden');
+                    _clearWelfareCountdown();
+                    if (!v.criticalSent && !v.isSafeConfirmed) {
+                        console.warn('iOS catch-up: welfare check deadline passed during suspension — firing alarm');
+                        triggerGraceExpiryAlarm();
+                    }
+                } else {
+                    // Deadline not yet passed — re-show modal with remaining time
+                    // The existing welfareCountdownId is dead (interval was suspended);
+                    // _showWelfareModal will clear it and restart from remaining seconds.
+                    _clearWelfareCountdown();
+                    const remainingSecs = Math.ceil((v.welfareDeadline - now) / 1000);
+                    const modal = document.getElementById('welfareCheckModal');
+                    const countEl = document.getElementById('welfareCountdown');
+                    if (modal && countEl) {
+                        modal.classList.remove('hidden');
+                        let rem = remainingSecs;
+                        const m = Math.floor(rem / 60);
+                        const s = rem % 60;
+                        countEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+                        welfareCountdownId = setInterval(() => {
+                            rem--;
+                            const mm = Math.floor(rem / 60);
+                            const ss = rem % 60;
+                            countEl.textContent = `${mm}:${ss.toString().padStart(2, '0')}`;
+                            if (rem <= 0) {
+                                _clearWelfareCountdown();
+                                modal.classList.add('hidden');
+                                v.welfareDeadline = null;
+                                saveState();
+                                if (!v.criticalSent && !v.isSafeConfirmed) triggerGraceExpiryAlarm();
+                            }
+                        }, 1000);
+                    }
+                }
+            }
         }
     }
 });
