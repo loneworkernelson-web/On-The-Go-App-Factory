@@ -142,6 +142,10 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
 #offlineBanner { background: #dc2626; color: white; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 0.25rem; z-index: 50; }
 #vehNagBar { background: #ea580c; color: white; text-align: center; font-size: 0.75rem; font-weight: 700; padding: 0.5rem; cursor: pointer; z-index: 40; border-bottom: 1px solid rgba(255,255,255,0.2); }
 .form-input-card { width: 100%; background-color: var(--surface); border: 1px solid rgba(255,255,255,0.15); border-radius: 0.5rem; padding: 0.75rem; color: white; font-size: 0.9rem; outline: none; margin-bottom: 0.5rem; display: block; }
+/* Theme-aware accent button — used wherever purple was previously hard-coded */
+.btn-accent { background-color: var(--accent) !important; color: white; }
+/* Travel settings toggle: colours with accent when checked */
+input[type="checkbox"]:checked ~ .travel-toggle-bg { background-color: var(--accent) !important; }
 .setting-label { display: block; font-size: 0.625rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; margin-left: 0.25rem; }
 .lbl-blue { color: #60a5fa; }
 .lbl-red { color: #f87171; }
@@ -558,6 +562,21 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </label>
         </div>
         
+<!-- Welfare Check Interval Selector — only shown when checkinEnabled is true -->
+<div id="welfareIntervalRow" class="hidden mb-3 bg-gray-800 rounded-lg px-3 py-2 border border-teal-900/50">
+    <div class="flex justify-between items-center mb-2">
+        <span class="text-teal-400 text-xs font-black uppercase tracking-widest">🔔 Welfare Check Interval</span>
+        <span id="welfareIntervalHint" class="text-xs text-gray-500 font-bold italic"></span>
+    </div>
+    <div class="grid grid-cols-5 gap-1.5">
+        <button onclick="setVisitWelfare(10)"  class="welfare-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">10m</button>
+        <button onclick="setVisitWelfare(15)"  class="welfare-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">15m</button>
+        <button onclick="setVisitWelfare(30)"  class="welfare-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">30m</button>
+        <button onclick="setVisitWelfare(60)"  class="welfare-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">1 hr</button>
+        <button onclick="setVisitWelfare(120)" class="welfare-btn py-1.5 rounded text-xs font-black border border-gray-600 bg-gray-700/50 text-gray-400">2 hr</button>
+    </div>
+</div>
+
 <!-- Duration Selector -->
 <div class="mb-4 bg-gray-800 rounded-lg p-3 border border-gray-700">
     <div class="flex justify-between items-center mb-3">
@@ -623,6 +642,9 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             </div>
             <div id="highRiskBadge" class="hidden text-red-500 font-black text-xs uppercase tracking-widest border border-red-500 inline-block px-3 py-1 rounded-lg mb-2">
                 ⚡ CRITICAL TIMING MODE
+            </div>
+            <div id="welfareBadge" class="hidden text-teal-400 font-black text-xs uppercase tracking-widest border border-teal-700 inline-block px-3 py-1 rounded-lg mb-2">
+                🔔 Welfare every <span id="welfareBadgeMins"></span>
             </div>
             <div id="overdueLabel" class="hidden text-red-500 font-black text-2xl animate-pulse my-2 tracking-[0.2em] border-2 border-red-500 inline-block px-6 py-2 rounded-xl uppercase">
                 OVERDUE
@@ -920,14 +942,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
             <a id="btnSiteCall" href="#" class="hidden flex-1 bg-green-600 text-white py-4 rounded-xl text-center font-black">📞 Call</a>
             <a id="btnSiteEmail" href="#" class="hidden flex-1 bg-blue-600 text-white py-4 rounded-xl text-center font-black">✉️ Email</a>
         </div>
-        <a id="btnSiteNav" href="#" target="_blank" class="hidden block w-full py-4 bg-purple-600 text-white font-black rounded-xl text-center mb-4">🗺️ Navigate</a>
+        <a id="btnSiteNav" href="#" target="_blank" class="hidden block w-full py-4 btn-accent font-black rounded-xl text-center mb-4">🗺️ Navigate</a>
         <button onclick="closeModal('info')" class="w-full py-4 bg-gray-700 text-gray-300 font-black rounded-xl">Close</button>
     </div>
 </div>
 
 <!-- Travel Settings Modal -->
 <div id="travelSettingsModal" class="hidden fixed inset-0 z-[460] flex items-center justify-center bg-black/80 backdrop-blur-sm" role="dialog" aria-modal="true">
-    <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 border-t-[8px] border-purple-600 mx-4">
+    <div class="bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-8 border-t-[8px] mx-4" style="border-top-color: var(--accent)">
         <div class="flex items-center gap-3 mb-6">
             <span class="text-3xl">🚗</span>
             <div>
@@ -944,14 +966,14 @@ canvas { touch-action: none; background: #fff; border-radius: 0.5rem; cursor: cr
                 <!-- Toggle switch -->
                 <div class="relative shrink-0">
                     <input type="checkbox" id="travelNoReportToggle" class="sr-only peer">
-                    <div class="w-11 h-6 bg-gray-600 peer-checked:bg-purple-600 rounded-full transition-colors"></div>
+                    <div class="w-11 h-6 bg-gray-600 rounded-full transition-colors travel-toggle-bg"></div>
                     <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
                 </div>
             </label>
         </div>
         <div class="flex gap-3">
             <button onclick="closeModal('travelSettings')" class="flex-1 py-4 bg-gray-800 text-gray-400 font-black rounded-2xl">Cancel</button>
-            <button onclick="saveTravelSettings()" class="flex-1 py-4 bg-purple-600 text-white font-black rounded-2xl shadow-lg">Save</button>
+            <button onclick="saveTravelSettings()" class="flex-1 py-4 btn-accent font-black rounded-2xl shadow-lg">Save</button>
         </div>
     </div>
 </div>
@@ -1176,7 +1198,15 @@ const DURATION_MAP = [
     390, 420, 450, 480          // 26-30: Maximum visits (6-8 hours)
 ];
 
-const CONFIG = {
+// Maps site risk level (set by supervisor in the Sites sheet) to a default
+// welfare check interval in minutes. Used as the starting point for the
+// per-visit selector; workers can adjust up or down before each visit.
+const RISK_WELFARE_MAP = {
+    Low:      60,   // Low risk    — hourly check-in is sufficient
+    Medium:   30,   // Medium risk — check in every 30 minutes
+    High:     15,   // High risk   — check in every 15 minutes
+    Critical: 10    // Critical    — check in every 10 minutes
+};
     // Backend
     url:            "%%GOOGLE_SHEET_URL%%",
     org:            "%%ORG_NAME%%",
@@ -1920,7 +1950,14 @@ function startWelfareChecks() {
     if (!CONFIG.checkinEnabled) return;
     stopWelfareChecks(); // clear any stale interval first
 
-    const intervalMs = (CONFIG.checkinInterval || 60) * 60 * 1000;
+    // Priority: per-visit override set at visit start → CONFIG global fallback.
+    // The per-visit value is resolved from (in order): worker's manual selector,
+    // site's persistent override, site risk level, then CONFIG.checkinInterval.
+    // It is already baked into state.activeVisit.checkinIntervalMins by startVisit().
+    const intervalMins = (state && state.activeVisit && state.activeVisit.checkinIntervalMins)
+        || CONFIG.checkinInterval
+        || 60;
+    const intervalMs = intervalMins * 60 * 1000;
     welfareIntervalId = setInterval(() => {
         if (!state || !state.activeVisit) return;
         // Don't interrupt if the alarm is already active — the worker has
@@ -2563,6 +2600,18 @@ function enterLockedScreen() {
     tick(); // Immediate first tick so the display is right straight away
     
     startWelfareChecks(); // Only fires if CONFIG.checkinEnabled — no-op otherwise
+    
+    // Update welfare badge on locked screen
+    if (CONFIG.checkinEnabled && state && state.activeVisit) {
+        const mins = state.activeVisit.checkinIntervalMins || CONFIG.checkinInterval || 60;
+        const badge = document.getElementById('welfareBadge');
+        const minsEl = document.getElementById('welfareBadgeMins');
+        if (badge && minsEl) {
+            minsEl.textContent = mins >= 60 ? `${mins / 60}hr` : `${mins}m`;
+            badge.classList.remove('hidden');
+        }
+    }
+    
     _lockOrientation();   // Prevent landscape rotation for the duration of the visit
 }
 
@@ -3326,9 +3375,11 @@ function createTravelTile() {
     tile.className = [
         'w-full h-14 rounded-xl shadow-lg flex items-center justify-between px-4',
         'cursor-pointer transition-all border-2',
-        'bg-gradient-to-r from-indigo-600 to-purple-700',
-        isActive ? 'border-white scale-[1.02] ring-2 ring-purple-400' : 'border-gray-700 hover:border-white/20'
+        isActive ? 'border-white scale-[1.02]' : 'border-gray-700 hover:border-white/20'
     ].join(' ');
+    // Gradient uses theme vars: surface → accent, so it looks right across all colour schemes
+    tile.style.background = `linear-gradient(to right, var(--surface), var(--accent))`;
+    if (isActive) tile.style.boxShadow = '0 0 0 2px var(--accent)';
 
     tile.innerHTML = `
         <div class="flex items-center gap-2">
@@ -3389,6 +3440,7 @@ function createLocationTile(loc) {
     
     tile.onclick = () => {
         state.selectedLocationId = (state.selectedLocationId === loc.id) ? null : loc.id;
+        updateWelfareSelector(state.selectedLocationId); // update welfare interval selector for this site
         renderLocations();
         updateArrivedButtonState();
     };
@@ -3400,6 +3452,115 @@ function createLocationTile(loc) {
  * Opens the travel settings modal for the current trip.
  * Called from the info button on the travel tile.
  */
+// ============================================================================
+// WELFARE CHECK INTERVAL — PER-VISIT SELECTOR
+// ============================================================================
+
+/**
+ * Called when a tile is selected — pre-selects the welfare interval button
+ * that matches the site's effective default, and shows a hint explaining why.
+ * Falls back gracefully if checkinEnabled is false (row stays hidden).
+ */
+function updateWelfareSelector(locationId) {
+    if (!CONFIG.checkinEnabled) return;
+
+    const row = document.getElementById('welfareIntervalRow');
+    if (!row) return;
+    row.classList.remove('hidden');
+
+    const loc = locationId ? state.locations.find(l => l.id === locationId) : null;
+
+    // Determine the effective default and hint text for this site
+    let defaultMins, hint;
+    if (loc && loc.welfareIntervalMins) {
+        defaultMins = loc.welfareIntervalMins;
+        hint = 'Site default';
+    } else if (loc && loc.riskLevel && RISK_WELFARE_MAP[loc.riskLevel]) {
+        defaultMins = RISK_WELFARE_MAP[loc.riskLevel];
+        const colours = { Low: 'text-green-400', Medium: 'text-yellow-400', High: 'text-orange-400', Critical: 'text-red-400' };
+        const hintEl = document.getElementById('welfareIntervalHint');
+        if (hintEl) {
+            hintEl.className = `text-xs font-bold italic ${colours[loc.riskLevel] || 'text-gray-400'}`;
+            hintEl.textContent = `${loc.riskLevel} risk`;
+        }
+        hint = null; // already set via className above
+    } else {
+        defaultMins = CONFIG.checkinInterval || 60;
+        hint = 'Global default';
+    }
+
+    if (hint) {
+        const hintEl = document.getElementById('welfareIntervalHint');
+        if (hintEl) { hintEl.className = 'text-xs text-gray-500 font-bold italic'; hintEl.textContent = hint; }
+    }
+
+    // Pre-select matching button (or nearest) and record in state
+    _highlightWelfareBtn(defaultMins);
+    state.visitWelfareOverride = defaultMins;
+}
+
+/**
+ * Called when a welfare quick-select button is tapped.
+ * Overrides the site/risk default for this visit only.
+ */
+function setVisitWelfare(mins) {
+    state.visitWelfareOverride = mins;
+    _highlightWelfareBtn(mins);
+    // Update hint to show this is a manual override
+    const hintEl = document.getElementById('welfareIntervalHint');
+    if (hintEl) { hintEl.className = 'text-xs text-blue-400 font-bold italic'; hintEl.textContent = 'This visit'; }
+}
+
+/** Highlights the welfare button whose value matches mins; clears others. */
+function _highlightWelfareBtn(mins) {
+    const map = { 10: 0, 15: 1, 30: 2, 60: 3, 120: 4 };
+    const btns = document.querySelectorAll('.welfare-btn');
+    btns.forEach((btn, i) => {
+        const active = (map[mins] === i);
+        btn.classList.toggle('bg-teal-700',   active);
+        btn.classList.toggle('border-teal-500', active);
+        btn.classList.toggle('text-white',     active);
+        btn.classList.toggle('bg-gray-700/50', !active);
+        btn.classList.toggle('border-gray-600', !active);
+        btn.classList.toggle('text-gray-400',  !active);
+    });
+}
+
+/**
+ * Saves a persistent welfare interval override on the location object.
+ * Called from the site info modal Save button.
+ * This value is used as the default pre-selection every time the worker
+ * visits this site — until changed or cleared.
+ */
+function saveSiteWelfareOverride(locId) {
+    const input = document.getElementById('siteWelfareInput');
+    if (!input) return;
+    const mins = parseInt(input.value, 10);
+    if (isNaN(mins) || mins < 5 || mins > 480) {
+        return showToast('⚠️ Enter a value between 5 and 480 minutes');
+    }
+    const idx = state.locations.findIndex(l => l.id === locId);
+    if (idx < 0) return;
+    state.locations[idx].welfareIntervalMins = mins;
+    saveState();
+    showToast(`✅ Welfare default set to ${mins}m for this site`);
+    // Refresh selector if this site is currently selected
+    if (state.selectedLocationId === locId) updateWelfareSelector(locId);
+}
+
+/**
+ * Clears the persistent welfare override for a site, reverting to
+ * risk level → global config default.
+ */
+function clearSiteWelfareOverride(locId) {
+    const idx = state.locations.findIndex(l => l.id === locId);
+    if (idx < 0) return;
+    delete state.locations[idx].welfareIntervalMins;
+    saveState();
+    showToast('🗑️ Site welfare default cleared');
+    if (state.selectedLocationId === locId) updateWelfareSelector(locId);
+}
+
 function openTravelSettings(event) {
     if (event) event.stopPropagation();
     const noReport = !!(state && state.travelNoReport);
@@ -3429,17 +3590,17 @@ function updateArrivedButtonState() {
     const hasDuration = durationMins > 0;
 
     btn.disabled = false; 
-    btn.classList.remove('bg-blue-600', 'bg-purple-600', 'bg-gray-700', 'text-white', 'text-gray-300', 'opacity-50');
+    btn.classList.remove('bg-blue-600', 'btn-accent', 'bg-gray-700', 'text-white', 'text-gray-300', 'opacity-50');
 
     // TRAVEL LOGIC: Time is mandatory, Site is optional
     if (state.isTravelActive) {
         if (!hasDuration) {
             btn.innerText = 'SELECT TRAVEL TIME';
-            btn.classList.add('bg-purple-600', 'text-white', 'opacity-50');
+            btn.classList.add('btn-accent', 'text-white', 'opacity-50');
         } else {
             const loc = state.locations.find(l => l.id === state.selectedLocationId);
             btn.innerText = loc ? `HOLD TO TRAVEL TO ${loc.name.toUpperCase()}` : 'HOLD TO START TRAVEL';
-            btn.classList.add('bg-purple-600', 'text-white');
+            btn.classList.add('btn-accent', 'text-white');
         }
     } 
     // STANDARD LOGIC: Both Time and Site mandatory
@@ -3553,6 +3714,16 @@ async function startVisit(isSkipCheck = false) {
     const anticipatedDeparture = startTime + (durationSec * 1000);
 
     // GOLDEN FIX: Storing the address in the session state
+    // Resolve the effective welfare check interval for this visit.
+    // Hierarchy: worker's manual selector → site's persistent override → risk level → global CONFIG.
+    const _resolvedWelfare = (() => {
+        if (state.visitWelfareOverride) return state.visitWelfareOverride;
+        if (loc.welfareIntervalMins)    return loc.welfareIntervalMins;
+        if (loc.riskLevel && RISK_WELFARE_MAP[loc.riskLevel]) return RISK_WELFARE_MAP[loc.riskLevel];
+        return CONFIG.checkinInterval || 60;
+    })();
+    state.visitWelfareOverride = null; // consume — reset for next visit
+
     state.activeVisit = {
         locationId: locId || 'travel',
         locationName: loc.name,
@@ -3564,6 +3735,7 @@ async function startVisit(isSkipCheck = false) {
         anticipatedDepartureTime: anticipatedDeparture,
         startGPS: verifiedStartGPS,
         highRisk: isHighRisk,
+        checkinIntervalMins: _resolvedWelfare, // welfare check interval for this visit
         isPanic: false,
         criticalSent: false,
         warn5minSent: false,
@@ -4446,6 +4618,7 @@ window.onload = () => {
         activeVisit: null,
         pendingUploads: [],
         locations: [],
+        visitWelfareOverride: null, // per-visit welfare interval (mins) — null = use site/risk default
         photoStore: {},
         meta: { lastVehCheck: null, wofExpiry: null },
         vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
@@ -4833,9 +5006,13 @@ async function sendTestAlert() {
 
     try {
         await outboxEnqueue(buildPayload({
-            'Alarm Status': 'TEST_ALERT',
-            'Notes':        'Manual test alert sent from Settings page to verify contact configuration.',
-            'Last Known GPS': lastGPS || '0,0'
+            'Alarm Status':   'TEST_ALERT',
+            'Notes':          'Manual test alert sent from Settings page to verify contact configuration.',
+            'Last Known GPS': lastGPS || '0,0',
+            // Override location with honest description — there is no active visit,
+            // so buildPayload() would otherwise fall back to "Unknown Site".
+            'Location Name':    'Test (no active visit)',
+            'Location Address': 'Sent from Settings page'
         }));
 
         if (resultEl) {
@@ -5332,6 +5509,7 @@ function forceSync(showUI) {
                 contactEmail: s.contactEmail,
                 notes: s.notes,
                 isCritical: s.critical || false,
+                riskLevel: s.riskLevel || '',       // Low / Medium / High / Critical — from Sites sheet col K
                 // NEW: Capture the emergency info from the spreadsheet
                 'Emergency Procedures': s.emergencyProcedures || s['Emergency Procedures'] || ''
             }));
@@ -5464,6 +5642,12 @@ function updateCriticalTimingBadge() {
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
+    }
+    
+    // Keep welfare badge in sync — hide it too when there's no active visit
+    const welfareBadge = document.getElementById('welfareBadge');
+    if (welfareBadge && (!state || !state.activeVisit)) {
+        welfareBadge.classList.add('hidden');
     }
 }
 
@@ -6266,6 +6450,52 @@ function populateSiteInfoModal(location) {
             <div class="text-xs text-gray-300 italic">${escapeHtml(location.notes)}</div>
         </div>`;
     }
+
+    // 4. WELFARE CHECK SECTION — only shown when checkinEnabled
+    if (CONFIG.checkinEnabled) {
+        // Risk level badge (read-only — set by supervisor in the Sites sheet)
+        const riskColours = {
+            Low:      'bg-green-900/40 text-green-400 border-green-700',
+            Medium:   'bg-yellow-900/40 text-yellow-400 border-yellow-700',
+            High:     'bg-orange-900/40 text-orange-400 border-orange-700',
+            Critical: 'bg-red-900/40 text-red-400 border-red-700'
+        };
+        const riskClass = (location.riskLevel && riskColours[location.riskLevel])
+            ? riskColours[location.riskLevel]
+            : 'bg-gray-800 text-gray-400 border-gray-600';
+        const riskLabel = location.riskLevel || 'Not set';
+
+        // Persistent site override — what interval is currently saved for this site
+        const savedMins = location.welfareIntervalMins || '';
+        const effectiveMins = savedMins || (location.riskLevel && RISK_WELFARE_MAP[location.riskLevel]) || CONFIG.checkinInterval || 60;
+        const effectiveLabel = savedMins
+            ? `${savedMins}m (site default)`
+            : (location.riskLevel && RISK_WELFARE_MAP[location.riskLevel])
+                ? `${effectiveMins}m (${location.riskLevel} risk default)`
+                : `${effectiveMins}m (global default)`;
+
+        html += `<div class="pt-3 border-t border-gray-700 mt-2">
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-xs text-teal-400 font-black uppercase tracking-widest">🔔 Welfare Check</label>
+                <span class="text-xs px-2 py-0.5 rounded border font-black uppercase tracking-widest ${riskClass}">${escapeHtml(riskLabel)}</span>
+            </div>
+            <p class="text-xs text-gray-400 mb-2">Effective: <strong class="text-white">${effectiveLabel}</strong></p>
+            <div class="flex gap-2 items-center">
+                <input id="siteWelfareInput" type="number" min="5" max="480" value="${escapeHtml(String(savedMins || effectiveMins))}"
+                       class="w-20 bg-gray-900 border border-gray-600 rounded-lg px-2 py-1.5 text-white text-sm text-center font-mono focus:border-teal-500 focus:outline-none"
+                       placeholder="${effectiveMins}">
+                <span class="text-xs text-gray-400">mins</span>
+                <button onclick="saveSiteWelfareOverride('${escapeHtml(location.id)}')"
+                        class="flex-1 py-1.5 bg-teal-700 hover:bg-teal-600 text-white text-xs font-black rounded-lg transition-colors">
+                    Save Default
+                </button>
+                ${savedMins ? `<button onclick="clearSiteWelfareOverride('${escapeHtml(location.id)}')"
+                        class="py-1.5 px-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-black rounded-lg transition-colors">
+                    ✕
+                </button>` : ''}
+            </div>
+            <p class="text-xs text-gray-500 mt-1.5 italic">Saved here as the default for every visit to this site. Adjust per-visit on the home screen.</p>
+        </div>`;
 
     html += `</div>`;
     content.innerHTML = html;
