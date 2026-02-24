@@ -21,7 +21,8 @@ const CONFIG = {
   COUNTRY_CODE: "%%COUNTRY_PREFIX%%", 
   LOCALE: "%%LOCALE%%",
   HEALTH_EMAIL: "%%HEALTH_EMAIL%%",   // Optional: override recipient for daily health email. Leave blank to use script owner.
-  HEALTHCHECK_URL: "%%HEALTHCHECK_URL%%"  // Optional: Healthchecks.io ping URL. Pinged after each successful checkOverdueVisits() run.
+  HEALTHCHECK_URL: "%%HEALTHCHECK_URL%%",  // Optional: Healthchecks.io ping URL. Pinged after each successful checkOverdueVisits() run.
+  NTFY_SERVER: "%%NTFY_SERVER%%"      // ntfy push notification server. Defaults to https://ntfy.sh (hosted). Replace with self-hosted URL for higher privacy.
 };
 
 const sp = PropertiesService.getScriptProperties();
@@ -548,6 +549,10 @@ if (!rowUpdated) {
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
         triggerAlerts(p, "IMMEDIATE");
     }
+    // TEST_ALERT: same delivery path but clearly marked so contacts know it's a drill.
+    if(p['Alarm Status'].includes("TEST_ALERT")) {
+        triggerAlerts(p, "TEST");
+    }
 }
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
     const templateName = p['Template Name'] || "";
@@ -723,57 +728,258 @@ function _cleanPhone(num) {
  * Fixes: GPS Variable injection and Dual-Contact SMS Routing.
  */
 function triggerAlerts(p, type) {
-    // FIXED: Added missing $ for template literal variable injection
-    const gpsLink = p['Last Known GPS'] ? `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(p['Last Known GPS'])}` : "No GPS Available";
-    
-    // DEFAULT CONTENT
-    let subject = `🚨 ${type}: ${p['Worker Name']} - ${p['Alarm Status']}`;
-    let body = `SAFETY ALERT\n\nWorker: ${p['Worker Name']}\nStatus: ${p['Alarm Status']}\nLocation: ${p['Location Name']}\nNotes: ${p['Notes']}\nGPS: ${gpsLink}\nBattery: ${p['Battery Level']}`;
 
-    // SPECIAL CASE: CRITICAL TIMING MODE
-    if (p['Alarm Status'].includes("CRITICAL TIMING")) {
-        subject = `🚨 URGENT: CRITICAL SAFETY BREACH - ${p['Worker Name']}`;
-        body = `⚠️ URGENT SAFETY ALERT (CRITICAL TIMING MODE)\n\n` +
-               `The worker, ${p['Worker Name']}, is now OVERDUE from a visit they self-identified as high-risk.\n\n` +
-               `In this mode, 15 minutes is considered mission-critical. Please attempt to make contact with the worker IMMEDIATELY.\n\n` +
-               `Location: ${p['Location Name']}\n` +
-               `Last Known GPS: ${gpsLink}\n` +
-               `Device Battery: ${p['Battery Level']}`;
+    // ── GPS HANDLING ────────────────────────────────────────────────────────
+    // Guard: treat "0,0" as no fix (it's the worker app fallback when GPS
+    // was unavailable, not a real coordinate).
+    const rawGPS   = p['Last Known GPS'];
+    const hasGPS   = rawGPS && rawGPS.trim() !== '' && rawGPS.trim() !== '0,0';
+    // BUG FIX: previous code used $${} which injected a literal '$' into the URL.
+    // Correct template literal interpolation is simply ${}.
+    const gpsLink  = hasGPS
+        ? `https://maps.google.com/?q=${encodeURIComponent(rawGPS.trim())}`
+        : null;
+    const gpsText  = hasGPS
+        ? `<a href="${gpsLink}" style="color:#2563eb;">${rawGPS.trim()}</a>`
+        : `Not available — please use the address above to locate the worker.`;
+    const gpsSmsTxt = hasGPS ? `GPS: ${gpsLink}` : `GPS: Not available`;
+
+    // ── STATUS-SPECIFIC MESSAGING ──────────────────────────────────────────
+    const status        = (p['Alarm Status'] || '').toUpperCase();
+    const workerName    = p['Worker Name']    || 'The worker';
+    const workerFirst   = workerName.split(' ')[0];
+    const workerPhone   = p['Worker Phone Number'] || 'Not provided';
+    const locationName  = p['Location Name']  || 'Unknown location';
+    const locationAddr  = p['Location Address'] || '';
+    const battery       = p['Battery Level']  || 'Unknown';
+    const notes         = p['Notes']          || '';
+    const sentAt        = Utilities.formatDate(
+                              new Date(), CONFIG.TIMEZONE, "dd/MM/yyyy, HH:mm:ss");
+
+    // Colour, urgency label and action guidance are tailored to each status.
+    let   headerColour  = '#dc2626';  // red  — default for alarms
+    let   statusLabel   = status;
+    let   whatHappened  = '';
+    let   actionSteps   = '';
+    let   noteToContact = '';
+    let   ntfyPriority  = 'high';     // ntfy push priority for this alert type
+    let   ntfyTags      = 'rotating_light';  // ntfy emoji tags
+
+    if (status.includes('DURESS')) {
+        headerColour  = '#7c3aed';  // purple — covert threat
+        statusLabel   = 'DURESS — SILENT ALARM';
+        ntfyPriority  = 'urgent';
+        ntfyTags      = 'rotating_light,purple_circle';
+        whatHappened  = `This worker has activated a <strong>DURESS signal</strong>. This may mean they are under threat and unable to speak freely. <strong>Please treat this as a real emergency.</strong>`;
+        actionSteps   = `
+            <li>Try to <strong>call or text ${workerFirst}</strong> on ${workerPhone}</li>
+            <li>If there is no answer within a few minutes, contact someone at the site and ask them to check on the worker's safety</li>
+            <li>If you believe they are in danger, <strong>contact emergency services (111)</strong></li>
+            <li>Once contact is made, ask them to resolve the alert using their safety app or call their Safety Manager</li>`;
+        noteToContact = `Before escalating to police, consider that the worker may be unable to speak freely. A silent duress is designed to look like a normal message — do not reveal that you have received this alert if you speak to someone at the scene who could be the threat.`;
     }
-    
-    // EMAIL ROUTING: Filter valid addresses and join for multi-recipient delivery
-    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if (emails.length > 0) {
+    else if (status.includes('PANIC') || status.includes('SOS')) {
+        headerColour  = '#dc2626';
+        statusLabel   = 'PANIC / SOS — MANUAL ALARM';
+        ntfyPriority  = 'urgent';
+        ntfyTags      = 'rotating_light,red_circle';
+        whatHappened  = `This worker has <strong>manually triggered a SOS panic alarm</strong>. They may be in immediate danger.`;
+        actionSteps   = `
+            <li>Try to <strong>call ${workerFirst}</strong> on ${workerPhone} immediately</li>
+            <li>If there is no answer, contact someone at the site to check on the worker</li>
+            <li>If you believe they are in danger, <strong>contact emergency services (111)</strong></li>
+            <li>Once contact is made, ask them to clear the alarm using their app PIN</li>`;
+        noteToContact = `This alarm was triggered manually by the worker pressing the SOS button. It should be treated as a genuine alert unless confirmed otherwise.`;
+    }
+    else if (status.includes('EMERGENCY')) {
+        headerColour  = '#dc2626';
+        statusLabel   = 'EMERGENCY — SIGNIFICANTLY OVERDUE';
+        ntfyPriority  = 'urgent';
+        ntfyTags      = 'rotating_light,red_circle';
+        whatHappened  = `This worker is <strong>significantly overdue</strong> and we have not been able to confirm their safety. Their grace period has expired.`;
+        actionSteps   = `
+            <li>Try to <strong>call ${workerFirst}</strong> on ${workerPhone} immediately</li>
+            <li>Contact someone at the site to check on the worker's welfare</li>
+            <li>If unreachable after a reasonable effort, <strong>consider contacting emergency services (111)</strong> and providing the location above</li>`;
+        noteToContact = `Before escalating to police, consider that the worker may be out of mobile data coverage, may have closed the app, or may have a flat battery. Try calling, texting, and checking with the site first.`;
+    }
+    else if (status.includes('OVERDUE') || status.includes('CRITICAL ESCALATION') || status.includes('OVERDUE WARNING')) {
+        headerColour  = '#d97706';  // amber — concern, not yet emergency
+        statusLabel   = 'OVERDUE — MISSED CHECK-IN';
+        ntfyPriority  = 'high';
+        ntfyTags      = 'warning,yellow_circle';
+        whatHappened  = `This worker <strong>has not checked out as scheduled</strong>. They may be delayed, unreachable, or in difficulty.`;
+        actionSteps   = `
+            <li>Try to <strong>call or text ${workerFirst}</strong> on ${workerPhone}</li>
+            <li>If you cannot reach them, contact someone at the site and ask them to check on the worker's safety</li>
+            <li>If they remain unreachable and you have concerns, <strong>contact emergency services (111)</strong></li>`;
+        noteToContact = `Before escalating to police, consider that the worker may be running late, out of coverage, or have a flat battery. Try calling, texting, and other contact methods first.`;
+    }
+    else if (status.includes('TEST_ALERT')) {
+        headerColour  = '#1d4ed8';  // blue — not a real emergency
+        statusLabel   = 'TEST — Safety System Check';
+        ntfyPriority  = 'default';
+        ntfyTags      = 'test_tube,blue_circle';
+        whatHappened  = `This is a <strong>scheduled test</strong> of ${workerName}'s lone worker safety app. <strong>No action is required.</strong>`;
+        actionSteps   = `
+            <li>No action required — this confirms your emergency contact details are correct and alerts are reaching your inbox</li>
+            <li>Please check that this email did not land in your spam folder</li>
+            <li>If you did <em>not</em> expect this test, contact ${workerName} on ${workerPhone} to confirm it was sent intentionally</li>`;
+        noteToContact = '';
+    }
+    else {
+        // Fallback for any other status (CRITICAL TIMING, LOW BATTERY, etc.)
+        whatHappened  = `A safety event has been recorded for this worker. Status: <strong>${status}</strong>.`;
+        actionSteps   = `<li>Try to contact <strong>${workerFirst}</strong> on ${workerPhone}</li>
+                         <li>If you have concerns about their safety, contact emergency services (111)</li>`;
+        noteToContact = '';
+    }
+
+    const headerEmoji = status.includes('TEST_ALERT') ? '🧪' : '🚨';
+
+    // ── BUILD HTML EMAIL ───────────────────────────────────────────────────
+    const locationBlock = [
+        `<tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap;vertical-align:top">Site:</td><td style="padding:4px 0"><strong>${locationName}</strong></td></tr>`,
+        locationAddr ? `<tr><td style="color:#6b7280;padding:4px 12px 4px 0;vertical-align:top">Address:</td><td style="padding:4px 0">${locationAddr}</td></tr>` : '',
+        `<tr><td style="color:#6b7280;padding:4px 12px 4px 0;vertical-align:top">GPS:</td><td style="padding:4px 0">${gpsText}</td></tr>`
+    ].filter(Boolean).join('');
+
+    // Build a per-recipient email with the correct salutation.
+    // Each recipient gets "Dear [their first name]" rather than a generic greeting.
+    // ntfyTopic: if provided, a subscribe deeplink is shown in TEST emails so contacts can opt in to push.
+    const buildHtml = (recipientName, ntfyTopic) => {
+        const salutation = recipientName
+            ? `Dear ${recipientName.split(' ')[0]},`
+            : 'Dear Emergency Contact,';
+        const ntfyServer = (CONFIG.NTFY_SERVER && !CONFIG.NTFY_SERVER.includes('%%'))
+            ? CONFIG.NTFY_SERVER.replace(/\/$/, '')
+            : 'https://ntfy.sh';
+        const ntfySubscribeBlock = (status.includes('TEST_ALERT') && ntfyTopic && ntfyTopic.trim())
+            ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px 20px;margin:24px 0 0">
+                 <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#1e40af">📲 Enable Instant Push Notifications</p>
+                 <p style="margin:0 0 12px;font-size:13px;color:#374151">Install the free <strong>ntfy app</strong> on your phone and tap the button below to subscribe to <strong>${workerName}'s</strong> safety alerts. You'll receive a push notification the instant an alarm fires — no need to check your email.</p>
+                 <a href="${ntfyServer}/${ntfyTopic.trim()}" style="display:inline-block;background:#1d4ed8;color:#fff;font-size:13px;font-weight:bold;padding:10px 20px;border-radius:6px;text-decoration:none">Subscribe to Push Alerts →</a>
+                 <p style="margin:10px 0 0;font-size:11px;color:#6b7280">Download ntfy: <a href="https://apps.apple.com/app/ntfy/id1625396347" style="color:#2563eb">iOS App Store</a> · <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" style="color:#2563eb">Google Play</a> · <a href="https://ntfy.sh" style="color:#2563eb">Web browser</a></p>
+               </div>`
+            : '';
+        return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+      <!-- Header -->
+      <tr><td style="background:${headerColour};color:#fff;padding:24px 28px;border-radius:8px 8px 0 0">
+        <div style="font-size:11px;font-weight:bold;letter-spacing:3px;opacity:0.85;text-transform:uppercase;margin-bottom:6px">OTG Lone Worker Safety</div>
+        <div style="font-size:22px;font-weight:bold">${headerEmoji} ${statusLabel}</div>
+      </td></tr>
+
+      <!-- Body -->
+      <tr><td style="background:#fff;padding:28px;border-radius:0 0 8px 8px">
+
+        <p style="margin:0 0 20px">${salutation}</p>
+        <p style="margin:0 0 20px">You are receiving this message because you are listed as <strong>${workerName}</strong>'s emergency contact.</p>
+
+        <h2 style="font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin:0 0 12px">What Has Happened</h2>
+        <p style="margin:0 0 6px">${whatHappened}</p>
+        ${notes ? `<p style="margin:8px 0 0;color:#6b7280;font-style:italic">&ldquo;${notes}&rdquo;</p>` : ''}
+
+        <h2 style="font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin:24px 0 12px">Worker Details</h2>
+        <table cellpadding="0" cellspacing="0">
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Name:</td><td style="padding:4px 0"><strong>${workerName}</strong></td></tr>
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Phone:</td><td style="padding:4px 0">${workerPhone}</td></tr>
+        </table>
+
+        <h2 style="font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin:24px 0 12px">Last Known Location</h2>
+        <table cellpadding="0" cellspacing="0">${locationBlock}</table>
+
+        <h2 style="font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin:24px 0 12px">What You Should Do Now</h2>
+        <ol style="margin:0 0 0 20px;padding:0;line-height:1.8">${actionSteps}</ol>
+
+        ${noteToContact ? `
+        <div style="background:#fef9c3;border-left:4px solid #eab308;padding:14px 16px;margin:24px 0 0;border-radius:0 6px 6px 0">
+          <p style="margin:0;font-size:13px;color:#78350f">${noteToContact}</p>
+        </div>` : ''}
+
+        ${ntfySubscribeBlock}
+
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0">
+        <table cellpadding="0" cellspacing="0" style="font-size:12px;color:#6b7280;width:100%">
+          <tr><td style="padding:2px 12px 2px 0;white-space:nowrap">Status:</td><td>${statusLabel}</td></tr>
+          <tr><td style="padding:2px 12px 2px 0;white-space:nowrap">Battery:</td><td>${battery}</td></tr>
+          <tr><td style="padding:2px 12px 2px 0;white-space:nowrap">Sent at:</td><td>${sentAt}</td></tr>
+        </table>
+
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+    };
+
+    // ── EMAIL ROUTING ──────────────────────────────────────────────────────
+    // Send each contact a personalised email (correct "Dear [Name]" salutation).
+    const contactPairs = [
+        { email: p['Emergency Contact Email'],   name: p['Emergency Contact Name'],   ntfy: p['Emergency Contact Ntfy']   },
+        { email: p['Escalation Contact Email'],  name: p['Escalation Contact Name'],  ntfy: p['Escalation Contact Ntfy']  }
+    ].filter(c => c.email && c.email.includes('@'));
+
+    contactPairs.forEach(contact => {
+        const subject  = `${headerEmoji} ${statusLabel} — ${workerName}`;
+        const htmlBody = buildHtml(contact.name, contact.ntfy);
         try {
-            MailApp.sendEmail({to: emails.join(','), subject: subject, body: body});
+            MailApp.sendEmail({ to: contact.email, subject, htmlBody });
         } catch (mailErr) {
             console.error("ALERT EMAIL FAILED: " + mailErr.toString());
-            // Increment daily fail counter so sendHealthEmail() can report it
             try {
                 const failCount = parseInt(sp.getProperty('DAILY_FAIL_COUNT') || '0', 10);
                 sp.setProperty('DAILY_FAIL_COUNT', String(failCount + 1));
-                sp.setProperty('LAST_FAIL_DETAIL', `${new Date().toISOString()} | Worker: ${p['Worker Name']} | ${mailErr.toString().substring(0, 200)}`);
+                sp.setProperty('LAST_FAIL_DETAIL',
+                    `${new Date().toISOString()} | Worker: ${workerName} | ${mailErr.toString().substring(0, 200)}`);
             } catch (propErr) { console.error("Could not write fail counter: " + propErr.toString()); }
         }
-    }
-    
-    // SMS ROUTING: Sent immediately to all active contacts in the payload
-    if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
-        // Ensure we capture both phone keys used in the worker app
+    });
+
+    // ── SMS ROUTING ────────────────────────────────────────────────────────
+    if (CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
         const numbers = [
-            p['Emergency Contact Number'] || p['Emergency Contact Phone'], 
+            p['Emergency Contact Number'] || p['Emergency Contact Phone'],
             p['Escalation Contact Number'] || p['Escalation Contact Phone']
         ].map(n => _cleanPhone(n)).filter(n => n);
-        
-        numbers.forEach(num => { 
+
+        const smsBody = `🚨 ${statusLabel}\nWorker: ${workerName}\nSite: ${locationName}\nPhone: ${workerPhone}\n${gpsSmsTxt}`;
+        numbers.forEach(num => {
             try {
                 UrlFetchApp.fetch('https://textbelt.com/text', {
-                    'method': 'post',
-                    'payload': { 'phone': num, 'message': `${subject}\nGPS: ${gpsLink}`, 'key': CONFIG.TEXTBELT_API_KEY }
-                }); 
-            } catch(e) { console.error("SMS Failed: " + e.toString()); }
+                    method: 'post',
+                    payload: { phone: num, message: smsBody, key: CONFIG.TEXTBELT_API_KEY }
+                });
+            } catch (e) { console.error("SMS Failed: " + e.toString()); }
         });
     }
+
+    // ── NTFY PUSH ROUTING ─────────────────────────────────────────────────
+    // Sends an instant push notification to each contact's phone via the ntfy app.
+    // Fires in addition to email and SMS — never instead of them.
+    // Silently skipped per-contact if no ntfy topic is configured.
+    const ntfyMessage = [
+        `Worker: ${workerName} · ${workerPhone}`,
+        `Site: ${locationName}`,
+        locationAddr ? `Address: ${locationAddr}` : '',
+        hasGPS ? `GPS: ${gpsLink}` : 'GPS: Not available',
+        `Battery: ${battery}`,
+        `Sent: ${sentAt}`
+    ].filter(Boolean).join('\n');
+
+    const ntfyContacts = [
+        { topic: p['Emergency Contact Ntfy'],  name: p['Emergency Contact Name']  },
+        { topic: p['Escalation Contact Ntfy'], name: p['Escalation Contact Name'] }
+    ].filter(c => c.topic && c.topic.trim());
+
+    ntfyContacts.forEach(c => {
+        _sendNtfy(c.topic, `${headerEmoji} ${statusLabel} — ${workerName}`, ntfyMessage, ntfyPriority, ntfyTags);
+    });
 }
 
 /**
@@ -784,6 +990,43 @@ function triggerAlerts(p, type) {
  * RE-ENGINEERED: Multi-Stage Escalation Engine
  * Logic: Handles 15/30/45 alerts and immediate [CRITICAL_TIMING] dual-alerts.
  */
+/**
+ * NTFY PUSH NOTIFICATION HELPER
+ * Posts a push notification to a contact's ntfy topic.
+ * The ntfy app on their phone receives it instantly, bypassing email latency.
+ *
+ * @param {string} topic    - The contact's private ntfy topic string (e.g. "alice-safety-7x9k2")
+ * @param {string} title    - Notification title (shown in bold on lock screen)
+ * @param {string} message  - Notification body text
+ * @param {string} priority - ntfy priority: "min","low","default","high","urgent"
+ * @param {string} tags     - Comma-separated ntfy emoji tags (e.g. "rotating_light,red_circle")
+ *
+ * Silently skipped if topic is blank or NTFY_SERVER is not configured.
+ * All errors are caught — a failed push must never prevent email/SMS from sending.
+ */
+function _sendNtfy(topic, title, message, priority, tags) {
+    if (!topic || topic.trim() === '') return;
+    const server = (CONFIG.NTFY_SERVER && !CONFIG.NTFY_SERVER.includes('%%'))
+        ? CONFIG.NTFY_SERVER.replace(/\/$/, '')
+        : 'https://ntfy.sh';
+    const url = `${server}/${topic.trim()}`;
+    try {
+        UrlFetchApp.fetch(url, {
+            method: 'post',
+            headers: {
+                'Title':    title,
+                'Priority': priority || 'default',
+                'Tags':     tags    || 'bell'
+            },
+            payload:            message,
+            muteHttpExceptions: true
+        });
+        console.log(`ntfy push sent to topic: ${topic}`);
+    } catch (e) {
+        console.error(`ntfy push failed for topic "${topic}": ${e.toString()}`);
+    }
+}
+
 /**
  * DEAD-MAN'S SWITCH PING
  * Fires a silent HTTP GET to the Healthchecks.io check URL after every
@@ -1529,16 +1772,20 @@ function triggerEscalation(sheet, entry, newStatus, isDual) {
     sheet.appendRow(newRow);
 
     const payload = {
-        'Worker Name': entry[2],
-        'Alarm Status': newStatus,
-        'Location Name': entry[12],
-        'Notes': `Alert: Worker is ${newStatus}.`,
-        'Last Known GPS': entry[14],
-        'Battery Level': entry[16],
-        'Emergency Contact Email': entry[6],
-        'Emergency Contact Number': entry[5], // Map frontend 'Phone' to backend 'Number'
-        'Escalation Contact Email': isDual ? entry[9] : "",
-        'Escalation Contact Number': isDual ? entry[8] : ""
+        'Worker Name':               entry[2],
+        'Worker Phone Number':       entry[3],
+        'Emergency Contact Name':    entry[4],
+        'Emergency Contact Number':  entry[5],
+        'Emergency Contact Email':   entry[6],
+        'Escalation Contact Name':   entry[7],
+        'Escalation Contact Number': isDual ? entry[8] : "",
+        'Escalation Contact Email':  isDual ? entry[9] : "",
+        'Alarm Status':              newStatus,
+        'Notes':                     `Alert: Worker is ${newStatus}.`,
+        'Location Name':             entry[12],
+        'Location Address':          entry[13],
+        'Last Known GPS':            entry[14],
+        'Battery Level':             entry[16]
     };
     triggerAlerts(payload, isDual ? "CRITICAL ESCALATION" : "OVERDUE WARNING");
 }
@@ -1578,18 +1825,51 @@ function handleSafetyResolution(p) {
     }
 
     // 2. Draft the Resolution Messages
-    const subject = `✅ ALL CLEAR: ${p['Worker Name']} is Safe`;
-    const body = `SAFETY RESOLUTION\n\n` +
-                 `The worker, ${p['Worker Name']}, has checked in and confirmed they are SAFE.\n\n` +
-                 `The previous safety alert is now resolved. No further action is required.\n\n` +
-                 `Timestamp: ${new Date().toLocaleString()}\n` +
-                 `Location: ${p['Location Name']}`;
+    const subject    = `✅ ALL CLEAR — ${p['Worker Name']} is safe`;
+    const workerName = p['Worker Name'] || 'The worker';
+    const workerPhone = p['Worker Phone Number'] || 'Not provided';
+    const resolvedAt  = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "dd/MM/yyyy, HH:mm:ss");
 
-    // 3. Dual-Contact Email
-    const emails = [p['Emergency Contact Email'], p['Escalation Contact Email']].filter(e => e && e.includes('@'));
-    if(emails.length > 0) { 
-        MailApp.sendEmail({to: emails.join(','), subject: subject, body: body}); 
-    }
+    const buildAllClearHtml = (recipientName) => {
+        const salutation = recipientName ? `Dear ${recipientName.split(' ')[0]},` : 'Dear Emergency Contact,';
+        return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+      <tr><td style="background:#16a34a;color:#fff;padding:24px 28px;border-radius:8px 8px 0 0">
+        <div style="font-size:11px;font-weight:bold;letter-spacing:3px;opacity:0.85;text-transform:uppercase;margin-bottom:6px">OTG Lone Worker Safety</div>
+        <div style="font-size:22px;font-weight:bold">✅ ALL CLEAR — Worker is Safe</div>
+      </td></tr>
+      <tr><td style="background:#fff;padding:28px;border-radius:0 0 8px 8px">
+        <p style="margin:0 0 20px">${salutation}</p>
+        <p style="margin:0 0 20px"><strong>${workerName}</strong> has confirmed they are safe. The previous safety alert is now resolved. <strong>No further action is required.</strong></p>
+        <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151">
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Worker:</td><td>${workerName}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Phone:</td><td>${workerPhone}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Location:</td><td>${p['Location Name'] || 'Unknown'}</td></tr>
+          <tr><td style="color:#6b7280;padding:4px 12px 4px 0;white-space:nowrap">Cleared at:</td><td>${resolvedAt}</td></tr>
+        </table>
+        <p style="margin:20px 0 0;font-size:13px;color:#6b7280">If you have any concerns, please contact the worker directly on ${workerPhone}.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+    };
+
+    // 3. Dual-Contact Email — personalised salutation per recipient
+    const contactPairs = [
+        { email: p['Emergency Contact Email'],  name: p['Emergency Contact Name']  },
+        { email: p['Escalation Contact Email'], name: p['Escalation Contact Name'] }
+    ].filter(c => c.email && c.email.includes('@'));
+
+    contactPairs.forEach(contact => {
+        try {
+            MailApp.sendEmail({ to: contact.email, subject, htmlBody: buildAllClearHtml(contact.name) });
+        } catch (e) { console.error("All Clear email failed: " + e.toString()); }
+    });
     
     // 4. Dual-Contact SMS
     if(CONFIG.TEXTBELT_API_KEY && CONFIG.TEXTBELT_API_KEY.length > 5) {
@@ -1606,5 +1886,19 @@ function handleSafetyResolution(p) {
             } catch(e) {}
         });
     }
+
+    // 5. ntfy push — All Clear notification to both contacts
+    const allClearMsg = [
+        `Worker: ${p['Worker Name'] || 'Unknown'} · ${p['Worker Phone Number'] || ''}`,
+        `Location: ${p['Location Name'] || 'Unknown'}`,
+        `Cleared: ${resolvedAt}`
+    ].filter(Boolean).join('\n');
+
+    [p['Emergency Contact Ntfy'], p['Escalation Contact Ntfy']]
+        .filter(t => t && t.trim())
+        .forEach(topic => {
+            _sendNtfy(topic, `✅ ALL CLEAR — ${p['Worker Name'] || 'Worker'} is safe`, allClearMsg, 'default', 'white_check_mark,green_circle');
+        });
+
     return { status: "success" };
 }
