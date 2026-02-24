@@ -692,6 +692,23 @@ function dataURItoBlob(dataURI) {
     }
 }
 
+function handleRegisterDevice(p) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Staff');
+  if (!sheet) return { status: "error", message: "Staff sheet missing" };
+  const data = sheet.getDataRange().getValues();
+  const workerName = p['Worker Name'];
+  const deviceId = p.deviceId;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === workerName) {
+      // Column E (index 4) — bind this device ID to the worker
+      sheet.getRange(i + 1, 5).setValue(deviceId);
+      return { status: "success", message: "Device successfully bound to " + workerName };
+    }
+  }
+  return { status: "error", message: "Worker not found in Staff registry" };
+}
+
 function updateStaffStatus(p) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Staff');
