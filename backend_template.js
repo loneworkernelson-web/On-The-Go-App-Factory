@@ -1,10 +1,10 @@
 /**
- * OTG APPSUITE - MASTER BACKEND v79.35
+ * OTG APPSUITE - MASTER BACKEND %%BACKEND_VERSION%%
  * FIXED: SOS Map URLs, SMS Payloads, and GAS Environment Stability
  */
 
 const CONFIG = {
-  VERSION: "v79.35", // New diagnostic property
+  VERSION: "%%BACKEND_VERSION%%", // Injected by Factory at build time
   MASTER_KEY: "%%SECRET_KEY%%", 
   WORKER_KEY: "%%WORKER_KEY%%", 
   ORS_API_KEY: "%%ORS_API_KEY%%", 
@@ -421,12 +421,22 @@ function handleWorkerPost(p, e) {
             console.log('Outbox dedup: discarding duplicate key ' + p.idempotencyKey);
             return;
         }
-        // Register the key, keep the window trimmed to 200 entries.
+        // Register the key, keep the window trimmed to 100 entries.
         seen.push(p.idempotencyKey);
-        if (seen.length > 200) seen.splice(0, seen.length - 200);
+        if (seen.length > 100) seen.splice(0, seen.length - 100); // 100 keys ≈ 5KB, safe under GAS 9KB per-key limit
         sp.setProperty(IDEM_PROP, JSON.stringify(seen));
     }
     // ── END IDEMPOTENCY GUARD ────────────────────────────────────────────────
+
+    // ── TEST_ALERT FAST PATH ─────────────────────────────────────────────────
+    // TEST_ALERT must never touch the Visits sheet. Writing it would overwrite the
+    // open ARRIVED row's status, stranding the visit and blocking the next real
+    // visit from correctly writing its address details.
+    if (p['Alarm Status'] && p['Alarm Status'].includes('TEST_ALERT')) {
+        triggerAlerts(p, "TEST");
+        return;
+    }
+    // ── END TEST_ALERT FAST PATH ─────────────────────────────────────────────
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('Visits');
@@ -548,10 +558,6 @@ if (!rowUpdated) {
 
     if(p['Alarm Status'].includes("EMERGENCY") || p['Alarm Status'].includes("PANIC") || p['Alarm Status'].includes("DURESS")) {
         triggerAlerts(p, "IMMEDIATE");
-    }
-    // TEST_ALERT: same delivery path but clearly marked so contacts know it's a drill.
-    if(p['Alarm Status'].includes("TEST_ALERT")) {
-        triggerAlerts(p, "TEST");
     }
 }
 function processFormEmail(p, reportObj, polishedNotes, p1, p2, p3, p4, sig) {
@@ -1498,7 +1504,7 @@ function getRouteDistanceWithTrail(trailStr) {
 
     if (points.length < 2) return null;
 
-    const coords = _decimateTrail(points, 25);
+    const coords = _decimateTrail(points, 40); // ORS free tier supports 50; 40 gives accuracy headroom
 
     try {
         const response = UrlFetchApp.fetch(
@@ -1610,7 +1616,8 @@ function getSyncData(workerName, deviceId) {
                     template: sData[i][1], company: sData[i][2], siteName: sData[i][3], 
                     address: sData[i][4], contactName: sData[i][5], 
                     contactPhone: sData[i][6], contactEmail: sData[i][7], 
-                    notes: sData[i][8], emergencyProcedures: sData[i][9] 
+                    notes: sData[i][8], emergencyProcedures: sData[i][9],
+                    riskLevel: sData[i][10] || ''  // Column K — Low / Medium / High / Critical
                 });
             }
         }
