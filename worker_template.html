@@ -2563,6 +2563,7 @@ function enterLockedScreen() {
     tick(); // Immediate first tick so the display is right straight away
     
     startWelfareChecks(); // Only fires if CONFIG.checkinEnabled — no-op otherwise
+    _lockOrientation();   // Prevent landscape rotation for the duration of the visit
 }
 
 /**
@@ -4518,9 +4519,11 @@ window.onload = () => {
     console.log("OTG Safety Engine: Robust Initialization Complete.");
     updateLastSyncUI();
 
-    // Keep currentBatteryLevel accurate for all buildPayload calls
+    // Keep currentBatteryLevel accurate for all buildPayload calls.
+    // 3-minute interval is sufficient — battery drains slowly and the 15% low-battery
+    // threshold gives ample warning time. 60s was unnecessarily frequent.
     refreshBatteryLevel();
-    setInterval(refreshBatteryLevel, 60000);
+    setInterval(refreshBatteryLevel, 180000);
 
     // OUTBOX: Migrate any events still in the localStorage legacy queue to
     // the durable IndexedDB store. No-op if the queue is already empty.
@@ -6127,9 +6130,36 @@ function releaseWakeLock() {
     }
 }
 
-// Release wake lock when visit ends
+/**
+ * SCREEN ORIENTATION LOCK
+ * Locks the display to portrait while a visit is active.
+ * Prevents accidental rotation into landscape, which breaks the locked-screen
+ * layout and could obscure the countdown timer or alarm controls.
+ *
+ * screen.orientation.lock() is supported on Android Chrome and most PWA contexts.
+ * On iOS Safari it is silently ignored — no error, no effect, no fallback needed.
+ * On desktop it will throw (not a mobile context) — caught and silently ignored.
+ */
+function _lockOrientation() {
+    try {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(() => {});
+        }
+    } catch (e) { /* not supported in this context — safe to ignore */ }
+}
+
+function _unlockOrientation() {
+    try {
+        if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+        }
+    } catch (e) { /* safe to ignore */ }
+}
+
+// Release wake lock and orientation lock when visit ends
 function exitLockedScreen() {
     releaseWakeLock();
+    _unlockOrientation();
 }
 
 function checkWizPinMatch() {
@@ -6643,7 +6673,11 @@ async function checkBatterySafety() {
     // Only check if we haven't already sent an alert this visit
     if (!state.activeVisit || state.activeVisit.lowBatterySent) return;
 
-    const levelStr = await getBatteryPercent(); // Existing function in v167
+    // Use the cached level — refreshBatteryLevel() keeps this accurate every 3 minutes,
+    // which is sufficient to detect a 15% threshold before it becomes critical.
+    // Calling getBatteryPercent() directly here was firing an async Battery API call
+    // on every tick (every 10s), an unnecessary overhead for a slowly-changing value.
+    const levelStr = currentBatteryLevel;
     const level = parseInt(levelStr);
 
     if (level <= 15) {
