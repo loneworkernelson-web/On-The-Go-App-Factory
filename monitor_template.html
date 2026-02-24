@@ -1068,6 +1068,7 @@ function getStatusDot(status, isOverdue, isStale) {
         case 'DEPARTED':
         case 'COMPLETED':
         case 'USER_SAFE':  return 'bg-slate-600';
+        case 'WELFARE_OK': return 'bg-teal-500';
         default:           return 'bg-slate-500';
     }
 }
@@ -1080,6 +1081,8 @@ function getStatusClass(status) {
     if (ALERT_STATUSES.some(a => s.includes(a))) return 'bg-red-500/20 text-red-400 border border-red-500/50';
     if (s === 'ARRIVED')    return 'bg-green-500/20  text-green-400  border border-green-500/50';
     if (s === 'TRAVELLING') return 'bg-blue-500/20   text-blue-400   border border-blue-500/50';
+    if (s === 'WELFARE_OK') return 'bg-teal-500/20 text-teal-400 border border-teal-500/50';
+    if (s.includes('TEST_ALERT')) return 'bg-blue-500/20 text-blue-400 border border-blue-500/50';
     return 'bg-slate-500/20 text-slate-400 border border-slate-500/50';
 }
 
@@ -1205,8 +1208,9 @@ function renderLog() {
         .map(r => {
             const t   = new Date(r['Timestamp']).toLocaleTimeString();
             const n   = escapeHtml(r['Worker Name']  || '');
-            const s   = escapeHtml(r['Alarm Status'] || '');
-            const cls = getStatusClass(r['Alarm Status']);
+            const rawS = r['Alarm Status'] || '';
+            const s   = escapeHtml(rawS.toUpperCase().includes('TEST_ALERT') ? '🧪 TEST — ' + rawS : rawS);
+            const cls = getStatusClass(rawS);
             return `<div class="text-xs py-1 border-b border-gray-800">
                         <span class="text-gray-300">${t}</span>
                         <span class="text-white font-semibold ml-1">${n}</span>
