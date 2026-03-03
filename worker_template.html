@@ -3,28 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>%%ORG_NAME%% Safety</title>
-<meta name="apple-mobile-web-app-title" content="%%APP_NAME%%">
+<title>OTG Safety</title>
+<meta name="apple-mobile-web-app-title" content="OTG Safety">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1e40af">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="%%LOGO_DATA%%">
+<meta name="theme-color" id="metaThemeColor" content="#1e3a8a">
+<link rel="manifest" href="manifest.json" id="manifestLink">
+<link rel="icon" href="./icon.png" id="faviconLink">
 
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 
 <style>
-/* 1. FACTORY DYNAMIC THEME */
+/* 1. RUNTIME THEME — defaults overridden at boot by applyTheme() from config.json */
 :root {
-    --primary:          %%PRIMARY_COLOR%%;           /* replaced at build time */
-    --accent:           %%ACCENT_COLOR%%;            /* replaced at build time */
-    --surface:          %%SURFACE_COLOR%%;           /* derived: primary -10L  */
-    --accent-glow:      %%ACCENT_GLOW%%;             /* derived: accent rgba   */
-    --text-on-primary:  %%TEXT_ON_PRIMARY%%;         /* white or black — WCAG AA on --primary  */
-    --text-on-accent:   %%TEXT_ON_ACCENT%%;          /* white or black — WCAG AA on --accent   */
+    --primary:          #1e3a8a;
+    --accent:           #3b82f6;
+    --surface:          #1e2f6a;
+    --accent-glow:      rgba(59,130,246,0.25);
+    --text-on-primary:  #ffffff;
+    --text-on-accent:   #ffffff;
 }
 
 /* 2. FORCE SYSTEM DIM: Required to dim the OS navigation bar for Battery Saver */
@@ -288,6 +288,41 @@ input[type="checkbox"]:checked ~ .travel-toggle-bg { background-color: var(--acc
 </head>
 <body class="h-full overflow-hidden select-none">
 
+<!-- =========================================================
+     BOOT SCREEN — visible while config.json is being fetched.
+     Hidden by applyConfig() on success; replaced by error UI on failure.
+     This is the ONLY element visible before CONFIG is populated.
+     ========================================================= -->
+<div id="bootScreen" style="
+    position: fixed; inset: 0; z-index: 9999;
+    background: #1e3a8a;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 1.5rem; color: white; font-family: 'Inter', sans-serif;
+">
+    <div id="bootSpinner" style="
+        width: 48px; height: 48px;
+        border: 4px solid rgba(255,255,255,0.2);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+    "></div>
+    <div style="text-align:center; max-width: 280px;">
+        <div style="font-weight:800; font-size:1.1rem; letter-spacing:0.05em; text-transform:uppercase; margin-bottom:0.35rem;">OTG Safety</div>
+        <div id="bootStatus" style="font-size:0.78rem; opacity:0.7; font-weight:600;">Loading configuration…</div>
+    </div>
+    <div id="bootError" style="display:none; text-align:center; max-width:300px; padding:0 1.5rem;">
+        <div style="font-size:2rem; margin-bottom:0.75rem;">⚠️</div>
+        <div style="font-weight:800; font-size:1rem; margin-bottom:0.5rem;">Configuration Unavailable</div>
+        <div id="bootErrorMsg" style="font-size:0.78rem; opacity:0.75; line-height:1.5; margin-bottom:1.25rem;"></div>
+        <button onclick="location.reload()" style="
+            background:#3b82f6; color:white; border:none;
+            padding:0.75rem 1.75rem; border-radius:0.75rem;
+            font-weight:700; font-size:0.85rem; cursor:pointer;
+        ">Retry</button>
+    </div>
+</div>
+
 <div id="offlineBanner" class="hidden bg-red-600 text-white text-center text-xs font-bold py-1">
     📡 OFFLINE MODE - Data queued for upload
 </div>
@@ -500,9 +535,9 @@ input[type="checkbox"]:checked ~ .travel-toggle-bg { background-color: var(--acc
 <div id="mainPage" class="page">
 <div class="header-bar">
     <div class="flex items-center gap-3">
-        <img src="%%LOGO_DATA%%" class="w-10 h-10 rounded-lg object-contain shadow-sm" alt="Logo">
+        <img id="headerLogo" src="./icon.png" class="w-10 h-10 rounded-lg object-contain shadow-sm" alt="Logo">
         <h1 class="text-xs font-black uppercase tracking-wider leading-tight" style="color: var(--text-on-primary)">
-            %%ORG_NAME%%<br><span class="italic" style="color: var(--accent)">Safety App</span>
+            <span id="headerOrgName">OTG</span><br><span class="italic" style="color: var(--accent)">Safety App</span>
         </h1>
     </div>
     <div class="flex gap-4 items-center"> 
@@ -549,7 +584,17 @@ input[type="checkbox"]:checked ~ .travel-toggle-bg { background-color: var(--acc
         Last Sync: Never
     </div>
 </div>
-        <!-- Regular locations (grid) -->
+        <!-- Site search — shown automatically when site count exceeds 15 -->
+        <div id="siteSearchRow" class="hidden mb-3">
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">🔍</span>
+                <input id="siteSearch" type="search" placeholder="Search sites…"
+                       class="w-full bg-gray-800 border border-gray-600 rounded-xl pl-8 pr-3 py-2.5 text-sm text-white font-bold placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                       oninput="renderLocations()">
+            </div>
+        </div>
+
+        <!-- Regular locations — grid (≤6) or compact list (7+) -->
         <div id="locationList" class="grid grid-cols-2 gap-3"></div>
     </div>
     <div class="footer-bar">
@@ -796,7 +841,7 @@ input[type="checkbox"]:checked ~ .travel-toggle-bg { background-color: var(--acc
                 <div class="flex gap-2 mb-3">
                     <div class="flex-1">
                         <div class="text-sm text-gray-300 uppercase font-bold mb-1">App Version</div>
-                        <div id="appVersion" class="text-sm font-mono text-blue-400">%%BUILD_VERSION%%</div>
+                        <div id="appVersion" class="text-sm font-mono text-blue-400">—</div>
                     </div>
                     <div class="flex-1">
                         <div class="text-sm text-gray-300 uppercase font-bold mb-1">Backend Version</div>
@@ -1208,35 +1253,265 @@ const RISK_WELFARE_MAP = {
     Critical: 10    // Critical    — check in every 10 minutes
 };
 
+// =============================================================================
+// CONFIG — populated at runtime by loadConfig() from ./config.json
+// Defaults here are safe fallbacks used only if config.json is somehow
+// partially malformed; in normal operation every field is overwritten.
+// =============================================================================
 const CONFIG = {
-    url:            "%%GOOGLE_SHEET_URL%%",
-    org:            "%%ORG_NAME%%",
-    key:            "%%WORKER_KEY%%",
-
-    // Features — all injected by Factory at build time
-    mileageEnabled: %%ENABLE_MILEAGE%%,
-    vehEnabled:     %%VEHICLE_ENABLED%%,
-    checkinEnabled: %%CHECKIN_ENABLED%%,
-
-    // Timing — injected by Factory
-    vehInterval:       %%VEHICLE_INTERVAL%%,    // days between vehicle checks
-    escalationMinutes: %%ESCALATION_MINUTES%%,  // mins before alarm escalates
-    checkinInterval:   %%CHECKIN_INTERVAL%%,    // mins between check-in prompts
-
-    // Localisation — injected by Factory
-    countryPrefix: "%%COUNTRY_PREFIX%%",
-    vehicleTerm:   "%%VEHICLE_TERM%%",
-    voiceLocale:   "%%VOICE_LOCALE%%",
-
-    // Requirements — injected by Factory
-    reqTravelReport: %%REQ_TRAVEL_REPORT%%,
-
-    // ntfy push notifications — injected by Factory
-    ntfyServer:     "%%NTFY_SERVER%%",
-
-    // Build stamp — injected by Factory
-    buildVersion:  "%%BUILD_VERSION%%"
+    url:            '',
+    org:            '',
+    appName:        '',
+    key:            '',
+    mileageEnabled: false,
+    vehEnabled:     false,
+    checkinEnabled: true,
+    vehInterval:       90,
+    escalationMinutes: 60,
+    checkinInterval:   30,
+    countryPrefix: '+64',
+    vehicleTerm:   'WOF',
+    voiceLocale:   'en-NZ',
+    reqTravelReport: true,
+    ntfyServer:     'https://ntfy.sh',
+    buildVersion:  '0.0.0'
 };
+
+// =============================================================================
+// CONFIG BOOT — fetch ./config.json, populate CONFIG, apply theme, then init
+// =============================================================================
+
+/**
+ * applyTheme — write config theme values to CSS custom properties BEFORE the
+ * app renders, preventing a flash of unstyled/default-coloured content.
+ * Must be called synchronously during boot, not in a setTimeout.
+ */
+function applyTheme(theme) {
+    if (!theme) return;
+    const root = document.documentElement;
+    if (theme.primary)        root.style.setProperty('--primary',         theme.primary);
+    if (theme.accent)         root.style.setProperty('--accent',          theme.accent);
+    if (theme.surface)        root.style.setProperty('--surface',         theme.surface);
+    if (theme.accentGlow)     root.style.setProperty('--accent-glow',     theme.accentGlow);
+    if (theme.textOnPrimary)  root.style.setProperty('--text-on-primary', theme.textOnPrimary);
+    if (theme.textOnAccent)   root.style.setProperty('--text-on-accent',  theme.textOnAccent);
+    // Keep <meta name="theme-color"> in sync with primary so the browser chrome matches
+    const meta = document.getElementById('metaThemeColor');
+    if (meta && theme.primary) meta.setAttribute('content', theme.primary);
+}
+
+/**
+ * applyConfig — map config.json fields onto the CONFIG object and update DOM
+ * elements that need config values set before app initialization.
+ */
+function applyConfig(cfg) {
+    // Core
+    CONFIG.url            = cfg.backendUrl        || '';
+    CONFIG.org            = cfg.orgName           || '';
+    CONFIG.appName        = cfg.appName           || cfg.orgName || '';
+    CONFIG.key            = cfg.workerKey         || '';
+    CONFIG.ntfyServer     = cfg.ntfyServer        || 'https://ntfy.sh';
+    CONFIG.buildVersion   = cfg.version           || '0.0.0';
+
+    // Features
+    if (cfg.features) {
+        CONFIG.mileageEnabled  = !!cfg.features.mileageEnabled;
+        CONFIG.vehEnabled      = !!cfg.features.vehicleEnabled;
+        CONFIG.checkinEnabled  = cfg.features.checkinEnabled !== false; // default true
+        CONFIG.reqTravelReport = !!cfg.features.requireTravelReport;
+    }
+
+    // Timing
+    if (cfg.timing) {
+        CONFIG.checkinInterval    = cfg.timing.checkinInterval    || 30;
+        CONFIG.escalationMinutes  = cfg.timing.escalationMinutes  || 60;
+        CONFIG.vehInterval        = cfg.timing.vehicleInterval    || 90;
+    }
+
+    // Locale
+    if (cfg.locale) {
+        CONFIG.countryPrefix = cfg.locale.countryPrefix || '+64';
+        CONFIG.vehicleTerm   = cfg.locale.vehicleTerm   || 'WOF';
+        CONFIG.voiceLocale   = cfg.locale.voiceLocale   || 'en-NZ';
+    }
+
+    // Theme — applied to CSS custom properties immediately
+    if (cfg.theme) applyTheme(cfg.theme);
+
+    // Logo
+    const logoUrl = cfg.logoUrl || './icon.png';
+    CONFIG.logoUrl = logoUrl;
+    const headerLogo = document.getElementById('headerLogo');
+    const faviconLink = document.getElementById('faviconLink');
+    if (headerLogo) headerLogo.src = logoUrl;
+    if (faviconLink) faviconLink.href = logoUrl;
+
+    // Org name display elements
+    const orgNameEls = document.querySelectorAll('.orgNameDisplay');
+    orgNameEls.forEach(el => { el.textContent = CONFIG.org; });
+    const headerOrg = document.getElementById('headerOrgName');
+    if (headerOrg) headerOrg.textContent = CONFIG.org;
+
+    // Page title
+    document.title = `${CONFIG.appName || CONFIG.org} Safety`;
+
+    // App version display in settings
+    const verEl = document.getElementById('appVersion');
+    if (verEl) verEl.textContent = CONFIG.buildVersion;
+
+    // Check for config version change — if version differs from last known,
+    // update localStorage and nudge the SW to refresh on next foreground load.
+    const storedVersion = localStorage.getItem('otg_config_version');
+    if (storedVersion && storedVersion !== CONFIG.buildVersion) {
+        console.log(`[OTG] Config version changed: ${storedVersion} → ${CONFIG.buildVersion}. Flagging for SW update.`);
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.getRegistration().then(reg => {
+                if (reg) reg.update();
+            });
+        }
+    }
+    localStorage.setItem('otg_config_version', CONFIG.buildVersion);
+
+    // Inject org-branded manifest for correct PWA install name
+    _injectDynamicManifest(cfg);
+}
+
+/**
+ * _injectDynamicManifest — gives the installed PWA the org's name rather than
+ * the generic "OTG Safety" fallback. Three layers, each covering a different
+ * scenario:
+ *
+ * Layer 1 — Blob URL (current session, Chrome/Android install prompt)
+ *   The browser reads <link rel="manifest"> when preparing the "Add to Home
+ *   Screen" prompt. Swapping the href to a Blob URL built from config means the
+ *   prompt shows the org name even on first load. The Blob URL is created
+ *   synchronously so it is ready before any user interaction could trigger
+ *   the prompt.
+ *
+ * Layer 2 — iOS <meta name="apple-mobile-web-app-title">
+ *   iOS Safari ignores manifest.json for the home-screen label entirely.
+ *   The meta tag is the only hook. Updated here with the short app name.
+ *
+ * Layer 3 — SW cache write (subsequent loads, standalone reloads, offline)
+ *   Writes the org manifest into the browser cache under the manifest.json
+ *   URL. The SW's manifest intercept handler reads config.json from cache to
+ *   build the same manifest, but this write ensures the correct manifest is
+ *   served even during the brief window between SW install and first activate,
+ *   and in browsers that don't support the SW manifest intercept path.
+ *   Uses a dedicated 'otg-manifest' cache that is preserved across SW version
+ *   bumps (the activate handler only wipes versioned 'otg-safety-*' caches).
+ */
+function _injectDynamicManifest(cfg) {
+    try {
+        const orgName  = cfg.orgName  || 'OTG';
+        const appName  = cfg.appName  || orgName;
+        const primary  = (cfg.theme && cfg.theme.primary) ? cfg.theme.primary : '#1e3a8a';
+        const logoSrc  = cfg.logoUrl  || './icon.png';
+
+        const manifest = {
+            name:             `${orgName} Safety`,
+            short_name:       appName,
+            description:      'Lone worker safety monitoring app',
+            start_url:        './index.html',
+            display:          'standalone',
+            background_color: primary,
+            theme_color:      primary,
+            orientation:      'portrait',
+            icons: [
+                { src: logoSrc, sizes: '192x192', type: 'image/png' },
+                { src: logoSrc, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+            ]
+        };
+        const json = JSON.stringify(manifest, null, 2);
+
+        // ── Layer 1: Blob URL — current session install prompt ─────────────────
+        const blob    = new Blob([json], { type: 'application/manifest+json' });
+        const blobUrl = URL.createObjectURL(blob);
+        const link    = document.getElementById('manifestLink');
+        if (link) link.href = blobUrl;
+
+        // ── Layer 2: iOS home-screen label ─────────────────────────────────────
+        const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) appleTitle.setAttribute('content', appName);
+
+        // ── Layer 3: SW cache write — subsequent loads and offline ─────────────
+        // 'otg-manifest' is a dedicated long-lived cache. The SW activate handler
+        // only purges versioned 'otg-safety-*' caches, so this survives SW updates.
+        // The SW manifest intercept also rebuilds from config.json, but this write
+        // provides a belt-and-suspenders fallback for edge cases.
+        if ('caches' in window) {
+            caches.open('otg-manifest').then(cache => {
+                cache.put('./manifest.json', new Response(json, {
+                    headers: { 'Content-Type': 'application/manifest+json' }
+                }));
+            }).catch(() => {});
+        }
+
+        console.log(`[OTG] Dynamic manifest injected: "${manifest.name}" / "${manifest.short_name}"`);
+    } catch (e) {
+        // Non-fatal — static manifest.json is the fallback
+        console.warn('[OTG] _injectDynamicManifest failed (non-fatal):', e);
+    }
+}
+
+/**
+ * loadConfig — fetches ./config.json, calls applyConfig(), then kicks off
+ * normal window.onload initialization. Called immediately when the script
+ * executes (not waiting for DOMContentLoaded) so the theme is applied early.
+ *
+ * Offline behaviour:
+ *  - The SW serves a cached config.json if available (network-first strategy).
+ *  - If the SW returns a 503 stub (first offline load, nothing cached), the
+ *    boot screen shows a clear error with a Retry button.
+ */
+async function loadConfig() {
+    const bootStatus  = document.getElementById('bootStatus');
+    const bootError   = document.getElementById('bootError');
+    const bootSpinner = document.getElementById('bootSpinner');
+    const bootErrMsg  = document.getElementById('bootErrorMsg');
+
+    try {
+        if (bootStatus) bootStatus.textContent = 'Fetching configuration…';
+
+        const response = await fetch('./config.json', { cache: 'no-store' });
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status} for config.json`);
+        }
+
+        const cfg = await response.json();
+
+        // Sanity-check the most critical field
+        if (cfg._error === 'config_unavailable_offline') {
+            throw new Error('App is offline and config.json has not been cached yet. Please connect to the internet for the first load, then the app will work offline.');
+        }
+        if (!cfg.backendUrl && !cfg.workerKey) {
+            throw new Error('config.json appears to be the example template — please populate your organisation values and re-deploy.');
+        }
+
+        applyConfig(cfg);
+
+        if (bootStatus) bootStatus.textContent = 'Ready.';
+
+        // Short pause so "Ready" is visible, then hide boot screen
+        await new Promise(r => setTimeout(r, 150));
+        const bootScreen = document.getElementById('bootScreen');
+        if (bootScreen) bootScreen.style.display = 'none';
+
+        // Trigger normal app initialization (equivalent to window.onload body)
+        _initApp();
+
+    } catch (err) {
+        console.error('[OTG] Config load failed:', err);
+        if (bootSpinner) bootSpinner.style.display = 'none';
+        if (bootErrMsg) bootErrMsg.textContent = err.message || String(err);
+        if (bootError) bootError.style.display = 'block';
+        if (bootStatus) bootStatus.style.display = 'none';
+    }
+}
+
+// Kick off config fetch as soon as the DOM is ready
+document.addEventListener('DOMContentLoaded', loadConfig);
 
 // ============================================================================
 // GLOBALS AND STATE INITIALIZATION
@@ -2932,33 +3207,34 @@ function tick() {
 // ENHANCED RENDER LOCATIONS (Layout Corrected)
 // ============================================================================
 function renderLocations() {
-    const list = document.getElementById('locationList');
+    const list      = document.getElementById('locationList');
     const travelRow = document.getElementById('travelRow');
-    
+    const searchRow = document.getElementById('siteSearchRow');
+
     if (!list || !travelRow) {
         console.error('UI Error: Location containers missing.');
         return;
     }
-    
-    list.innerHTML = '';
+
+    list.innerHTML  = '';
     travelRow.innerHTML = '';
-    
-    // 1. Render Travel Tile (Only if enabled in Factory)
+
+    // ── 1. Travel tile ───────────────────────────────────────────────────────
     if (CONFIG.mileageEnabled) {
-        const travelTile = createTravelTile();
-        travelRow.appendChild(travelTile);
+        travelRow.classList.remove('hidden');
+        travelRow.appendChild(createTravelTile());
     } else {
-        // If mileage is disabled, you might want to hide the row entirely
         travelRow.classList.add('hidden');
     }
-    
-    // 2. Render Regular Locations
+
+    // ── 2. Filter to named sites ─────────────────────────────────────────────
     const sites = state.locations.filter(loc => loc && loc.id !== 'travel');
-    
+
     if (sites.length === 0) {
-        // FIXED: Provides a clear action instead of a blank screen
+        if (searchRow) searchRow.classList.add('hidden');
+        list.className = 'col-span-2';
         const empty = document.createElement('div');
-        empty.className = 'col-span-2 p-12 text-center';
+        empty.className = 'p-12 text-center';
         empty.innerHTML = `
             <div class="text-4xl mb-4 opacity-20">📡</div>
             <p class="text-xs font-bold text-blue-300 uppercase tracking-widest mb-4">No Sites Synced</p>
@@ -2967,15 +3243,56 @@ function renderLocations() {
             </button>
         `;
         list.appendChild(empty);
+        updateArrivedButtonState();
+        return;
     }
-    else {
-        sites.forEach(loc => {
-            const tile = createLocationTile(loc);
-            list.appendChild(tile);
-        });
+
+    // ── 3. Decide layout ─────────────────────────────────────────────────────
+    // ≤6  → 2-col card grid (unchanged)
+    // 7–15 → compact list, no search
+    // 16+  → compact list + search bar
+    const count     = sites.length;
+    const useList   = count > 6;
+    const showSearch = count > 15;
+
+    if (searchRow) searchRow.classList.toggle('hidden', !showSearch);
+
+    // ── 4. Sort: last-visited first, then alphabetical ───────────────────────
+    const lastId     = state.lastVisitedLocationId;
+    const searchTerm = showSearch
+        ? (document.getElementById('siteSearch')?.value || '').toLowerCase().trim()
+        : '';
+
+    const sorted = [...sites].sort((a, b) => {
+        if (a.id === lastId && b.id !== lastId) return -1;
+        if (b.id === lastId && a.id !== lastId) return  1;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+
+    // ── 5. Apply search filter (only active at 16+) ──────────────────────────
+    const visible = searchTerm
+        ? sorted.filter(loc =>
+            (loc.name        || '').toLowerCase().includes(searchTerm) ||
+            (loc.companyName || '').toLowerCase().includes(searchTerm) ||
+            (loc.address     || '').toLowerCase().includes(searchTerm))
+        : sorted;
+
+    // ── 6. Render ────────────────────────────────────────────────────────────
+    if (useList) {
+        list.className = 'flex flex-col gap-1.5';
+        if (visible.length === 0) {
+            const none = document.createElement('div');
+            none.className = 'py-8 text-center text-xs font-bold text-gray-500 uppercase tracking-widest';
+            none.textContent = 'No sites match your search.';
+            list.appendChild(none);
+        } else {
+            visible.forEach(loc => list.appendChild(createLocationRow(loc)));
+        }
+    } else {
+        list.className = 'grid grid-cols-2 gap-3';
+        visible.forEach(loc => list.appendChild(createLocationTile(loc)));
     }
-    
-    // 3. Sync Button State
+
     updateArrivedButtonState();
 }
 // ============================================================================
@@ -3093,8 +3410,8 @@ async function saveWizard() {
 
     // 2. REGISTRATION: Must succeed before the wizard completes.
     //    Uses a direct fetch (not the upload queue) so we can read the response.
-    //    Template mode (%%WORKER_KEY%% not injected) skips this check.
-    if (CONFIG.key && !CONFIG.key.includes('%%') && CONFIG.url && !CONFIG.url.includes('%%')) {
+    //    Skips check if CONFIG not yet populated (key too short).
+    if (CONFIG.key && CONFIG.key.length >= 3 && CONFIG.url && CONFIG.url.length >= 10) {
         const btnNext = document.getElementById('btnWizNext');
         if (btnNext) { btnNext.disabled = true; btnNext.textContent = 'Registering…'; }
 
@@ -3454,6 +3771,63 @@ function createLocationTile(loc) {
  * Called from the info button on the travel tile.
  */
 // ============================================================================
+// COMPACT LIST ROW — used when site count exceeds 6
+// ============================================================================
+
+/**
+ * Creates a single-line list row for the adaptive list view.
+ * Shows a risk-level colour bar on the left edge, site name, company,
+ * a "Recent" badge for the last-visited site, and the info button.
+ * Minimum tap height is 52px — comfortable for thumb use in the field.
+ */
+function createLocationRow(loc) {
+    const isSel  = state && state.selectedLocationId === loc.id;
+    const isLast = state && loc.id === state.lastVisitedLocationId;
+
+    // Left-edge risk bar colour — matches the colours used in the welfare hint
+    const riskBarColour = {
+        Low:      '#22c55e',   // green-500
+        Medium:   '#eab308',   // yellow-500
+        High:     '#f97316',   // orange-500
+        Critical: '#ef4444'    // red-500
+    }[loc.riskLevel] || 'transparent';
+
+    const hasInfo = !!(loc.address || loc.notes || loc.contactName || loc.contactPhone || loc.contactEmail);
+
+    const row = document.createElement('div');
+    row.className = [
+        'flex items-center gap-3 pl-2 pr-3 rounded-xl border-2 cursor-pointer transition-all',
+        'min-h-[52px]',
+        isSel
+            ? 'border-blue-500 bg-blue-900/40'
+            : (loc.isCritical
+                ? 'border-red-900/50 bg-red-950/20 hover:bg-red-950/40'
+                : 'border-gray-700 bg-gray-800 hover:bg-gray-700/70 active:scale-[0.99]')
+    ].join(' ');
+
+    row.innerHTML = `
+        <div class="w-1 self-stretch rounded-full flex-shrink-0 my-2" style="background:${riskBarColour}"></div>
+        <div class="flex-1 min-w-0 py-2.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[13px] font-black text-white truncate leading-tight">${escapeHtml(loc.name)}</span>
+                ${isLast ? `<span class="text-[9px] font-black text-blue-400 uppercase tracking-widest bg-blue-950 px-1.5 py-0.5 rounded-full border border-blue-700/50 flex-shrink-0">Recent</span>` : ''}
+            </div>
+            ${loc.companyName ? `<div class="text-[11px] font-bold text-gray-400 truncate leading-none mt-0.5">${escapeHtml(loc.companyName)}</div>` : ''}
+        </div>
+        ${hasInfo ? `<button class="text-gray-500 hover:text-gray-300 flex-shrink-0 p-1.5 -mr-1 text-base leading-none z-20" onclick="showSiteInfo('${escapeHtml(loc.id)}', event)">ℹ️</button>` : ''}
+    `;
+
+    row.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        state.selectedLocationId = (state.selectedLocationId === loc.id) ? null : loc.id;
+        updateWelfareSelector(state.selectedLocationId);
+        renderLocations();
+        updateArrivedButtonState();
+    };
+    return row;
+}
+
+// ============================================================================
 // WELFARE CHECK INTERVAL — PER-VISIT SELECTOR
 // ============================================================================
 
@@ -3771,6 +4145,13 @@ async function startVisit(isSkipCheck = false) {
     // interactions. It is acquired only when the alarm fires so the slide-to-
     // confirm screen stays lit and the worker cannot miss the alert.
     if (isTravelMode || locId === 'travel') if (typeof startTravellingPulse === 'function') startTravellingPulse();
+
+    // Persist the last-visited site so the "Recent" pin survives app restarts.
+    // Travel sessions are excluded — the pin is only meaningful for named sites.
+    if (locId && locId !== 'travel' && !isTravelMode) {
+        state.lastVisitedLocationId = locId;
+        saveState();
+    }
 
     resetInactivityTimer(); 
     renderLocations();
@@ -4600,7 +4981,10 @@ async function fetchLocationsFromBackend() {
 // ============================================================================
 // HIGH-INTEGRITY INITIALIZATION (Fixed Syntax)
 // ============================================================================
-window.onload = () => {
+// _initApp is called by loadConfig() after config.json has been fetched and
+// applied. It replaces the old window.onload handler. The boot screen hides
+// before this runs so the user sees a fully themed, configured app.
+function _initApp() {
     // navigator.storage.persist() is the standardised W3C Storage API.
     // Note: if the browser console shows a ".persistent" deprecation, it refers
     // to the old webkitPersistentStorage API — not this call — and can be ignored.
@@ -4623,7 +5007,8 @@ window.onload = () => {
         photoStore: {},
         meta: { lastVehCheck: null, wofExpiry: null },
         vehicle: { wofExpiry: '', regoExpiry: '', lastVehCheck: null },
-        visitDurationMinutes: 0 
+        visitDurationMinutes: 0,
+        lastVisitedLocationId: null   // persisted so "Recent" pin survives app restarts
     };
 
     // 2. Bind high-sensitivity actions to long-press AFTER state load
@@ -4660,7 +5045,7 @@ window.onload = () => {
             // enterLockedScreen() starts tickIntervalId - no duplicate needed here
         }
 
-        const isTemplate = !CONFIG.key || CONFIG.key.includes('%%');
+        const isTemplate = !CONFIG.key || CONFIG.key.length < 3;
         if (!isTemplate && navigator.onLine) {
             forceSync(false); 
         }
@@ -5038,7 +5423,7 @@ function updateSystemInfo() {
     const syncStatus = document.getElementById('syncStatus');
     
     // Skip ping if key hasn't been injected by factory yet
-    if (!CONFIG.key || CONFIG.key.includes('%%')) {
+    if (!CONFIG.key || CONFIG.key.length < 3) {
         if (backendVersion) {
             backendVersion.textContent = 'Pending factory injection';
             backendVersion.className = 'text-sm font-mono text-yellow-400';
@@ -5452,7 +5837,7 @@ function updateOnlineStatus() {
 // Enhanced forceSync with online check
 function forceSync(showUI) {
     // 1. GATEKEEPER: Prevent sync in template mode or if identity is missing
-    if (!CONFIG.key || CONFIG.key.includes('%%')) {
+    if (!CONFIG.key || CONFIG.key.length < 3) {
         if (showUI) showToast('⚠️ Template mode - awaiting deployment');
         return;
     }
