@@ -401,7 +401,7 @@ function handleResolvePost(p) {
     // This sends the Email and SMS to both emergency contacts immediately.
     handleSafetyResolution(p); 
 }
-function handleWorkerPost(p, e) {
+function handleWorkerPost(p) {
     // ── IDEMPOTENCY GUARD ────────────────────────────────────────────────────
     // The IndexedDB outbox on the worker device retries failed deliveries until
     // it receives an HTTP 200. Under no-cors mode the response is always opaque,
@@ -1835,8 +1835,11 @@ function triggerEscalation(sheet, entry, newStatus, isDual) {
  * Logic: Notifies both contacts that the emergency has ended.
  */
 function handleSafetyResolution(p) {
-    // 1. Update the Visit Record for the audit trail
-    handleWorkerPost(p);
+    // NOTE: handleWorkerPost is NOT called here. When invoked via the 'resolve'
+    // action, handleResolvePost has already written/updated the Visits row.
+    // When invoked directly via 'notifySafety', the caller is responsible for
+    // any prior sheet write. Calling handleWorkerPost here caused a duplicate
+    // row on every resolution.
 
     // GUARD: Only send All Clear if an overdue/alarm alert was actually sent.
     // If the worker resolved quickly before any alert fired, contacts never
