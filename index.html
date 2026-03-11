@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>On-The-Go App Factory v82.0 — Config Model</title>
+      <title>On-The-Go App Factory v84.0 — Config Model</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- JSZip removed: Config Model no longer builds ZIP archives -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
@@ -21,7 +22,7 @@
     .btn-success { background: linear-gradient(to right, #059669, #10b981); color: white; }
     .code-scroll { background: #020617; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: 'Menlo', monospace; font-size: 0.8rem; color: #a5b4fc; overflow-y: auto; max-height: 250px; white-space: pre-wrap; }
     .highlight-box { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
-    .tab-btn { flex: 1; py-4; font-weight: bold; color: #94a3b8; border-bottom: 4px solid transparent; transition: all 0.2s; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .tab-btn { flex: 1; padding-top: 1rem; padding-bottom: 1rem; font-weight: bold; color: #94a3b8; border-bottom: 4px solid transparent; transition: all 0.2s; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
     .tab-btn.active { color: #60a5fa; border-color: #3b82f6; background: #1f2937; }
     a.link { color: #60a5fa; text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-weight: 700; }
     .drop-zone { border: 4px dashed #475569; border-radius: 16px; padding: 20px; text-align: center; background: #0f172a; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
@@ -41,9 +42,9 @@
 </head>
 <body class="min-h-screen py-8 px-4 relative">
 
-  <div id="disclaimerModal" class="modal-backdrop" style="display: flex;">
+  <div id="disclaimerModal" class="modal-backdrop" style="display: flex;" role="dialog" aria-modal="true" aria-labelledby="disclaimerTitle">
       <div class="modal-content border-yellow-600">
-          <h2 class="text-2xl font-extrabold text-white mb-2">⚠️ Safety Notice</h2>
+          <h2 id="disclaimerTitle" class="text-2xl font-extrabold text-white mb-2">⚠️ Safety Notice</h2>
           <div class="space-y-4 text-gray-200 text-sm mb-6 font-bold">
               <p>The <strong>OTG AppSuite</strong> is a professional serverless safety solution.</p>
               <ul class="list-disc pl-5 space-y-2">
@@ -61,9 +62,9 @@
       </div>
   </div>
 
-  <div id="driveHelpModal" class="modal-backdrop">
+  <div id="driveHelpModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="driveHelpTitle">
       <div class="modal-content border-blue-500">
-          <h2 class="text-xl font-extrabold text-white mb-4">📂 How to get a Drive Folder ID</h2>
+          <h2 id="driveHelpTitle" class="text-xl font-extrabold text-white mb-4">📂 How to get a Drive Folder ID</h2>
           <p class="text-sm text-white font-bold mb-4">Open your Google Drive folder. Copy the long string of letters and numbers at the very end of the URL.</p>
           <div class="bg-black p-3 rounded font-mono text-xs text-green-400 mb-4 break-all font-bold">
               drive.google.com/drive/folders/<strong>1AbCdEfGhIjKlMnOpQrStUvWxYz</strong>
@@ -75,33 +76,33 @@
   <div class="max-w-6xl mx-auto blur-sm transition-all duration-500" id="mainContent">
     <header class="text-center mb-10">
       <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">OTG AppSuite Factory</h1>
-      <p class="text-white font-extrabold tracking-widest text-sm uppercase">v82.0 | Config Model — Runtime Configuration</p>
+      <p class="text-white font-extrabold tracking-widest text-sm uppercase">v84.0 | Config Model — Runtime Configuration</p>
     </header>
 
     <div class="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden">
-      <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base">
-        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active">1. Config</button>
-        <button onclick="gotoStep(2)" id="tab2" class="tab-btn">2. Database</button>
-        <button onclick="gotoStep(3)" id="tab3" class="tab-btn">3. Cloud System</button>
-        <button onclick="gotoStep(4)" id="tab4" class="tab-btn">4. Download Config</button>
-        <button onclick="gotoStep(5)" id="tab5" class="tab-btn">5. Deployment</button>
+      <div class="flex bg-gray-900 border-b border-gray-700 text-sm md:text-base" role="tablist" aria-label="Factory setup steps">
+        <button onclick="gotoStep(1)" id="tab1" class="tab-btn active" role="tab" aria-selected="true" aria-controls="step1">1. Config</button>
+        <button onclick="gotoStep(2)" id="tab2" class="tab-btn" role="tab" aria-selected="false" aria-controls="step2">2. Database</button>
+        <button onclick="gotoStep(3)" id="tab3" class="tab-btn" role="tab" aria-selected="false" aria-controls="step3">3. Cloud System</button>
+        <button onclick="gotoStep(4)" id="tab4" class="tab-btn" role="tab" aria-selected="false" aria-controls="step4">4. Download Config</button>
+        <button onclick="gotoStep(5)" id="tab5" class="tab-btn" role="tab" aria-selected="false" aria-controls="step5">5. Deployment</button>
       </div>
 
       <div class="p-6 md:p-10">
 
-        <div id="step1" class="step-section active space-y-8">
+        <div id="step1" class="step-section active space-y-8" role="tabpanel" aria-labelledby="tab1">
           <div class="grid md:grid-cols-2 gap-8">
             <div class="space-y-6">
               <div>
-                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">1. Organisation Name</label>
+                  <label for="orgName" class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">1. Organisation Name</label>
                   <input type="text" id="orgName" class="input-field" value="My Organisation" oninput="saveInput(this)">
                   <p class="help-text italic">Appears in app headers, report emails, and generated safety manuals.</p>
               </div>
               
               <div>
                   <div class="flex justify-between items-center mb-1">
-                      <label class="block text-blue-300 font-extrabold text-xs uppercase tracking-widest">2. App Icon Label</label>
-                      <span class="text-[11px] text-gray-300 font-black" id="charCount">6/12</span>
+                      <label for="appName" class="block text-blue-300 font-extrabold text-xs uppercase tracking-widest">2. App Icon Label</label>
+                      <span class="text-[11px] text-gray-300 font-black" id="charCount" aria-live="polite" aria-label="Character count">6/12</span>
                   </div>
                   <input type="text" id="appName" maxlength="12" class="input-field text-center font-black text-green-400 border-green-600/50" value="Safety" oninput="updateCharCount(this); saveInput(this)">
                   <p class="help-text italic">The short name workers see under the app icon on their phone (Max 12 chars).</p>
@@ -112,7 +113,7 @@
     
 <div class="mb-4">
     <div class="flex justify-between items-end mb-1">
-        <label class="block text-blue-300 font-extrabold text-xs">Secret Key (Admin Only)</label>
+        <label for="secretKey" class="block text-blue-300 font-extrabold text-xs">Secret Key (Admin Only)</label>
         <span id="keyLenCounter" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">0 / 32–64</span>
     </div>
     <div class="flex gap-2">
@@ -125,7 +126,7 @@
     <p class="help-text italic">Used by administrators to access the spreadsheet. <strong>Do not share.</strong></p>
 </div>
     <div>
-        <label class="block text-blue-300 font-extrabold mb-1 text-xs">Worker Key (App Setup)</label>
+        <label for="workerKey" class="block text-blue-300 font-extrabold mb-1 text-xs">Worker Key (App Setup)</label>
         <div class="flex gap-2">
             <input type="text" id="workerKey" class="input-field text-green-400 font-mono text-sm py-2" oninput="saveInput(this)">
             <button onclick="generateSecureKey('workerKey')" class="btn bg-gray-700 hover:bg-gray-600 text-white py-2">🔄</button>
@@ -134,7 +135,7 @@
 </div>
 
               <div>
-                  <label class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">3. Regional Logic</label>
+                  <label for="countrySelect" class="block text-blue-300 font-extrabold mb-1 text-xs uppercase tracking-widest">3. Regional Logic</label>
                   <select id="countrySelect" class="input-field cursor-pointer py-3 text-sm font-black" onchange="updateRegionInfo()">
                       <option value="+64">New Zealand (+64)</option><option value="+61">Australia (+61)</option><option value="+44">United Kingdom (+44)</option><option value="+1">USA / Canada (+1)</option>
                   </select>
@@ -148,7 +149,7 @@
             
             <div class="highlight-box flex flex-col items-center justify-center text-center">
               <label class="block text-blue-300 font-extrabold mb-3 text-sm uppercase tracking-widest">4. App Branding (Customise)</label>
-              <div id="dropZone" class="drop-zone w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-4 border-4" onclick="document.getElementById('logoInput').click()">
+              <div id="dropZone" class="drop-zone w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-4 border-4" onclick="document.getElementById('logoInput').click()" role="button" tabindex="0" aria-label="Upload logo image — click or drag and drop">
                 <img id="logoImg" class="hidden h-full w-full object-cover">
                 <span id="logoText" class="text-white text-[11px] uppercase font-black px-4 leading-tight">Drag Logo Here or Click to Upload</span>
               </div>
@@ -185,7 +186,7 @@
     <div class="mt-8 pt-8 border-t border-gray-700">
     <h3 class="text-white font-black mb-4 uppercase text-[10px] tracking-widest text-center">📱 Live App Preview</h3>   
     
-    <div id="appMockup" class="mx-auto w-64 h-[450px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative transition-all duration-500">
+    <div id="appMockup" class="mx-auto w-64 h-[450px] rounded-[2.5rem] border-[6px] border-gray-900 bg-[#111827] shadow-2xl overflow-hidden relative transition-all duration-500" aria-hidden="true">
         
         <div id="mockHeader" class="h-12 border-b border-gray-700 flex items-center px-4 justify-between bg-[#111827]">
             <div class="flex items-center gap-2">
@@ -195,24 +196,36 @@
             <div class="w-3 h-3 rounded-full bg-gray-700"></div>
         </div>
 
-        <div class="p-4 space-y-4">
-            <div class="flex gap-2">
-                <div class="w-8 h-8 bg-gray-800 rounded-lg border border-gray-700"></div>
-                <div class="w-8 h-8 bg-gray-800 rounded-lg border border-gray-700"></div>
-                <div id="mockTravelCard" class="flex-1 h-8 rounded-lg border transition-colors duration-500"></div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-2">
-                <div class="h-20 bg-gray-800 rounded-lg border border-gray-700 p-2">
-                    <div class="h-1 w-6 bg-gray-600 rounded mb-1"></div>
-                    <div class="h-2 w-10 bg-white/20 rounded"></div>
+        <div class="p-4 space-y-3">
+            <!-- Location tiles: one inactive, one selected -->
+            <div class="space-y-1.5">
+                <div class="h-10 bg-gray-800 rounded-lg border border-gray-700 flex items-center px-2 gap-2">
+                    <div class="w-2 h-2 rounded-full bg-gray-600"></div>
+                    <div class="h-1.5 w-16 bg-gray-600 rounded"></div>
                 </div>
-                <div id="mockAccentCard" class="h-20 border-2 rounded-lg p-2 shadow-lg transition-colors duration-500">
-                    <div class="h-1 w-6 opacity-40 rounded mb-1 bg-white"></div>
-                    <div class="h-2 w-10 opacity-40 rounded bg-white"></div>
+                <div id="mockAccentCard" class="h-10 rounded-lg border-2 flex items-center px-2 gap-2 shadow transition-colors duration-500">
+                    <div class="w-2 h-2 rounded-full bg-white opacity-60"></div>
+                    <div class="h-1.5 w-20 bg-white opacity-40 rounded"></div>
+                    <div class="ml-auto text-[7px] font-black text-white opacity-60 uppercase tracking-wide">Selected</div>
                 </div>
             </div>
-            <div class="h-2 w-24 bg-gray-700 rounded mx-auto mt-4"></div>
+
+            <!-- Travel mode pill -->
+            <div id="mockTravelCard" class="w-full h-7 rounded-full border flex items-center justify-center gap-1 transition-colors duration-500">
+                <span class="text-[7px] font-black text-white opacity-50 uppercase tracking-widest">🚗 Travel Mode</span>
+            </div>
+
+            <!-- Duration preset buttons -->
+            <div>
+                <div class="text-[7px] text-gray-500 font-black uppercase tracking-widest mb-1.5">Expected Duration</div>
+                <div class="flex gap-1">
+                    <div class="flex-1 h-7 rounded-lg border border-gray-600 bg-gray-800 flex items-center justify-center text-[8px] font-black text-gray-500">15m</div>
+                    <div id="mockDurSelected" class="flex-1 h-7 rounded-lg border-2 flex items-center justify-center text-[8px] font-black text-white transition-colors duration-500">30m</div>
+                    <div class="flex-1 h-7 rounded-lg border border-gray-600 bg-gray-800 flex items-center justify-center text-[8px] font-black text-gray-500">1hr</div>
+                    <div class="flex-1 h-7 rounded-lg border border-gray-600 bg-gray-800 flex items-center justify-center text-[8px] font-black text-gray-500">2hr</div>
+                </div>
+                <div class="text-[7px] text-gray-500 font-bold text-right mt-1">Due: 2:45 PM</div>
+            </div>
         </div>
 
         <div id="mockFooter" class="absolute bottom-0 w-full p-4 border-t border-gray-700 bg-[#111827] transition-colors duration-500">
@@ -238,12 +251,16 @@
     <div class="grid md:grid-cols-2 gap-10">
         <div class="space-y-6">
             <div>
-                <label class="block text-white font-black text-xs uppercase tracking-widest">Alarm Grace Period (Mins)</label>
+                <label for="escalationMins" class="block text-white font-black text-xs uppercase tracking-widest">Alarm Grace Period (Mins)</label>
                 <input type="number" id="escalationMins" value="15" class="bg-gray-800 border border-gray-600 rounded p-2 text-white w-20 text-center font-black text-xl" oninput="saveInput(this)">
                 <p class="help-text italic leading-tight">Time allowed for workers to mark themselves "Safe" before the emergency alert fires.</p>
             </div>
             <div class="space-y-4">
                 <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkMileage" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Enable Mileage Tracking</span></label>
+                <div class="ml-0 pl-0">
+                    <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkTravelReport" class="w-6 h-6 rounded bg-gray-700" onchange="saveInput(this)" checked><span class="text-sm font-black text-gray-200 uppercase">Require Travel Reports</span></label>
+                    <p class="text-[10px] text-gray-400 ml-9 mt-1 leading-tight italic">When on, all travel sessions require a report on departure (org policy). When off, workers set their own default in the app's Travel Settings.</p>
+                </div>
                 
                 <div>
                     <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" id="chkCheckin" class="w-6 h-6 rounded bg-gray-700" onchange="toggleCheckin(); saveInput(this)"><span class="text-sm font-black text-gray-200 uppercase">Periodic Welfare Check-in</span></label>
@@ -258,18 +275,18 @@
             </div>
         </div>
         <div class="space-y-6">
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Textbelt Key (SMS Alerts)</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Essential for sending high-priority SMS alerts to contacts if an alarm fires.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Gemini AI Key (Grammar)</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Used to automatically professionalise worker reports and fix spelling.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">ORS Key (Mileage Tracking)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Required for road-accurate mileage tracking. This key is hidden from workers.</p></div>
-            <div><div class="flex justify-between items-end mb-1"><label class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Photo Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where is this?</a></div><input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Organises all report photos into a dedicated Drive folder for the Diocese.</p></div>
+            <div><div class="flex justify-between items-end mb-1"><label for="textbeltKey" class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Textbelt Key (SMS Alerts)</label><a href="https://textbelt.com/#pricing" target="_blank" class="link">Get Key</a></div><input type="text" id="textbeltKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Essential for sending high-priority SMS alerts to contacts if an alarm fires.</p></div>
+            <div><div class="flex justify-between items-end mb-1"><label for="geminiKey" class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Gemini AI Key (Grammar)</label><a href="https://aistudio.google.com/app/apikey" target="_blank" class="link">Get Key</a></div><input type="text" id="geminiKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Used to automatically professionalise worker reports and fix spelling.</p></div>
+            <div><div class="flex justify-between items-end mb-1"><label for="orsKey" class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">ORS Key (Mileage Tracking)</label><a href="https://openrouteservice.org/dev/#/signup" target="_blank" class="link">Get Key</a></div><input type="text" id="orsKey" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Required for road-accurate mileage tracking. This key is hidden from workers.</p></div>
+            <div><div class="flex justify-between items-end mb-1"><label for="folderId" class="text-[11px] font-black text-indigo-300 uppercase tracking-widest">Photo Folder ID</label><a onclick="document.getElementById('driveHelpModal').style.display='flex'" class="link">Where is this?</a></div><input type="text" id="folderId" class="input-field py-2 text-xs font-mono font-bold" placeholder="Optional" oninput="saveInput(this)"><p class="help-text italic leading-tight">Organises all report photos into a dedicated Drive folder for the Diocese.</p></div>
             <div class="pt-4 border-t border-gray-700">
-                <label class="text-[11px] font-black text-emerald-300 uppercase tracking-widest block mb-1">System Health Report Email</label>
+                <label for="healthEmail" class="text-[11px] font-black text-emerald-300 uppercase tracking-widest block mb-1">System Health Report Email</label>
                 <input type="email" id="healthEmail" class="input-field py-2 text-xs font-mono font-bold" placeholder="admin@yourorg.com (optional)" oninput="saveInput(this)">
                 <p class="help-text italic leading-tight">A daily system health summary is emailed here each morning — visit counts, escalations triggered, failed alert emails, and any workers with an open visit older than 24 hours. Leave blank to send to the Google account that owns the Apps Script.</p>
             </div>
             <div class="pt-4 border-t border-gray-700">
                 <div class="flex justify-between items-end mb-1">
-                    <label class="text-[11px] font-black text-amber-300 uppercase tracking-widest">Healthchecks.io Ping URL</label>
+                    <label for="healthcheckUrl" class="text-[11px] font-black text-amber-300 uppercase tracking-widest">Healthchecks.io Ping URL</label>
                     <a href="https://healthchecks.io" target="_blank" class="link">Free signup →</a>
                 </div>
                 <input type="url" id="healthcheckUrl" class="input-field py-2 text-xs font-mono font-bold" placeholder="https://hc-ping.com/your-uuid-here (optional)" oninput="saveInput(this)">
@@ -277,7 +294,7 @@
             </div>
             <div class="pt-4 border-t border-gray-700">
                 <div class="flex justify-between items-end mb-1">
-                    <label class="text-[11px] font-black text-teal-300 uppercase tracking-widest">ntfy Push Notification Server</label>
+                    <label for="ntfyServer" class="text-[11px] font-black text-teal-300 uppercase tracking-widest">ntfy Push Notification Server</label>
                     <a href="https://ntfy.sh" target="_blank" class="link">About ntfy →</a>
                 </div>
                 <input type="url" id="ntfyServer" class="input-field py-2 text-xs font-mono font-bold" placeholder="https://ntfy.sh (default — leave blank to use hosted service)" oninput="saveInput(this)">
@@ -288,7 +305,7 @@
 </div>
           <div class="flex justify-end pt-6"><button onclick="gotoStep(2)" class="btn btn-primary text-lg px-12 shadow-2xl font-black uppercase tracking-widest">Next: Database Setup →</button></div>
         </div>
-        <div id="step2" class="step-section space-y-8">
+        <div id="step2" class="step-section space-y-8" role="tabpanel" aria-labelledby="tab2">
             <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-10 rounded-3xl border border-blue-500 shadow-xl text-center">
                 <h2 class="text-3xl font-black text-white mb-2 uppercase tracking-widest">Option A: The Automated Way</h2>
                 <div class="bg-yellow-900/40 border-l-8 border-yellow-500 p-5 mb-8 text-left max-w-2xl mx-auto rounded-r font-black">
@@ -312,15 +329,15 @@
             <div class="flex justify-between pt-8"><button onclick="gotoStep(1)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button onclick="gotoStep(3)" class="btn btn-primary text-lg shadow-2xl font-black uppercase tracking-widest">Next: Cloud System →</button></div>
         </div>
 
-        <div id="step3" class="step-section space-y-10">
+        <div id="step3" class="step-section space-y-10" role="tabpanel" aria-labelledby="tab3">
           <div class="bg-gray-900 p-8 rounded-3xl border border-gray-600 space-y-6 shadow-2xl">
               <h3 class="font-black text-green-400 text-xl uppercase tracking-widest">1. Install System "Brain"</h3>
               <p class="text-sm text-white font-black italic">This script handles all safety logic and database synchronization.</p>
               <div class="space-y-3">
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Click "Copy Code" below.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Go to Spreadsheet > <strong>Extensions > Apps Script</strong>.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter">Delete any text already in the editor.</span></div>
-                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox"><span class="text-sm text-white font-black uppercase tracking-tighter"><strong>Paste</strong> the code and click <strong>Save</strong> (Disk Icon).</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox" aria-label="Click Copy Code below"><span class="text-sm text-white font-black uppercase tracking-tighter">Click "Copy Code" below.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox" aria-label="Go to Spreadsheet Extensions then Apps Script"><span class="text-sm text-white font-black uppercase tracking-tighter">Go to Spreadsheet > <strong>Extensions > Apps Script</strong>.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox" aria-label="Delete any text already in the editor"><span class="text-sm text-white font-black uppercase tracking-tighter">Delete any text already in the editor.</span></div>
+                  <div class="checklist-item" onclick="toggleCheck(this)"><input type="checkbox" class="checklist-checkbox" aria-label="Paste the code and click Save"><span class="text-sm text-white font-black uppercase tracking-tighter"><strong>Paste</strong> the code and click <strong>Save</strong> (Disk Icon).</span></div>
               </div>
               <button onclick="copyScript()" class="btn bg-blue-600 text-white w-full font-black shadow-2xl py-4 uppercase tracking-widest text-lg">📋 COPY SYSTEM CODE</button>
               <div id="codeContainer" class="hidden mt-4"><pre id="codeDisplay" class="code-scroll">Generating...</pre></div>
@@ -401,58 +418,89 @@
           </div>
 
           <div id="urlInputSection" class="space-y-6 pt-8 border-t border-gray-700">
-              <label class="block text-green-400 font-black text-center uppercase tracking-[0.3em] text-sm">3. Paste your Web App URL here:</label>
+              <label for="webAppUrl" class="block text-green-400 font-black text-center uppercase tracking-[0.3em] text-sm">3. Paste your Web App URL here:</label>
               <input type="url" id="webAppUrl" class="input-field text-center font-mono text-yellow-300 border-green-500/50 text-xl" placeholder="https://script.google.com/.../exec" oninput="saveInput(this)">
               <div class="flex justify-center">
                   <button onclick="testConnection()" class="btn bg-yellow-600 hover:bg-yellow-500 text-white font-black py-5 px-16 rounded-2xl shadow-2xl uppercase tracking-widest text-lg">📡 TEST SYSTEM CONNECTION</button>
               </div>
-              <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-black uppercase tracking-widest"></div>
+              <div id="testResult" class="hidden mt-4 p-4 rounded-xl text-center font-black uppercase tracking-widest" role="status" aria-live="polite"></div>
           </div>
-          <div class="flex justify-between pt-8"><button onclick="gotoStep(2)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button id="btnNextDownload" onclick="gotoStep(4); refreshConfigPreview();" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed shadow-2xl font-black uppercase tracking-widest">Next: Download Config →</button></div>
+          <div class="flex justify-between pt-8"><button onclick="gotoStep(2)" class="text-white font-black uppercase tracking-widest text-xs">Back</button><button id="btnNextDownload" onclick="gotoStep(4);" disabled class="btn btn-primary text-lg opacity-50 cursor-not-allowed shadow-2xl font-black uppercase tracking-widest">Next: Download Config →</button></div>
         </div>
 
-        <div id="step4" class="step-section text-center space-y-12 py-12">
+        <div id="step4" class="step-section text-center space-y-12 py-12" role="tabpanel" aria-labelledby="tab4">
             <div class="text-emerald-400 text-8xl mb-4 animate-bounce">✅</div>
-            <h2 class="text-4xl font-black text-white uppercase tracking-widest">Download config.json</h2>
-            <p class="help-text text-lg max-w-xl mx-auto">Under the Config Model, the worker app is a single canonical codebase — no more ZIP builds. Download your <code class="bg-gray-800 px-2 py-0.5 rounded text-green-400">config.json</code> and commit it to your hosting repo.</p>
+            <h2 class="text-4xl font-black text-white uppercase tracking-widest">Download Your Files</h2>
+            <p class="help-text text-lg max-w-xl mx-auto">Download your org-specific config and the complete worker app deployment pack. The monitor app and supporting docs are separate downloads below.</p>
 
-            <div class="max-w-2xl mx-auto text-left space-y-4">
-                <div class="bg-gray-900 rounded-2xl border border-gray-700 p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-blue-300 text-xs font-black uppercase tracking-widest">Generated config.json Preview</span>
-                        <button onclick="refreshConfigPreview()" class="text-xs text-gray-400 hover:text-white font-bold">↻ Refresh</button>
-                    </div>
-                    <pre id="configPreview" class="code-scroll text-xs text-green-300 whitespace-pre-wrap max-h-64 overflow-y-auto"></pre>
-                </div>
-            </div>
-
-            <div class="flex flex-col items-center gap-4">
-                <button onclick="downloadConfig()" class="btn btn-success py-6 text-2xl w-full max-w-md shadow-2xl transform hover:scale-105 transition-all font-black uppercase tracking-widest">
-                    ⬇ Download config.json
+            <!-- ── PRIMARY: Worker Deployment Pack ── -->
+            <div class="max-w-md mx-auto flex flex-col gap-3">
+                <button onclick="downloadWorkerPack()"
+                        class="btn btn-success py-6 text-xl w-full shadow-2xl transform hover:scale-105 transition-all font-black uppercase tracking-widest">
+                    📦 Download Worker App Pack
                 </button>
-                <p class="text-xs text-gray-400 font-bold">Place this file at the root of your hosted worker app — same folder as <code class="text-green-400">index.html</code></p>
-
-                <div class="mt-4 border-t border-gray-700 pt-6 w-full max-w-md text-center">
-                    <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-3">Supervisor Dashboard</p>
-                    <button onclick="downloadMonitor()" class="btn py-4 text-base w-full bg-indigo-700 hover:bg-indigo-600 text-white shadow-lg font-black uppercase tracking-widest transition">
-                        🖥 Download Monitor App
-                    </button>
-                    <p class="text-xs text-gray-500 font-bold mt-2">Self-contained HTML file — open in any browser, no hosting required.</p>
-                </div>
+                <p id="packNote" class="text-xs text-gray-400 font-bold">
+                    ZIP containing <code class="text-green-400">index.html</code>,
+                    <code class="text-green-400">sw.js</code>,
+                    <code class="text-green-400">manifest.json</code>,
+                    <code class="text-green-400">config.json</code>,
+                    <code class="text-yellow-400">icon.png</code>, and
+                    <code class="text-teal-400">worker_guide.html</code> — ready to deploy.
+                    Your logo and keys are embedded in config.json.
+                </p>
+                <p id="packNoteNoGuide" class="hidden text-xs text-amber-400 font-bold">
+                    ZIP will contain <code class="text-green-400">index.html</code>,
+                    <code class="text-green-400">sw.js</code>,
+                    <code class="text-green-400">manifest.json</code>,
+                    <code class="text-green-400">config.json</code>, and
+                    <code class="text-yellow-400">icon.png</code>.
+                    Add <code class="text-amber-400">guide_template.html</code> to the Factory folder to include the worker guide in the pack.
+                </p>
             </div>
 
+            <!-- ── DIVIDER ── -->
+            <div class="max-w-md mx-auto border-t border-gray-700 pt-8 flex flex-col gap-3">
+                <p class="text-xs text-gray-500 font-black uppercase tracking-widest mb-1">Supervisor Dashboard</p>
+                <button onclick="downloadMonitor()"
+                        class="btn py-4 text-base w-full bg-indigo-700 hover:bg-indigo-600 text-white shadow-lg font-black uppercase tracking-widest transition">
+                    🖥 Download Monitor App
+                </button>
+                <p class="text-xs text-gray-500 font-bold">Self-contained HTML — open in any browser, no hosting required.</p>
+            </div>
+
+            <!-- ── OPTIONAL: Supporting Documents ── -->
+            <div class="max-w-md mx-auto border-t border-gray-700 pt-8 flex flex-col gap-3">
+                <p class="text-xs text-gray-500 font-black uppercase tracking-widest mb-1">Supporting Documents (standalone downloads)</p>
+                <button id="btnDlGuide" onclick="downloadGuide()"
+                        class="btn py-4 text-base w-full bg-teal-800 hover:bg-teal-700 text-white shadow font-black uppercase tracking-widest transition opacity-50 cursor-not-allowed" disabled>
+                    📘 Download Worker Guide
+                </button>
+                <p id="guideUnavailNote" class="text-xs text-amber-500 font-bold -mt-1">guide_template.html not found — add the file to enable this download.</p>
+
+                <button id="btnDlManual" onclick="downloadManual()"
+                        class="btn py-4 text-base w-full bg-teal-800 hover:bg-teal-700 text-white shadow font-black uppercase tracking-widest transition opacity-50 cursor-not-allowed" disabled>
+                    📗 Download Operations Manual
+                </button>
+                <p id="manualUnavailNote" class="text-xs text-amber-500 font-bold -mt-1">ops_manual_template.html not found — add the file to enable this download.</p>
+            </div>
+
+            <!-- ── NOTE ── -->
             <div class="max-w-2xl mx-auto text-left bg-blue-900/20 border border-blue-500/30 rounded-2xl p-6">
-                <p class="text-blue-300 font-black text-xs uppercase tracking-widest mb-3">Also download Code.gs from Step 3 — the backend injection system is unchanged.</p>
-                <p class="text-gray-300 text-sm font-bold leading-relaxed">The worker app files (<code class="text-green-400">index.html</code>, <code class="text-green-400">sw.js</code>, <code class="text-green-400">manifest.json</code>) are the canonical versions from the OTG repository. Only <code class="text-green-400">config.json</code> and your logo are org-specific.</p>
+                <p class="text-blue-300 font-black text-xs uppercase tracking-widest mb-3">Also download Code.gs from Step 3 — the backend is unchanged.</p>
+                <p class="text-gray-300 text-sm font-bold leading-relaxed">
+                    The worker app, service worker, and <code class="text-green-400">manifest.json</code> are all included in the pack above.
+                    If you uploaded a logo, <code class="text-yellow-400">icon.png</code> is included too — no extra files needed from any repository.
+                </p>
             </div>
 
-            <div class="flex justify-between pt-12">
+            <div class="flex justify-between pt-4">
                 <button onclick="gotoStep(3)" class="text-white font-black uppercase tracking-widest text-xs">Back</button>
                 <button onclick="gotoStep(5)" class="btn btn-primary shadow-2xl font-black uppercase tracking-widest">Next: Deployment →</button>
             </div>
+
         </div>
 
-<div id="step5" class="step-section space-y-12">
+<div id="step5" class="step-section space-y-12" role="tabpanel" aria-labelledby="tab5">
             <div class="bg-gray-900 p-10 rounded-3xl border border-gray-700 shadow-2xl">
                 <div class="flex items-center gap-4 mb-6">
                     <span class="text-4xl">🚀</span>
@@ -466,9 +514,21 @@
                 <div class="grid gap-10">
                     <div class="flex gap-6">
                         <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl shrink-0 shadow-lg border-2 border-blue-400">1</div>
-                        <div>
-                            <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">Get the Canonical App Files</p>
-                            <p class="text-white font-bold text-sm leading-relaxed">The canonical worker app files (<code class="text-green-400">index.html</code>, <code class="text-green-400">sw.js</code>, <code class="text-green-400">manifest.json</code>) come from the OTG repository. Place your <code class="text-green-400">config.json</code> and <code class="text-green-400">icon.png</code> in the same folder.</p>
+                        <div class="flex-1">
+                            <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">Assemble Your Deployment Folder</p>
+                            <p class="text-white font-bold text-sm leading-relaxed mb-3">Create a folder on your computer and place all of the following files in it — everything at the <strong>same level</strong>, no subfolders.</p>
+                            <div class="bg-gray-950 rounded-xl border border-gray-700 p-4 font-mono text-xs leading-relaxed">
+                                <div class="text-gray-500 mb-2">your-org-safety/</div>
+                                <div class="ml-4 space-y-1">
+                                    <div><span class="text-green-400">index.html</span> <span class="text-gray-600 font-sans">— worker app (from Worker App Pack)</span></div>
+                                    <div><span class="text-green-400">sw.js</span> <span class="text-gray-600 font-sans">— service worker (from Worker App Pack)</span></div>
+                                    <div><span class="text-green-400">manifest.json</span> <span class="text-gray-600 font-sans">— PWA manifest (from Worker App Pack) ✦</span></div>
+                                    <div><span class="text-yellow-400">config.json</span> <span class="text-gray-600 font-sans">— your org config (from Worker App Pack) ✦</span></div>
+                                    <div><span class="text-yellow-400">icon.png</span> <span class="text-gray-600 font-sans">— your logo (from Worker App Pack, if uploaded) ✦</span></div>
+                                    <div><span class="text-teal-400">worker_guide.html</span> <span class="text-gray-600 font-sans">— worker guide (from Worker App Pack) ◆</span></div>
+                                </div>
+                                <div class="mt-3 pt-3 border-t border-gray-800 text-gray-600 font-sans">✦ org-specific &nbsp;◆ optional but recommended — linked automatically in the app's Resource Library</div>
+                            </div>
                         </div>
                     </div>
 
@@ -476,7 +536,7 @@
                         <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-xl shrink-0 shadow-lg border-2 border-blue-400">2</div>
                         <div>
                             <p class="text-blue-300 font-black uppercase tracking-[0.2em] text-[10px] mb-1">One-Drag Deployment (Netlify / GitHub Pages)</p>
-                            <p class="text-white font-bold text-sm leading-relaxed">Drag your folder to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-black">Netlify Drop</a> or push to a GitHub Pages branch. The folder must contain <code class="text-green-400">index.html</code>, <code class="text-green-400">sw.js</code>, <code class="text-green-400">manifest.json</code>, <code class="text-green-400">config.json</code>, and <code class="text-green-400">icon.png</code>.</p>
+                            <p class="text-white font-bold text-sm leading-relaxed">Drag your folder to <a href="https://app.netlify.com/drop" target="_blank" class="text-blue-400 underline font-black">Netlify Drop</a> or push to a GitHub Pages branch. Everything you need is in the Worker App Pack — just unzip and drag.</p>
                         </div>
                     </div>
 
@@ -506,21 +566,21 @@
                 <p class="text-gray-200 font-bold text-sm mb-8 leading-relaxed">Paste your final URL below. This generates your official "Welcome" pack for staff.</p>
 
                 <div class="mb-10">
-                    <label class="block text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-2 ml-1">Your Deployed Worker App URL</label>
+                    <label for="workerAppUrl" class="block text-[10px] text-indigo-300 font-black uppercase tracking-widest mb-2 ml-1">Your Deployed Worker App URL</label>
                     <input type="url" id="workerAppUrl" class="input-field shadow-inner font-black border-2 border-indigo-500/30 bg-gray-900 focus:border-blue-500 placeholder-gray-600" placeholder="https://your-org-safety.netlify.app" oninput="generateLaunchPack()">
                 </div>
 
                 <div id="launchPack" class="hidden grid md:grid-cols-3 gap-10">
                     <div class="md:col-span-2">
                         <label class="block text-[10px] text-gray-400 font-black uppercase tracking-widest mb-3 ml-1">Official Welcome Email</label>
-                        <textarea id="launchEmail" class="w-full h-56 bg-gray-900 border border-indigo-500/50 rounded-2xl p-6 text-sm text-white font-mono shadow-inner font-bold leading-relaxed" readonly></textarea>
+                        <textarea id="launchEmail" class="w-full h-56 bg-gray-900 border border-indigo-500/50 rounded-2xl p-6 text-sm text-white font-mono shadow-inner font-bold leading-relaxed" readonly aria-label="Staff welcome email template"></textarea>
                         <div class="mt-4 flex items-center gap-3">
                             <span class="px-3 py-1 bg-indigo-900/50 text-indigo-300 text-[10px] font-black uppercase rounded-lg border border-indigo-500/30">Onboarding Pack Ready</span>
                             <span class="text-[10px] text-gray-500 font-bold">Copy this email and send to your staff team.</span>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-3xl flex flex-col items-center justify-center shadow-2xl border-4 border-white transition-transform hover:scale-105">
-                        <img id="qrImage" src="" class="w-44 h-44 mb-4">
+                        <img id="qrImage" src="" class="w-44 h-44 mb-4" alt="QR code for worker app installation">
                         <p class="text-gray-900 text-[10px] font-black uppercase tracking-widest text-center leading-tight">Worker App<br>Setup QR Code</p>
                         <p class="text-gray-500 text-[8px] font-bold mt-2 uppercase tracking-tighter">(Right-click image to save)</p>
                     </div>
@@ -541,14 +601,149 @@
  <script>
     const MASTER_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QtcQVe0Ppl-mQbN4MOEp2RgncnHv1jyphKB4vCBPe4g/copy";
     const FILES = { worker: 'worker_template.html', monitor: 'monitor_template.html', backend: 'backend_template.js', guide: 'guide_template.html', manual: 'ops_manual_template.html' };
+
+    // Service worker source — embedded directly so no extra file is needed in the factory folder.
+    // Identical for every org (no variable injection required).
+    const SW_SOURCE = `// OTG Lone Worker Safety System — Canonical Service Worker
+// Cache name is updated by reading the version field from config.json at install time.
+// This replaces the old build-stamp approach; cache invalidation is now driven by
+// incrementing "version" in config.json rather than by regenerating files.
+
+let CACHE_NAME = 'otg-safety-v1'; // updated dynamically at install time (see below)
+
+const CRITICAL_ASSETS = [
+    './',
+    './index.html',
+    './config.json',
+    './manifest.json',
+    './icon.png',
+    'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js',
+    'https://cdn.tailwindcss.com'
+];
+
+// ─── 1. INSTALL ──────────────────────────────────────────────────────────────
+self.addEventListener('install', event => {
+    event.waitUntil(
+        (async () => {
+            try {
+                const cfgResp = await fetch('./config.json', { cache: 'no-cache' });
+                if (cfgResp.ok) {
+                    const cfg = await cfgResp.json();
+                    if (cfg.version) {
+                        const slug = String(cfg.version).replace(/[^a-z0-9]/gi, '-');
+                        CACHE_NAME = \`otg-safety-\${slug}\`;
+                    }
+                }
+            } catch (e) {
+                console.warn('[SW] Could not read config.json version at install:', e.message);
+            }
+
+            const cache = await caches.open(CACHE_NAME);
+            console.log('[SW] Pre-caching critical assets for', CACHE_NAME);
+
+            for (const url of CRITICAL_ASSETS) {
+                try {
+                    const response = await fetch(url, {
+                        mode: url.startsWith('http') ? 'no-cors' : 'cors',
+                        redirect: 'follow'
+                    });
+                    await cache.put(url, response);
+                } catch (err) {
+                    console.warn('[SW] Could not pre-cache:', url);
+                }
+            }
+
+            await self.skipWaiting();
+        })()
+    );
+});
+
+// ─── 2. ACTIVATE ─────────────────────────────────────────────────────────────
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(
+                keys
+                    .filter(k => k !== CACHE_NAME)
+                    .map(k => {
+                        console.log('[SW] Removing old cache:', k);
+                        return caches.delete(k);
+                    })
+            )
+        ).then(() => self.clients.claim())
+    );
+});
+
+// ─── 3. FETCH ────────────────────────────────────────────────────────────────
+self.addEventListener('fetch', event => {
+    if (event.request.method !== 'GET') return;
+
+    const url = new URL(event.request.url);
+    const isConfig = url.pathname.endsWith('/config.json');
+
+    event.respondWith(
+        isConfig
+            ? networkFirstConfig(event.request)
+            : cacheFirst(event.request)
+    );
+});
+
+async function networkFirstConfig(request) {
+    try {
+        const networkResp = await fetch(request);
+        if (networkResp.ok || networkResp.status === 0) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, networkResp.clone());
+        }
+        return networkResp;
+    } catch (_) {
+        const cached = await caches.match(request);
+        return cached || new Response('{"error":"config unavailable offline"}', {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+}
+
+async function cacheFirst(request) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
+    try {
+        const networkResp = await fetch(request);
+        if (networkResp && (networkResp.status === 200 || networkResp.status === 0)) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, networkResp.clone());
+        }
+        return networkResp;
+    } catch (_) {
+        return caches.match('./') || new Response('Offline', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' }
+        });
+    }
+}
+
+// ─── 4. MESSAGES ─────────────────────────────────────────────────────────────
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        event.waitUntil(self.skipWaiting());
+    }
+});`;
+
     const BLUEPRINTS = {
         Visits: `Timestamp\tDate\tWorker Name\tWorker Phone Number\tEmergency Contact Name\tEmergency Contact Number\tEmergency Contact Email\tEscalation Contact Name\tEscalation Contact Number\tEscalation Contact Email\tAlarm Status\tNotes\tLocation Name\tLocation Address\tLast Known GPS\tGPS Timestamp\tBattery Level\tPhoto 1\tDistance (km)\tVisit Report Data\tAnticipated Departure Time\tSignature\tPhoto 2\tPhoto 3\tPhoto 4`,
         Staff: `Name\tRole\tStatus\tToken\tDeviceID\tLastVehCheck\tWOFExpiry`,
-        Sites: `Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes`,
-        Templates: `Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\tQuestion 3\tQuestion 4\tQuestion 5\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t[SIGN] Signature\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?`,
+        Sites: `Assigned To\tTemplate Name\tCompany Name\tSite Name\tAddress\tContact Name\tContact Phone\tContact Email\tSite Notes\tEmergency Procedures\tRisk Level\tPre-Visit Form`,
+        Templates: `Type\tTemplate Name\tAssigned To (Worker Names or ALL)\tEmail Recipient\tQuestion 1\tQuestion 2\t[Questions 3-30]\tForm Timing\nFORM\tAccident Report\tALL\tsafety@org.com\t[HEADING] Incident Details\t[TEXT] What happened?\t[PHOTO] Evidence\t\t\tpre-visit\nREPORT\tStandard Visit\t\t\t[TEXT] Visit Notes\t[PHOTO] Site Photo\t[YESNO] Hazards Identified?\t\t\t`,
     };
     let TEMPLATES = {};
-    const REGION_DATA = { "+64": { term: "WOF", locale: "en-NZ", tz: "Pacific/Auckland" }, "+61": { term: "Rego", locale: "en-AU", tz: "Australia/Sydney" }, "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London" }, "+1": { term: "Inspection", locale: "en-US", tz: "America/New_York" } };
+    const REGION_DATA = { 
+        "+64": { term: "WOF",        locale: "en-NZ", tz: "Pacific/Auckland",    mapLat: -40.9,  mapLng:  174.9 },
+        "+61": { term: "Rego",       locale: "en-AU", tz: "Australia/Sydney",    mapLat: -33.9,  mapLng:  151.2 },
+        "+44": { term: "Inspection", locale: "en-GB", tz: "Europe/London",       mapLat:  51.5,  mapLng:   -0.1 },
+        "+1":  { term: "Inspection", locale: "en-US", tz: "America/New_York",    mapLat:  40.7,  mapLng:  -74.0 }
+    };
     let selectedConfig = REGION_DATA["+64"];
 
     // Computed once at load time so every build from this session shares the same stamp.
@@ -564,6 +759,7 @@
         );
         document.getElementById('mainContent').classList.remove('blur-sm');
         loadPersistedData();
+        updateMockupUI();
         if(!document.getElementById('secretKey').value) generateSecureKey('secretKey');
         if(!document.getElementById('workerKey').value) generateSecureKey('workerKey');
         updateRegionInfo();
@@ -574,10 +770,16 @@
             if (r.ok) TEMPLATES[k] = await r.text(); 
             else throw new Error();
         } catch(e){
-            console.error(`Failed to load ${f}. System build may be incomplete.`);
-            alert(`⚠️ Warning: Could not load the ${k} template. Please refresh.`);
+            if (k === 'guide' || k === 'manual') {
+                // Optional templates — silently skip. Buttons will be disabled until the file is added.
+                console.warn(`Optional template '${f}' not found — download unavailable until file is present.`);
+            } else {
+                console.error(`Failed to load ${f}. System build may be incomplete.`);
+                alert(`⚠️ Warning: Could not load the ${k} template. Please refresh.`);
+            }
         } 
     }
+    _updateOptionalDownloadButtons();
 };
 
     function updateCharCount(el) { document.getElementById('charCount').innerText = `${el.value.length}/${el.maxLength}`; }
@@ -705,6 +907,18 @@ function applyPreset(p, a, el) {
         mockAccentCard.style.backgroundColor = a + '33'; // 20% opacity
     }
 
+    const mockTravelCard = document.getElementById('mockTravelCard');
+    if(mockTravelCard) {
+        mockTravelCard.style.borderColor = a + '4d';
+        mockTravelCard.style.backgroundColor = a + '1a';
+    }
+
+    const mockDurSelected = document.getElementById('mockDurSelected');
+    if(mockDurSelected) {
+        mockDurSelected.style.borderColor = a;
+        mockDurSelected.style.backgroundColor = a + '33';
+    }
+
     document.querySelectorAll('.preset-swatch').forEach(s => s.classList.remove('selected'));
     if(el) el.classList.add('selected');
 }
@@ -712,7 +926,7 @@ function applyPreset(p, a, el) {
     function copyData(k) { navigator.clipboard.writeText(BLUEPRINTS[k]); alert(k + " Blueprint Copied!"); }
     function openMagicLink() { window.open(MASTER_SHEET_URL, '_blank'); }
     function toggleCheck(el) { el.classList.toggle('checked'); el.querySelector('input').checked = el.classList.contains('checked'); }
-    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'healthcheckUrl', 'ntfyServer', 'escalationMins', 'countrySelect', 'appName', 'checkinMins'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
+    function loadPersistedData() { ['orgName', 'secretKey', 'workerKey', 'webAppUrl', 'geminiKey', 'orsKey', 'textbeltKey', 'folderId', 'healthEmail', 'healthcheckUrl', 'ntfyServer', 'escalationMins', 'countrySelect', 'appName', 'checkinMins'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v) document.getElementById(id).value = v; }); ['chkRedaction', 'chkVehicle', 'chkCheckin', 'chkTravelReport', 'chkMileage'].forEach(id => { const v = localStorage.getItem('otg_' + id); if(v !== null) document.getElementById(id).checked = (v === 'true'); }); }
     function updateRegionInfo() { const sel = document.getElementById('countrySelect').value; selectedConfig = REGION_DATA[sel] || REGION_DATA["+64"]; document.getElementById('detectedTz').textContent = selectedConfig.tz; document.getElementById('vehTermDisplay').textContent = selectedConfig.term; document.getElementById('voiceLocaleDisplay').textContent = selectedConfig.locale; document.getElementById('phoneFmtDisplay').textContent = sel; document.getElementById('timezoneVal').value = selectedConfig.tz; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('mainContent').classList.remove('blur-sm'); }
     function toggleEnterBtn() {
@@ -727,7 +941,7 @@ function applyPreset(p, a, el) {
     btn.classList.toggle('shadow-2xl', on);
 }
     function setupDragDrop() { const dz = document.getElementById('dropZone'); dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-blue-500'); }); dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('border-blue-500'); if (e.dataTransfer.files.length) handleLogo({files:e.dataTransfer.files}); }); }
-    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++) document.getElementById('tab'+i).classList.toggle('active', i===n); if(n===3) generateScript(); }
+    function gotoStep(n) { document.querySelectorAll('.step-section').forEach(e=>e.classList.remove('active')); document.getElementById('step'+n).classList.add('active'); for(let i=1; i<=5; i++) { document.getElementById('tab'+i).classList.toggle('active', i===n); document.getElementById('tab'+i).setAttribute('aria-selected', i===n ? 'true' : 'false'); } if(n===3) generateScript(); }
     function toggleCheckin() { document.getElementById('checkinOptions').classList.toggle('hidden', !document.getElementById('chkCheckin').checked); }
     function toggleVehicle() { document.getElementById('vehOptions').classList.toggle('hidden', !document.getElementById('chkVehicle').checked); }
     function copyScript() { generateScript(); navigator.clipboard.writeText(document.getElementById('codeDisplay').textContent); alert("Copied!"); }
@@ -745,7 +959,7 @@ function applyPreset(p, a, el) {
             .replace(/%%HEALTH_EMAIL%%/g, document.getElementById('healthEmail').value)
             .replace(/%%HEALTHCHECK_URL%%/g, document.getElementById('healthcheckUrl').value)
             .replace(/%%NTFY_SERVER%%/g, document.getElementById('ntfyServer').value || 'https://ntfy.sh')
-            .replace(/%%BACKEND_VERSION%%/g, 'v81.36 · ' + buildTimestamp);
+            .replace(/%%BACKEND_VERSION%%/g, 'v82 · ' + buildTimestamp);
     }
 
    // NEW: Logic to sync the UI Mockup with user inputs
@@ -787,6 +1001,11 @@ function updateMockupUI() {
     if(travelCard) {
         travelCard.style.borderColor = accent + '4d'; // 30% opacity
         travelCard.style.backgroundColor = accent + '1a'; // 10% opacity
+    }
+    const mockDurSelected = document.getElementById('mockDurSelected');
+    if(mockDurSelected) {
+        mockDurSelected.style.borderColor = accent;
+        mockDurSelected.style.backgroundColor = accent + '33';
     }
 }
 
@@ -844,6 +1063,7 @@ function testConnection() {
         const vehEnabled  = document.getElementById('chkVehicle').checked;
         const checkinEnabled = document.getElementById('chkCheckin').checked;
         const mileageEnabled = document.getElementById('chkMileage') ? document.getElementById('chkMileage').checked : false;
+        const requireTravelReport = document.getElementById('chkTravelReport') ? document.getElementById('chkTravelReport').checked : true;
 
         // Theme
         // Colours are stored in localStorage by applyPreset() / the logo sampler.
@@ -872,7 +1092,7 @@ function testConnection() {
                 "mileageEnabled":     mileageEnabled,
                 "checkinEnabled":     checkinEnabled,
                 "vehicleEnabled":     vehEnabled,
-                "requireTravelReport": true
+                "requireTravelReport": requireTravelReport
             },
             "timing": {
                 "checkinInterval":   parseInt(checkinMins, 10)   || 30,
@@ -894,6 +1114,34 @@ function testConnection() {
             },
             "logoUrl": logoUrl
         };
+    }
+
+    // =========================================================================
+    // MANIFEST BUILDER: buildManifestJson() — assembles manifest.json for PWA
+    // install prompt. Uses same config sources as buildConfigObject().
+    // =========================================================================
+    function buildManifestJson() {
+        const org      = document.getElementById('orgName').value.trim() || 'Safety App';
+        const appShort = document.getElementById('appName').value.trim() || org;
+        const primary  = localStorage.getItem('otg_theme_primary') || '#1e3a8a';
+        const surface  = _deriveColorSurface(primary);
+
+        const manifest = {
+            "name":             org,
+            "short_name":       appShort,
+            "description":      org + " Lone Worker Safety App",
+            "start_url":        "./",
+            "scope":            "./",
+            "display":          "standalone",
+            "orientation":      "portrait",
+            "theme_color":      primary,
+            "background_color": surface,
+            "icons": [
+                { "src": "./icon.png", "sizes": "192x192", "type": "image/png" },
+                { "src": "./icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+            ]
+        };
+        return JSON.stringify(manifest, null, 2);
     }
 
     // Colour utility helpers — outer scope so all functions can use them
@@ -929,15 +1177,6 @@ function testConnection() {
         } catch { return `rgba(59,130,246,${alpha})`; }
     }
 
-    function refreshConfigPreview() {
-        try {
-            const cfg = buildConfigObject();
-            document.getElementById('configPreview').textContent = JSON.stringify(cfg, null, 2);
-        } catch (err) {
-            document.getElementById('configPreview').textContent = 'Error building config: ' + err.message;
-        }
-    }
-
     function downloadConfig() {
         const mKey = document.getElementById('secretKey').value.trim();
         if (mKey.length < 32 || mKey.length > 64) {
@@ -951,7 +1190,7 @@ function testConnection() {
         }
         const url = document.getElementById('webAppUrl').value.trim();
         if (!url || !url.startsWith('https://script.google.com')) {
-            alert('⚠️ Please enter your Google Apps Script Web App URL (Step 2) before downloading config.');
+            alert('⚠️ Please enter your Google Apps Script Web App URL (Step 3) before downloading config.');
             return;
         }
 
@@ -1010,8 +1249,8 @@ function testConnection() {
             .replace(/%%TEXT_ON_PRIMARY%%/g,  textOnPrimary)
             .replace(/%%TEXT_ON_ACCENT%%/g,   textOnAccent)
             .replace(/%%BUILD_VERSION%%/g,    'v82 · ' + buildTimestampLocal)
-            .replace(/%%MAP_LAT%%/g,          '-40.9')
-            .replace(/%%MAP_LNG%%/g,          '174.9');
+            .replace(/%%MAP_LAT%%/g,          String(selectedConfig.mapLat || -40.9))
+            .replace(/%%MAP_LNG%%/g,          String(selectedConfig.mapLng || 174.9));
 
         const blob = new Blob([monHtml], { type: 'text/html' });
         const filename = (org || 'org').replace(/[^a-z0-9_-]/gi, '_') + '_monitor.html';
@@ -1025,7 +1264,175 @@ function testConnection() {
     }
 
 
-   // NEW: Logic to sync the UI Mockup with user inputs
+    // ── Optional template download helpers ────────────────────────────────────
+
+    function _updateOptionalDownloadButtons() {
+        const guideBtn   = document.getElementById('btnDlGuide');
+        const manualBtn  = document.getElementById('btnDlManual');
+        const guideNote  = document.getElementById('guideUnavailNote');
+        const manualNote = document.getElementById('manualUnavailNote');
+        const packNote        = document.getElementById('packNote');
+        const packNoteNoGuide = document.getElementById('packNoteNoGuide');
+
+        const guideAvail  = !!TEMPLATES.guide;
+        const manualAvail = !!TEMPLATES.manual;
+
+        if (guideBtn) {
+            guideBtn.disabled = !guideAvail;
+            guideBtn.classList.toggle('opacity-50', !guideAvail);
+            guideBtn.classList.toggle('cursor-not-allowed', !guideAvail);
+            if (guideNote) guideNote.classList.toggle('hidden', guideAvail);
+        }
+        if (manualBtn) {
+            manualBtn.disabled = !manualAvail;
+            manualBtn.classList.toggle('opacity-50', !manualAvail);
+            manualBtn.classList.toggle('cursor-not-allowed', !manualAvail);
+            if (manualNote) manualNote.classList.toggle('hidden', manualAvail);
+        }
+        // Pack note: show guide-included variant when guide is available
+        if (packNote)        packNote.classList.toggle('hidden', !guideAvail);
+        if (packNoteNoGuide) packNoteNoGuide.classList.toggle('hidden', guideAvail);
+    }
+
+    function downloadGuide() {
+        if (!TEMPLATES.guide) {
+            alert('⚠️ Worker guide template not loaded. Add guide_template.html to the factory folder and refresh.');
+            return;
+        }
+        const org = document.getElementById('orgName').value.trim() || 'org';
+        const guideHtml = TEMPLATES.guide
+            .replace(/%%ORG_NAME%%/g,    org)
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
+        const blob = new Blob([guideHtml], { type: 'text/html' });
+        const filename = 'worker_guide.html';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 500);
+    }
+
+    function downloadManual() {
+        if (!TEMPLATES.manual) {
+            alert('⚠️ Operations manual template not loaded. Add ops_manual_template.html to the factory folder and refresh.');
+            return;
+        }
+        const org = document.getElementById('orgName').value.trim() || 'org';
+        const manualHtml = TEMPLATES.manual
+            .replace(/%%ORG_NAME%%/g,    org)
+            .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
+        const blob = new Blob([manualHtml], { type: 'text/html' });
+        const filename = org.replace(/[^a-z0-9_-]/gi, '_') + '_ops_manual.html';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 500);
+    }
+
+    /**
+     * downloadWorkerPack — bundles the worker app deployment files into a ZIP.
+     * Always includes: index.html (worker app), sw.js, config.json, README.txt
+     * Conditionally includes: worker_guide.html (when guide template is loaded)
+     */
+    async function downloadWorkerPack() {
+        if (!TEMPLATES.worker) {
+            alert('⚠️ Worker template not loaded. Please refresh the Factory page and try again.');
+            return;
+        }
+
+        const org  = document.getElementById('orgName').value.trim() || 'org';
+        const slug = org.replace(/[^a-z0-9_-]/gi, '_');
+        const hasGuide = !!TEMPLATES.guide;
+
+        // Build config.json
+        const cfg = buildConfigObject();
+        const configJson = JSON.stringify(cfg, null, 2);
+
+        // Build injected guide HTML if available
+        let guideHtml = null;
+        if (hasGuide) {
+            guideHtml = TEMPLATES.guide
+                .replace(/%%ORG_NAME%%/g,    org)
+                .replace(/%%VEHICLE_TERM%%/g, selectedConfig.term);
+        }
+
+        const builtDate = new Date().toLocaleDateString('en-NZ', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        // Extract logo for icon.png if a logo was uploaded (data URL)
+        const logoDataUrl = document.getElementById('logoUrl').value || '';
+        let iconB64  = null;
+        let iconMime = 'image/png';
+        if (logoDataUrl.startsWith('data:')) {
+            const match = logoDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) { iconMime = match[1]; iconB64 = match[2]; }
+        }
+        const hasIcon = !!iconB64;
+
+        const readme =
+`OTG Worker App Deployment Pack
+================================
+Organisation: ${org}
+Built:        ${builtDate}
+
+CONTENTS
+--------
+  index.html        — Worker PWA (canonical — same for all organisations)
+  sw.js             — Service worker (canonical — same for all organisations)
+  manifest.json     — PWA manifest (org-specific name, colours, and icon)
+  config.json       — Your org configuration ← the only file that changes between orgs
+                      (logo, theme colours, and keys are all embedded inside it)
+${hasIcon
+? '  icon.png          — Your organisation logo (extracted from config)'
+: '  [icon.png not included — no logo was uploaded in the Factory.\n   Add a 512×512 PNG named icon.png to the deployment folder for the best PWA install experience.]'}
+${hasGuide
+? '  worker_guide.html — Worker reference guide (pre-filled with your org name)\n                      automatically linked in the app\'s Resource Library'
+: '  [worker_guide.html not included — add guide_template.html to the Factory folder to enable]'}
+
+DEPLOYMENT
+----------
+1. Drag this folder to https://app.netlify.com/drop
+   — or push to a GitHub Pages branch.
+2. Your worker app will be live at the URL Netlify/GitHub assigns.
+3. For future config changes only (branding, keys, intervals):
+   regenerate config.json in the Factory and replace just that one file.
+   No rebuild of the worker app needed.
+
+The Monitor app (supervisor dashboard) is a separate download from Step 4 —
+it is self-contained and does not need hosting.
+`;
+
+        try {
+            const zip = new JSZip();
+            zip.file('index.html',    TEMPLATES.worker);
+            zip.file('sw.js',         SW_SOURCE);
+            zip.file('manifest.json', buildManifestJson());
+            zip.file('config.json',   configJson);
+            if (hasIcon) zip.file('icon.png', iconB64, { base64: true });
+            if (guideHtml) zip.file('worker_guide.html', guideHtml);
+            zip.file('README.txt',    readme);
+
+            const blob = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = slug + '_worker_pack.zip';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 500);
+        } catch (err) {
+            console.error('Worker pack ZIP failed:', err);
+            alert('⚠️ Could not create ZIP: ' + err.message);
+        }
+    }
 
     function generateLaunchPack() {
         const urlInput = document.getElementById('workerAppUrl');
